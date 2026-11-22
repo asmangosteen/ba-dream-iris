@@ -40,8 +40,9 @@
   /* Iris 전용 — 툴 화면 크롬 */
   --iris-line:var(--ref-color-gray-900-5);
   --iris-line-strong:var(--ref-color-gray-900-10);
-  --iris-canvas:var(--sys-color-neutral-200);
-  --iris-component:var(--sys-color-theme-purple-default);
+  --iris-canvas:var(--sys-color-neutral-100);
+  --iris-component:var(--sys-color-brand-primary-default);
+  --iris-ink:var(--sys-color-neutral-800);
 }
 
 body{margin:0;font-family:var(--font-family-base);color:var(--sys-color-neutral-800);-webkit-font-smoothing:antialiased}
@@ -51,10 +52,9 @@ input,textarea{font:inherit;color:inherit}
 .hov:hover{background-color:var(--interaction-light-gray-hover)}
 .hov:active{background-color:var(--interaction-light-gray-pressed)}
 .pri:hover{filter:brightness(.94)}
-.canvas-dots{background-color:var(--iris-canvas);background-image:radial-gradient(var(--ref-color-gray-900-10) 1px,transparent 1px);background-size:20px 20px}
+.canvas-dots{background-color:var(--iris-canvas)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.aurora i{position:absolute;border-radius:50%;filter:blur(72px);opacity:.55}
+.aurora{display:none}
 
 /* 아이콘 — 바드림 Icon(outlined/solid 16px) 원본 파일을 마스크로 칠해 글자색을 따릅니다 */
 .ic{display:inline-block;flex:none;width:16px;height:16px;background-color:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
@@ -97,17 +97,26 @@ input,textarea{font:inherit;color:inherit}
 .i-warning_solid{--i:url('/_blob/191ac452cbc26114e4fa42312c3ef5be')}
 .i-write{--i:url('/_blob/1b676d853f5100b1386d91ca889fe93e')}
 
-/* 바드림 Badge (size m · type alpha · form rounded) — 글자는 대비 4.5:1을 위해 한 단계 진한 색 */
-.bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:var(--ref-spacing-02) var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap}
-.bd-badge.s{padding:1px var(--ref-spacing-05) 2px;font-size:11px;line-height:16px}
+/* 배지 — 흑백 + primary 원칙. 툴 화면에서는 색 바탕을 쓰지 않고 선 · 글자색 · 검정 채움으로만 구분합니다
+   반영됨(t-success) = primary 선, 일부 반영(t-warning) = 검정 선, 미반영(t-destructed) = 검정 채움, 해당 없음(t-gray) = 회색 선 */
+.bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:1px var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap;background:var(--sys-color-common-white-default)}
+.bd-badge.s{padding:0 var(--ref-spacing-05);font-size:11px;line-height:18px}
 .bd-badge.angular{border-radius:var(--ref-radius-02)}
-.t-gray{background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
-.t-brand{background:var(--sys-color-brand-primary-lightest);color:var(--ref-color-blue-600)}
-.t-success{background:var(--sys-color-theme-success-bg);color:var(--ref-color-green-700)}
-.t-warning{background:var(--sys-color-theme-warning-bg);color:var(--ref-color-orange-800)}
-.t-destructed{background:var(--sys-color-theme-destructed-bg);color:var(--ref-color-red-700)}
-.t-purple{background:var(--sys-color-theme-purple-bg);color:var(--ref-color-purple-700)}
-.t-turquoise{background:var(--sys-color-theme-turquoise-bg);color:var(--ref-color-turquoise-800)}
+.t-gray,.t-purple,.t-turquoise{color:var(--sys-color-neutral-600);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-10)}
+.t-brand,.t-success{color:var(--sys-color-brand-primary-default);box-shadow:inset 0 0 0 1px var(--ref-color-blue-500-40)}
+.t-warning{color:var(--sys-color-neutral-800);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-40)}
+.t-destructed{background:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.t-solid{background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+
+/* 툴 크롬 — 피그마 UI3 · Deus 밀도 */
+.pn-h{display:flex;align-items:center;justify-content:space-between;height:36px;padding:0 var(--ref-spacing-08) 0 var(--ref-spacing-10);font-size:12px;font-weight:600;color:var(--sys-color-neutral-800)}
+.pn-sec{box-shadow:0 -1px 0 var(--iris-line-strong)}
+.ib{width:28px;height:28px;flex:none;border-radius:var(--ref-radius-03);display:grid;place-items:center;color:var(--sys-color-neutral-700)}
+.ib:hover{background:var(--interaction-light-gray-hover)}
+.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-100);font-size:12px;box-sizing:border-box}
+.fld>span{color:var(--sys-color-neutral-600);flex:none}
+.fld input{width:100%;min-width:0;border:0;outline:0;background:transparent;font-size:12px;color:var(--sys-color-neutral-800)}
+.btn-ink{background:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
 
 /* 바드림 Button */
 .bd-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--ref-spacing-02);box-sizing:border-box;white-space:nowrap;font-family:var(--font-family-base);text-align:center}
