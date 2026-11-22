@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Iris 문서 추가</title>
+<link rel="stylesheet" href="assets/iris-base.css">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>[v-cloak]{display:none}</style>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" v-cloak></div>
+<script type="text/x-template" id="tpl">
+<div>
+
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+  <div aria-hidden="true" style="position: absolute; inset: 0">
+    <div class="sq float s" style="position: absolute; left: 8px; top: 8px; width: 264px; height: 40px"></div>
+    <div class="sq float" style="position: absolute; left: 8px; top: 56px; bottom: 8px; width: 264px"></div>
+    <div class="sq float s" style="position: absolute; left: 280px; top: 56px; width: 40px; height: 360px"></div>
+    <div class="sq float s" style="position: absolute; right: 8px; top: 8px; width: 288px; height: 40px"></div>
+    <div class="sq float" style="position: absolute; right: 8px; top: 56px; bottom: 8px; width: 288px"></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: var(--dimmed-bg)"></div>
+
+  <div style="position: relative; min-height: 900px; display: grid; place-items: center; padding: var(--ref-spacing-12)">
+    <section role="dialog" aria-modal="true" aria-labelledby="addDocTitle" class="sq" style="width: 100%; max-width: 560px; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); display: flex; flex-direction: column; overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-08)">
+        <h1 id="addDocTitle" style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">문서 추가</h1>
+        <a href="Main.html" aria-label="닫기" class="ib"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
+      </div>
+
+      <div role="tablist" aria-label="문서를 넣는 방법" class="seg" style="padding: 0 var(--ref-spacing-10)">
+        <template v-for="(t, __it) in tabs" :key="__it">
+          <button role="tab" :aria-selected="t.on" @click="t.pick" :class="t.cls">{{t.label}}</button>
+        </template>
+      </div>
+
+      <div style="padding: var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10); min-height: 300px; box-sizing: border-box">
+        <template v-if="isFile">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+            <label class="sq" style="display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-14) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 1px; text-align: center; cursor: pointer">
+              <span style="width: 44px; height: 44px; border-radius: 50%; background: var(--sys-color-common-white-default); display: grid; place-items: center; color: var(--sys-color-brand-primary-default); box-shadow: var(--shadow-01)"><span class="ic ic-20 i-upload" aria-hidden="true"></span></span>
+              <span style="font-weight: 600">파일을 끌어다 놓거나 눌러서 골라주세요</span>
+              <span style="color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">PDF · Word · Markdown, 50MB까지</span>
+              <input type="file" class="sr">
+            </label>
+            <div class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px">
+              <span class="sq" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; color: var(--sys-color-neutral-800); display: grid; place-items: center; font-size: 12px; line-height: 18px; font-weight: 600; flex: none">PDF</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+                <span style="font-weight: 500">착한구독 개편 기획서 v1.2.pdf</span>
+                <span style="height: 4px; border-radius: 2px; background: var(--ref-color-gray-900-5); overflow: hidden"><span style="display: block; width: 100%; height: 100%; background: var(--sys-color-brand-primary-default)"></span></span>
+                <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">2.4MB · 요구사항 9개</span>
+              </span>
+              <button aria-label="파일 빼기" class="ib"><span class="ic i-trashbin" aria-hidden="true"></span></button>
+            </div>
+          </div>
+        </template>
+
+        <template v-if="isLink">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+              <label for="docUrl" style="font-weight: 500">문서 주소</label>
+              <div class="sq" style="--sq-fill: var(--sys-color-neutral-200); display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-03); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px">
+                <span class="ic i-link" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
+                <input id="docUrl" value="https://docs.google.com/document/d/구독료정책" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 12px">
+              </div>
+            </div>
+            <div class="sq" style="display: flex; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px">
+              <span class="sq" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; color: var(--sys-color-neutral-800); display: grid; place-items: center; flex: none"><span class="ic i-document" aria-hidden="true"></span></span>
+              <span style="display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0">
+                <span style="font-weight: 500">구독료 정책 정리</span>
+                <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">요구사항 3개</span>
+              </span>
+            </div>
+          </div>
+        </template>
+
+        <template v-if="isWrite">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+              <label for="docName" style="font-weight: 500">문서 이름</label>
+              <span class="sq" style="--sq-fill: var(--sys-color-neutral-200); display: flex; height: 32px; border-radius: var(--ref-radius-03)"><input id="docName" placeholder="예: 신청 플로우 개발 메모" style="padding: 0 var(--ref-spacing-08); font-size: 12px; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+              <span style="font-weight: 500">어떤 틀로 시작할까요?</span>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06)">
+                <button class="sq" style="display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest)"><span style="font-weight: 600; color: var(--sys-color-brand-primary-default)">기획서</span></button>
+                <button class="sq hov" style="display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><span style="font-weight: 600">개발 메모</span></button>
+                <button class="sq hov" style="display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><span style="font-weight: 600">빈 문서</span></button>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <span style="font-weight: 500">분류</span>
+          <div class="seg" style="margin-left: calc(-1 * var(--ref-spacing-08))">
+            <template v-for="(c, __ic) in cats" :key="__ic">
+              <button @click="c.pick" :aria-pressed="c.on" :class="c.cls">{{c.label}}</button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12)">
+        <a href="Main.html" class="act m gray" style="flex: 1">취소</a>
+        <a href="DocSplit.html" class="act m pri" style="flex: 2.25">추가하기</a>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+</script>
+<script>
+const { createApp, reactive, computed } = Vue;
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(patch) { Object.assign(this.state, typeof patch === 'function' ? patch(this.state) : patch); }
+}
+
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'file', cat: 'plan' };
+  }
+  renderVals() {
+    const t = this.state.tab, c = this.state.cat;
+    const tabDefs = [['file', '파일 올리기'], ['link', '링크 붙여넣기'], ['write', '직접 쓰기']];
+    const catDefs = [['plan', '기획'], ['dev', '개발'], ['design', '디자인'], ['etc', '기타']];
+    return {
+      isFile: t === 'file', isLink: t === 'link', isWrite: t === 'write',
+      tabs: tabDefs.map((d) => ({
+        label: d[1], on: t === d[0],
+        pick: () => this.setState({ tab: d[0] }),
+        cls: 'sq seg-item' + (t === d[0] ? ' on' : '')
+      })),
+      cats: catDefs.map((d) => ({
+        label: d[1], on: c === d[0],
+        pick: () => this.setState({ cat: d[0] }),
+        cls: 'sq seg-item' + (c === d[0] ? ' on' : '')
+      }))
+    };
+  }
+}
+
+const __inst = new Component({});
+__inst.state = reactive(__inst.state);
+const __vals = computed(() => __inst.renderVals());
+createApp({
+  template: '#tpl',
+  setup() { const o = {}; Object.keys(__vals.value).forEach((k) => { o[k] = computed(() => __vals.value[k]); }); return o; },
+  mounted() { if (__inst.componentDidMount) __inst.componentDidMount(); }
+}).mount('#app');
+</script>
+</body>
+</html>

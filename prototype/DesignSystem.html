@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Iris 디자인 시스템</title>
+<link rel="stylesheet" href="assets/iris-base.css">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>[v-cloak]{display:none}</style>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" v-cloak></div>
+<script type="text/x-template" id="tpl">
+<div>
+
+<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); z-index: 3">
+    <a href="Home.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04)">
+      <img src="assets/bd-symbol.svg" alt="" style="height: 13px; width: auto; display: block">
+      <span style="font-weight: 700; font-size: 14px; line-height: 22px; color: var(--sys-color-common-black-default)">Iris</span>
+    </a>
+    <nav aria-label="주 메뉴" class="seg">
+      <a href="Home.html" class="sq seg-item">프로젝트</a>
+      <a href="Requirements.html" class="sq seg-item">요구사항</a>
+      <a href="DesignSystem.html" class="sq seg-item on">디자인 시스템</a>
+    </nav>
+  </div>
+  <div class="sq float s" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); z-index: 3">
+    <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; min-width: 200px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); font-size: 12px; line-height: 18px">
+      <span class="ic ic-14 i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
+      <kbd class="num" style="line-height: 18px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
+    </button>
+    <button aria-label="알림" class="ib"><span class="ic i-bell" aria-hidden="true"></span></button>
+    <button aria-label="내 계정" style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600">김</button>
+  </div>
+
+  <div style="display: contents">
+    <aside aria-label="컴포넌트 목록" class="sq float" style="flex: 0 0 264px; box-sizing: border-box; padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-12); overflow: auto; display: flex; flex-direction: column">
+      <template v-for="(g, __ig) in nav.groups" :key="__ig">
+        <div :style="g.style">
+          <span class="nav-label">{{g.label}}</span>
+          <template v-for="(it, __iit) in g.items" :key="__iit">
+            <a href="#" @click="it.pick" :class="it.cls">{{it.name}}</a>
+          </template>
+        </div>
+      </template>
+    </aside>
+
+    <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box">
+      <h1 style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
+      <div class="seg" style="flex-wrap: wrap; margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06))">
+        <template v-for="(c, __ic) in chips" :key="__ic">
+          <button @click="c.pick" :aria-pressed="c.on" :class="c.cls">{{c.label}}</button>
+        </template>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-10)">
+        <template v-for="(k, __ik) in cards" :key="__ik">
+          <button @click="k.pick" :aria-pressed="k.on" style="display: flex; flex-direction: column; gap: var(--ref-spacing-08); text-align: left; min-width: 0">
+            <span class="sq" data-preview :style="k.thumb" aria-hidden="true">
+              <template v-for="(pt, __ipt) in k.parts" :key="__ipt"><span :class="pt.cls" :style="pt.style">{{pt.text}}</span></template>
+            </span>
+            <span style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--ref-spacing-06)">
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{k.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">화면 {{k.n}}</span>
+            </span>
+          </button>
+        </template>
+      </div>
+    </main>
+
+    <aside aria-label="컴포넌트 상세" class="sq float" style="flex: 0 0 320px; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-11) var(--ref-spacing-16); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-14)">
+      <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+        <h2 style="margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{cur.name}}</h2>
+        <div class="sq" style="padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-700); white-space: pre-wrap">{{cur.code}}</div>
+      </section>
+      <section style="display: flex; flex-direction: column">
+        <h3 style="margin: 0 0 var(--ref-spacing-06); font-size: 12px; line-height: 18px; font-weight: 600">쓰는 화면</h3>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 0 0 var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); font-size: 12px; line-height: 20px; font-weight: 600; color: var(--sys-color-neutral-600)"><span>화면</span><span>개수</span></div>
+        <template v-for="(u, __iu) in cur.uses" :key="__iu">
+          <a href="Main.html" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) 0; box-shadow: inset 0 -1px 0 var(--iris-line)">
+            <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{u.screen}}</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">{{u.project}}</span></span>
+            <span style="color: var(--sys-color-neutral-700)">{{u.n}}</span>
+          </a>
+        </template>
+      </section>
+      <a href="#" class="act line" style="align-self: flex-start; color: var(--sys-color-neutral-800)">스토리북 <span class="ic ic-14 i-arrow_up_right" aria-hidden="true"></span></a>
+    </aside>
+  </div>
+</div>
+</div>
+</script>
+<script>
+const { createApp, reactive, computed } = Vue;
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(patch) { Object.assign(this.state, typeof patch === 'function' ? patch(this.state) : patch); }
+}
+
+const P = 'var(--sys-color-brand-primary-default)', W = 'var(--sys-color-common-white-default)', N8 = 'var(--sys-color-neutral-800)', N6 = 'var(--sys-color-neutral-600)', N5 = 'var(--sys-color-neutral-500)', LN = 'var(--ref-color-gray-900-10)';
+const T = (text, style, cls) => ({ text: text || '', style: style || '', cls: cls || '' });
+const C = 'display:flex;align-items:center;justify-content:center;gap:8px;';
+const CHECK = "url(\"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M2.5 6.2l2.3 2.3 4.7-4.9%27 stroke=%27white%27 stroke-width=%271.6%27 fill=%27none%27/%3E%3C/svg%3E\")";
+const GROUPS = [
+  ['액션', [
+    ['button', 'Button', 38, C, [T('신청하기', '', 'bd-button l primary')], '<Button type="primary" size="l">\n  신청하기\n</Button>'],
+    ['textbtn', 'Text Button', 21, C, [T('전체보기', 'color:' + P + ';font-weight:500')], '<TextButton>전체보기</TextButton>'],
+    ['iconbtn', 'Icon Button', 33, C, [T('', 'color:' + N8, 'ic ic-24 i-close')], '<IconButton icon-name="close" />']
+  ]],
+  ['선택', [
+    ['checkbox', 'Checkbox', 12, C, [T('', 'width:22px;height:22px;border-radius:6px;background:' + P + ' ' + CHECK + ' center/14px no-repeat'), T('', 'width:22px;height:22px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--sys-color-neutral-400)')], '<Checkbox :checked="true" />'],
+    ['toggle', 'Toggle', 6, C, [T('', 'width:44px;height:26px;border-radius:999px;background:radial-gradient(circle at 31px 50%, #fff 10px, transparent 10.5px),' + P), T('', 'width:44px;height:26px;border-radius:999px;background:radial-gradient(circle at 13px 50%, #fff 10px, transparent 10.5px),var(--sys-color-neutral-300)')], '<Toggle size="l" :checked="true" />'],
+    ['chip', 'Chip', 15, 'display:flex;align-items:center;justify-content:center;gap:4px;', [T('전체', '', 'bd-chip on'), T('액션', '', 'bd-chip')], '<Chip :selected="true">전체</Chip>'],
+    ['seg', 'Segmented Control', 9, 'display:flex;align-items:center;justify-content:center;padding:0 24px;', [T('1주', 'flex:1;padding:6px 0;text-align:center;background:var(--sys-color-neutral-100);border-radius:10px 0 0 10px;color:' + N6 + ';font-size:12px;line-height:18px'), T('4주', 'flex:1;padding:6px 0;text-align:center;background:#fff;border-radius:8px;box-shadow:0 0 0 3px var(--sys-color-neutral-100),0 1px 3px 3px rgb(3 9 26 / 6%);color:' + N8 + ';font-size:12px;line-height:18px;font-weight:600;position:relative'), T('12주', 'flex:1;padding:6px 0;text-align:center;background:var(--sys-color-neutral-100);border-radius:0 10px 10px 0;color:' + N6 + ';font-size:12px;line-height:18px')], '<SegmentedControl\n  :items="[\'1주\', \'4주\', \'12주\']"\n  size="m" />']
+  ]],
+  ['입력', [
+    ['input', 'Text Input', 14, 'display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 24px;', [T('이름', 'font-size:12px;line-height:18px;font-weight:500'), T('이름을 적어주세요', 'padding:8px 12px;border-radius:10px;box-shadow:inset 0 0 0 1px ' + LN + ';color:' + N5)], '<TextInput label="이름"\n  placeholder="이름을 적어주세요" />'],
+    ['search', 'Search Field', 7, 'display:flex;align-items:center;padding:0 24px;', [T('검색', 'flex:1;padding:8px 12px;border-radius:10px;background:var(--sys-color-neutral-100);color:' + N5)], '<SearchField placeholder="검색" />']
+  ]],
+  ['표시', [
+    ['badge', 'Badge', 24, 'display:flex;align-items:center;justify-content:center;gap:4px;', [T('추천', '', 'bd-badge t-brand'), T('쿠폰', '', 'bd-badge t-gray'), T('20%', '', 'bd-badge t-destructed')], '<Badge theme="brand" type="alpha">\n  추천\n</Badge>'],
+    ['notice', 'Notice Box', 17, 'display:flex;align-items:center;padding:0 20px;', [T('반납일 3일 전에 알려드려요.', 'flex:1;padding:10px 12px;border-radius:10px;background:var(--sys-color-brand-primary-lightest);color:' + P + ';font-size:12px;line-height:18px')], '<NoticeBox type="primary"\n  contents="caption"\n  icon-name="info_solid" />'],
+    ['product', 'Product Card', 11, 'display:flex;align-items:center;padding:0 20px;', [T('모델 A', 'flex:1;padding:10px 12px 10px 64px;border-radius:16px;box-shadow:inset 0 0 0 1px ' + LN + ';background:linear-gradient(var(--sys-color-neutral-100),var(--sys-color-neutral-100)) 10px 50%/44px 44px no-repeat;font-weight:500;line-height:44px')], '<ProductCard />']
+  ]],
+  ['내비게이션', [
+    ['topbar', 'Top Bar', 41, 'display:flex;align-items:center;justify-content:space-between;padding:0 20px;', [T('', 'color:' + N8, 'ic ic-20 i-chevron_left'), T('신청하기', 'font-weight:600'), T('', 'color:' + N8, 'ic ic-20 i-close')], '<TopBar mode="back" line />'],
+    ['tab', 'Tab', 19, 'display:flex;align-items:flex-end;justify-content:center;gap:20px;padding-bottom:58px;', [T('전체', 'padding-bottom:6px;font-weight:600;box-shadow:inset 0 -2px 0 ' + N8), T('진행 중', 'padding-bottom:6px;color:' + N5), T('완료', 'padding-bottom:6px;color:' + N5)], '<Tab :items="[\'전체\', \'진행 중\', \'완료\']" />'],
+    ['bottombar', 'Bottom Bar', 26, 'display:flex;align-items:flex-end;padding:0 20px 20px;', [T('다음', '', 'bd-button l primary')], '<BottomBar>\n  <Button type="primary" size="xl">다음</Button>\n</BottomBar>']
+  ]]
+];
+const USES = {
+  button: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['신청_04_결제', '착한구독 신청 플로우 개편', 1], ['반납_01_반납일선택', '단기구독 반납 흐름', 2], ['내차고_홈', '내 차고 홈 리뉴얼', 3]],
+  badge: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['쿠폰함', '마이페이지 정리', 4], ['피드_목록', '커뮤니티 피드 개선', 2]],
+  seg: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['구독현황', '단기구독 반납 흐름', 1]],
+  toggle: [['신청_03_보험옵션', '착한구독 신청 플로우 개편', 2], ['알림 설정', '마이페이지 정리', 5]],
+  topbar: [['신청_01_차종선택', '착한구독 신청 플로우 개편', 1], ['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['피드_상세', '커뮤니티 피드 개선', 1]],
+  product: [['신청_01_차종선택', '착한구독 신청 플로우 개편', 3], ['상품리스트', '단기구독 반납 흐름', 8]]
+};
+const FALLBACK = [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['피드_목록', '커뮤니티 피드 개선', 2]];
+const ALL = [];
+GROUPS.forEach((g) => g[1].forEach((c) => ALL.push({ g: g[0], id: c[0], name: c[1], n: c[2], wrap: c[3], parts: c[4], code: c[5] })));
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'button', filter: '' };
+  }
+  renderVals() {
+    const s = this.state;
+    const pick = (id) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ sel: id }); };
+    const cards = ALL.filter((c) => !s.filter || c.g === s.filter).map((c) => ({
+      name: c.name, n: c.n, parts: c.parts, on: s.sel === c.id, pick: pick(c.id),
+      thumb: 'height:168px;border-radius:var(--ref-radius-07);--sq-fill:var(--sys-color-common-white-default);--sq-line-w:' + (s.sel === c.id ? '0.5px;--sq-line:var(--sys-color-brand-primary-default);' : '1px;--sq-line:var(--iris-line-strong);') + c.wrap
+    }));
+    const cur = ALL.find((c) => c.id === s.sel);
+    return {
+      nav: {
+        allClass: 'sq nav-item' + (s.filter === '' ? ' on' : ''),
+        all: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ filter: '' }); },
+        groups: GROUPS.map((g, gi) => ({ label: g[0], style: 'display:flex;flex-direction:column;' + (gi ? 'margin-top:var(--ref-spacing-10)' : ''), items: g[1].map((c) => ({ name: c[1], pick: pick(c[0]), cls: 'sq nav-item s' + (s.sel === c[0] ? ' on' : '') })) }))
+      },
+      chips: [['', '전체']].concat(GROUPS.map((g) => [g[0], g[0]])).map((c) => ({ label: c[1], on: s.filter === c[0], cls: 'sq seg-item' + (s.filter === c[0] ? ' on' : ''), pick: () => this.setState({ filter: c[0] }) })),
+      cards: cards,
+      cur: { name: cur.name, code: cur.code, uses: (USES[cur.id] || FALLBACK).map((u) => ({ screen: u[0], project: u[1], n: u[2] })) }
+    };
+  }
+}
+
+const __inst = new Component({});
+__inst.state = reactive(__inst.state);
+const __vals = computed(() => __inst.renderVals());
+createApp({
+  template: '#tpl',
+  setup() { const o = {}; Object.keys(__vals.value).forEach((k) => { o[k] = computed(() => __vals.value[k]); }); return o; },
+  mounted() { if (__inst.componentDidMount) __inst.componentDidMount(); }
+}).mount('#app');
+</script>
+</body>
+</html>

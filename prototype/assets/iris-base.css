@@ -1,0 +1,245 @@
+/* Iris 시안 공용 스타일 — 값은 @ba-dream/design-system tokens.css 변수 이름을 그대로 씁니다 */
+@font-face{font-family:'Pretendard';src:url('fonts/Pretendard-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('fonts/Pretendard-Medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('fonts/Pretendard-SemiBold.woff2') format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('fonts/Pretendard-Bold.woff2') format('woff2');font-weight:700;font-display:swap}
+
+:root{
+  --font-family-base:Pretendard,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-weight-regular:400;--font-weight-medium:500;--font-weight-semibold:600;--font-weight-bold:700;
+
+  --ref-color-blue-50:#EEF4FC;--ref-color-blue-100:#D0E3FE;--ref-color-blue-200:#B0D0FD;--ref-color-blue-300:#84B6FD;--ref-color-blue-500:#2C7BE2;--ref-color-blue-600:#2369C6;--ref-color-blue-700:#1A539E;--ref-color-blue-900:#0D2D57;
+  --ref-color-emerald-50:#EDF8F3;--ref-color-emerald-100:#C6EBDB;--ref-color-emerald-500:#33B289;
+  --ref-color-purple-50:#FAEFFC;--ref-color-purple-100:#EDC9F4;--ref-color-purple-500:#AF3BC6;--ref-color-purple-700:#7D298D;
+  --ref-color-turquoise-50:#E9FBF9;--ref-color-turquoise-100:#B6EEE8;--ref-color-turquoise-600:#00ACA2;--ref-color-turquoise-800:#046861;
+  --ref-color-red-50:#FFEDEB;--ref-color-red-100:#FCC4BF;--ref-color-red-500:#E72F37;--ref-color-red-700:#A32226;
+  --ref-color-green-50:#EBFAEB;--ref-color-green-100:#C3EFC3;--ref-color-green-600:#1F8F30;--ref-color-green-700:#1B7026;
+  --ref-color-orange-50:#FFF3ED;--ref-color-orange-100:#FFD8C3;--ref-color-orange-500:#FF792C;--ref-color-orange-800:#8D4219;
+  --ref-color-yellow-50:#FFF9EA;--ref-color-yellow-100:#FFEEBF;--ref-color-yellow-500:#FABF21;
+  --ref-color-gray-0:#FFFFFF;--ref-color-gray-50:#FDFDFD;--ref-color-gray-100:#F6F7F7;--ref-color-gray-200:#F1F2F3;--ref-color-gray-300:#DBDCDF;--ref-color-gray-400:#C2C4C8;--ref-color-gray-500:#8C9199;--ref-color-gray-600:#5B616C;--ref-color-gray-700:#454C58;--ref-color-gray-800:#202837;--ref-color-gray-900:#03091A;
+  --ref-color-gray-900-5:rgb(3 9 26 / 5%);--ref-color-gray-900-10:rgb(3 9 26 / 10%);--ref-color-gray-900-20:rgb(3 9 26 / 20%);--ref-color-gray-900-40:rgb(3 9 26 / 40%);
+  --ref-color-blue-500-20:rgb(44 123 226 / 20%);--ref-color-blue-500-40:rgb(44 123 226 / 40%);
+
+  --sys-color-brand-primary-lightest:var(--ref-color-blue-50);--sys-color-brand-primary-lighter:var(--ref-color-blue-100);--sys-color-brand-primary-light:var(--ref-color-blue-300);--sys-color-brand-primary-default:var(--ref-color-blue-500);--sys-color-brand-primary-dark:var(--ref-color-blue-700);
+  --sys-color-theme-purple-bg:var(--ref-color-purple-50);--sys-color-theme-purple-default:var(--ref-color-purple-500);
+  --sys-color-theme-turquoise-bg:var(--ref-color-turquoise-50);--sys-color-theme-turquoise-default:var(--ref-color-turquoise-600);
+  --sys-color-theme-destructed-bg:var(--ref-color-red-50);--sys-color-theme-destructed-default:var(--ref-color-red-500);
+  --sys-color-theme-success-bg:var(--ref-color-green-50);--sys-color-theme-success-default:var(--ref-color-green-600);
+  --sys-color-theme-warning-bg:var(--ref-color-orange-50);--sys-color-theme-warning-default:var(--ref-color-orange-500);
+  --sys-color-common-white-default:var(--ref-color-gray-50);--sys-color-common-white-emphasis:var(--ref-color-gray-0);--sys-color-common-black-default:var(--ref-color-gray-900);
+  --sys-color-neutral-100:var(--ref-color-gray-100);--sys-color-neutral-200:var(--ref-color-gray-200);--sys-color-neutral-300:var(--ref-color-gray-300);--sys-color-neutral-400:var(--ref-color-gray-400);--sys-color-neutral-500:var(--ref-color-gray-500);--sys-color-neutral-600:var(--ref-color-gray-600);--sys-color-neutral-700:var(--ref-color-gray-700);--sys-color-neutral-800:var(--ref-color-gray-800);
+
+  --interaction-light-gray-hover:rgb(3 9 26 / 5%);--interaction-light-gray-pressed:rgb(3 9 26 / 10%);--interaction-light-blue-hover:rgb(44 123 226 / 8%);
+
+  --ref-spacing-02:2px;--ref-spacing-04:4px;--ref-spacing-05:6px;--ref-spacing-06:8px;--ref-spacing-07:10px;--ref-spacing-08:12px;--ref-spacing-09:14px;--ref-spacing-10:16px;--ref-spacing-11:20px;--ref-spacing-12:24px;--ref-spacing-13:28px;--ref-spacing-14:32px;--ref-spacing-16:40px;--ref-spacing-17:48px;--ref-spacing-19:64px;
+  --ref-radius-02:4px;--ref-radius-03:6px;--ref-radius-04:8px;--ref-radius-05:10px;--ref-radius-06:12px;--ref-radius-07:16px;--ref-radius-08:20px;--ref-radius-09:24px;--ref-radius-12:999px;
+  --shadow-01:0 2px 4px 0 rgb(69 76 88 / 20%);--shadow-02:0 4px 6px -1px rgb(69 76 88 / 20%);--shadow-03:0 6px 12px -2px rgb(69 76 88 / 20%);--shadow-04:0 8px 20px -3px rgb(69 76 88 / 24%);--shadow-05:0 12px 24px -4px rgb(69 76 88 / 32%);
+  --typography-display-size:36px;--typography-heading-1-size:28px;--typography-heading-2-size:24px;--typography-title-size:20px;--typography-subtitle-size:18px;--typography-body-1-size:16px;--typography-body-2-size:14px;--typography-caption-1-size:12px;--typography-caption-2-size:10px;
+  --dimmed-bg:rgb(0 0 0 / 40%);
+
+  /* Iris 전용 — 툴 화면 크롬 */
+  --iris-line:var(--ref-color-gray-900-5);
+  --iris-line-strong:var(--ref-color-gray-900-10);
+  --iris-canvas:var(--sys-color-neutral-100);
+  --iris-component:var(--sys-color-brand-primary-default);
+  --iris-ink:var(--sys-color-neutral-800);
+}
+
+body{margin:0;font-family:var(--font-family-base);color:var(--sys-color-neutral-800);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left}
+input,textarea{font:inherit;color:inherit}
+.hov:hover{background-color:var(--interaction-light-gray-hover)}
+.hov:active{background-color:var(--interaction-light-gray-pressed)}
+.pri:hover{filter:brightness(.94)}
+.canvas-dots{background-color:var(--iris-canvas)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.aurora{display:none}
+
+/* 아이콘 — 바드림 Icon(outlined/solid 16px) 원본 파일을 마스크로 칠해 글자색을 따릅니다 */
+.ic{display:inline-block;flex:none;width:16px;height:16px;background-color:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+.ic-12{width:12px;height:12px}.ic-14{width:14px;height:14px}.ic-20{width:20px;height:20px}.ic-24{width:24px;height:24px}
+.i-arrow_up_right{--i:url('icons/arrow_up_right.svg')}
+.i-bell{--i:url('icons/bell.svg')}
+.i-check{--i:url('icons/check.svg')}
+.i-check_in_circle{--i:url('icons/check_in_circle.svg')}
+.i-chevron_down{--i:url('icons/chevron_down.svg')}
+.i-chevron_left{--i:url('icons/chevron_left.svg')}
+.i-chevron_right{--i:url('icons/chevron_right.svg')}
+.i-clip{--i:url('icons/clip.svg')}
+.i-close{--i:url('icons/close.svg')}
+.i-close_in_circle{--i:url('icons/close_in_circle.svg')}
+.i-comment{--i:url('icons/comment.svg')}
+.i-copy{--i:url('icons/copy.svg')}
+.i-document{--i:url('icons/document.svg')}
+.i-document_add{--i:url('icons/document_add.svg')}
+.i-home{--i:url('icons/home.svg')}
+.i-image{--i:url('icons/image.svg')}
+.i-info{--i:url('icons/info.svg')}
+.i-info_solid{--i:url('icons/info_solid.svg')}
+.i-link{--i:url('icons/link.svg')}
+.i-list{--i:url('icons/list.svg')}
+.i-menu_bento{--i:url('icons/menu_bento.svg')}
+.i-menu_kebab{--i:url('icons/menu_kebab.svg')}
+.i-minus_in_circle{--i:url('icons/minus_in_circle.svg')}
+.i-pencil{--i:url('icons/pencil.svg')}
+.i-person{--i:url('icons/person.svg')}
+.i-play{--i:url('icons/play.svg')}
+.i-plus{--i:url('icons/plus.svg')}
+.i-refresh{--i:url('icons/refresh.svg')}
+.i-search{--i:url('icons/search.svg')}
+.i-setting{--i:url('icons/setting.svg')}
+.i-share{--i:url('icons/share.svg')}
+.i-table{--i:url('icons/table.svg')}
+.i-trashbin{--i:url('icons/trashbin.svg')}
+.i-upload{--i:url('icons/upload.svg')}
+.i-warning{--i:url('icons/warning.svg')}
+.i-warning_solid{--i:url('icons/warning_solid.svg')}
+.i-write{--i:url('icons/write.svg')}
+
+/* 배지 — 흑백 + primary 원칙. 툴 화면에서는 색 바탕을 쓰지 않고 선 · 글자색 · 검정 채움으로만 구분합니다
+   반영됨(t-success) = primary 선, 일부 반영(t-warning) = 검정 선, 미반영(t-destructed) = 검정 채움, 해당 없음(t-gray) = 회색 선 */
+.bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:1px var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap;background:var(--sys-color-common-white-default)}
+.bd-badge.s{padding:0 var(--ref-spacing-05);font-size:12px;line-height:18px}
+.bd-badge.angular{border-radius:var(--ref-radius-02)}
+.t-gray,.t-purple,.t-turquoise{color:var(--sys-color-neutral-600);box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-10)}
+.t-brand,.t-success{color:var(--sys-color-brand-primary-default);box-shadow:inset 0 0 0 0.5px var(--ref-color-blue-500-40)}
+.t-warning{color:var(--sys-color-neutral-800);box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-40)}
+.t-destructed{background:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.t-solid{background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+
+/* 툴 크롬 — 피그마 UI3 · Deus 밀도 */
+.pn-h{display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 var(--ref-spacing-08) 0 var(--ref-spacing-10);font-size:12px;font-weight:600;color:var(--sys-color-neutral-800)}
+.pn-sec{box-shadow:0 -1px 0 var(--iris-line)}
+.ib{width:28px;height:28px;flex:none;border-radius:var(--ref-radius-03);display:grid;place-items:center;color:var(--sys-color-neutral-700)}
+.ib:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;box-sizing:border-box}
+.fld>span{color:var(--sys-color-neutral-600);flex:none}
+.fld input{width:100%;min-width:0;border:0;outline:0;background:transparent;font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';font-size:12px;color:var(--sys-color-neutral-800)}
+.btn-ink{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+
+/* ============================================================
+   Squircle — @ba-dream/design-system 의 Squircle 레이어와 같은 방식 (Corner smoothing 60%)
+   요소는 배경 · 선을 직접 칠하지 않고 --sq-fill · --sq-line · --sq-line-w 로 넘깁니다.
+   ::before 가 채우기, ::after 가 안쪽 선을 그리고, 각 요소의 script(irisSquircle)가
+   figma-squircle 경로를 계산해 clip-path 로 자릅니다. 작업 캔버스 안의 화면에는 쓰지 않습니다.
+   ============================================================ */
+:root{--bd-corner-smoothing:.6}
+:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
+.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after,.dd::before,.dd::after,.menu::before,.menu::after,.menu-item::before,.menu-item::after,.grp::before,.grp::after,.act::before,.act::after,.field::before,.field::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
+.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before,.grp::before,.act::before,.field::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
+.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after,.act::after,.field::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
+[data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
+[data-sq]::before{clip-path:var(--sq-path)}
+[data-sq]::after{box-shadow:none!important;background:var(--sq-line);clip-path:var(--sq-ring)}
+.sq-clip[data-sq]{clip-path:var(--sq-clip)}
+.sq.hov:hover,.sq.hov:active{background-color:transparent}
+.sq.hov:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.sq.hov:active{--sq-overlay:var(--interaction-light-gray-pressed)}
+
+/* 사이트(design-system.ba-dream.com) 사이드바 위계 — 그룹 라벨 12 M neutral-500 · 항목 14/20 R neutral-600 · 선택 soft 채움 + SB */
+.nav-label{display:block;padding:0 var(--ref-spacing-08) var(--ref-spacing-04);font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800)}
+.nav-item{display:flex;align-items:center;gap:var(--ref-spacing-06);padding:7px var(--ref-spacing-08);border-radius:var(--ref-radius-04);font-size:14px;line-height:20px;color:var(--sys-color-neutral-600);white-space:nowrap}
+.nav-item:hover{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800)}
+.nav-item.on{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600}
+.nav-item.s{padding:5px var(--ref-spacing-08);font-size:12px;line-height:18px}
+
+/* 사이트 Chip — 34 높이 · radius 10 · 14 M. 선택은 primary 글자 + 연파랑 + primary 선 */
+.bd-chip{display:inline-flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:6px var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500;white-space:nowrap;color:var(--sys-color-neutral-600);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px}
+.bd-chip.s{padding:var(--ref-spacing-02) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px}
+.bd-chip.on{color:var(--sys-color-brand-primary-default);--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--ref-color-blue-500-40);--sq-line-w:0.5px}
+.bd-chip:not(.on):hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.chip-n{font-weight:500;color:inherit;opacity:.7}
+
+/* 바드림 Button — 배경 · 선은 squircle 레이어로 */
+.bd-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--ref-spacing-02);box-sizing:border-box;white-space:nowrap;font-family:var(--font-family-base);text-align:center}
+.bd-button.s{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px;font-weight:600}
+.bd-button.m{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
+.bd-button.l{padding:var(--ref-spacing-06) var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
+.bd-button.xl{padding:var(--ref-spacing-08) var(--ref-spacing-10);border-radius:var(--ref-radius-06);font-size:16px;line-height:24px;font-weight:500}
+.bd-button.primary{--sq-fill:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+.bd-button.secondary{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
+.bd-button.tertiary{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
+.bd-button.stroke{--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;color:var(--sys-color-neutral-600)}
+.bd-button.ink{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.bd-button.primary:hover,.bd-button.ink:hover{--sq-overlay:rgb(13 45 87 / 15%)}
+.bd-button.secondary:hover{--sq-overlay:var(--interaction-light-blue-hover)}
+.bd-button.tertiary:hover,.bd-button.stroke:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+
+/* 에셋 패널 썸네일 */
+button:hover>.asset-thumb{--sq-line:var(--ref-color-gray-900-20)}
+button:active{cursor:grabbing}
+
+/* 프로젝트 카드 hover — 썸네일 선만 진하게 (사이트 ccard 와 같음) */
+.proj:hover>.proj-thumb{--sq-line:var(--ref-color-gray-900-20)}
+
+/* ============================================================
+   pen.dev 기반 앱 셸 — 화면 전체가 회색 캔버스이고, 패널은 그 위에 떠 있는 흰 카드
+   ============================================================ */
+:root{--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%))}
+.float{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
+.float.s{border-radius:var(--ref-radius-06)}
+.seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
+.seg-item{display:inline-flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px;font-weight:500;color:var(--sys-color-neutral-500);white-space:nowrap}
+.seg-item:hover{color:var(--sys-color-neutral-800)}
+.seg-item.on{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600}
+.seg-item.m{padding:var(--ref-spacing-05) var(--ref-spacing-08);font-size:14px;line-height:22px}
+.seg-item .n{font-weight:500;color:var(--sys-color-neutral-500)}
+/* 값 · 숫자 — Pretendard 고정폭 숫자(tnum). 코드 조각만 코딩 글꼴 */
+.mono,.num{font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';font-size:12px}
+.rail-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--ref-radius-04);color:var(--sys-color-neutral-700)}
+.rail-btn:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.rail-btn.on{--sq-fill:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+.sec-h{display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 var(--ref-spacing-06) 0 var(--ref-spacing-08);font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800)}
+.sec{box-shadow:0 -1px 0 var(--iris-line)}
+
+/* 피그마식 속성 컨트롤 — 드롭다운 · 토글 · 입력 */
+.prop-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--ref-spacing-06);min-height:28px}
+.prop-row>.k{color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd{font-variant-numeric:tabular-nums;font-feature-settings:'tnum';display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
+.dd:hover{--sq-line:var(--ref-color-gray-900-10);--sq-line-w:0.5px}
+.dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-04);filter:drop-shadow(0 1px 2px rgb(3 9 26 / 6%)) drop-shadow(0 8px 16px rgb(3 9 26 / 10%))}
+.menu-item{display:flex;align-items:center;gap:var(--ref-spacing-04);height:26px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
+.menu-item:hover{--sq-fill:var(--sys-color-neutral-100)}
+.menu-item.on{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default);font-weight:600}
+.tg{width:28px;height:16px;border-radius:999px;flex:none;background:var(--sys-color-neutral-300);position:relative}
+.tg::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s}
+.tg.on{background:var(--sys-color-brand-primary-default)}.tg.on::after{left:14px}
+.txt-in{font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border:0;outline:0;border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-200);font-size:12px;color:var(--sys-color-neutral-800)}
+.txt-in:focus{box-shadow:inset 0 0 0 0.5px var(--sys-color-brand-primary-default)}
+.handle{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default)}
+.t11{font-size:12px;line-height:18px}
+
+/* 피그마식 속성 패널 보조 요소 */
+.sub{display:block;font-size:12px;line-height:18px;color:var(--sys-color-neutral-500)}
+.grp{display:flex;padding:var(--ref-spacing-02);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200)}
+.grp>.ib{flex:1;height:24px}
+.grp>.ib.on{--sq-fill:var(--sys-color-common-white-emphasis);color:var(--sys-color-neutral-800);filter:drop-shadow(0 1px 1px rgb(3 9 26 / 10%))}
+.cb{display:flex;align-items:center;gap:var(--ref-spacing-04);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800)}
+.cb>i{width:12px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--sys-color-neutral-400);flex:none}
+.cb.on>i{background:var(--sys-color-neutral-800) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2l2 2 4-4.4' stroke='white' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") center/10px no-repeat;box-shadow:none}
+.sw{width:12px;height:12px;flex:none;border-radius:3px;box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-20)}
+
+/* ============================================================
+   화면 위계 가이드 (PRD/05_UI_GUIDE.md) — 기준: 03-5 에디터
+   ============================================================ */
+.tx-title{font-size:16px;line-height:24px;font-weight:600;color:var(--sys-color-neutral-800);margin:0;letter-spacing:0}
+.tx-head{font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800);margin:0}
+.tx-body{font-size:12px;line-height:18px;font-weight:400;color:var(--sys-color-neutral-800)}
+.tx-meta{font-size:12px;line-height:18px;font-weight:400;color:var(--sys-color-neutral-500)}
+.tx-read{font-size:12px;line-height:20px;font-weight:400;color:var(--sys-color-neutral-700);margin:0}
+.tx-code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;line-height:16px;color:var(--sys-color-neutral-700)}
+.act{display:inline-flex;align-items:center;justify-content:center;gap:var(--ref-spacing-02);flex:none;height:26px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-family:var(--font-family-base);font-size:12px;line-height:18px;font-weight:600;white-space:nowrap;text-align:center}
+.act.m{height:32px;padding:0 var(--ref-spacing-08)}
+.act.pri{--sq-fill:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+.act.pri:hover{--sq-overlay:rgb(13 45 87 / 15%)}
+.act.line{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;color:var(--sys-color-neutral-800)}
+.act.gray{--sq-fill:var(--sys-color-neutral-200);color:var(--sys-color-neutral-700)}
+.act.line:hover,.act.gray:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.field{display:flex;align-items:center;gap:var(--ref-spacing-04);height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800)}
+.field.m{height:32px;padding:0 var(--ref-spacing-08)}
+.field.focus{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
+.field input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;font-family:var(--font-family-base);font-size:12px;color:var(--sys-color-neutral-800)}
+.field input::placeholder{color:var(--sys-color-neutral-500)}
+.tx-panel{font-size:14px;line-height:22px;font-weight:600;color:var(--sys-color-neutral-800)}

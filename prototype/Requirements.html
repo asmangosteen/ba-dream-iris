@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Iris 요구사항 보드</title>
+<link rel="stylesheet" href="assets/iris-base.css">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>[v-cloak]{display:none}</style>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" v-cloak></div>
+<script type="text/x-template" id="tpl">
+<div>
+
+<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); z-index: 3">
+    <a href="Home.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04)">
+      <img src="assets/bd-symbol.svg" alt="" style="height: 13px; width: auto; display: block">
+      <span style="font-weight: 700; font-size: 12px; line-height: 18px; color: var(--sys-color-common-black-default)">Iris</span>
+    </a>
+    <nav aria-label="주 메뉴" class="seg">
+      <a href="Home.html" class="sq seg-item">프로젝트</a>
+      <a href="Requirements.html" class="sq seg-item on">요구사항</a>
+      <a href="DesignSystem.html" class="sq seg-item">디자인 시스템</a>
+    </nav>
+  </div>
+  <div class="sq float s" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); z-index: 3">
+    <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; min-width: 200px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); font-size: 12px; line-height: 18px">
+      <span class="ic ic-14 i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
+      <kbd class="num" style="line-height: 18px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
+    </button>
+    <button aria-label="알림" class="ib"><span class="ic i-bell" aria-hidden="true"></span></button>
+    <button aria-label="내 계정" style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600">김</button>
+  </div>
+
+  <div style="display: contents">
+    <aside aria-label="프로젝트" class="sq float" style="flex: 0 0 264px; box-sizing: border-box; padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-12); display: flex; flex-direction: column">
+      <span class="nav-label">진행 중</span>
+      <a href="#" class="sq nav-item s on">착한구독 신청 플로우 개편</a>
+      <a href="#" class="sq nav-item s">내 차고 홈 리뉴얼</a>
+      <a href="#" class="sq nav-item s">커뮤니티 피드 개선</a>
+      <a href="#" class="sq nav-item s">단기구독 반납 흐름</a>
+      <span class="nav-label" style="margin-top: var(--ref-spacing-10)">완료</span>
+      <a href="#" class="sq nav-item s">마이페이지 정리</a>
+    </aside>
+
+    <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10)">
+        <h1 style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-common-black-default)">요구사항</h1>
+        <div style="display: flex; gap: var(--ref-spacing-06)">
+          <button class="act line" style="color: var(--sys-color-neutral-800)">내보내기</button>
+          <a href="AddDoc.html" class="act pri"><span class="ic i-plus" aria-hidden="true"></span>요구사항 추가</a>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-12) 0 var(--ref-spacing-08)">
+        <div class="seg" style="margin-left: calc(-1 * var(--ref-spacing-06))">
+          <template v-for="(s, __is) in stats" :key="__is">
+            <button @click="s.pick" :aria-pressed="s.on" :class="s.cls">{{s.label}} <span class="n">{{s.count}}</span></button>
+          </template>
+        </div>
+        <label class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; width: 220px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-500)">
+          <span class="ic i-search" aria-hidden="true"></span><span class="sr">요구사항 검색</span>
+          <input placeholder="번호나 내용으로 찾기" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 12px; color: var(--sys-color-neutral-800)">
+        </label>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; line-height: 18px">
+        <thead>
+          <tr style="box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-600)">
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 84px">번호</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600">요구사항</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 150px">문서</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 150px">화면</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 88px">상태</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 110px">확인</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="(r, __ir) in rows" :key="__ir">
+            <tr style="box-shadow: inset 0 -1px 0 var(--iris-line)">
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); font-weight: 600; white-space: nowrap">{{r.code}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)">{{r.title}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); color: var(--sys-color-neutral-600)">{{r.doc}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)"><a href="Main.html" :style="r.screenStyle">{{r.screen}}</a></td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)"><span :class="r.badge">{{r.status}}</span></td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); font-size: 12px; color: var(--sys-color-neutral-500); white-space: nowrap">{{r.who}}</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <template v-if="empty">
+        <div style="padding: var(--ref-spacing-17) 0; text-align: center; color: var(--sys-color-neutral-500)">이 상태의 요구사항이 없어요</div>
+      </template>
+    </main>
+  </div>
+</div>
+</div>
+</script>
+<script>
+const { createApp, reactive, computed } = Vue;
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(patch) { Object.assign(this.state, typeof patch === 'function' ? patch(this.state) : patch); }
+}
+
+const ROWS = [
+  ['REQ-005', '차종 카드에 1회 충전 주행거리와 충전 시간을 보여준다', '기획서 v1.2 · 2쪽', '신청_01_차종선택', 'reflected', '박디자 · 오늘'],
+  ['REQ-007', '차종 카드에 월 구독료 시작가를 보여준다', '기획서 v1.2 · 2쪽', '신청_01_차종선택', 'reflected', '박디자 · 오늘'],
+  ['REQ-008', '비교하기로 차종을 최대 3대까지 비교할 수 있다', '기획서 v1.2 · 3쪽', '', 'missing', '—'],
+  ['REQ-012', '구독료 비교표를 화면 위쪽에 보여준다', '기획서 v1.2 · 4쪽', '신청_02_구독료선택', 'reflected', '김기획 · 어제'],
+  ['REQ-013', '약정 기간마다 할인 구독료를 보여준다', '구독료 정책 정리', '신청_02_구독료선택', 'partial', '김기획 · 어제'],
+  ['REQ-014', '추천 요금제에 ‘가장 많이 선택’ 배지를 단다', '기획서 v1.2 · 4쪽', '신청_02_구독료선택', 'reflected', '김기획 · 어제'],
+  ['REQ-015', '요금제를 누르면 혜택 상세 바텀시트를 연다', '기획서 v1.2 · 5쪽', '', 'missing', '—'],
+  ['REQ-021', '다음 버튼은 화면 아래에 고정한다', '개발 메모', '신청_02_구독료선택', 'reflected', '이개발 · 11월 20일'],
+  ['REQ-030', '보험 3종을 카드로 비교해 하나를 고른다', '기획서 v1.2 · 6쪽', '신청_03_보험옵션', 'reflected', '박디자 · 11월 19일'],
+  ['REQ-031', '옵션을 켜고 끌 때 월 구독료를 바로 다시 계산한다', '구독료 정책 정리', '신청_03_보험옵션', 'partial', '박디자 · 11월 19일'],
+  ['REQ-040', '지금 낼 금액을 연파랑 박스로 강조한다', '기획서 v1.2 · 7쪽', '신청_04_결제', 'reflected', '김기획 · 11월 18일'],
+  ['REQ-042', '첫 달 무료 혜택 안내를 보여준다', '구독료 정책 정리', '신청_04_결제', 'na', '김기획 · 11월 18일'],
+  ['REQ-043', '결제 수단을 바꿀 수 있는 버튼을 둔다', '개발 메모', '신청_04_결제', 'missing', '—']
+];
+const ST = { reflected: ['반영됨', 't-success'], partial: ['일부 반영', 't-warning'], missing: ['미반영', 't-destructed'], na: ['해당 없음', 't-gray'] };
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = { f: 'all' };
+  }
+  renderVals() {
+    const f = this.state.f;
+    const defs = [['all', '전체'], ['reflected', '반영됨'], ['partial', '일부 반영'], ['missing', '미반영'], ['na', '해당 없음']];
+    const rows = ROWS.filter((r) => f === 'all' || r[4] === f);
+    return {
+      empty: rows.length === 0,
+      stats: defs.map((d) => ({
+        label: d[1], on: f === d[0],
+        count: d[0] === 'all' ? ROWS.length : ROWS.filter((r) => r[4] === d[0]).length,
+        pick: () => this.setState({ f: d[0] }),
+        cls: 'sq seg-item' + (f === d[0] ? ' on' : '')
+      })),
+      rows: rows.map((r) => ({
+        code: r[0], title: r[1], doc: r[2], screen: r[3] || '연결 안 됨', who: r[5],
+        status: ST[r[4]][0], badge: 'bd-badge ' + ST[r[4]][1],
+        screenStyle: r[3] ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-500)'
+      }))
+    };
+  }
+}
+
+const __inst = new Component({});
+__inst.state = reactive(__inst.state);
+const __vals = computed(() => __inst.renderVals());
+createApp({
+  template: '#tpl',
+  setup() { const o = {}; Object.keys(__vals.value).forEach((k) => { o[k] = computed(() => __vals.value[k]); }); return o; },
+  mounted() { if (__inst.componentDidMount) __inst.componentDidMount(); }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Iris 프로젝트 홈</title>
+<link rel="stylesheet" href="assets/iris-base.css">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>[v-cloak]{display:none}</style>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" v-cloak></div>
+<script type="text/x-template" id="tpl">
+<div>
+
+<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); z-index: 3">
+    <a href="Home.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04)">
+      <img src="assets/bd-symbol.svg" alt="" style="height: 13px; width: auto; display: block">
+      <span style="font-weight: 700; font-size: 14px; line-height: 22px; color: var(--sys-color-common-black-default)">Iris</span>
+    </a>
+    <nav aria-label="주 메뉴" class="seg">
+      <a href="Home.html" class="sq seg-item on">프로젝트</a>
+      <a href="Requirements.html" class="sq seg-item">요구사항</a>
+      <a href="DesignSystem.html" class="sq seg-item">디자인 시스템</a>
+    </nav>
+  </div>
+  <div class="sq float s" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); z-index: 3">
+    <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; min-width: 200px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); font-size: 12px; line-height: 18px">
+      <span class="ic ic-14 i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
+      <kbd class="num" style="line-height: 18px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
+    </button>
+    <button aria-label="알림" class="ib"><span class="ic i-bell" aria-hidden="true"></span></button>
+    <button aria-label="내 계정" style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600">김</button>
+  </div>
+
+  <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19)">
+    <div style="max-width: 1120px; margin: 0 auto">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10)">
+        <h1 style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-common-black-default)">프로젝트</h1>
+        <div style="display: flex; gap: var(--ref-spacing-06)">
+          <a href="AddDoc.html" class="act line" style="color: var(--sys-color-neutral-800)">문서로 시작</a>
+          <a href="Main.html" class="act pri"><span class="ic i-plus" aria-hidden="true"></span>새 프로젝트</a>
+        </div>
+      </div>
+      <div role="tablist" aria-label="프로젝트 거르기" class="seg" style="margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06))">
+        <template v-for="(f, __if) in filters" :key="__if">
+          <button role="tab" :aria-selected="f.on" @click="f.pick" :class="f.cls">{{f.label}} <span class="n">{{f.count}}</span></button>
+        </template>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08)">
+        <template v-for="(p, __ip) in projects" :key="__ip">
+          <a href="Main.html" class="proj" style="display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0">
+            <span class="sq proj-thumb" data-preview aria-hidden="true" style="height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: flex; align-items: flex-end; justify-content: center; gap: var(--ref-spacing-08); padding-top: var(--ref-spacing-14); box-sizing: border-box; overflow: hidden">
+              <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 70%; background: var(--ref-color-gray-900-10)"></span><span style="height: 32px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span><span style="height: 32px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span></span>
+              <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 55%; background: var(--ref-color-gray-900-10)"></span><span style="height: 44px; background: var(--sys-color-brand-primary-lightest)"></span><span style="margin-top: auto; height: 14px; background: var(--sys-color-brand-primary-default)"></span></span>
+              <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 80%; background: var(--ref-color-gray-900-10)"></span><span style="height: 48px; background: var(--sys-color-neutral-100)"></span></span>
+            </span>
+            <span style="display: flex; flex-direction: column">
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">{{p.meta}}</span>
+            </span>
+          </a>
+        </template>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+</script>
+<script>
+const { createApp, reactive, computed } = Vue;
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(patch) { Object.assign(this.state, typeof patch === 'function' ? patch(this.state) : patch); }
+}
+
+const PROJECTS = [
+  { name: '착한구독 신청 플로우 개편', stage: '디자인', done: 9, total: 13, updated: '10분 전', who: '김기획' },
+  { name: '내 차고 홈 리뉴얼', stage: '기획', done: 2, total: 11, updated: '어제', who: '박디자' },
+  { name: '커뮤니티 피드 개선', stage: '개발', done: 17, total: 18, updated: '3일 전', who: '이개발' },
+  { name: '단기구독 반납 흐름', stage: '디자인', done: 5, total: 9, updated: '11월 18일', who: '박디자' },
+  { name: '마이페이지 정리', stage: '완료', done: 12, total: 12, updated: '11월 10일', who: '김기획' }
+];
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'active' };
+  }
+  renderVals() {
+    const f = this.state.filter;
+    const defs = [['active', '진행 중'], ['mine', '내가 참여'], ['done', '완료'], ['all', '전체']];
+    const pick = (key) => PROJECTS.filter((p) => key === 'all' ? true : key === 'done' ? p.stage === '완료' : key === 'mine' ? p.who === '김기획' : p.stage !== '완료');
+    return {
+      filters: defs.map((d) => ({ label: d[1], count: pick(d[0]).length, on: f === d[0], cls: 'sq seg-item' + (f === d[0] ? ' on' : ''), pick: () => this.setState({ filter: d[0] }) })),
+      projects: pick(f).map((p) => ({ name: p.name, meta: p.stage + ' · 반영 ' + p.done + '/' + p.total + ' · ' + p.updated }))
+    };
+  }
+}
+
+const __inst = new Component({});
+__inst.state = reactive(__inst.state);
+const __vals = computed(() => __inst.renderVals());
+createApp({
+  template: '#tpl',
+  setup() { const o = {}; Object.keys(__vals.value).forEach((k) => { o[k] = computed(() => __vals.value[k]); }); return o; },
+  mounted() { if (__inst.componentDidMount) __inst.componentDidMount(); }
+}).mount('#app');
+</script>
+</body>
+</html>

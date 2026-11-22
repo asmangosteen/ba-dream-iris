@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Iris 문서 함께 보기</title>
+<link rel="stylesheet" href="assets/iris-base.css">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+<style>[v-cloak]{display:none}</style>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" v-cloak></div>
+<script type="text/x-template" id="tpl">
+<div>
+
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-08); z-index: 3; font-size: 12px; line-height: 18px">
+    <a href="Home.html" aria-label="Iris 홈으로" style="display: flex; align-items: center"><img src="assets/bd-symbol.svg" alt="" style="height: 12px; width: auto; display: block"></a>
+    <a href="Home.html" style="color: var(--sys-color-neutral-500)">착한구독 신청 플로우 개편</a>
+    <span class="ic ic-12 i-chevron_right" aria-hidden="true" style="color: var(--sys-color-neutral-400)"></span>
+    <span style="font-weight: 600">신청 플로우</span>
+  </div>
+  <div style="position: absolute; inset: 0; display: flex">
+  <main aria-label="캔버스" class="canvas-dots" style="flex: 1; min-width: 0; position: relative; overflow: hidden">
+    <div style="position: absolute; left: 48px; top: 88px; display: flex; gap: 44px">
+      <template v-for="(fr, __ifr) in frames" :key="__ifr">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 176px; flex: none">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px"><span :style="fr.labelStyle">{{fr.name}}</span></div>
+          <div :style="fr.frameStyle" aria-hidden="true">
+            <div style="height: 26px"></div>
+            <div style="padding: 0 9px 10px; font-size: 11px; font-weight: 600; color: var(--sys-color-common-black-default)">{{fr.title}}</div>
+            <div style="padding: 0 9px; display: flex; flex-direction: column; gap: 6px">
+              <div style="height: 22px; border-radius: 6px; background: var(--sys-color-neutral-100)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+            </div>
+            <div style="position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: var(--sys-color-brand-primary-default)"></div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <aside aria-label="문서" class="sq float" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 600px; display: flex; flex-direction: column; overflow: hidden; z-index: 3">
+    <div role="tablist" aria-label="문서" class="seg" style="padding: var(--ref-spacing-06); flex: none; box-shadow: 0 1px 0 var(--iris-line)">
+      <template v-for="(d, __id) in docs" :key="__id">
+        <button role="tab" :aria-selected="d.on" @click="d.pick" :class="d.cls">{{d.title}}</button>
+      </template>
+      <a href="AddDoc.html" aria-label="문서 추가" class="ib" style="margin-left: auto"><span class="ic i-plus" aria-hidden="true"></span></a><a href="Main.html" aria-label="문서 닫기" class="ib"><span class="ic i-close" aria-hidden="true"></span></a>
+    </div>
+
+    <div style="flex: 1; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-16) var(--ref-spacing-17)">
+      <article style="max-width: 600px; display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <h1 style="margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-common-black-default)">착한구독 개편 기획서 v1.2</h1>
+          <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-500)"><span>PDF · 11월 20일</span><a href="#" style="color: var(--sys-color-brand-primary-default); font-weight: 500">원본</a></div>
+        </div>
+
+        <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <h2 style="margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">3. 구독료 선택</h2>
+          <p style="margin: 0; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700)">고객은 약정 기간과 요금제를 한 화면에서 비교하고 고른다. 기존 화면은 요금제마다 상세로 들어가야 해서 비교가 어려웠다.</p>
+        </section>
+
+        <template v-for="(rb, __irb) in reqBlocks" :key="__irb">
+          <button @click="rb.pick" :aria-pressed="rb.on" class="sq" :style="rb.style">
+            <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{rb.code}}</span>
+              <span :class="rb.badge" style="margin-left: auto">{{rb.status}}</span>
+            </span>
+            <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700)">{{rb.text}}</span>
+          </button>
+        </template>
+
+        <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); position: relative">
+          <h2 style="margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">4. 예외 상황</h2>
+          <p style="margin: 0; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700)">재고가 없는 차종은 목록 맨 아래로 내리고, <mark style="background: var(--sys-color-brand-primary-lighter); color: var(--sys-color-neutral-800); border-radius: 2px; padding: 1px 0">입고 알림 신청 버튼을 대신 보여준다.</mark> 알림은 입고되면 앱 푸시로 보낸다.</p>
+          <div role="dialog" aria-label="선택한 문장" class="sq" style="position: absolute; left: 140px; top: 98px; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%))">
+            <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); color: var(--sys-color-common-white-default); font-weight: 500"><span class="ic i-plus" aria-hidden="true"></span>요구사항으로 만들기</button>
+            <span style="width: 1px; height: 16px; background: rgb(253 253 253 / 20%)"></span>
+            <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); color: var(--sys-color-common-white-default); font-weight: 500"><span class="ic i-comment" aria-hidden="true"></span>메모</button>
+          </div>
+        </section>
+      </article>
+    </div>
+  </aside>
+  </div>
+</div>
+</div>
+</script>
+<script>
+const { createApp, reactive, computed } = Vue;
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(patch) { Object.assign(this.state, typeof patch === 'function' ? patch(this.state) : patch); }
+}
+
+const SCREENS = [
+  { id: 's1', name: '신청_01_차종선택', title: '차종을 골라주세요' },
+  { id: 's2', name: '신청_02_구독료선택', title: '구독료를 골라주세요' },
+  { id: 's3', name: '신청_03_보험옵션', title: '보험과 옵션을 골라주세요' }
+];
+const REQS = [
+  { code: 'REQ-012', status: '반영됨', badge: 't-success', screens: ['s2'], text: '구독료 비교표를 화면 위쪽에 보여준다. 라이트 · 스탠다드 · 프리미엄을 한눈에 비교할 수 있어야 한다.' },
+  { code: 'REQ-013', status: '일부 반영', badge: 't-warning', screens: ['s2'], text: '약정 기간(12 · 24 · 36개월)마다 할인 구독료와 원래 구독료를 함께 보여준다.' },
+  { code: 'REQ-014', status: '반영됨', badge: 't-success', screens: ['s2'], text: '가장 많이 고른 요금제에 ‘가장 많이 선택’ 배지를 달고 처음부터 골라둔다.' },
+  { code: 'REQ-030', status: '반영됨', badge: 't-success', screens: ['s3'], text: '보험은 기본형 · 안심형 · 프리미엄형 3종을 카드로 비교해 하나를 고른다.' }
+];
+const DOCS = [
+  { id: 'd1', title: '착한구독 개편 기획서 v1.2', icon: 'ic i-document' },
+  { id: 'd2', title: '구독료 정책 정리', icon: 'ic i-link' },
+  { id: 'd3', title: '개발 메모', icon: 'ic i-write' }
+];
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = { req: 'REQ-013', doc: 'd1' };
+  }
+  renderVals() {
+    const cur = REQS.find((r) => r.code === this.state.req);
+    const linked = cur ? cur.screens : [];
+    return {
+      frames: SCREENS.map((s) => {
+        const on = linked.indexOf(s.id) > -1;
+        return {
+          name: s.name, title: s.title, linked: on,
+          labelStyle: on ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-500);font-weight:400',
+          frameStyle: 'position:relative;width:176px;height:381px;border-radius:2px;overflow:hidden;background:var(--sys-color-common-white-default);box-shadow:var(--shadow-01);' + (on ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:2px' : 'outline:1px solid var(--iris-line);opacity:.55')
+        };
+      }),
+      docs: DOCS.map((d) => ({
+        title: d.title, on: this.state.doc === d.id,
+        pick: () => this.setState({ doc: d.id }),
+        cls: 'sq seg-item' + (this.state.doc === d.id ? ' on' : '')
+      })),
+      reqBlocks: REQS.map((r) => {
+        const on = this.state.req === r.code;
+        return {
+          code: r.code, status: r.status, badge: 'bd-badge s ' + r.badge, text: r.text, on: on,
+          screens: '화면 ' + r.screens.length + '개',
+          pick: () => this.setState({ req: on ? '' : r.code }),
+          style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);width:100%;padding:var(--ref-spacing-08) var(--ref-spacing-10);border-radius:var(--ref-radius-06);' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px' : '--sq-fill:var(--sys-color-neutral-100)')
+        };
+      })
+    };
+  }
+}
+
+const __inst = new Component({});
+__inst.state = reactive(__inst.state);
+const __vals = computed(() => __inst.renderVals());
+createApp({
+  template: '#tpl',
+  setup() { const o = {}; Object.keys(__vals.value).forEach((k) => { o[k] = computed(() => __vals.value[k]); }); return o; },
+  mounted() { if (__inst.componentDidMount) __inst.componentDidMount(); }
+}).mount('#app');
+</script>
+</body>
+</html>

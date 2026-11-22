@@ -1,0 +1,52 @@
+<title>Iris 프로토타입</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 레이아웃: 회색 캔버스 위 흰 카드 하나 — 화면 묶음별 링크 목록 (Iris 앱 셸과 같은 결) */
+@font-face{font-family:'Pretendard';src:url('assets/fonts/Pretendard-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('assets/fonts/Pretendard-Medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('assets/fonts/Pretendard-SemiBold.woff2') format('woff2');font-weight:600;font-display:swap}
+:root{
+  --canvas:#F6F7F7; --panel:#FFFFFF; --line:rgb(3 9 26 / 8%); --ink:#202837; --muted:#8C9199; --soft:#F1F2F3; --accent:#2C7BE2;
+  --font:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--canvas:#0F131A;--panel:#171C25;--line:rgb(255 255 255 / 9%);--ink:#E8EAED;--muted:#8C9199;--soft:#212734;--accent:#5B9BF0;color-scheme:dark}}
+:root[data-theme="dark"]{--canvas:#0F131A;--panel:#171C25;--line:rgb(255 255 255 / 9%);--ink:#E8EAED;--muted:#8C9199;--soft:#212734;--accent:#5B9BF0;color-scheme:dark}
+body{background:var(--canvas);color:var(--ink);font-family:var(--font);font-size:12px;line-height:18px;-webkit-font-smoothing:antialiased;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:32px}
+.card{max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:20px}
+h1{margin:0;font-size:16px;line-height:24px;font-weight:600;text-wrap:balance}
+.group{display:flex;flex-direction:column;gap:2px}
+.group h2{margin:0 0 4px;font-size:12px;line-height:18px;font-weight:600}
+a.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px;padding:0 10px;margin:0 -10px;border-radius:8px;color:var(--ink);text-decoration:none}
+a.row:hover{background:var(--soft)}
+a.row:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+a.row span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+.note{color:var(--muted)}
+</style>
+<main class="card">
+  <h1>Iris 프로토타입</h1>
+  <div class="group">
+    <h2>진입 · 프로젝트</h2>
+    <a class="row" href="Login.html"><span>로그인</span><span>01</span></a>
+    <a class="row" href="Home.html"><span>프로젝트 홈</span><span>02</span></a>
+  </div>
+  <div class="group">
+    <h2>에디터</h2>
+    <a class="row" href="Main.html"><span>화면 인스펙터</span><span>03</span></a>
+    <a class="row" href="MainLayer.html"><span>레이어 선택</span><span>03-2</span></a>
+    <a class="row" href="MainDoc.html"><span>문서 열람</span><span>03-3</span></a>
+    <a class="row" href="MainAsset.html"><span>에셋 상세</span><span>03-4</span></a>
+    <a class="row" href="MainDesign.html"><span>디자인 수정</span><span>03-5</span></a>
+  </div>
+  <div class="group">
+    <h2>문서 · 피그마</h2>
+    <a class="row" href="DocSplit.html"><span>문서 함께 보기</span><span>04</span></a>
+    <a class="row" href="AddDoc.html"><span>문서 추가</span><span>05</span></a>
+    <a class="row" href="FigmaLink.html"><span>피그마 화면 가져오기</span><span>06</span></a>
+  </div>
+  <div class="group">
+    <h2>디자인 시스템 · 요구사항</h2>
+    <a class="row" href="DesignSystem.html"><span>디자인 시스템</span><span>07</span></a>
+    <a class="row" href="Requirements.html"><span>요구사항</span><span>08</span></a>
+  </div>
+  <p class="note" style="margin:0">각 화면은 1440 × 900 데스크톱 기준이에요.</p>
+</main>
