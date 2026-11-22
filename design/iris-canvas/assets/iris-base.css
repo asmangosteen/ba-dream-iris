@@ -102,9 +102,9 @@ input,textarea{font:inherit;color:inherit}
 .bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:1px var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap;background:var(--sys-color-common-white-default)}
 .bd-badge.s{padding:0 var(--ref-spacing-05);font-size:11px;line-height:18px}
 .bd-badge.angular{border-radius:var(--ref-radius-02)}
-.t-gray,.t-purple,.t-turquoise{color:var(--sys-color-neutral-600);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-10)}
-.t-brand,.t-success{color:var(--sys-color-brand-primary-default);box-shadow:inset 0 0 0 1px var(--ref-color-blue-500-40)}
-.t-warning{color:var(--sys-color-neutral-800);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-40)}
+.t-gray,.t-purple,.t-turquoise{color:var(--sys-color-neutral-600);box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-10)}
+.t-brand,.t-success{color:var(--sys-color-brand-primary-default);box-shadow:inset 0 0 0 0.5px var(--ref-color-blue-500-40)}
+.t-warning{color:var(--sys-color-neutral-800);box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-40)}
 .t-destructed{background:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
 .t-solid{background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
 
@@ -147,7 +147,7 @@ input,textarea{font:inherit;color:inherit}
 /* 사이트 Chip — 34 높이 · radius 10 · 14 M. 선택은 primary 글자 + 연파랑 + primary 선 */
 .bd-chip{display:inline-flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:6px var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500;white-space:nowrap;color:var(--sys-color-neutral-600);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px}
 .bd-chip.s{padding:var(--ref-spacing-02) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px}
-.bd-chip.on{color:var(--sys-color-brand-primary-default);--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--ref-color-blue-500-40)}
+.bd-chip.on{color:var(--sys-color-brand-primary-default);--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--ref-color-blue-500-40);--sq-line-w:0.5px}
 .bd-chip:not(.on):hover{--sq-overlay:var(--interaction-light-gray-hover)}
 .chip-n{font-weight:500;color:inherit;opacity:.7}
 
@@ -197,8 +197,8 @@ button:active{cursor:grabbing}
 .prop-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--ref-spacing-06);min-height:28px}
 .prop-row>.k{color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd{font-variant-numeric:tabular-nums;font-feature-settings:'tnum';display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-100);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
-.dd:hover{--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px}
-.dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:1px}
+.dd:hover{--sq-line:var(--ref-color-gray-900-10);--sq-line-w:0.5px}
+.dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
 .menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-04);filter:drop-shadow(0 1px 2px rgb(3 9 26 / 6%)) drop-shadow(0 8px 16px rgb(3 9 26 / 10%))}
 .menu-item{display:flex;align-items:center;gap:var(--ref-spacing-04);height:26px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
 .menu-item:hover{--sq-fill:var(--sys-color-neutral-100)}
@@ -207,6 +207,6 @@ button:active{cursor:grabbing}
 .tg::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s}
 .tg.on{background:var(--sys-color-brand-primary-default)}.tg.on::after{left:14px}
 .txt-in{font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border:0;outline:0;border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-100);font-size:12px;color:var(--sys-color-neutral-800)}
-.txt-in:focus{box-shadow:inset 0 0 0 1px var(--sys-color-brand-primary-default)}
+.txt-in:focus{box-shadow:inset 0 0 0 0.5px var(--sys-color-brand-primary-default)}
 .handle{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default)}
 .t11{font-size:11px;line-height:16px}

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 에디터 — 디자인 수정</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/3564395045f9743ee72fe9b9e90fc1f3">
+<link rel="stylesheet" href="/_blob/78bca9c6a1184813713f8b09421d8a2b">
 </head>
 <body>
 <x-dc>
@@ -941,7 +941,7 @@ class Component extends DCLogic {
             code: code, text: rq.title, status: STATUS[k].label, badge: 'bd-badge s ' + STATUS[k].cls, on: on,
             where: SCREENS[rq.s].name + (ANCHOR[code] ? ' · ' + ANCHOR[code] : ''),
             pick: () => on ? this.setState({ req: null, layer: 0 }) : this.pickReq(code),
-            style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);width:100%;padding:var(--ref-spacing-07) var(--ref-spacing-08);border-radius:var(--ref-radius-06);text-align:left;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:1px' : '--sq-fill:var(--sys-color-neutral-100)')
+            style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);width:100%;padding:var(--ref-spacing-07) var(--ref-spacing-08);border-radius:var(--ref-radius-06);text-align:left;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px' : '--sq-fill:var(--sys-color-neutral-100)')
           };
         })
       }))

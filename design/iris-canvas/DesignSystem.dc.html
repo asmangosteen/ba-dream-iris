@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 디자인 시스템</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/3564395045f9743ee72fe9b9e90fc1f3">
+<link rel="stylesheet" href="/_blob/78bca9c6a1184813713f8b09421d8a2b">
 </head>
 <body>
 <x-dc>
@@ -205,7 +205,7 @@ class Component extends DCLogic {
     const pick = (id) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ sel: id }); };
     const cards = ALL.filter((c) => !s.filter || c.g === s.filter).map((c) => ({
       name: c.name, n: c.n, parts: c.parts, on: s.sel === c.id, pick: pick(c.id),
-      thumb: 'height:168px;border-radius:var(--ref-radius-07);--sq-fill:var(--sys-color-common-white-default);--sq-line-w:' + (s.sel === c.id ? '1.5px;--sq-line:var(--sys-color-brand-primary-default);' : '1px;--sq-line:var(--iris-line-strong);') + c.wrap
+      thumb: 'height:168px;border-radius:var(--ref-radius-07);--sq-fill:var(--sys-color-common-white-default);--sq-line-w:' + (s.sel === c.id ? '0.5px;--sq-line:var(--sys-color-brand-primary-default);' : '1px;--sq-line:var(--iris-line-strong);') + c.wrap
     }));
     const cur = ALL.find((c) => c.id === s.sel);
     return {

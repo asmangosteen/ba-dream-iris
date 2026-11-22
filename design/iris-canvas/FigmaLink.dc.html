@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 피그마 화면 연결</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/3564395045f9743ee72fe9b9e90fc1f3">
+<link rel="stylesheet" href="/_blob/78bca9c6a1184813713f8b09421d8a2b">
 </head>
 <body>
 <x-dc>
@@ -165,7 +165,7 @@ class Component extends DCLogic {
         return {
           name: f.name, meta: f.meta, on: on,
           toggle: () => { const next = Object.assign({}, p); next[f.id] = !on; this.setState({ picked: next }); },
-          thumbStyle: 'position:relative;display:flex;flex-direction:column;gap:5px;height:190px;padding:12px 9px;box-sizing:border-box;border-radius:var(--ref-radius-04);--sq-fill:var(--sys-color-common-white-default);' + (on ? '--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:1.5px' : '--sq-line:var(--iris-line-strong);--sq-line-w:1px;opacity:.6'),
+          thumbStyle: 'position:relative;display:flex;flex-direction:column;gap:5px;height:190px;padding:12px 9px;box-sizing:border-box;border-radius:var(--ref-radius-04);--sq-fill:var(--sys-color-common-white-default);' + (on ? '--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px' : '--sq-line:var(--iris-line-strong);--sq-line-w:1px;opacity:.6'),
           checkStyle: 'position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;' + (on ? 'background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)' : 'background:var(--sys-color-common-white-default);color:transparent;box-shadow:inset 0 0 0 1px var(--sys-color-neutral-400)')
         };
       })
