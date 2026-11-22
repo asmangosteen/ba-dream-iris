@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 문서 함께 보기</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/78bca9c6a1184813713f8b09421d8a2b">
+<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
 </head>
 <body>
 <x-dc>
@@ -26,7 +26,7 @@ a{color:inherit}a:hover{color:inherit}
     <div style="position: absolute; left: 48px; top: 88px; display: flex; gap: 44px">
       <sc-for list="{{frames}}" as="fr" hint-placeholder-count="3">
         <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 176px; flex: none">
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px"><span style="{{fr.labelStyle}}">{{fr.name}}</span></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px"><span style="{{fr.labelStyle}}">{{fr.name}}</span></div>
           <div style="{{fr.frameStyle}}" aria-hidden="true">
             <div style="height: 26px"></div>
             <div style="padding: 0 9px 10px; font-size: 11px; font-weight: 600; color: var(--sys-color-common-black-default)">{{fr.title}}</div>
@@ -109,7 +109,7 @@ const DOCS = [
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
@@ -181,7 +181,7 @@ class Component extends DCLogic {
         const on = linked.indexOf(s.id) > -1;
         return {
           name: s.name, title: s.title, linked: on,
-          labelStyle: on ? 'color:var(--sys-color-brand-primary-default);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500',
+          labelStyle: on ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-500);font-weight:400',
           frameStyle: 'position:relative;width:176px;height:381px;border-radius:2px;overflow:hidden;background:var(--sys-color-common-white-default);box-shadow:var(--shadow-01);' + (on ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:2px' : 'outline:1px solid var(--iris-line);opacity:.55')
         };
       }),

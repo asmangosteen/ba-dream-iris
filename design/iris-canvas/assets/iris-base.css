@@ -100,7 +100,7 @@ input,textarea{font:inherit;color:inherit}
 /* 배지 — 흑백 + primary 원칙. 툴 화면에서는 색 바탕을 쓰지 않고 선 · 글자색 · 검정 채움으로만 구분합니다
    반영됨(t-success) = primary 선, 일부 반영(t-warning) = 검정 선, 미반영(t-destructed) = 검정 채움, 해당 없음(t-gray) = 회색 선 */
 .bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:1px var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap;background:var(--sys-color-common-white-default)}
-.bd-badge.s{padding:0 var(--ref-spacing-05);font-size:11px;line-height:18px}
+.bd-badge.s{padding:0 var(--ref-spacing-05);font-size:12px;line-height:18px}
 .bd-badge.angular{border-radius:var(--ref-radius-02)}
 .t-gray,.t-purple,.t-turquoise{color:var(--sys-color-neutral-600);box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-10)}
 .t-brand,.t-success{color:var(--sys-color-brand-primary-default);box-shadow:inset 0 0 0 0.5px var(--ref-color-blue-500-40)}
@@ -113,7 +113,7 @@ input,textarea{font:inherit;color:inherit}
 .pn-sec{box-shadow:0 -1px 0 var(--iris-line)}
 .ib{width:28px;height:28px;flex:none;border-radius:var(--ref-radius-03);display:grid;place-items:center;color:var(--sys-color-neutral-700)}
 .ib:hover{--sq-overlay:var(--interaction-light-gray-hover)}
-.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-100);font-size:12px;box-sizing:border-box}
+.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;box-sizing:border-box}
 .fld>span{color:var(--sys-color-neutral-600);flex:none}
 .fld input{width:100%;min-width:0;border:0;outline:0;background:transparent;font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';font-size:12px;color:var(--sys-color-neutral-800)}
 .btn-ink{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
@@ -125,10 +125,10 @@ input,textarea{font:inherit;color:inherit}
    figma-squircle 경로를 계산해 clip-path 로 자릅니다. 작업 캔버스 안의 화면에는 쓰지 않습니다.
    ============================================================ */
 :root{--bd-corner-smoothing:.6}
-:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
-.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after,.dd::before,.dd::after,.menu::before,.menu::after,.menu-item::before,.menu-item::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
-.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
-.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
+:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
+.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after,.dd::before,.dd::after,.menu::before,.menu::after,.menu-item::before,.menu-item::after,.grp::before,.grp::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
+.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before,.grp::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
+.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
 [data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
 [data-sq]::before{clip-path:var(--sq-path)}
 [data-sq]::after{box-shadow:none!important;background:var(--sq-line);clip-path:var(--sq-ring)}
@@ -138,7 +138,7 @@ input,textarea{font:inherit;color:inherit}
 .sq.hov:active{--sq-overlay:var(--interaction-light-gray-pressed)}
 
 /* 사이트(design-system.ba-dream.com) 사이드바 위계 — 그룹 라벨 12 M neutral-500 · 항목 14/20 R neutral-600 · 선택 soft 채움 + SB */
-.nav-label{display:block;padding:0 var(--ref-spacing-08) var(--ref-spacing-04);font-size:12px;line-height:18px;font-weight:500;color:var(--sys-color-neutral-500)}
+.nav-label{display:block;padding:0 var(--ref-spacing-08) var(--ref-spacing-04);font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800)}
 .nav-item{display:flex;align-items:center;gap:var(--ref-spacing-06);padding:7px var(--ref-spacing-08);border-radius:var(--ref-radius-04);font-size:14px;line-height:20px;color:var(--sys-color-neutral-600);white-space:nowrap}
 .nav-item:hover{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800)}
 .nav-item.on{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600}
@@ -177,7 +177,7 @@ button:active{cursor:grabbing}
    pen.dev 기반 앱 셸 — 화면 전체가 회색 캔버스이고, 패널은 그 위에 떠 있는 흰 카드
    ============================================================ */
 :root{--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%))}
-.float{--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
+.float{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
 .float.s{border-radius:var(--ref-radius-06)}
 .seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
 .seg-item{display:inline-flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px;font-weight:500;color:var(--sys-color-neutral-500);white-space:nowrap}
@@ -196,7 +196,7 @@ button:active{cursor:grabbing}
 /* 피그마식 속성 컨트롤 — 드롭다운 · 토글 · 입력 */
 .prop-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--ref-spacing-06);min-height:28px}
 .prop-row>.k{color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dd{font-variant-numeric:tabular-nums;font-feature-settings:'tnum';display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-100);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
+.dd{font-variant-numeric:tabular-nums;font-feature-settings:'tnum';display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
 .dd:hover{--sq-line:var(--ref-color-gray-900-10);--sq-line-w:0.5px}
 .dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
 .menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-04);filter:drop-shadow(0 1px 2px rgb(3 9 26 / 6%)) drop-shadow(0 8px 16px rgb(3 9 26 / 10%))}
@@ -206,7 +206,17 @@ button:active{cursor:grabbing}
 .tg{width:28px;height:16px;border-radius:999px;flex:none;background:var(--sys-color-neutral-300);position:relative}
 .tg::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s}
 .tg.on{background:var(--sys-color-brand-primary-default)}.tg.on::after{left:14px}
-.txt-in{font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border:0;outline:0;border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-100);font-size:12px;color:var(--sys-color-neutral-800)}
+.txt-in{font-family:var(--font-family-base);font-variant-numeric:tabular-nums;font-feature-settings:'tnum';width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border:0;outline:0;border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-200);font-size:12px;color:var(--sys-color-neutral-800)}
 .txt-in:focus{box-shadow:inset 0 0 0 0.5px var(--sys-color-brand-primary-default)}
 .handle{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default)}
-.t11{font-size:11px;line-height:16px}
+.t11{font-size:12px;line-height:18px}
+
+/* 피그마식 속성 패널 보조 요소 */
+.sub{display:block;font-size:12px;line-height:18px;color:var(--sys-color-neutral-500)}
+.grp{display:flex;padding:var(--ref-spacing-02);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200)}
+.grp>.ib{flex:1;height:24px}
+.grp>.ib.on{--sq-fill:var(--sys-color-common-white-emphasis);color:var(--sys-color-neutral-800);filter:drop-shadow(0 1px 1px rgb(3 9 26 / 10%))}
+.cb{display:flex;align-items:center;gap:var(--ref-spacing-04);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800)}
+.cb>i{width:12px;height:12px;border-radius:3px;box-shadow:inset 0 0 0 1px var(--sys-color-neutral-400);flex:none}
+.cb.on>i{background:var(--sys-color-neutral-800) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2l2 2 4-4.4' stroke='white' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") center/10px no-repeat;box-shadow:none}
+.sw{width:12px;height:12px;flex:none;border-radius:3px;box-shadow:inset 0 0 0 0.5px var(--ref-color-gray-900-20)}

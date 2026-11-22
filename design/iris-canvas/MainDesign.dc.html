@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 에디터 — 디자인 수정</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/78bca9c6a1184813713f8b09421d8a2b">
+<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
 </head>
 <body>
 <x-dc>
@@ -35,7 +35,7 @@ a{color:inherit}a:hover{color:inherit}
     <sc-if value="{{left.isFile}}" hint-placeholder-val="{{true}}">
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
         <div style="padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); display: flex; flex-direction: column; box-shadow: inset 0 -1px 0 var(--iris-line)">
-          <div style="display: flex; align-items: center; justify-content: space-between; padding-right: var(--ref-spacing-02)"><span class="nav-label" style="padding-bottom: 0">페이지</span><button class="ib" aria-label="페이지 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-right: var(--ref-spacing-02)"><span class="nav-label" style="padding-bottom: 0">페이지</span><span style="display: flex"><button class="ib" aria-label="페이지 찾기"><span class="ic ic-14 i-search" aria-hidden="true"></span></button><button class="ib" aria-label="페이지 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div>
           <button class="sq nav-item s on">신청 플로우</button>
           <button class="sq nav-item s">마이페이지</button>
           <button class="sq nav-item s">홈 · 내 차고</button>
@@ -44,6 +44,7 @@ a{color:inherit}a:hover{color:inherit}
           <span class="nav-label" style="padding-bottom: var(--ref-spacing-06)">레이어</span>
           <sc-for list="{{layers}}" as="ly" hint-placeholder-count="10">
             <button class="sq" onClick="{{ly.pick}}" aria-pressed="{{ly.on}}" style="{{ly.rowStyle}}">
+              <span class="ic ic-12 i-chevron_down" aria-hidden="true" style="{{ly.chevStyle}}"></span>
               <sc-if value="{{ly.isFrame}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--sys-color-neutral-600)"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
               <sc-if value="{{ly.isComp}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>
               <sc-if value="{{ly.isText}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--sys-color-neutral-600)"><path d="M2 3V2h8v1M6 2v8M4.5 10h3" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
@@ -124,7 +125,7 @@ a{color:inherit}a:hover{color:inherit}
           </section>
         </div>
         <div style="flex: none; display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line)">
-          <button onClick="{{ad.add}}" class="bd-button s primary">넣기 <kbd class="mono" style="font-size: 11px; opacity: .7">↵</kbd></button>
+          <button onClick="{{ad.add}}" class="bd-button s primary">넣기 <kbd class="num" style="opacity: .7">↵</kbd></button>
         </div>
       </div>
       </sc-if>
@@ -148,7 +149,7 @@ a{color:inherit}a:hover{color:inherit}
     <div style="position: absolute; left: 352px; top: 72px; display: flex; gap: 48px; align-items: flex-start">
 
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px">
           <span style="{{f1.labelStyle}}">신청_01_차종선택</span>
           <span style="{{f1.countStyle}}">{{f1.count}}</span>
         </div>
@@ -172,11 +173,11 @@ a{color:inherit}a:hover{color:inherit}
             </div>
           </div>
         </button>
-        <sc-if value="{{f1.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+        <sc-if value="{{f1.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px">375 × 812</div></sc-if>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px">
           <span style="{{f2.labelStyle}}">신청_02_구독료선택</span>
           <span style="{{f2.countStyle}}">{{f2.count}}</span>
         </div>
@@ -200,11 +201,11 @@ a{color:inherit}a:hover{color:inherit}
             <div style="{{cv.btn}}">{{cv.label}}</div>
           </div>
         </button>
-        <sc-if value="{{f2.whole}}" hint-placeholder-val="{{true}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+        <sc-if value="{{f2.whole}}" hint-placeholder-val="{{true}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px">375 × 812</div></sc-if>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px">
           <span style="{{f3.labelStyle}}">신청_03_보험옵션</span>
           <span style="{{f3.countStyle}}">{{f3.count}}</span>
         </div>
@@ -224,11 +225,11 @@ a{color:inherit}a:hover{color:inherit}
             <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px 12px; box-shadow: 0 -1px 0 var(--iris-line); display: flex; justify-content: space-between; align-items: center"><span style="color: var(--sys-color-neutral-600)">월 구독료</span><span style="padding: 5px 12px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-weight: 500">다음</span></div>
           </div>
         </button>
-        <sc-if value="{{f3.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+        <sc-if value="{{f3.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px">375 × 812</div></sc-if>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; line-height: 16px">
           <span style="{{f4.labelStyle}}">신청_04_결제</span>
           <span style="{{f4.countStyle}}">{{f4.count}}</span>
         </div>
@@ -248,7 +249,7 @@ a{color:inherit}a:hover{color:inherit}
             <div style="position: absolute; left: 10px; right: 10px; bottom: 12px; height: 26px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-weight: 500; font-size: 9px">결제하기</div>
           </div>
         </button>
-        <sc-if value="{{f4.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+        <sc-if value="{{f4.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px">375 × 812</div></sc-if>
       </div>
     </div>
 
@@ -281,11 +282,6 @@ a{color:inherit}a:hover{color:inherit}
     <a href="FigmaLink.dc.html" aria-label="피그마 화면 가져오기" class="rail-btn"><span class="ic i-arrow_up_right" aria-hidden="true"></span></a>
   </div>
 
-  <div class="sq float s" style="{{zoom.style}}">
-    <button class="ib" aria-label="축소" style="width: 24px; height: 24px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" stroke="currentColor" stroke-width="1.3"></path></svg></button>
-    <span class="mono" style="min-width: 36px; text-align: center; color: var(--sys-color-neutral-800)">50%</span>
-    <button class="ib" aria-label="확대" style="width: 24px; height: 24px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" stroke="currentColor" stroke-width="1.3"></path></svg></button>
-  </div>
 
   <div class="sq float s" style="{{right.pillStyle}}">
     <div aria-label="지금 보고 있는 멤버 3명" style="display: flex; align-items: center; margin-right: auto; padding-left: var(--ref-spacing-02)">
@@ -293,9 +289,9 @@ a{color:inherit}a:hover{color:inherit}
       <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default), inset 0 0 0 1px var(--ref-color-gray-900-20); margin-left: -4px">박</span>
       <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -4px">이</span>
     </div>
-    <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}">문서</button>
-    <button class="sq seg-item" style="color: var(--sys-color-neutral-800)">공유</button>
     <button aria-label="미리보기" class="ib"><span class="ic ic-12 i-play" aria-hidden="true"></span></button>
+    <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}">문서</button>
+    <button class="bd-button s primary">공유</button>
   </div>
 
 
@@ -306,7 +302,9 @@ a{color:inherit}a:hover{color:inherit}
           <button role="tab" aria-selected="{{tabs.designSel}}" onClick="{{tabs.toDesign}}" class="{{tabs.designCls}}">디자인</button>
           <button role="tab" aria-selected="{{tabs.planSel}}" onClick="{{tabs.toPlan}}" class="{{tabs.planCls}}">기획</button>
           <button role="tab" aria-selected="{{tabs.devSel}}" onClick="{{tabs.toDev}}" class="{{tabs.devCls}}">개발</button>
+          <button class="sq hov" aria-label="확대 비율" style="margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700)"><span class="num">50%</span><span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button>
         </div>
+        <sc-if value="{{tabs.notDesign}}" hint-placeholder-val="{{true}}">
         <div style="flex: none; padding: 0 var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
             <span style="{{obj.nameStyle}}">
@@ -318,6 +316,7 @@ a{color:inherit}a:hover{color:inherit}
           </div>
           <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><span class="t11" style="color: var(--sys-color-neutral-500)">{{obj.source}}</span></sc-if>
         </div>
+        </sc-if>
 
         <div style="flex: 1; min-height: 0; overflow: auto">
           <sc-if value="{{tabs.planSel}}" hint-placeholder-val="{{true}}">
@@ -349,14 +348,14 @@ a{color:inherit}a:hover{color:inherit}
                         <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" title="{{rq.label}} · 눌러서 바꾸기" style="width: 14px; height: 18px; display: grid; place-items: center"><span style="{{rq.icon}}" aria-hidden="true"></span></button>
                         <span style="font-weight: 500; color: var(--sys-color-neutral-800)">{{rq.title}}</span>
                         <span></span>
-                        <span class="t11" style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="mono" style="font-size: 11px">{{rq.code}}</span> · {{rq.anchor}}</span>
+                        <span class="t11" style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="num">{{rq.code}}</span> · {{rq.anchor}}</span>
                         <sc-if value="{{rq.hasNote}}" hint-placeholder-val="{{false}}">
                           <span></span><span class="t11" style="color: var(--sys-color-neutral-700)">{{rq.note}}</span>
                         </sc-if>
                         <span></span>
                         <div class="t11" style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-500)">
                           <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rq.doc}}</span>
-                          <button onClick="{{rq.openDoc}}" class="t11" style="flex: none; color: var(--sys-color-brand-primary-default); font-weight: 500">원문</button>
+                          <button onClick="{{rq.openDoc}}" style="flex: none; color: var(--sys-color-brand-primary-default); font-weight: 500">원문</button>
                         </div>
                       </div>
                     </sc-for>
@@ -432,9 +431,12 @@ a{color:inherit}a:hover{color:inherit}
 
           <sc-if value="{{tabs.designSel}}" hint-placeholder-val="{{false}}">
             <div style="padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-10)">
+                <button class="sq hov" style="{{ds.kindStyle}}"><sc-if value="{{ds.isInst}}" hint-placeholder-val="{{false}}"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>{{ds.kind}}<span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button>
+                <span style="display: flex"><button class="ib" aria-label="코드 보기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5 4L2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="컴포넌트로 만들기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.8l2 2-2 2-2-2zM3.8 5l2 2-2 2-2-2zM10.2 5l2 2-2 2-2-2zM7 8.2l2 2-2 2-2-2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="더보기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1" fill="currentColor"></circle><circle cx="7" cy="7" r="1" fill="currentColor"></circle><circle cx="11" cy="7" r="1" fill="currentColor"></circle></svg></button></span>
+              </div>
               <sc-if value="{{ds.isInst}}" hint-placeholder-val="{{false}}">
                 <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                  <div class="sec-h" style="height: 24px; padding: 0"><span style="display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--iris-component)"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg>{{ds.instName}}</span><button class="ib" aria-label="원본 컴포넌트로 돌리기" style="width: 24px; height: 24px"><span class="ic ic-14 i-refresh" aria-hidden="true"></span></button></div>
                   <sc-for list="{{ds.props}}" as="pr" hint-placeholder-count="3">
   <div class="prop-row">
     <span class="k">{{pr.k}}</span>
@@ -449,52 +451,67 @@ a{color:inherit}a:hover{color:inherit}
                 </section>
               </sc-if>
               <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                <div class="sec-h" style="height: 24px; padding: 0"><span>위치</span></div>
-                <div class="sq" style="display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100)">
-  <button class="ib" aria-label="왼쪽 맞춤" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1.5v11M4.5 4h7M4.5 9h4" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-  <button class="ib" aria-label="가로 가운데" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11M3 4h8M4.5 9h5" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-  <button class="ib" aria-label="오른쪽 맞춤" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M12 1.5v11M2.5 4h7M5.5 9h4" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-  <button class="ib" aria-label="위 맞춤" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 2h11M4 4.5v7M9 4.5v4" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-  <button class="ib" aria-label="세로 가운데" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11M4 3v8M9 4.5v5" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-  <button class="ib" aria-label="아래 맞춤" style="flex: 1; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 12h11M4 2.5v7M9 5.5v4" stroke="currentColor" stroke-width="1.3" fill="none"></path></svg></button>
-</div>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04)"><label class="fld"><span>X</span><input value="{{geo.x}}" readonly="readonly"></label><label class="fld"><span>Y</span><input value="{{geo.y}}" readonly="readonly"></label></div>
+                <div class="sec-h" style="height: 24px; padding: 0"><span>위치</span><span style="display: flex"></span></div>
+                <span class="sub">정렬</span>
+                <div style="display: flex; gap: var(--ref-spacing-04)"><div class="grp" style="flex: 1"><button class="ib" aria-label="왼쪽 맞춤" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1.5v11M4.5 4h7M4.5 9h4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="가로 가운데" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11M3 4h8M4.5 9h5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="오른쪽 맞춤" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M12 1.5v11M2.5 4h7M5.5 9h4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="위 맞춤" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 2h11M4 4.5v7M9 4.5v4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="세로 가운데" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11M4 3v8M9 4.5v5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="아래 맞춤" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 12h11M4 2.5v7M9 5.5v4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div></div>
+                <span class="sub">위치</span>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center"><label class="fld"><span>X</span><input value="{{geo.x}}" readonly="readonly"></label><label class="fld"><span>Y</span><input value="{{geo.y}}" readonly="readonly"></label></div>
+                <span class="sub">회전</span>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center"><label class="fld"><span>∠</span><input value="0°" readonly="readonly"></label><span style="display: flex"><button class="ib" aria-label="90도 돌리기" style="width: 24px; height: 24px"><span class="ic ic-14 i-refresh" aria-hidden="true"></span></button><button class="ib" aria-label="좌우 뒤집기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11M5 4L2 7l3 3V4zM9 4l3 3-3 3V4z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button><button class="ib" aria-label="상하 뒤집기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11M4 5L7 2l3 3H4zM4 9l3 3 3-3H4z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></span></div>
               </section>
               <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                <div class="sec-h" style="height: 24px; padding: 0"><span>크기</span></div>
-                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04)"><label class="fld"><span>W</span><input value="{{geo.w}}" readonly="readonly"></label><label class="fld"><span>H</span><input value="{{geo.h}}" readonly="readonly"></label></div>
-                <div class="sq" style="display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100)">
-                  <sc-for list="{{ds.sizing}}" as="z" hint-placeholder-count="3"><button onClick="{{z.pick}}" aria-pressed="{{z.on}}" class="sq" style="{{z.style}}">{{z.label}}</button></sc-for>
-                </div>
+                <div class="sec-h" style="height: 24px; padding: 0"><span>레이아웃</span><span style="display: flex"></span></div>
+                <span class="sub">흐름</span>
+                <div style="display: flex"><div class="grp" style="flex: 1"><sc-for list="{{ds.flow}}" as="fw" hint-placeholder-count="4"><button onClick="{{fw.pick}}" aria-label="{{fw.label}}" aria-pressed="{{fw.on}}" class="{{fw.cls}}"><span style="{{fw.icon}}"></span></button></sc-for></div></div>
+                <span class="sub">크기</span>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center"><label class="fld"><span>W</span><input value="{{geo.w}}" readonly="readonly"></label><label class="fld"><span>H</span><input value="{{geo.h}}" readonly="readonly"></label><button class="ib" aria-label="비율 고정" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5.5 8.5l3-3M4.5 6.5L3.3 7.7a2 2 0 0 0 2.8 2.8l1.2-1.2M9.5 7.5l1.2-1.2a2 2 0 0 0-2.8-2.8L6.7 4.7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div>
+                <sc-if value="{{ds.hasGap}}" hint-placeholder-val="{{true}}">
+                  <span class="sub">간격</span>
+                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center"><label class="fld"><span>↕</span><input value="{{ds.gap}}" readonly="readonly"></label><label class="fld"><span>□</span><input value="{{ds.pad}}" readonly="readonly"></label></div>
+                </sc-if>
+                <button class="{{ds.clipCls}}" onClick="{{ds.clipFlip}}" style="margin-top: var(--ref-spacing-02)"><i></i>내용 자르기</button>
               </section>
               <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                <div class="sec-h" style="height: 24px; padding: 0"><span>모양</span></div>
-                <div class="prop-row"><span class="k">투명도</span><label class="fld"><input value="{{ds.opacity}}" readonly="readonly"></label></div>
-                <div class="prop-row"><span class="k">모서리</span><div style="position: relative; min-width: 0">
+                <div class="sec-h" style="height: 24px; padding: 0"><span>모양</span><span style="display: flex"><button class="ib" aria-label="숨기기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7s2-3.8 5.5-3.8S12.5 7 12.5 7 10.5 10.8 7 10.8 1.5 7 1.5 7z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path><circle cx="7" cy="7" r="1.6" fill="currentColor"></circle></svg></button></span></div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center"><span class="sub">투명도</span><span class="sub">모서리</span></div>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center"><label class="fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"></rect><path d="M2.5 11.5l9-9V9.5a2 2 0 0 1-2 2z" fill="currentColor" opacity=".4"></path></svg><input value="{{ds.opacity}}" readonly="readonly"></label><div style="position: relative; min-width: 0">
   <button class="{{ds.radius.cls}}" onClick="{{ds.radius.toggle}}" aria-expanded="{{ds.radius.open}}"><span style="display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0"><span style="{{ds.radius.sw}}"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ds.radius.value}}</span></span><span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button>
   <sc-if value="{{ds.radius.open}}" hint-placeholder-val="{{false}}"><div class="sq menu" role="listbox"><sc-for list="{{ds.radius.opts}}" as="o" hint-placeholder-count="3"><button role="option" aria-selected="{{o.on}}" class="{{o.cls}}" onClick="{{o.pick}}"><span style="{{o.sw}}"></span>{{o.label}}</button></sc-for></div></sc-if>
-</div></div>
+</div><button class="ib" aria-label="모서리 따로" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 5V2.5H5M9 2.5h2.5V5M11.5 9v2.5H9M5 11.5H2.5V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div>
               </section>
               <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                <div class="sec-h" style="height: 24px; padding: 0"><span>채우기</span><button class="ib" aria-label="채우기 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
-                <div style="position: relative; min-width: 0">
+                <div class="sec-h" style="height: 24px; padding: 0"><span>채우기</span><span style="display: flex"><button class="ib" aria-label="색 스타일" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor"></circle><circle cx="9.5" cy="4.5" r="1.6" fill="currentColor"></circle><circle cx="4.5" cy="9.5" r="1.6" fill="currentColor"></circle><circle cx="9.5" cy="9.5" r="1.6" fill="currentColor"></circle></svg></button><button class="ib" aria-label="채우기 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px auto auto; gap: var(--ref-spacing-04); align-items: center"><div style="position: relative; min-width: 0">
   <button class="{{ds.fill.cls}}" onClick="{{ds.fill.toggle}}" aria-expanded="{{ds.fill.open}}"><span style="display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0"><span style="{{ds.fill.sw}}"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ds.fill.value}}</span></span><span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button>
   <sc-if value="{{ds.fill.open}}" hint-placeholder-val="{{false}}"><div class="sq menu" role="listbox"><sc-for list="{{ds.fill.opts}}" as="o" hint-placeholder-count="3"><button role="option" aria-selected="{{o.on}}" class="{{o.cls}}" onClick="{{o.pick}}"><span style="{{o.sw}}"></span>{{o.label}}</button></sc-for></div></sc-if>
-</div>
+</div><label class="fld"><input value="100" readonly="readonly"><span>%</span></label><button class="ib" aria-label="채우기 숨기기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7s2-3.8 5.5-3.8S12.5 7 12.5 7 10.5 10.8 7 10.8 1.5 7 1.5 7z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path><circle cx="7" cy="7" r="1.6" fill="currentColor"></circle></svg></button><button class="ib" aria-label="채우기 빼기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div>
               </section>
               <sc-if value="{{ds.hasText}}" hint-placeholder-val="{{true}}">
                 <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
-                  <div class="sec-h" style="height: 24px; padding: 0"><span>텍스트</span></div>
+                  <div class="sec-h" style="height: 24px; padding: 0"><span>텍스트</span><span style="display: flex"><button class="ib" aria-label="텍스트 스타일" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor"></circle><circle cx="9.5" cy="4.5" r="1.6" fill="currentColor"></circle><circle cx="4.5" cy="9.5" r="1.6" fill="currentColor"></circle><circle cx="9.5" cy="9.5" r="1.6" fill="currentColor"></circle></svg></button></span></div>
                   <div style="position: relative; min-width: 0">
   <button class="{{ds.text.cls}}" onClick="{{ds.text.toggle}}" aria-expanded="{{ds.text.open}}"><span style="display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0"><span style="{{ds.text.sw}}"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ds.text.value}}</span></span><span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button>
   <sc-if value="{{ds.text.open}}" hint-placeholder-val="{{false}}"><div class="sq menu" role="listbox"><sc-for list="{{ds.text.opts}}" as="o" hint-placeholder-count="3"><button role="option" aria-selected="{{o.on}}" class="{{o.cls}}" onClick="{{o.pick}}"><span style="{{o.sw}}"></span>{{o.label}}</button></sc-for></div></sc-if>
 </div>
-                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04)"><label class="fld"><span>크기</span><input value="{{ds.textSize}}" readonly="readonly"></label><label class="fld"><span>행간</span><input value="{{ds.textLine}}" readonly="readonly"></label></div>
+                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center"><label class="fld"><span>크기</span><input value="{{ds.textSize}}" readonly="readonly"></label><label class="fld"><span>행간</span><input value="{{ds.textLine}}" readonly="readonly"></label></div>
                 </section>
               </sc-if>
-              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)"><div class="sec-h" style="height: 24px; padding: 0"><span>선</span><button class="ib" aria-label="선 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></section>
-              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)"><div class="sec-h" style="height: 24px; padding: 0"><span>효과</span><button class="ib" aria-label="효과 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></section>
-              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)"><div class="sec-h" style="height: 24px; padding: 0"><span>내보내기</span><button class="ib" aria-label="내보내기 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></section>
+              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)"><div class="sec-h" style="height: 24px; padding: 0"><span>선</span><span style="display: flex"><button class="ib" aria-label="선 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div></section>
+              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)"><div class="sec-h" style="height: 24px; padding: 0"><span>효과</span><span style="display: flex"><button class="ib" aria-label="효과 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div></section>
+              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
+                <div class="sec-h" style="height: 24px; padding: 0"><span>선택 색상</span><span style="display: flex"></span></div>
+                <sc-for list="{{ds.selColors}}" as="sc" hint-placeholder-count="2">
+                  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: var(--ref-spacing-04)">
+                    <div class="fld"><span class="sw" style="{{sc.sw}}"></span><span style="color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{sc.name}}</span></div>
+                    <label class="fld"><input value="100" readonly="readonly"><span>%</span></label>
+                  </div>
+                </sc-for>
+              </section>
+              <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
+                <div class="sec-h" style="height: 24px; padding: 0"><span>내보내기</span><span style="display: flex"><button class="ib" aria-label="내보내기 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div>
+                <div style="display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto; gap: var(--ref-spacing-04); align-items: center"><button class="sq dd">2x<span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button><button class="sq dd">PNG<span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button><button class="ib" aria-label="내보내기 설정" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1" fill="currentColor"></circle><circle cx="7" cy="7" r="1" fill="currentColor"></circle><circle cx="11" cy="7" r="1" fill="currentColor"></circle></svg></button><button class="ib" aria-label="내보내기 빼기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div>
+                <button class="bd-button s stroke" style="width: 100%; color: var(--sys-color-neutral-800); margin-top: var(--ref-spacing-02)">{{ds.exportLabel}}</button>
+              </section>
             </div>
           </sc-if>
         </div>
@@ -510,10 +527,10 @@ a{color:inherit}a:hover{color:inherit}
           <button onClick="{{right.closeDoc}}" class="ib" aria-label="문서 닫기" style="margin-left: auto"><span class="ic i-close" aria-hidden="true"></span></button>
         </div>
         <div style="flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-10) var(--ref-spacing-10) var(--ref-spacing-16)">
-          <article style="display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+          <article style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
-              <h2 style="margin: 0; font-size: var(--typography-body-1-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">{{reader.title}}</h2>
-              <span class="t11" style="display: flex; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-500)">{{reader.meta}}<a href="DocSplit.dc.html" style="color: var(--sys-color-brand-primary-default); font-weight: 500">넓게 보기</a></span>
+              <h2 style="margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{reader.title}}</h2>
+              <span style="display: flex; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">{{reader.meta}}<a href="DocSplit.dc.html" style="color: var(--sys-color-brand-primary-default); font-weight: 500">넓게 보기</a></span>
             </div>
             <sc-for list="{{reader.sections}}" as="sec" hint-placeholder-count="2">
               <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
@@ -522,8 +539,8 @@ a{color:inherit}a:hover{color:inherit}
                 <sc-for list="{{sec.reqs}}" as="rb" hint-placeholder-count="2">
                   <button onClick="{{rb.pick}}" aria-pressed="{{rb.on}}" class="sq" style="{{rb.style}}">
                     <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
-                      <span class="mono" style="font-size: 11px; line-height: 16px; font-weight: 600; color: var(--sys-color-neutral-800)">{{rb.code}}</span>
-                      <span class="t11" style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rb.where}}</span>
+                      <span class="num" style="line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{rb.code}}</span>
+                      <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rb.where}}</span>
                       <span class="{{rb.badge}}" style="margin-left: auto">{{rb.status}}</span>
                     </span>
                     <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800)">{{rb.text}}</span>
@@ -683,12 +700,12 @@ const STATUS_ICON = (k, n) => {
   if (k === 'missing') return base + 'border:1.5px dashed var(--sys-color-neutral-500)';
   return base + 'background:linear-gradient(#fff, #fff) center/' + Math.round(n / 2) + 'px 1.5px no-repeat, var(--sys-color-neutral-300)';
 };
-const START = {"tab": "design", "sel": "s2", "layer": 12, "menu": "d:fill", "dv": {"type": "primary", "size": "xl", "label": "다음 단계로", "disabled": false, "fill": "brand/primary-default", "radius": "radius/12", "text": "Body 1/16 M", "sizing": "채우기"}};
+const START = {"tab": "design", "sel": "s2", "layer": 12, "menu": "d:type", "dv": {"type": "primary", "size": "xl", "label": "다음 단계로", "disabled": false, "fill": "brand/primary-default", "radius": "radius/12", "text": "Body 1/16 M", "sizing": "채우기"}};
 /* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
@@ -796,8 +813,8 @@ class Component extends DCLogic {
       sel: sel, whole: whole,
       count: done + '/' + all,
       select: () => this.setState({ sel: id, layer: 0 }),
-      labelStyle: sel ? 'color:var(--sys-color-brand-primary-default);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500',
-      countStyle: 'font-weight:600;' + (done === all ? 'color:var(--sys-color-brand-primary-default)' : 'color:var(--sys-color-neutral-600)'),
+      labelStyle: sel ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-500);font-weight:400',
+      countStyle: 'font-weight:500;font-variant-numeric:tabular-nums;' + (done === all ? 'color:var(--sys-color-brand-primary-default)' : 'color:var(--sys-color-neutral-600)'),
       frameStyle: 'display:block;width:196px;height:424px;overflow:hidden;background:var(--sys-color-common-white-default);' + (whole ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:0' : sel ? 'outline:1px solid var(--ref-color-blue-500-40)' : 'outline:1px solid var(--iris-line-strong)')
     };
   }
@@ -812,12 +829,15 @@ class Component extends DCLogic {
 
     /* 레이어 목록 */
     const added = s.dropped.filter((d) => d.s === s.sel).map((d) => [d.name.replace(/ /g, ''), 1, 'comp', [0, 0, 0, 0]]);
-    const layers = raw.concat(added).map((l, i) => {
+    const all2 = raw.concat(added);
+    const layers = all2.map((l, i) => {
       const on = i === s.layer;
+      const kids = !!all2[i + 1] && all2[i + 1][1] > l[1];
       return {
+        chevStyle: 'color:var(--sys-color-neutral-500);' + (kids ? '' : 'visibility:hidden'),
         name: l[0], on: on, isFrame: l[2] === 'frame', isComp: l[2] === 'comp', isText: l[2] === 'text', isRect: l[2] === 'rect', isImage: l[2] === 'image',
         pick: () => { if (i < raw.length) this.setState({ layer: i, req: null }); },
-        rowStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);width:100%;height:28px;flex:none;border-radius:var(--ref-radius-04);padding-left:' + (8 + l[1] * 14) + 'px;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);font-weight:600;' : '') + (l[2] === 'comp' ? 'color:var(--iris-component);' + (on ? '' : 'font-weight:500') : (on ? 'color:var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-700)'))
+        rowStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);width:100%;height:28px;flex:none;border-radius:var(--ref-radius-04);padding-left:' + (4 + l[1] * 14) + 'px;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);font-weight:600;' : '') + (l[2] === 'comp' ? 'color:var(--iris-component);' + (on ? '' : 'font-weight:500') : (on ? 'color:var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-700)'))
       };
     });
 
@@ -907,13 +927,20 @@ class Component extends DCLogic {
       btn: 'position:absolute;left:10px;right:10px;bottom:12px;height:' + bh + 'px;border-radius:' + (rpx > 100 ? 99 : Math.round(rpx * 196 / 375)) + 'px;background:' + fillVar(dv.fill) + ';color:' + TYPE_INK[dv.type] + ';' + (dv.type === 'stroke' ? 'box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-10);' : '') + 'display:grid;place-items:center;font-weight:500;font-size:' + Math.max(8, Math.round(tx[1] * 196 / 375)) + 'px;' + (dv.disabled ? 'opacity:.4;' : '')
     };
     const ds = {
-      isInst: isBtn, instName: 'Button',
+      isInst: isBtn || L[2] === 'comp', instName: L[0],
+      kind: (L[2] === 'comp') ? L[0] : ({ frame: '프레임', text: '텍스트', rect: '사각형', image: '이미지' })[L[2]],
+      kindStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);margin-left:calc(-1 * var(--ref-spacing-04));padding:var(--ref-spacing-02) var(--ref-spacing-04);border-radius:var(--ref-radius-03);font-weight:600;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : ''),
+      flow: [['free', '자유 배치', 'M3 3h3v3H3zM8 8h3v3H8zM8 3h3v3'], ['col', '세로로 쌓기', 'M3 2h8v3H3zM3 9h8v3H3z'], ['row', '가로로 쌓기', 'M2 3h3v8H2zM9 3h3v8H9z'], ['grid', '격자', 'M2.5 2.5h4v4h-4zM7.5 2.5h4v4h-4zM2.5 7.5h4v4h-4zM7.5 7.5h4v4h-4z']].map((f) => { const cur = s.flow || (isBtn ? 'row' : (L[2] === 'frame' ? 'col' : 'free')); return { label: f[1], on: cur === f[0], cls: 'ib' + (cur === f[0] ? ' on' : ''), pick: () => this.setState({ flow: f[0] }), icon: 'display:block;width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 14 14\'><path d=\'' + f[2] + '\' stroke=\'black\' stroke-width=\'1.2\' fill=\'none\'/></svg>') + '") center/contain no-repeat;mask:url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 14 14\'><path d=\'' + f[2] + '\' stroke=\'black\' stroke-width=\'1.2\' fill=\'none\'/></svg>') + '") center/contain no-repeat' }; }),
+      hasGap: isBtn || L[2] === 'frame', gap: isBtn ? '2' : '8', pad: isBtn ? '12' : '0',
+      clipCls: 'cb' + (s.clip === false ? '' : ' on'), clipFlip: () => this.setState({ clip: s.clip === false }),
+      selColors: (isBtn ? [dv.fill, ({ primary: 'common/white-default', secondary: 'brand/primary-default', tertiary: 'neutral/600', stroke: 'neutral/600' })[dv.type]] : ['common/white-default', 'neutral/800']).map((n) => ({ name: n, sw: 'background:' + (n === 'neutral/600' ? 'var(--sys-color-neutral-600)' : fillVar(n)) })),
+      exportLabel: (isBtn ? 'Button' : L[0]) + ' 내보내기',
       props: isBtn ? [
         this.ctrl('d:type', 'type', 'dd', BTN_T, dv.type, (v) => this.setDv({ type: v, fill: TYPE_FILL[v] })),
         this.ctrl('d:size', 'size', 'dd', BTN_S, dv.size, (v) => this.setDv({ size: v })),
         this.ctrl('d:label', 'label', 'txt', null, dv.label, (v) => this.setDv({ label: v })),
         this.ctrl('d:disabled', 'disabled', 'tg', null, dv.disabled, (v) => this.setDv({ disabled: v }))
-      ] : [],
+      ] : (inst ? inst.props.map((x) => this.ctrl('d:' + x[0], x[0], 'txt', null, x[1], () => {})) : []),
       sizing: ['고정', '내용 맞춤', '채우기'].map((z) => { const on = isBtn ? dv.sizing === z : z === '고정'; return { label: z, on: on, pick: () => isBtn && this.setDv({ sizing: z }), style: 'flex:1;padding:3px 0;border-radius:var(--ref-radius-02);text-align:center;font-size:11px;line-height:16px;' + (on ? '--sq-fill:var(--sys-color-common-white-default);color:var(--sys-color-neutral-800);font-weight:600;filter:drop-shadow(0 1px 1px rgb(3 9 26 / 8%))' : 'color:var(--sys-color-neutral-500);font-weight:500') }; }),
       opacity: dv.disabled && isBtn ? '40%' : '100%',
       radius: this.ctrl('d:radius', '', 'dd', RADII.map((r) => r[0]), isBtn ? dv.radius : (L[2] === 'comp' || L[2] === 'frame' ? 'radius/07' : '없음'), (v) => isBtn && this.setDv({ radius: v })),
@@ -985,7 +1012,7 @@ class Component extends DCLogic {
         }
       },
       tabs: {
-        planSel: s.tab === 'plan', devSel: s.tab === 'dev', designSel: s.tab === 'design',
+        planSel: s.tab === 'plan', devSel: s.tab === 'dev', designSel: s.tab === 'design', notDesign: s.tab !== 'design',
         planCls: 'sq seg-item' + (s.tab === 'plan' ? ' on' : ''), devCls: 'sq seg-item' + (s.tab === 'dev' ? ' on' : ''), designCls: 'sq seg-item' + (s.tab === 'design' ? ' on' : ''),
         toPlan: () => this.setState({ tab: 'plan' }), toDev: () => this.setState({ tab: 'dev' }), toDesign: () => this.setState({ tab: 'design' })
       },
