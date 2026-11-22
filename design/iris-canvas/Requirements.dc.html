@@ -44,8 +44,8 @@ a{color:inherit}a:hover{color:inherit}
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--ref-spacing-08)">
         <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
           <button onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="{{s.style}}">
-            <span style="color: var(--sys-color-neutral-600)">{{s.label}}</span>
-            <span style="font-size: var(--typography-heading-2-size); line-height: 32px; font-weight: 600; color: var(--sys-color-neutral-800)">{{s.count}}</span>
+            <span style="color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">{{s.label}}</span>
+            <span style="font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-neutral-800)">{{s.count}}</span>
           </button>
         </sc-for>
       </div>
@@ -62,7 +62,7 @@ a{color:inherit}a:hover{color:inherit}
           </div>
         </div>
         <div style="overflow-x: auto">
-          <table style="width: 100%; min-width: 880px; border-collapse: collapse; text-align: left">
+          <table style="width: 100%; min-width: 880px; border-collapse: collapse; text-align: left; font-size: 13px; line-height: 20px">
             <thead>
               <tr style="box-shadow: inset 0 -1px 0 var(--iris-line-strong), inset 0 1px 0 var(--iris-line-strong); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">
                 <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-10); font-weight: 600; width: 96px">번호</th>
@@ -76,7 +76,7 @@ a{color:inherit}a:hover{color:inherit}
             <tbody>
               <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
                 <tr style="box-shadow: inset 0 -1px 0 var(--iris-line)">
-                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 13px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.code}}</td>
+                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.code}}</td>
                   <td style="padding: var(--ref-spacing-08)">{{r.title}}</td>
                   <td style="padding: var(--ref-spacing-08); color: var(--sys-color-neutral-600)">{{r.doc}}</td>
                   <td style="padding: var(--ref-spacing-08)"><a href="Main.dc.html" style="{{r.screenStyle}}">{{r.screen}}</a></td>

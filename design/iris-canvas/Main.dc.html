@@ -179,8 +179,8 @@ a{color:inherit}a:hover{color:inherit}
       <button aria-label="바드림 컴포넌트" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
       <button aria-label="코멘트" class="ib" style="width: 32px; height: 32px"><span class="ic i-comment" aria-hidden="true"></span></button>
       <span style="width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-04)"></span>
-      <button class="hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500"><span class="ic i-link" aria-hidden="true"></span>요구사항 연결</button>
-      <a href="FigmaLink.dc.html" class="hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500"><span class="ic i-arrow_up_right" aria-hidden="true"></span>피그마 화면</a>
+      <button class="hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-link" aria-hidden="true"></span>요구사항 연결</button>
+      <a href="FigmaLink.dc.html" class="hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-arrow_up_right" aria-hidden="true"></span>피그마 화면</a>
     </div>
   </main>
 
@@ -242,7 +242,7 @@ a{color:inherit}a:hover{color:inherit}
                     {{rq.label}}
                   </button>
                 </div>
-                <div style="font-size: 13px; line-height: 20px; color: var(--sys-color-neutral-800)">{{rq.title}}</div>
+                <div style="font-weight: 500; color: var(--sys-color-neutral-800)">{{rq.title}}</div>
                 <sc-if value="{{rq.hasNote}}" hint-placeholder-val="{{false}}">
                   <div style="display: flex; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-700)"><span class="ic ic-12 i-warning" aria-hidden="true" style="margin-top: 3px"></span><span>{{rq.note}}</span></div>
                 </sc-if>

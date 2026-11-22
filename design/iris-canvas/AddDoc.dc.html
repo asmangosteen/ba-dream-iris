@@ -24,7 +24,7 @@ a{color:inherit}a:hover{color:inherit}
   <div style="position: relative; min-height: 900px; display: grid; place-items: center; padding: var(--ref-spacing-12)">
     <section role="dialog" aria-modal="true" aria-labelledby="addDocTitle" style="width: 100%; max-width: 560px; background: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); box-shadow: var(--shadow-05); display: flex; flex-direction: column; overflow: hidden">
       <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-08)">
-        <h1 id="addDocTitle" style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-neutral-800)">문서 추가</h1>
+        <h1 id="addDocTitle" style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">문서 추가</h1>
         <a href="Main.dc.html" aria-label="닫기" class="hov" style="width: 32px; height: 32px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-600)"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
       </div>
 
@@ -39,8 +39,8 @@ a{color:inherit}a:hover{color:inherit}
           <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
             <label style="display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-14) var(--ref-spacing-10); border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); text-align: center; cursor: pointer">
               <span style="width: 44px; height: 44px; border-radius: 50%; background: var(--sys-color-common-white-default); display: grid; place-items: center; color: var(--sys-color-brand-primary-default); box-shadow: var(--shadow-01)"><span class="ic ic-20 i-upload" aria-hidden="true"></span></span>
-              <span style="font-weight: 600; font-size: 16px; line-height: 24px">파일을 끌어다 놓거나 눌러서 골라주세요</span>
-              <span style="color: var(--sys-color-neutral-600)">PDF · Word · Markdown, 50MB까지</span>
+              <span style="font-weight: 600">파일을 끌어다 놓거나 눌러서 골라주세요</span>
+              <span style="color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">PDF · Word · Markdown, 50MB까지</span>
               <input type="file" class="sr">
             </label>
             <div style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--iris-line-strong)">
@@ -59,9 +59,9 @@ a{color:inherit}a:hover{color:inherit}
           <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
               <label for="docUrl" style="font-weight: 500">문서 주소</label>
-              <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 48px; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default)">
+              <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 40px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default)">
                 <span class="ic i-link" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
-                <input id="docUrl" value="https://docs.google.com/document/d/구독료정책" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px">
+                <input id="docUrl" value="https://docs.google.com/document/d/구독료정책" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
               </div>
             </div>
             <div style="display: flex; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--iris-line-strong)">
@@ -82,7 +82,7 @@ a{color:inherit}a:hover{color:inherit}
           <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
               <label for="docName" style="font-weight: 500">문서 이름</label>
-              <input id="docName" placeholder="예: 신청 플로우 개발 메모" style="height: 48px; padding: 0 var(--ref-spacing-10); border: 0; outline: 0; border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 16px">
+              <input id="docName" placeholder="예: 신청 플로우 개발 메모" style="height: 40px; padding: 0 var(--ref-spacing-08); border: 0; outline: 0; border-radius: var(--ref-radius-05); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 14px">
             </div>
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
               <span style="font-weight: 500">어떤 틀로 시작할까요?</span>
@@ -106,8 +106,8 @@ a{color:inherit}a:hover{color:inherit}
       </div>
 
       <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12)">
-        <a href="Main.dc.html" class="bd-button xl tertiary" style="flex: 1">취소</a>
-        <a href="DocSplit.dc.html" class="bd-button xl primary" style="flex: 2.25">추가하기</a>
+        <a href="Main.dc.html" class="bd-button l tertiary" style="flex: 1">취소</a>
+        <a href="DocSplit.dc.html" class="bd-button l primary" style="flex: 2.25">추가하기</a>
       </div>
     </section>
   </div>
@@ -128,7 +128,7 @@ class Component extends DCLogic {
       tabs: tabDefs.map((d) => ({
         label: d[1], on: t === d[0],
         pick: () => this.setState({ tab: d[0] }),
-        style: 'padding:var(--ref-spacing-06) 0 var(--ref-spacing-08);font-size:16px;line-height:24px;' + (t === d[0] ? 'color:var(--sys-color-neutral-800);font-weight:600;box-shadow:inset 0 -2px 0 var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-600);font-weight:500')
+        style: 'padding:var(--ref-spacing-06) 0 var(--ref-spacing-08);font-size:14px;line-height:22px;' + (t === d[0] ? 'color:var(--sys-color-neutral-800);font-weight:600;box-shadow:inset 0 -2px 0 var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-600);font-weight:500')
       })),
       cats: catDefs.map((d) => ({
         label: d[1], on: c === d[0],
