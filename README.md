@@ -20,7 +20,8 @@
 
 ## 기술 스택 (예정)
 
-- **앱**: Next.js + TypeScript
+- **앱**: Nuxt 4 (Vue 3) + TypeScript
+- **디자인 시스템**: [`@ba-dream/design-system`](https://design-system.ba-dream.com)
 - **백엔드**: Supabase (DB · 로그인 · 파일 저장)
 - **배포**: Vercel
 - **캔버스**: 자체 개발한 DOM 기반 캔버스. 화면 요소를 실제 HTML 요소로 그리는 방식으로, 토스 Deus와 같은 접근입니다.

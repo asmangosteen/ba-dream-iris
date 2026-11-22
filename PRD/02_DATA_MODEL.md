@@ -138,7 +138,7 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 | title | 제목 | 착한구독 개편 기획서 v1.2 | O |
 | category | 분류 | planning / dev / design / etc | O |
 | source_type | 출처 | `native` / `upload` / `link` | O |
-| content_blocks | 블록 에디터 내용 (native) | BlockNote JSON | native일 때 |
+| content_blocks | 블록 에디터 내용 (native) | Tiptap JSON | native일 때 |
 | file_path | 원본 파일 (upload) | docs/doc_01.pdf | upload일 때 |
 | file_type | 파일 형식 | pdf / docx / md | upload일 때 |
 | url | 외부 링크 (link) | https://... | link일 때 |

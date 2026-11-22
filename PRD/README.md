@@ -30,8 +30,9 @@
 | MVP | 프로젝트 허브 + 피그마 연결 + 기본 캔버스 + 컴포넌트·토큰 목록 |
 | 문서 | 툴 안 작성 + 외부 링크 읽기 + 파일 업로드 → 하나의 읽기 뷰 |
 | 요구사항 추출 | Phase 1 번호 규칙 자동 + 직접 지정 → Phase 2 AI 초안 |
-| 기술 | Next.js + Supabase + 자체 DOM 캔버스(Deus 방식) + Vercel |
+| 기술 | Nuxt 4(Vue) + 바드림 디자인 시스템 + Supabase + 자체 DOM 캔버스(Deus 방식) + Vercel |
 | 로그인 | `@ba-dream.com` 이메일 인증코드 |
+| 디자인 | `@ba-dream/design-system`(Vue 3) + AUTO-MAKE 규칙, 무드는 design-system.ba-dream.com |
 | 이름 | Iris(이리스): 기획·디자인·개발을 잇는 무지개 |
 
 ## 레퍼런스 요약
@@ -53,7 +54,7 @@
 
 ## 다음 단계
 
-1. **디자인 작업**: [01_PRD.md](./01_PRD.md)의 "5. 화면 구성 & 디자인 방향"에 있는 Phase 1 화면 10개를 디자인한다.
+1. **디자인 시안**: Phase 1 화면 8장을 바드림 디자인 시스템으로 만들었다 → [design/iris-canvas](../design/iris-canvas/README.md)
 2. **개발 시작**: [03_PHASES.md](./03_PHASES.md)의 "Phase 1 시작 프롬프트"로 D1부터 진행한다.
 
 ## 미결 사항 (모아보기)

@@ -67,10 +67,12 @@ Supabase Auth 이메일 인증코드(OTP, 6자리). `@ba-dream.com` 도메인만
 @PRD/04_PROJECT_SPEC.md
 
 오늘은 Phase 1 일정표의 D1만 진행합니다:
-- Next.js + TypeScript + Tailwind 프로젝트 생성 (04_PROJECT_SPEC.md 구조대로)
+- Nuxt 4 + TypeScript 프로젝트 생성 (04_PROJECT_SPEC.md 구조대로)
+- @ba-dream/design-system 설치 후 tokens.css · style.css · fonts.css 연결
 - Supabase 연결, 02_DATA_MODEL.md 기준 테이블 + RLS(보안 규칙) 마이그레이션 작성
 - @ba-dream.com 전용 이메일 OTP 로그인
-- 에디터 셸 레이아웃 (좌측 패널 / 캔버스 영역 / 우측 패널 / pill 툴바), 내용은 비어 있어도 됨
+- 에디터 셸 레이아웃 (좌측 패널 / 캔버스 영역 / 우측 패널 / 플로팅 툴바), 내용은 비어 있어도 됨
+- 화면은 design/iris-canvas/ 의 HTML 시안(Login · Main)을 기준으로 디자인 시스템 컴포넌트로 만든다
 - Vercel 배포까지
 
 반드시 지켜야 할 것:
@@ -120,7 +122,7 @@ Comment, ScreenSnapshot, Module, Component.props_schema 사용 시작, 레이어
 ### 기능
 - [ ] 실시간 동시편집 + 접속자 아바타·커서 (화면 JSON → Yjs/Loro 문서로 전환)
 - [ ] 프로토타입: 탭/호버 → 화면 이동, 전환(즉시/푸시/스프링), ▶ 미리보기
-- [ ] 코드 탭: 선택 화면 → React(바드림 코드 컴포넌트 기준) 코드, 접근성 안내 주석
+- [ ] 코드 탭: 선택 화면 → Vue 코드(바드림 디자인 시스템 컴포넌트 기준), 접근성 안내 주석
 - [ ] 피그마 파일 가져오기: 피그마 레이어 → 편집 가능한 노드 변환 (주요 타입부터)
 - [ ] 펜·벡터·불리언·마스크
 - [ ] 프로젝트 반영률 대시보드, 팀 플러그인(확장 기능) 구조
