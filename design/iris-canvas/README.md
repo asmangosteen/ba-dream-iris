@@ -13,6 +13,9 @@ Phase 1 화면 8장의 HTML 시안 소스입니다. 바드림 디자인 시스�
 | Login.dc.html | 01 로그인 (@ba-dream.com 인증코드) |
 | Home.dc.html | 02 프로젝트 홈 |
 | Main.dc.html | 03 에디터: 화면 인스펙터 (디자인 · 기획 · 개발 탭) ★ |
+| MainLayer.dc.html | 03-2 에디터: 레이어를 골랐을 때 (캔버스 강조 · 인스턴스 속성) |
+| MainDoc.dc.html | 03-3 에디터: 문서를 오른쪽 패널에서 읽을 때 (요구사항 → 레이어 강조) |
+| MainAsset.dc.html | 03-4 에디터: 에셋 상세를 왼쪽 사이드바에서 볼 때 (속성 · 쓰는 곳) |
 | DocSplit.dc.html | 04 문서 함께 보기 |
 | AddDoc.dc.html | 05 문서 추가 모달 |
 | FigmaLink.dc.html | 06 피그마 화면 연결 |

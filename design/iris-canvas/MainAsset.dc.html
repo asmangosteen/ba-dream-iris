@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 에디터 — 에셋 상세</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-wrap: wrap; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+
+  <aside aria-label="왼쪽 패널" style="flex: 0 0 240px; min-width: 0; height: 900px; display: flex; flex-direction: column; box-shadow: 1px 0 0 var(--iris-line-strong); position: relative; z-index: 1; background: var(--sys-color-common-white-default)">
+    <div style="padding: var(--ref-spacing-08) var(--ref-spacing-06) 0 var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <a href="Home.dc.html" class="sq hov" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-03)">
+          <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 12px; width: auto; display: block">
+          <span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
+        </a>
+        <button class="ib" aria-label="검색"><span class="ic i-search" aria-hidden="true"></span></button>
+      </div>
+      <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">착한구독 신청 플로우 개편</span>
+    </div>
+
+    <div role="tablist" aria-label="왼쪽 패널" style="display: flex; gap: var(--ref-spacing-10); padding: 0 var(--ref-spacing-10); box-shadow: inset 0 -1px 0 var(--iris-line-strong); flex: none">
+      <sc-for list="{{left.tabs}}" as="t" hint-placeholder-count="3">
+        <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{left.isFile}}" hint-placeholder-val="{{true}}">
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+        <div style="padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-08); display: flex; flex-direction: column; box-shadow: inset 0 -1px 0 var(--iris-line)">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-right: var(--ref-spacing-02)"><span class="nav-label" style="padding-bottom: 0">페이지</span><button class="ib" aria-label="페이지 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
+          <button class="sq nav-item s on">신청 플로우</button>
+          <button class="sq nav-item s">마이페이지</button>
+          <button class="sq nav-item s">홈 · 내 차고</button>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-10); display: flex; flex-direction: column">
+          <span class="nav-label" style="padding-bottom: var(--ref-spacing-06)">레이어</span>
+          <sc-for list="{{layers}}" as="ly" hint-placeholder-count="10">
+            <button class="sq" onClick="{{ly.pick}}" aria-pressed="{{ly.on}}" style="{{ly.rowStyle}}">
+              <sc-if value="{{ly.isFrame}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--sys-color-neutral-600)"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
+              <sc-if value="{{ly.isComp}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>
+              <sc-if value="{{ly.isText}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--sys-color-neutral-600)"><path d="M2 3V2h8v1M6 2v8M4.5 10h3" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
+              <sc-if value="{{ly.isRect}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--sys-color-neutral-600)"><rect x="1.6" y="1.6" width="8.8" height="8.8" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"></rect></svg></sc-if>
+              <sc-if value="{{ly.isImage}}" hint-placeholder-val="{{false}}"><span class="ic ic-12 i-image" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span></sc-if>
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ly.name}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{left.isAssets}}" hint-placeholder-val="{{false}}">
+      <sc-if value="{{ad.closed}}" hint-placeholder-val="{{true}}">
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+        <div style="padding: var(--ref-spacing-08) var(--ref-spacing-08) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+          <label class="fld" style="height: 32px; border-radius: var(--ref-radius-04); padding: 0 var(--ref-spacing-06)">
+            <span class="ic ic-14 i-search" aria-hidden="true"></span>
+            <input value="{{assets.q}}" onInput="{{assets.type}}" placeholder="컴포넌트 찾기" aria-label="컴포넌트 찾기">
+          </label>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-02)">
+            <span style="font-weight: 600; color: var(--sys-color-neutral-800)">바드림 디자인 시스템</span>
+            <span style="color: var(--sys-color-neutral-500)">1.0.0</span>
+          </div>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow: auto; padding: 0 var(--ref-spacing-08) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+          <sc-for list="{{assets.groups}}" as="g" hint-placeholder-count="4">
+            <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+              <span class="nav-label" style="padding: 0 var(--ref-spacing-02)">{{g.label}}</span>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-08) var(--ref-spacing-06)">
+                <sc-for list="{{g.items}}" as="c" hint-placeholder-count="3">
+                  <button draggable="true" onDragStart="{{c.drag}}" onClick="{{c.open}}" aria-label="{{c.aria}}" style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; cursor: grab">
+                    <span class="sq asset-thumb" style="{{c.wrap}}">
+                      <sc-for list="{{c.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
+                    </span>
+                    <span style="padding: 0 var(--ref-spacing-02); font-weight: 500; color: var(--sys-color-neutral-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.name}}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </section>
+          </sc-for>
+          <sc-if value="{{assets.empty}}" hint-placeholder-val="{{false}}">
+            <span style="padding: var(--ref-spacing-10) var(--ref-spacing-02); color: var(--sys-color-neutral-500)">찾는 컴포넌트가 없어요</span>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ad.open}}" hint-placeholder-val="{{false}}">
+      <div style="flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column">
+        <div style="display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-04)">
+          <button class="ib" aria-label="에셋 목록으로" onClick="{{ad.back}}"><span class="ic i-chevron_left" aria-hidden="true"></span></button>
+          <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ad.name}}</span>
+        </div>
+        <div style="padding: 0 var(--ref-spacing-08) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+          <span class="sq" draggable="true" onDragStart="{{ad.drag}}" style="{{ad.wrap}}" aria-label="{{ad.aria}}">
+            <sc-for list="{{ad.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
+          </span>
+          <sc-for list="{{ad.controls}}" as="ct" hint-placeholder-count="2">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+              <span style="font-weight: 600; color: var(--sys-color-neutral-800)">{{ct.name}}</span>
+              <div class="sq" style="display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100)">
+                <sc-for list="{{ct.opts}}" as="o" hint-placeholder-count="3"><button onClick="{{o.pick}}" aria-pressed="{{o.on}}" class="sq" style="{{o.style}}">{{o.label}}</button></sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <button onClick="{{ad.add}}" class="bd-button m primary" style="width: 100%">캔버스에 추가</button>
+          <div class="sq" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700); white-space: pre-wrap; overflow-wrap: anywhere">{{ad.code}}</div>
+        </div>
+        <div style="padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-12); box-shadow: inset 0 1px 0 var(--iris-line); display: flex; flex-direction: column">
+          <span class="nav-label">이 파일에서 쓰는 곳</span>
+          <sc-for list="{{ad.uses}}" as="u" hint-placeholder-count="2">
+            <button onClick="{{u.pick}}" class="{{u.cls}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--iris-component)"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis">{{u.frame}}</span><span style="color: var(--sys-color-neutral-500)">{{u.n}}</span></button>
+          </sc-for>
+          <sc-if value="{{ad.unused}}" hint-placeholder-val="{{false}}"><span style="padding: 0 var(--ref-spacing-08); color: var(--sys-color-neutral-500)">아직 쓰지 않았어요</span></sc-if>
+        </div>
+      </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{left.isDocs}}" hint-placeholder-val="{{false}}">
+      <div style="flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-10) var(--ref-spacing-04); display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+        <sc-for list="{{docsNav}}" as="dg" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-right: var(--ref-spacing-02); min-height: 22px"><span class="nav-label" style="padding-bottom: 0">{{dg.label}}</span><sc-if value="{{dg.first}}" hint-placeholder-val="{{true}}"><a href="AddDoc.dc.html" class="ib" aria-label="문서 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></a></sc-if></div>
+            <sc-for list="{{dg.items}}" as="di" hint-placeholder-count="2">
+              <button onClick="{{di.open}}" class="{{di.cls}}"><span class="{{di.icon}}" aria-hidden="true"></span><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis">{{di.title}}</span><span style="font-weight: 400; color: var(--sys-color-neutral-500)">{{di.n}}</span></button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </aside>
+
+  <main aria-label="캔버스" class="canvas-dots" onDragOver="{{canvas.over}}" onDrop="{{canvas.drop}}" style="flex: 999 1 560px; min-width: 0; height: 900px; position: relative; overflow: hidden">
+    <div style="position: absolute; left: 48px; top: 72px; display: flex; gap: 48px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f1.labelStyle}}">신청_01_차종선택</span>
+          <span style="{{f1.countStyle}}">{{f1.count}}</span>
+        </div>
+        <button onClick="{{f1.select}}" aria-label="신청_01_차종선택 화면 선택" style="{{f1.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800)">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 12px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">차종을 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100)"></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 A</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">월 구독료 시작가</span></div>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100)"></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 B</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">월 구독료 시작가</span></div>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100)"></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 C</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span></div>
+              </div>
+            </div>
+          </div>
+        </button>
+        <sc-if value="{{f1.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f2.labelStyle}}">신청_02_구독료선택</span>
+          <span style="{{f2.countStyle}}">{{f2.count}}</span>
+        </div>
+        <button onClick="{{f2.select}}" aria-label="신청_02_구독료선택 화면 선택" style="{{f2.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">구독료를 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sys-color-neutral-100); border-radius: 6px; padding: 2px; text-align: center; color: var(--sys-color-neutral-600)">
+                <div style="padding: 3px 0">12개월</div><div style="padding: 3px 0; background: var(--sys-color-common-white-default); border-radius: 4px; font-weight: 600; color: var(--sys-color-neutral-800); box-shadow: 0 1px 2px rgb(3 9 26 / 8%)">24개월</div><div style="padding: 3px 0">36개월</div>
+              </div>
+              <div style="border-radius: 8px; background: var(--sys-color-neutral-100); padding: 6px 7px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; text-align: center; color: var(--sys-color-neutral-600)"><span>라이트</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">스탠다드</span><span>프리미엄</span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span></div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); padding: 7px; display: flex; flex-direction: column; gap: 3px">
+                <span style="align-self: flex-start; padding: 0 4px; border-radius: 99px; background: var(--sys-color-common-white-default); color: var(--sys-color-brand-primary-default); font-weight: 600">가장 많이 선택</span>
+                <span style="font-weight: 500; font-size: 9px">스탠다드</span>
+                <span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">할인 구독료</span> <span style="color: var(--sys-color-neutral-500)">원래 구독료</span></span>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 500; font-size: 9px">라이트</span><span style="height: 3px; width: 50%; background: var(--ref-color-gray-900-10); border-radius: 2px"></span></div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 500; font-size: 9px">프리미엄</span><span style="height: 3px; width: 50%; background: var(--ref-color-gray-900-10); border-radius: 2px"></span></div>
+            </div>
+            <div style="position: absolute; left: 10px; right: 10px; bottom: 12px; height: 26px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-weight: 500; font-size: 9px">다음</div>
+          </div>
+        </button>
+        <sc-if value="{{f2.whole}}" hint-placeholder-val="{{true}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f3.labelStyle}}">신청_03_보험옵션</span>
+          <span style="{{f3.countStyle}}">{{f3.count}}</span>
+        </div>
+        <button onClick="{{f3.select}}" aria-label="신청_03_보험옵션 화면 선택" style="{{f3.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">보험과 옵션을 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-weight: 600; font-size: 9px">보험</span>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 3px var(--sys-color-brand-primary-default)"></span>기본형</div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400)"></span>안심형</div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400)"></span>프리미엄형</div>
+              <span style="font-weight: 600; font-size: 9px; margin-top: 6px">추가 옵션</span>
+              <div style="display: flex; justify-content: space-between; align-items: center">헬멧 대여 <span style="width: 18px; height: 10px; border-radius: 6px; background: var(--sys-color-brand-primary-default)"></span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center">추가 배터리 <span style="width: 18px; height: 10px; border-radius: 6px; background: var(--sys-color-neutral-300)"></span></div>
+            </div>
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px 12px; box-shadow: 0 -1px 0 var(--iris-line); display: flex; justify-content: space-between; align-items: center"><span style="color: var(--sys-color-neutral-600)">월 구독료</span><span style="padding: 5px 12px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-weight: 500">다음</span></div>
+          </div>
+        </button>
+        <sc-if value="{{f3.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f4.labelStyle}}">신청_04_결제</span>
+          <span style="{{f4.countStyle}}">{{f4.count}}</span>
+        </div>
+        <button onClick="{{f4.select}}" aria-label="신청_04_결제 화면 선택" style="{{f4.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">결제할 금액을 확인해주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="border-radius: 8px; background: var(--sys-color-brand-primary-lightest); padding: 8px; display: flex; justify-content: space-between; color: var(--sys-color-brand-primary-default)"><span style="font-weight: 500">지금 낼 금액</span><span style="font-weight: 600">₩ —</span></div>
+              <div style="border-radius: 8px; background: var(--sys-color-neutral-100); padding: 8px; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">차종</span><span>모델 A</span></div>
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">구독료</span><span>스탠다드 · 24개월</span></div>
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">보험</span><span>기본형</span></div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 5px; font-weight: 500; margin-top: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--sys-color-brand-primary-default)"></span>약관에 모두 동의해요</div>
+            </div>
+            <div style="position: absolute; left: 10px; right: 10px; bottom: 12px; height: 26px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-weight: 500; font-size: 9px">결제하기</div>
+          </div>
+        </button>
+        <sc-if value="{{f4.whole}}" hint-placeholder-val="{{false}}"><div class="sq" style="align-self: center; margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px">375 × 812</div></sc-if>
+      </div>
+    </div>
+
+    <sc-if value="{{hl.show}}" hint-placeholder-val="{{false}}">
+      <div aria-hidden="true" style="{{hl.box}}">
+        <span style="position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: var(--ref-spacing-02); padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 500; white-space: nowrap">{{hl.size}}</span>
+      </div>
+    </sc-if>
+
+    <sc-for list="{{canvas.dropped}}" as="d" hint-placeholder-count="0">
+      <div style="{{d.pos}}">
+        <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-brand-primary-default); font-weight: 500; white-space: nowrap">{{d.name}}</span>
+        <span style="{{d.wrap}}"><sc-for list="{{d.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for></span>
+      </div>
+    </sc-for>
+
+    <div role="toolbar" aria-label="도구" style="position: absolute; left: 50%; bottom: var(--ref-spacing-10); transform: translateX(-50%); display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; filter: drop-shadow(0 6px 12px rgb(69 76 88 / 16%))" class="sq">
+      <button aria-label="이동 (V)" aria-pressed="true" class="sq" style="width: 32px; height: 32px; border-radius: var(--ref-radius-04); display: grid; place-items: center; --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.2l9.3 4.6-4 1.3-1.4 4z" fill="currentColor"></path></svg></button>
+      <button aria-label="프레임 (F)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+      <button aria-label="사각형 (R)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.33" fill="none"></rect></svg></button>
+      <button aria-label="텍스트 (T)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5V3h10v1.5M8 3v10M6 13h4" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+      <button aria-label="이미지" class="ib" style="width: 32px; height: 32px"><span class="ic i-image" aria-hidden="true"></span></button>
+      <button aria-label="에셋 열기" onClick="{{left.toAssets}}" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+      <button aria-label="코멘트" class="ib" style="width: 32px; height: 32px"><span class="ic i-comment" aria-hidden="true"></span></button>
+      <span style="width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-04)"></span>
+      <button class="sq hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-link" aria-hidden="true"></span>요구사항 연결</button>
+      <a href="FigmaLink.dc.html" class="sq hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-arrow_up_right" aria-hidden="true"></span>피그마 화면</a>
+    </div>
+  </main>
+
+  <aside aria-label="오른쪽 패널" style="{{right.style}}">
+    <div style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 48px; padding: 0 var(--ref-spacing-08); flex: none">
+      <div aria-label="지금 보고 있는 멤버 3명" style="display: flex; align-items: center; margin-right: auto">
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default)">김</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default), inset 0 0 0 1px var(--ref-color-gray-900-20); margin-left: -4px">박</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -4px">이</span>
+      </div>
+      <button aria-label="미리보기" class="btn-ink" style="width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center"><span class="ic ic-12 i-play" aria-hidden="true"></span></button>
+      <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}" style="height: 28px">문서</button>
+      <button class="bd-button s primary" style="height: 28px; padding: 0 var(--ref-spacing-08)">공유</button>
+    </div>
+
+    <sc-if value="{{right.inspector}}" hint-placeholder-val="{{true}}">
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-04); flex: none; box-shadow: 0 1px 0 var(--iris-line-strong)">
+          <div role="tablist" aria-label="인스펙터 탭" style="display: flex; gap: var(--ref-spacing-02)">
+            <button role="tab" aria-selected="{{tabs.designSel}}" onClick="{{tabs.toDesign}}" style="{{tabs.designStyle}}">디자인</button>
+            <button role="tab" aria-selected="{{tabs.planSel}}" onClick="{{tabs.toPlan}}" style="{{tabs.planStyle}}">기획</button>
+            <button role="tab" aria-selected="{{tabs.devSel}}" onClick="{{tabs.toDev}}" style="{{tabs.devStyle}}">개발</button>
+          </div>
+          <button class="sq hov" aria-label="확대 비율 50%" style="display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700)">50% <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+        </div>
+
+        <div style="flex: none; padding: var(--ref-spacing-08) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
+            <span style="{{obj.nameStyle}}">
+              <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
+              <sc-if value="{{obj.isComp}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{obj.name}}</span>
+            </span>
+            <span class="bd-badge s t-gray">{{obj.badge}}</span>
+          </div>
+          <span style="color: var(--sys-color-neutral-500)">{{obj.source}}</span>
+        </div>
+
+        <div style="flex: 1; min-height: 0; overflow: auto">
+          <sc-if value="{{tabs.planSel}}" hint-placeholder-val="{{true}}">
+            <div>
+              <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}">
+                <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between">
+                    <span style="font-weight: 600">요구사항 반영</span>
+                    <span style="font-weight: 600"><span style="color: var(--sys-color-brand-primary-default)">{{sum.done}}</span> / {{sum.total}}</span>
+                  </div>
+                  <div role="img" aria-label="{{sum.aria}}" style="display: flex; height: 4px; gap: 2px">
+                    <span style="{{sum.rBar}}"></span><span style="{{sum.pBar}}"></span><span style="{{sum.mBar}}"></span>
+                  </div>
+                  <div style="display: flex; gap: var(--ref-spacing-08); color: var(--sys-color-neutral-600)">
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default)"></span>반영 {{sum.r}}</span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--sys-color-neutral-800)"></span>일부 {{sum.p}}</span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-neutral-800)"></span>미반영 {{sum.m}}</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div class="pn-sec">
+                <div class="pn-h"><span>{{plan.title}}</span><button class="ib" aria-label="요구사항 연결"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
+                <sc-for list="{{reqs}}" as="rq" hint-placeholder-count="4">
+                  <div style="padding: var(--ref-spacing-06) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--iris-line)">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
+                      <span style="font-weight: 500; color: var(--sys-color-neutral-500)">{{rq.code}}<span style="color: var(--sys-color-neutral-400)"> · {{rq.anchor}}</span></span>
+                      <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" class="{{rq.chipClass}}">
+                        <sc-if value="{{rq.isR}}" hint-placeholder-val="{{true}}"><span class="ic ic-12 i-check" aria-hidden="true"></span></sc-if>
+                        {{rq.label}}
+                      </button>
+                    </div>
+                    <div style="font-weight: 500; color: var(--sys-color-neutral-800)">{{rq.title}}</div>
+                    <sc-if value="{{rq.hasNote}}" hint-placeholder-val="{{false}}">
+                      <div style="display: flex; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-700)"><span class="ic ic-12 i-warning" aria-hidden="true" style="margin-top: 3px"></span><span>{{rq.note}}</span></div>
+                    </sc-if>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-600)">
+                      <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rq.doc}}</span>
+                      <button onClick="{{rq.openDoc}}" style="flex: none; color: var(--sys-color-brand-primary-default); font-weight: 500">원문 보기</button>
+                    </div>
+                  </div>
+                </sc-for>
+                <sc-if value="{{plan.empty}}" hint-placeholder-val="{{false}}">
+                  <div style="padding: var(--ref-spacing-06) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06)">
+                    <span style="color: var(--sys-color-neutral-500)">연결된 요구사항이 없어요</span>
+                    <button class="bd-button s stroke" style="color: var(--sys-color-neutral-800)"><span class="ic ic-12 i-link" aria-hidden="true"></span>요구사항 연결</button>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                <div class="pn-h"><span>관련 문서</span><a href="AddDoc.dc.html" class="ib" aria-label="문서 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></a></div>
+                <sc-for list="{{relDocs}}" as="rd" hint-placeholder-count="3">
+                  <button onClick="{{rd.open}}" class="sq hov" style="display: flex; align-items: center; gap: var(--ref-spacing-06); width: calc(100% - 8px); height: 32px; margin: 0 var(--ref-spacing-02); padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04)"><span class="{{rd.icon}}" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span><span style="flex: 1; min-width: 0">{{rd.title}}</span><span style="color: var(--sys-color-neutral-500)">{{rd.kind}}</span></button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabs.devSel}}" hint-placeholder-val="{{false}}">
+            <div>
+              <sc-if value="{{dev.isComp}}" hint-placeholder-val="{{false}}">
+                <div>
+                  <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                    <div class="pn-h"><span>컴포넌트</span><button onClick="{{dev.openAsset}}" style="color: var(--sys-color-brand-primary-default); font-weight: 500">에셋에서 보기</button></div>
+                    <sc-for list="{{dev.props}}" as="pp" hint-placeholder-count="3">
+                      <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; min-height: 28px; padding: 0 var(--ref-spacing-10)">
+                        <span style="color: var(--sys-color-neutral-500)">{{pp.k}}</span>
+                        <span class="fld" style="height: 26px"><span style="color: var(--sys-color-neutral-800)">{{pp.v}}</span></span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+                    <span style="font-weight: 600">코드</span>
+                    <div class="sq" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700); white-space: pre-wrap; overflow-wrap: anywhere">{{dev.code}}</div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{dev.isFrame}}" hint-placeholder-val="{{true}}">
+                <div>
+                  <div class="pn-sec" style="padding-bottom: var(--ref-spacing-06)">
+                    <div class="pn-h"><span>사용 컴포넌트</span><span style="font-weight: 500; color: var(--sys-color-neutral-600)">{{dev.summary}}</span></div>
+                    <sc-for list="{{dev.comps}}" as="c" hint-placeholder-count="4">
+                      <button onClick="{{c.open}}" class="sq hov" style="display: flex; align-items: center; gap: var(--ref-spacing-06); width: calc(100% - 8px); margin: 0 var(--ref-spacing-02); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04)">
+                        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--iris-component)"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg>
+                        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500; color: var(--iris-component)">{{c.name}}</span><span style="font-size: 12px; color: var(--sys-color-neutral-500); font-family: ui-monospace, Menlo, monospace">{{c.code}}</span></span>
+                        <span style="font-weight: 600; color: var(--sys-color-neutral-700)">×{{c.count}}</span>
+                      </button>
+                    </sc-for>
+                    <sc-if value="{{dev.hasUnmatched}}" hint-placeholder-val="{{true}}">
+                      <div style="display: flex; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-10); color: var(--sys-color-neutral-700)"><span class="ic ic-12 i-info" aria-hidden="true" style="margin-top: 3px"></span><span>{{dev.unmatched}}</span></div>
+                    </sc-if>
+                  </div>
+                  <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                    <div class="pn-h"><span>사용 토큰</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">brand/primary-default</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-800)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">neutral/800</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">neutral/100</span></div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{dev.isPlain}}" hint-placeholder-val="{{false}}">
+                <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06)">
+                  <span style="color: var(--sys-color-neutral-500)">{{dev.plainText}}</span>
+                  <sc-if value="{{dev.canSwap}}" hint-placeholder-val="{{false}}"><button onClick="{{dev.toAssets}}" class="bd-button s stroke" style="color: var(--sys-color-neutral-800)">컴포넌트로 바꾸기</button></sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{tabs.designSel}}" hint-placeholder-val="{{false}}">
+            <div>
+              <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                <div class="pn-h"><span>위치</span></div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04) var(--ref-spacing-06); padding: 0 var(--ref-spacing-10)">
+                  <label class="fld"><span>X</span><input value="{{geo.x}}" readonly="readonly"></label>
+                  <label class="fld"><span>Y</span><input value="{{geo.y}}" readonly="readonly"></label>
+                </div>
+              </div>
+              <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                <div class="pn-h"><span>레이아웃</span></div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04) var(--ref-spacing-06); padding: 0 var(--ref-spacing-10)">
+                  <label class="fld"><span>W</span><input value="{{geo.w}}" readonly="readonly"></label>
+                  <label class="fld"><span>H</span><input value="{{geo.h}}" readonly="readonly"></label>
+                </div>
+              </div>
+              <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                <div class="pn-h"><span>모양</span></div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04) var(--ref-spacing-06); padding: 0 var(--ref-spacing-10)">
+                  <label class="fld"><span>투명도</span><input value="100%" readonly="readonly"></label>
+                  <label class="fld"><span>모서리</span><input value="{{geo.radius}}" readonly="readonly"></label>
+                </div>
+              </div>
+              <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
+                <div class="pn-h"><span>채우기</span><button class="ib" aria-label="채우기 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
+                <div style="padding: 0 var(--ref-spacing-10)"><div class="fld"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"></span><span style="color: var(--sys-color-neutral-800)">{{geo.fill}}</span><span style="margin-left: auto">100%</span></div></div>
+              </div>
+              <div class="pn-sec"><div class="pn-h"><span>선</span><button class="ib" aria-label="선 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></div>
+              <div class="pn-sec"><div class="pn-h"><span>효과</span><button class="ib" aria-label="효과 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></div>
+              <div class="pn-sec"><div class="pn-h"><span>내보내기</span><button class="ib" aria-label="내보내기 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{right.docOpen}}" hint-placeholder-val="{{false}}">
+      <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+        <div role="tablist" aria-label="문서" style="display: flex; align-items: center; gap: var(--ref-spacing-10); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-10); flex: none; box-shadow: 0 1px 0 var(--iris-line-strong)">
+          <sc-for list="{{reader.tabs}}" as="t" hint-placeholder-count="3">
+            <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+          </sc-for>
+          <button onClick="{{right.closeDoc}}" class="ib" aria-label="문서 닫기" style="margin-left: auto"><span class="ic i-close" aria-hidden="true"></span></button>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-17)">
+          <article style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+              <h2 style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-neutral-800)">{{reader.title}}</h2>
+              <span style="display: flex; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">{{reader.meta}}<a href="DocSplit.dc.html" style="color: var(--sys-color-brand-primary-default); font-weight: 500">넓게 보기</a></span>
+            </div>
+            <sc-for list="{{reader.sections}}" as="sec" hint-placeholder-count="2">
+              <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+                <h3 style="margin: 0; font-size: var(--typography-body-1-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">{{sec.h}}</h3>
+                <p style="margin: 0; font-size: 14px; line-height: 22px; color: var(--sys-color-neutral-700)">{{sec.p}}</p>
+                <sc-for list="{{sec.reqs}}" as="rb" hint-placeholder-count="2">
+                  <button onClick="{{rb.pick}}" aria-pressed="{{rb.on}}" class="sq" style="{{rb.style}}">
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+                      <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{rb.code}}</span>
+                      <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rb.where}}</span>
+                      <span class="{{rb.badge}}" style="margin-left: auto">{{rb.status}}</span>
+                    </span>
+                    <span style="font-size: 14px; line-height: 22px; color: var(--sys-color-neutral-700)">{{rb.text}}</span>
+                  </button>
+                </sc-for>
+              </section>
+            </sc-for>
+          </article>
+        </div>
+      </div>
+    </sc-if>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const STATUS = {
+  reflected: { label: '반영됨', cls: 't-success' },
+  partial: { label: '일부 반영', cls: 't-warning' },
+  missing: { label: '미반영', cls: 't-destructed' },
+  na: { label: '해당 없음', cls: 't-gray' }
+};
+const NEXT = { reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' };
+const SCREENS = {
+  s1: { name: '신청_01_차종선택', status: '승인', source: '피그마 · 오늘 09:40', isFigma: true, x: '0' },
+  s2: { name: '신청_02_구독료선택', status: '검토 중', source: '피그마 · 2시간 전', isFigma: true, x: '455' },
+  s3: { name: '신청_03_보험옵션', status: '작업 중', source: 'Iris 캔버스', isFigma: false, x: '910' },
+  s4: { name: '신청_04_결제', status: '작업 중', source: 'Iris 캔버스', isFigma: false, x: '1365' }
+};
+const REQS = [
+  { s: 's1', code: 'REQ-005', title: '차종 카드에 1회 충전 주행거리와 충전 시간을 보여준다', doc: '착한구독 개편 기획서 v1.2 · 2쪽' },
+  { s: 's1', code: 'REQ-007', title: '차종 카드에 월 구독료 시작가를 보여준다', doc: '착한구독 개편 기획서 v1.2 · 2쪽' },
+  { s: 's1', code: 'REQ-008', title: '비교하기로 차종을 최대 3대까지 비교할 수 있다', doc: '착한구독 개편 기획서 v1.2 · 3쪽' },
+  { s: 's2', code: 'REQ-012', title: '구독료 비교표를 화면 위쪽에 보여준다', doc: '착한구독 개편 기획서 v1.2 · 4쪽' },
+  { s: 's2', code: 'REQ-013', title: '약정 기간(12·24·36개월)마다 할인 구독료를 보여준다', doc: '구독료 정책 정리 · 2. 할인', note: '할인 구독료는 있지만 원래 구독료 취소선이 빠져 있어요.' },
+  { s: 's2', code: 'REQ-014', title: '추천 요금제에 ‘가장 많이 선택’ 배지를 단다', doc: '착한구독 개편 기획서 v1.2 · 4쪽' },
+  { s: 's2', code: 'REQ-015', title: '요금제를 누르면 혜택 상세 바텀시트를 연다', doc: '착한구독 개편 기획서 v1.2 · 5쪽' },
+  { s: 's2', code: 'REQ-021', title: '다음 버튼은 화면 아래에 고정한다', doc: '신청 플로우 개발 메모' },
+  { s: 's3', code: 'REQ-030', title: '보험 3종을 카드로 비교해 하나를 고른다', doc: '착한구독 개편 기획서 v1.2 · 6쪽' },
+  { s: 's3', code: 'REQ-031', title: '옵션을 켜고 끌 때 월 구독료를 바로 다시 계산한다', doc: '구독료 정책 정리 · 3. 옵션', note: '월 구독료 자리는 있지만 금액이 아직 비어 있어요.' },
+  { s: 's4', code: 'REQ-040', title: '지금 낼 금액을 연파랑 박스로 강조한다', doc: '착한구독 개편 기획서 v1.2 · 7쪽' },
+  { s: 's4', code: 'REQ-041', title: '약관 전체 동의를 한 번에 할 수 있다', doc: '착한구독 개편 기획서 v1.2 · 7쪽' },
+  { s: 's4', code: 'REQ-042', title: '첫 달 무료 혜택 안내를 보여준다', doc: '구독료 정책 정리 · 4. 혜택' },
+  { s: 's4', code: 'REQ-043', title: '결제 수단을 바꿀 수 있는 버튼을 둔다', doc: '신청 플로우 개발 메모' }
+];
+const INITIAL = { 'REQ-005': 'reflected', 'REQ-007': 'reflected', 'REQ-008': 'missing', 'REQ-012': 'reflected', 'REQ-013': 'partial', 'REQ-014': 'reflected', 'REQ-015': 'missing', 'REQ-021': 'reflected', 'REQ-030': 'reflected', 'REQ-031': 'partial', 'REQ-040': 'reflected', 'REQ-041': 'reflected', 'REQ-042': 'na', 'REQ-043': 'missing' };
+const P = 'var(--sys-color-brand-primary-default)', W = 'var(--sys-color-common-white-default)', N8 = 'var(--sys-color-neutral-800)', N6 = 'var(--sys-color-neutral-600)', N5 = 'var(--sys-color-neutral-500)', LN = 'var(--ref-color-gray-900-10)';
+const T = (text, style, cls) => ({ text: text || '', style: style || '', cls: cls || '' });
+const ROW = 'display:flex;align-items:center;justify-content:center;gap:4px;';
+const ASSETS = [
+  { label: '액션', items: [
+    { name: 'Button', wrap: ROW, parts: [T('신청하기', 'padding:4px 10px;border-radius:8px;background:' + P + ';color:' + W + ';font-size:12px;line-height:18px;font-weight:500')] },
+    { name: 'Text Button', wrap: ROW, parts: [T('전체보기', 'color:' + P + ';font-size:12px;line-height:18px;font-weight:500')] },
+    { name: 'Icon Button', wrap: ROW, parts: [T('', 'color:' + N8, 'ic ic-20 i-close')] }
+  ] },
+  { label: '선택', items: [
+    { name: 'Checkbox', wrap: ROW, parts: [T('', 'width:18px;height:18px;border-radius:4px;background-color:' + P + ';background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M2.5 6.2l2.3 2.3 4.7-4.9%27 stroke=%27white%27 stroke-width=%271.6%27 fill=%27none%27/%3E%3C/svg%3E");background-size:12px;background-position:center;background-repeat:no-repeat'), T('동의', 'font-size:12px;line-height:18px')] },
+    { name: 'Toggle', wrap: ROW, parts: [T('', 'width:34px;height:20px;border-radius:999px;background:radial-gradient(circle at 24px 50%, #fff 7px, transparent 7.5px),' + P), T('', 'width:34px;height:20px;border-radius:999px;background:radial-gradient(circle at 10px 50%, #fff 7px, transparent 7.5px),var(--sys-color-neutral-300)')] },
+    { name: 'Chip', wrap: ROW, parts: [T('전체', 'padding:1px 8px;border-radius:6px;background:var(--sys-color-brand-primary-lightest);box-shadow:inset 0 0 0 1px var(--ref-color-blue-500-40);color:' + P + ';font-size:12px;line-height:18px;font-weight:500'), T('액션', 'padding:1px 8px;border-radius:6px;box-shadow:inset 0 0 0 1px ' + LN + ';color:' + N6 + ';font-size:12px;line-height:18px;font-weight:500')] },
+    { name: 'Segmented Control', wrap: 'display:flex;align-items:center;justify-content:center;', parts: [T('1주', 'padding:2px 7px;border-radius:6px 0 0 6px;background:var(--sys-color-neutral-100);color:' + N6 + ';font-size:10px;line-height:16px;box-shadow:-2px 0 0 0 var(--sys-color-neutral-100)'), T('4주', 'padding:2px 7px;border-radius:5px;background:#fff;color:' + N8 + ';font-size:10px;line-height:16px;font-weight:600;box-shadow:0 0 0 2px var(--sys-color-neutral-100)'), T('12주', 'padding:2px 7px;border-radius:0 6px 6px 0;background:var(--sys-color-neutral-100);color:' + N6 + ';font-size:10px;line-height:16px;box-shadow:2px 0 0 0 var(--sys-color-neutral-100)')] }
+  ] },
+  { label: '입력', items: [
+    { name: 'Text Input', wrap: 'display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 12px;', parts: [T('이름', 'font-size:10px;line-height:16px;font-weight:500'), T('이름을 적어주세요', 'padding:3px 6px;border-radius:6px;box-shadow:inset 0 0 0 1px ' + LN + ';color:' + N5 + ';font-size:10px;line-height:16px;white-space:nowrap;overflow:hidden')] },
+    { name: 'Search Field', wrap: 'display:flex;align-items:center;padding:0 12px;', parts: [T('검색', 'flex:1;padding:4px 8px;border-radius:6px;background:var(--sys-color-neutral-100);color:' + N5 + ';font-size:10px;line-height:16px')] }
+  ] },
+  { label: '표시', items: [
+    { name: 'Badge', wrap: ROW, parts: [T('추천', '', 'bd-badge s t-brand'), T('20%', '', 'bd-badge s t-destructed')] },
+    { name: 'Notice Box', wrap: 'display:flex;align-items:center;padding:0 10px;', parts: [T('3일 전에 알려드려요', 'flex:1;padding:5px 8px;border-radius:8px;background:var(--sys-color-brand-primary-lightest);color:' + P + ';font-size:10px;line-height:16px;white-space:nowrap;overflow:hidden')] },
+    { name: 'Product Card', wrap: 'display:flex;align-items:center;padding:0 10px;', parts: [T('모델 A', 'flex:1;padding:6px 8px 6px 36px;border-radius:8px;box-shadow:inset 0 0 0 1px ' + LN + ';background:linear-gradient(var(--sys-color-neutral-100),var(--sys-color-neutral-100)) 6px 50%/22px 22px no-repeat;font-size:10px;line-height:16px;font-weight:500;white-space:nowrap')] }
+  ] },
+  { label: '내비게이션', items: [
+    { name: 'Top Bar', wrap: 'display:flex;align-items:center;justify-content:space-between;padding:0 12px;', parts: [T('', 'color:' + N8, 'ic ic-14 i-chevron_left'), T('신청하기', 'font-size:10px;line-height:16px;font-weight:600'), T('', 'color:' + N8, 'ic ic-14 i-close')] },
+    { name: 'Tab', wrap: 'display:flex;align-items:flex-end;justify-content:center;gap:12px;', parts: [T('전체', 'padding-bottom:3px;font-size:10px;line-height:16px;font-weight:600;box-shadow:inset 0 -1.5px 0 ' + N8), T('진행 중', 'padding-bottom:3px;font-size:10px;line-height:16px;color:' + N5)] },
+    { name: 'Bottom Bar', wrap: 'display:flex;align-items:flex-end;padding:0 10px 10px;', parts: [T('다음', 'flex:1;padding:3px 0;border-radius:6px;background:' + P + ';color:' + W + ';text-align:center;font-size:10px;line-height:16px;font-weight:500')] }
+  ] }
+];
+const BY_NAME = {};
+ASSETS.forEach((g) => g.items.forEach((c) => { BY_NAME[c.name] = c; }));
+/* 레이어: [이름, 깊이, 종류, [x, y, w, h] (프레임 안 좌표)] */
+const LAYERS = {
+  s1: [['신청_01_차종선택', 0, 'frame', [0, 0, 196, 424]], ['TopBar', 1, 'comp', [0, 0, 196, 28]], ['Title Area', 1, 'frame', [0, 28, 196, 33]], ['Title', 2, 'text', [10, 32, 120, 20]], ['Content Area', 1, 'frame', [0, 61, 196, 174]], ['ProductCard', 2, 'comp', [10, 61, 176, 54]], ['ProductCard', 2, 'comp', [10, 121, 176, 54]], ['ProductCard', 2, 'comp', [10, 181, 176, 54]]],
+  s2: [['신청_02_구독료선택', 0, 'frame', [0, 0, 196, 424]], ['TopBar', 1, 'comp', [0, 0, 196, 28]], ['Title Area', 1, 'frame', [0, 28, 196, 31]], ['Title', 2, 'text', [10, 32, 124, 20]], ['Content Area', 1, 'frame', [0, 59, 196, 198]], ['SegmentedControl', 2, 'comp', [10, 59, 176, 21]], ['비교표', 2, 'frame', [10, 86, 176, 32]], ['플랜 카드', 2, 'frame', [10, 124, 176, 55]], ['Badge', 3, 'comp', [17, 131, 58, 13]], ['플랜 카드', 2, 'frame', [10, 185, 176, 33]], ['Rectangle 12', 2, 'rect', [10, 224, 176, 33]], ['BottomBar', 1, 'comp', [0, 376, 196, 48]], ['Button', 2, 'comp', [10, 386, 176, 26]]],
+  s3: [['신청_03_보험옵션', 0, 'frame', [0, 0, 196, 424]], ['Header', 1, 'frame', [0, 0, 196, 59]], ['Title', 2, 'text', [10, 32, 140, 20]], ['보험', 1, 'text', [10, 59, 176, 13]], ['RadioCard', 1, 'frame', [10, 77, 176, 25]], ['RadioCard', 1, 'frame', [10, 109, 176, 25]], ['RadioCard', 1, 'frame', [10, 140, 176, 25]], ['추가 옵션', 1, 'text', [10, 177, 176, 13]], ['OptionRow', 1, 'frame', [10, 196, 176, 11]], ['OptionRow', 1, 'frame', [10, 213, 176, 11]], ['TotalBar', 1, 'frame', [0, 383, 196, 41]]],
+  s4: [['신청_04_결제', 0, 'frame', [0, 0, 196, 424]], ['Header', 1, 'frame', [0, 0, 196, 59]], ['Title', 2, 'text', [10, 32, 150, 20]], ['지금 낼 금액', 1, 'frame', [10, 59, 176, 27]], ['금액 표', 1, 'frame', [10, 92, 176, 58]], ['약관 동의', 1, 'frame', [10, 160, 176, 11]], ['Banner', 1, 'image', [10, 180, 176, 44]], ['PayButton', 1, 'frame', [10, 386, 176, 26]]]
+};
+const FRAME_X = { s1: 48, s2: 292, s3: 536, s4: 780 };
+const FRAME_Y = 94;
+/* 요구사항이 걸린 레이어 */
+const ANCHOR = { 'REQ-005': 'ProductCard', 'REQ-007': 'ProductCard', 'REQ-008': '', 'REQ-012': '비교표', 'REQ-013': '플랜 카드', 'REQ-014': 'Badge', 'REQ-015': '플랜 카드', 'REQ-021': 'BottomBar', 'REQ-030': 'RadioCard', 'REQ-031': 'TotalBar', 'REQ-040': '지금 낼 금액', 'REQ-041': '약관 동의', 'REQ-042': 'Banner', 'REQ-043': 'PayButton' };
+const COMPS = {
+  s1: { list: [['TopBar', '<TopBar mode="back">', 1], ['ProductCard', '<ProductCard>', 3]], unmatched: '' },
+  s2: { list: [['TopBar', '<TopBar mode="back">', 1], ['SegmentedControl', '<SegmentedControl size="m">', 1], ['Badge', '<Badge theme="brand" type="alpha">', 1], ['BottomBar', '<BottomBar>', 1], ['Button', '<Button type="primary" size="xl">', 1]], unmatched: '연결 안 된 레이어 · Rectangle 12' },
+  s3: { list: [], unmatched: '' },
+  s4: { list: [], unmatched: '' }
+};
+/* 인스턴스 속성 (개발 탭) */
+const INST = {
+  TopBar: { asset: 'Top Bar', props: [['mode', 'back'], ['line', 'false'], ['title', '없음']], code: '<TopBar mode="back" />' },
+  SegmentedControl: { asset: 'Segmented Control', props: [['size', 'm'], ['items', '12개월 · 24개월 · 36개월'], ['selected', '24개월']], code: '<SegmentedControl size="m"\n  :items="[\'12개월\', \'24개월\', \'36개월\']"\n  v-model="term" />' },
+  Badge: { asset: 'Badge', props: [['theme', 'brand'], ['type', 'alpha'], ['label', '가장 많이 선택']], code: '<Badge theme="brand" type="alpha">\n  가장 많이 선택\n</Badge>' },
+  BottomBar: { asset: 'Bottom Bar', props: [['type', 'single'], ['line', 'true']], code: '<BottomBar>\n  <Button type="primary" size="xl">다음</Button>\n</BottomBar>' },
+  Button: { asset: 'Button', props: [['type', 'primary'], ['size', 'xl'], ['label', '다음'], ['disabled', 'false']], code: '<Button type="primary" size="xl">\n  다음\n</Button>' },
+  ProductCard: { asset: 'Product Card', props: [['image', '차종 사진'], ['title', '모델 A'], ['price', '월 구독료 시작가']], code: '<ProductCard title="모델 A" />' }
+};
+const ASSET_TO_LAYER = { 'Top Bar': 'TopBar', 'Segmented Control': 'SegmentedControl', 'Badge': 'Badge', 'Bottom Bar': 'BottomBar', 'Button': 'Button', 'Product Card': 'ProductCard' };
+const CODE = { 'Button': '<Button type="{t}" size="{s}">\n  신청하기\n</Button>', 'Text Button': '<TextButton>전체보기</TextButton>', 'Icon Button': '<IconButton icon-name="close" />', 'Checkbox': '<Checkbox :checked="true" />', 'Toggle': '<Toggle :checked="true" />', 'Chip': '<Chip :selected="true">전체</Chip>', 'Segmented Control': '<SegmentedControl size="m" :items="items" />', 'Text Input': '<TextInput label="이름" />', 'Search Field': '<SearchField placeholder="검색" />', 'Badge': '<Badge theme="{th}" type="alpha">추천</Badge>', 'Notice Box': '<NoticeBox type="primary" />', 'Product Card': '<ProductCard />', 'Top Bar': '<TopBar mode="back" />', 'Tab': '<Tab :items="items" />', 'Bottom Bar': '<BottomBar />' };
+/* 문서 */
+const DOCS = [
+  { id: 'd1', group: '기획', title: '착한구독 개편 기획서 v1.2', short: '기획서 v1.2', icon: 'ic ic-14 i-document', kind: 'PDF', meta: 'PDF · 11월 20일 · 김기획', sections: [
+    { h: '3. 구독료 선택', p: '고객은 약정 기간과 요금제를 한 화면에서 비교하고 고른다. 기존 화면은 요금제마다 상세로 들어가야 해서 비교가 어려웠다.', reqs: ['REQ-012', 'REQ-014', 'REQ-015'] },
+    { h: '4. 보험과 옵션', p: '보험은 한 가지를 고르고, 옵션은 켜고 끄며 바로 월 구독료를 확인한다.', reqs: ['REQ-030'] },
+    { h: '5. 결제', p: '결제 전에 지금 낼 금액을 가장 먼저 보여주고, 약관은 한 번에 동의할 수 있게 한다.', reqs: ['REQ-040', 'REQ-041'] }
+  ] },
+  { id: 'd2', group: '기획', title: '구독료 정책 정리', short: '구독료 정책', icon: 'ic ic-14 i-link', kind: '링크', meta: 'Google Docs · 11월 19일 · 김기획', sections: [
+    { h: '2. 할인', p: '약정이 길수록 할인 폭이 커진다. 할인 구독료 옆에 원래 구독료를 취소선으로 함께 둔다.', reqs: ['REQ-013'] },
+    { h: '3. 옵션', p: '옵션 금액은 월 구독료에 바로 더해 보여준다.', reqs: ['REQ-031'] },
+    { h: '4. 혜택', p: '첫 달 무료는 이번 개편 범위에서 뺐다.', reqs: ['REQ-042'] }
+  ] },
+  { id: 'd3', group: '개발', title: '신청 플로우 개발 메모', short: '개발 메모', icon: 'ic ic-14 i-write', kind: 'Iris', meta: 'Iris 문서 · 11월 20일 · 이개발', sections: [
+    { h: '하단 버튼', p: '긴 화면에서도 다음 버튼은 BottomBar 로 고정한다. 결제 수단 변경은 결제 화면에서만 연다.', reqs: ['REQ-021', 'REQ-043'] }
+  ] }
+];
+const DOC_OF = (r) => r.doc.indexOf('구독료 정책') === 0 ? 'd2' : r.doc.indexOf('신청 플로우 개발') === 0 ? 'd3' : 'd1';
+const BTN_T = ['primary', 'secondary', 'tertiary', 'stroke'], BTN_S = ['s', 'm', 'l', 'xl'], BADGE_T = [['brand', 't-brand'], ['gray', 't-gray'], ['dark', 't-destructed']];
+const THUMB = 'height:64px;border-radius:var(--ref-radius-04);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;overflow:hidden;';
+const START = {"left": "assets", "asset": "Button", "tab": "dev", "sel": "s2", "layer": 12};
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
+class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
+  constructor(props) {
+    super(props);
+    this.state = Object.assign({ tab: 'plan', left: 'file', q: '', sel: 's2', layer: 0, doc: null, req: null, asset: null, bt: 'primary', bs: 'l', bth: 'brand', st: Object.assign({}, INITIAL), dropped: [] }, START);
+    this.dragName = null;
+  }
+  cycle(code) {
+    const st = Object.assign({}, this.state.st);
+    st[code] = NEXT[st[code]];
+    this.setState({ st: st });
+  }
+  place(name, x, y) {
+    const n = this.state.dropped.length;
+    this.setState({ dropped: this.state.dropped.concat([{ name: name, x: x == null ? 300 + n * 16 : x, y: y == null ? 560 + n * 16 : y, s: this.state.sel }]) });
+  }
+  layerIndex(sid, name) {
+    const i = LAYERS[sid].findIndex((l) => l[0] === name);
+    return i < 0 ? 0 : i;
+  }
+  pickReq(code) {
+    const r = REQS.find((x) => x.code === code);
+    if (!r) return;
+    this.setState({ req: code, sel: r.s, layer: ANCHOR[code] ? this.layerIndex(r.s, ANCHOR[code]) : 0 });
+  }
+  frame(id) {
+    const sel = this.state.sel === id;
+    const list = REQS.filter((r) => r.s === id);
+    const done = list.filter((r) => this.state.st[r.code] === 'reflected').length;
+    const all = list.filter((r) => this.state.st[r.code] !== 'na').length;
+    const whole = sel && this.state.layer === 0;
+    return {
+      sel: sel, whole: whole,
+      count: done + '/' + all,
+      select: () => this.setState({ sel: id, layer: 0 }),
+      labelStyle: sel ? 'color:var(--sys-color-brand-primary-default);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500',
+      countStyle: 'font-weight:600;' + (done === all ? 'color:var(--sys-color-brand-primary-default)' : 'color:var(--sys-color-neutral-600)'),
+      frameStyle: 'display:block;width:196px;height:424px;overflow:hidden;background:var(--sys-color-common-white-default);' + (whole ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:0' : sel ? 'outline:1px solid var(--ref-color-blue-500-40)' : 'outline:1px solid var(--iris-line-strong)')
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const tabStyle = (on) => 'padding:var(--ref-spacing-08) var(--ref-spacing-06);font-size:12px;' + (on ? 'color:var(--sys-color-neutral-800);font-weight:600' : 'color:var(--sys-color-neutral-500);font-weight:500');
+    const lineTab = (on) => 'padding:var(--ref-spacing-06) 0 var(--ref-spacing-07);font-size:12px;line-height:18px;white-space:nowrap;' + (on ? 'color:var(--sys-color-neutral-800);font-weight:600;box-shadow:inset 0 -1.5px 0 var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-500);font-weight:500');
+    const raw = LAYERS[s.sel];
+    const L = raw[s.layer] || raw[0];
+    const isFrameSel = s.layer === 0;
+    const cur = SCREENS[s.sel];
+
+    /* 레이어 목록 */
+    const added = s.dropped.filter((d) => d.s === s.sel).map((d) => [d.name.replace(/ /g, ''), 1, 'comp', [0, 0, 0, 0]]);
+    const layers = raw.concat(added).map((l, i) => {
+      const on = i === s.layer;
+      return {
+        name: l[0], on: on, isFrame: l[2] === 'frame', isComp: l[2] === 'comp', isText: l[2] === 'text', isRect: l[2] === 'rect', isImage: l[2] === 'image',
+        pick: () => { if (i < raw.length) this.setState({ layer: i, req: null }); },
+        rowStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);width:100%;height:28px;flex:none;border-radius:var(--ref-radius-04);padding-left:' + (8 + l[1] * 14) + 'px;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);font-weight:600;' : '') + (l[2] === 'comp' ? 'color:var(--iris-component);' + (on ? '' : 'font-weight:500') : (on ? 'color:var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-700)'))
+      };
+    });
+
+    /* 요구사항 */
+    const all = REQS.filter((r) => r.s === s.sel);
+    const scoped = isFrameSel ? all : all.filter((r) => ANCHOR[r.code] === L[0]);
+    const mk = (r) => {
+      const k = s.st[r.code];
+      return {
+        code: r.code, title: r.title, doc: r.doc, anchor: ANCHOR[r.code] || '연결 안 됨', note: r.note || '', hasNote: !!r.note && k !== 'reflected',
+        label: STATUS[k].label, aria: r.code + ' 상태 ' + STATUS[k].label + ', 눌러서 바꾸기',
+        chipClass: 'bd-badge s ' + STATUS[k].cls, isR: k === 'reflected',
+        cycle: () => this.cycle(r.code),
+        openDoc: () => this.setState({ doc: DOC_OF(r), req: r.code })
+      };
+    };
+    const list = scoped.map(mk);
+    const cnt = (lab) => all.filter((r) => STATUS[s.st[r.code]].label === lab).length;
+    const r = cnt('반영됨'), p = cnt('일부 반영'), m = cnt('미반영');
+    const total = r + p + m || 1;
+    const bar = (n, c) => 'display:block;border-radius:2px;width:' + (n / total * 100) + '%;' + c;
+
+    /* 캔버스 강조 */
+    const box = L[3];
+    const hlShow = !isFrameSel && box[2] > 0;
+
+    /* 개발 탭 */
+    const inst = L[2] === 'comp' ? INST[L[0]] : null;
+    const cm = COMPS[s.sel];
+    const totalComps = cm.list.reduce((a, c) => a + c[2], 0);
+
+    /* 에셋 */
+    const q = s.q.trim().toLowerCase().replace(/\s/g, '');
+    const groups = ASSETS.map((g) => ({
+      label: g.label,
+      items: g.items.filter((c) => !q || c.name.toLowerCase().replace(/\s/g, '').includes(q) || g.label.includes(q)).map((c) => ({
+        name: c.name, parts: c.parts, wrap: THUMB + c.wrap, aria: c.name + ' 자세히 보기',
+        drag: (e) => { this.dragName = c.name; try { e.dataTransfer.setData('text/plain', c.name); e.dataTransfer.effectAllowed = 'copy'; } catch (err) {} },
+        open: () => this.setState({ asset: c.name })
+      }))
+    })).filter((g) => g.items.length);
+    const A = s.asset ? BY_NAME[s.asset] : null;
+    let ad = { open: false, closed: true, name: '', parts: [], wrap: '', controls: [], uses: [], unused: false, code: '' };
+    if (A) {
+      let parts = A.parts, controls = [], code = CODE[A.name] || '';
+      const seg = (name, opts, curv, key) => ({ name: name, opts: opts.map((o) => ({ label: o[1], on: curv === o[0], pick: () => { const n = {}; n[key] = o[0]; this.setState(n); }, style: 'flex:1;padding:3px 0;border-radius:var(--ref-radius-03);text-align:center;font-size:12px;line-height:18px;' + (curv === o[0] ? '--sq-fill:var(--sys-color-common-white-default);color:var(--sys-color-neutral-800);font-weight:600;filter:drop-shadow(0 1px 2px rgb(3 9 26 / 10%))' : 'color:var(--sys-color-neutral-600);font-weight:500') })) });
+      if (A.name === 'Button') {
+        parts = [T('신청하기', '', 'bd-button ' + s.bs + ' ' + s.bt)];
+        controls = [seg('type', BTN_T.map((t) => [t, t]), s.bt, 'bt'), seg('size', BTN_S.map((t) => [t, t]), s.bs, 'bs')];
+        code = code.replace('{t}', s.bt).replace('{s}', s.bs);
+      } else if (A.name === 'Badge') {
+        const th = BADGE_T.find((b) => b[0] === s.bth);
+        parts = [T('추천', '', 'bd-badge ' + th[1])];
+        controls = [seg('theme', BADGE_T.map((b) => [b[0], b[0]]), s.bth, 'bth')];
+        code = code.replace('{th}', s.bth);
+      }
+      const lname = ASSET_TO_LAYER[A.name];
+      const uses = Object.keys(LAYERS).map((sid) => ({ sid: sid, n: LAYERS[sid].filter((l) => l[2] === 'comp' && l[0] === lname).length })).filter((u) => u.n).map((u) => ({
+        frame: SCREENS[u.sid].name, n: u.n,
+        cls: 'sq nav-item s' + (s.sel === u.sid && L[0] === lname ? ' on' : ''),
+        pick: () => this.setState({ sel: u.sid, layer: this.layerIndex(u.sid, lname), tab: 'dev' })
+      }));
+      ad = {
+        open: true, closed: false, name: A.name, parts: parts, controls: controls, code: code, uses: uses, unused: !uses.length,
+        aria: A.name + ' 캔버스로 끌어다 놓기',
+        wrap: 'height:120px;border-radius:var(--ref-radius-06);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;cursor:grab;' + A.wrap.replace(/font-size:10px/g, 'font-size:12px'),
+        back: () => this.setState({ asset: null }),
+        add: () => this.place(A.name),
+        drag: (e) => { this.dragName = A.name; try { e.dataTransfer.setData('text/plain', A.name); } catch (err) {} }
+      };
+    }
+    const dropped = s.dropped.map((d) => {
+      const c = BY_NAME[d.name];
+      return {
+        name: d.name, parts: c.parts,
+        pos: 'position:absolute;left:' + d.x + 'px;top:' + d.y + 'px;display:flex;flex-direction:column;gap:2px;pointer-events:none',
+        wrap: 'display:flex;width:150px;height:56px;background:var(--sys-color-common-white-default);outline:1px solid var(--sys-color-brand-primary-default);' + c.wrap
+      };
+    });
+
+    /* 문서 */
+    const D = s.doc ? DOCS.find((d) => d.id === s.doc) : null;
+    const reqCount = (d) => d.sections.reduce((a, x) => a + x.reqs.length, 0);
+    const docsNav = ['기획', '개발'].map((g, gi) => ({
+      label: g, first: gi === 0,
+      items: DOCS.filter((d) => d.group === g).map((d) => ({ title: d.title, icon: d.icon, n: reqCount(d), cls: 'sq nav-item s' + (s.doc === d.id ? ' on' : ''), open: () => this.setState({ doc: d.id }) }))
+    }));
+    const reader = D ? {
+      title: D.title, meta: D.meta,
+      tabs: DOCS.map((d) => ({ label: d.short, on: d.id === D.id, style: lineTab(d.id === D.id), pick: () => this.setState({ doc: d.id }) })),
+      sections: D.sections.map((x) => ({
+        h: x.h, p: x.p,
+        reqs: x.reqs.map((code) => {
+          const rq = REQS.find((y) => y.code === code), k = s.st[code], on = s.req === code;
+          return {
+            code: code, text: rq.title, status: STATUS[k].label, badge: 'bd-badge s ' + STATUS[k].cls, on: on,
+            where: SCREENS[rq.s].name + (ANCHOR[code] ? ' · ' + ANCHOR[code] : ''),
+            pick: () => on ? this.setState({ req: null, layer: 0 }) : this.pickReq(code),
+            style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);width:100%;padding:var(--ref-spacing-07) var(--ref-spacing-08);border-radius:var(--ref-radius-06);text-align:left;' + (on ? '--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:1px' : '--sq-fill:var(--sys-color-neutral-100)')
+          };
+        })
+      }))
+    } : { title: '', meta: '', tabs: [], sections: [] };
+
+    const fx = FRAME_X[s.sel];
+    return {
+      left: {
+        isFile: s.left === 'file', isAssets: s.left === 'assets', isDocs: s.left === 'docs',
+        tabs: [['file', '파일'], ['assets', '에셋'], ['docs', '문서']].map((t) => ({ label: t[1], on: s.left === t[0], style: lineTab(s.left === t[0]), pick: () => this.setState({ left: t[0] }) })),
+        toAssets: () => this.setState({ left: 'assets', asset: null })
+      },
+      assets: { q: s.q, type: (e) => this.setState({ q: e.target.value }), groups: groups, empty: !groups.length },
+      ad: ad,
+      docsNav: docsNav,
+      right: {
+        inspector: !D, docOpen: !!D,
+        style: 'flex:0 0 ' + (D ? '400px' : '300px') + ';min-width:0;height:900px;display:flex;flex-direction:column;box-shadow:-1px 0 0 var(--iris-line-strong);position:relative;z-index:1;background:var(--sys-color-common-white-default)',
+        docBtn: 'bd-button s ' + (D ? 'ink' : 'stroke'),
+        toggleDoc: () => this.setState(D ? { doc: null } : { doc: DOC_OF(all[0] || REQS[0]) }),
+        closeDoc: () => this.setState({ doc: null, req: null })
+      },
+      reader: reader,
+      hl: {
+        show: hlShow, name: L[0], size: Math.round(box[2] * 375 / 196) + ' × ' + Math.round(box[3] * 375 / 196),
+        box: 'position:absolute;left:' + (fx + box[0]) + 'px;top:' + (FRAME_Y + box[1]) + 'px;width:' + box[2] + 'px;height:' + box[3] + 'px;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default);pointer-events:none'
+      },
+      canvas: {
+        dropped: dropped,
+        over: (e) => { e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {} },
+        drop: (e) => {
+          e.preventDefault();
+          let name = this.dragName;
+          try { name = e.dataTransfer.getData('text/plain') || name; } catch (err) {}
+          if (!BY_NAME[name]) return;
+          const el = e.currentTarget, rect = el.getBoundingClientRect(), k = rect.width / el.offsetWidth || 1;
+          this.dragName = null;
+          this.place(name, Math.round((e.clientX - rect.left) / k - 75), Math.round((e.clientY - rect.top) / k - 28));
+        }
+      },
+      tabs: {
+        planSel: s.tab === 'plan', devSel: s.tab === 'dev', designSel: s.tab === 'design',
+        planStyle: tabStyle(s.tab === 'plan'), devStyle: tabStyle(s.tab === 'dev'), designStyle: tabStyle(s.tab === 'design'),
+        toPlan: () => this.setState({ tab: 'plan' }), toDev: () => this.setState({ tab: 'dev' }), toDesign: () => this.setState({ tab: 'design' })
+      },
+      f1: this.frame('s1'), f2: this.frame('s2'), f3: this.frame('s3'), f4: this.frame('s4'),
+      obj: {
+        name: L[0], isFrame: isFrameSel, isComp: L[2] === 'comp',
+        badge: isFrameSel ? cur.status : ({ comp: '인스턴스', frame: '프레임', text: '텍스트', rect: '사각형', image: '이미지' })[L[2]],
+        source: isFrameSel ? cur.source : cur.name + ' 안',
+        nameStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);min-width:0;font-weight:600;font-size:14px;line-height:22px;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : 'color:var(--sys-color-neutral-800)')
+      },
+      plan: { title: isFrameSel ? '연결된 요구사항' : '이 레이어의 요구사항', empty: !list.length },
+      reqs: list,
+      relDocs: DOCS.map((d) => ({ title: d.title, icon: d.icon.replace('ic-14 ', ''), kind: d.kind, open: () => this.setState({ doc: d.id }) })),
+      sum: { done: r, total: r + p + m, r: r, p: p, m: m, rBar: bar(r, 'background:var(--sys-color-brand-primary-default)'), pBar: bar(p, 'box-shadow:inset 0 0 0 1px var(--sys-color-neutral-800)'), mBar: bar(m, 'background:var(--sys-color-neutral-800)'), aria: '반영 ' + r + '개, 일부 반영 ' + p + '개, 미반영 ' + m + '개' },
+      layers: layers,
+      dev: {
+        isFrame: isFrameSel, isComp: !!inst, isPlain: !isFrameSel && !inst,
+        plainText: L[2] === 'rect' ? '디자인 시스템과 연결 안 된 레이어예요' : '컴포넌트가 아닌 레이어예요',
+        canSwap: L[2] === 'rect',
+        toAssets: () => this.setState({ left: 'assets', asset: null }),
+        props: inst ? inst.props.map((x) => ({ k: x[0], v: x[1] })) : [],
+        code: inst ? inst.code : '',
+        openAsset: () => inst && this.setState({ left: 'assets', asset: inst.asset }),
+        comps: cm.list.map((c) => ({ name: c[0], code: c[1], count: c[2], open: () => this.setState({ left: 'assets', asset: INST[c[0]] ? INST[c[0]].asset : null }) })),
+        summary: cm.list.length ? totalComps + '개' : '없음',
+        unmatched: cm.unmatched, hasUnmatched: !!cm.unmatched
+      },
+      geo: {
+        x: isFrameSel ? cur.x : String(box[0] * 2), y: isFrameSel ? '0' : String(box[1] * 2),
+        w: String(isFrameSel ? 375 : Math.round(box[2] * 375 / 196)), h: String(isFrameSel ? 812 : Math.round(box[3] * 375 / 196)),
+        radius: isFrameSel ? '0' : (L[2] === 'comp' || L[2] === 'frame' ? 'radius/07' : '0'),
+        fill: isFrameSel ? 'common/white-default' : (L[2] === 'text' ? 'neutral/800' : 'common/white-default')
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
