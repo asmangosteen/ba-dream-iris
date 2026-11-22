@@ -1,0 +1,9 @@
+<!-- Supabase › Authentication › Emails › Templates › Confirm signup (처음 로그인하는 사람이 받는 메일)
+     제목: Iris 로그인 코드 {{ .Token }} -->
+<div style="font-family:'Pretendard',-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:400px;margin:0 auto;padding:32px 24px;color:#202837;font-size:14px;line-height:22px">
+  <p style="margin:0 0 16px;font-size:16px;line-height:24px;font-weight:600">Iris에 처음 오셨네요</p>
+  <p style="margin:0 0 8px">로그인 화면에 아래 코드를 적어주세요.</p>
+  <p style="margin:0 0 24px;padding:12px 0;background:#F1F2F3;border-radius:8px;text-align:center;font-size:24px;line-height:32px;font-weight:600;letter-spacing:6px;font-variant-numeric:tabular-nums">{{ .Token }}</p>
+  <p style="margin:0 0 24px">또는 <a href="{{ .ConfirmationURL }}" style="color:#2C7BE2;font-weight:500">이 링크</a>를 눌러 바로 들어가도 돼요.</p>
+  <p style="margin:0;color:#8C9199;font-size:12px;line-height:18px">직접 요청하지 않았다면 이 메일은 무시해도 괜찮아요.</p>
+</div>
