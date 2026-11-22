@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 피그마 화면 연결</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
+<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
 </head>
 <body>
 <x-dc>
@@ -15,9 +15,12 @@ a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
 <div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
-  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; flex-direction: column">
-    <div style="height: 56px; background: var(--sys-color-common-white-default)"></div>
-    <div style="flex: 1; display: flex"><div style="width: 248px; background: var(--sys-color-common-white-default)"></div><div style="flex: 1" class="canvas-dots"></div><div style="width: 336px; background: var(--sys-color-common-white-default)"></div></div>
+  <div aria-hidden="true" style="position: absolute; inset: 0">
+    <div class="sq float s" style="position: absolute; left: 8px; top: 8px; width: 264px; height: 40px"></div>
+    <div class="sq float" style="position: absolute; left: 8px; top: 56px; bottom: 8px; width: 264px"></div>
+    <div class="sq float s" style="position: absolute; left: 280px; top: 56px; width: 40px; height: 360px"></div>
+    <div class="sq float s" style="position: absolute; right: 8px; top: 8px; width: 288px; height: 40px"></div>
+    <div class="sq float" style="position: absolute; right: 8px; top: 56px; bottom: 8px; width: 288px"></div>
   </div>
   <div aria-hidden="true" style="position: absolute; inset: 0; background: var(--dimmed-bg)"></div>
 
@@ -35,7 +38,7 @@ a{color:inherit}a:hover{color:inherit}
             <span class="ic i-link" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
             <input id="figmaUrl" value="figma.com/design/Ab12Cd/착한구독-신청?node-id=12-345" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
           </div>
-          <button class="bd-button l secondary">불러오기</button>
+          <button class="bd-button l stroke" style="color: var(--sys-color-neutral-800)">불러오기</button>
         </div>
       </div>
 
@@ -68,7 +71,7 @@ a{color:inherit}a:hover{color:inherit}
 
       <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-12) var(--ref-spacing-12)">
         <a href="Main.dc.html" class="bd-button l tertiary" style="flex: 1">취소</a>
-        <a href="Main.dc.html" class="bd-button l primary" style="flex: 2.25">{{cta}}</a>
+        <a href="Main.dc.html" class="bd-button l ink" style="flex: 2.25">{{cta}}</a>
       </div>
     </section>
   </div>
@@ -85,7 +88,7 @@ const FRAMES = [
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 문서 함께 보기</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
+<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
 </head>
 <body>
 <x-dc>
@@ -14,25 +14,16 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
-
-<header style="height: 56px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-10); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 2">
-  <a href="Home.dc.html" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
-    <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 15px; width: auto; display: block">
-    <span style="font-weight: 700; font-size: 18px; line-height: 24px; color: var(--sys-color-common-black-default)">Iris</span>
-  </a>
-  <nav aria-label="위치" style="display: flex; align-items: center; gap: var(--ref-spacing-04); margin-left: var(--ref-spacing-10); color: var(--sys-color-neutral-600)">
-    <a href="Home.dc.html">착한구독 신청 플로우 개편</a>
-    <span class="ic ic-12 i-chevron_right" aria-hidden="true"></span>
-    <span style="color: var(--sys-color-neutral-800); font-weight: 600">신청 플로우</span>
-  </nav>
-  <div style="flex: 1"></div>
-  <a href="Main.dc.html" class="bd-button m stroke" style="color: var(--sys-color-neutral-800)">문서 닫기</a>
-</header>
-
-<div style="flex: 1; min-height: 0; display: flex; flex-wrap: wrap">
-  <main aria-label="캔버스" class="canvas-dots" style="flex: 1 1 520px; min-width: 0; position: relative; overflow: hidden">
-    <div style="position: absolute; left: 40px; top: 60px; display: flex; gap: 44px">
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-08); z-index: 3; font-size: 12px; line-height: 18px">
+    <a href="Home.dc.html" aria-label="Iris 홈으로" style="display: flex; align-items: center"><img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 12px; width: auto; display: block"></a>
+    <a href="Home.dc.html" style="color: var(--sys-color-neutral-500)">착한구독 신청 플로우 개편</a>
+    <span class="ic ic-12 i-chevron_right" aria-hidden="true" style="color: var(--sys-color-neutral-400)"></span>
+    <span style="font-weight: 600">신청 플로우</span>
+  </div>
+  <div style="position: absolute; inset: 0; display: flex">
+  <main aria-label="캔버스" class="canvas-dots" style="flex: 1; min-width: 0; position: relative; overflow: hidden">
+    <div style="position: absolute; left: 48px; top: 88px; display: flex; gap: 44px">
       <sc-for list="{{frames}}" as="fr" hint-placeholder-count="3">
         <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 176px; flex: none">
           <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px"><span style="{{fr.labelStyle}}">{{fr.name}}</span></div>
@@ -52,18 +43,18 @@ a{color:inherit}a:hover{color:inherit}
     </div>
   </main>
 
-  <aside aria-label="문서" style="flex: 0 1 600px; min-width: 0; display: flex; flex-direction: column; box-shadow: -1px 0 0 var(--iris-line); background: var(--sys-color-common-white-default)">
-    <div role="tablist" aria-label="문서" style="display: flex; align-items: center; gap: var(--ref-spacing-12); padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-16); box-shadow: inset 0 -1px 0 var(--iris-line-strong); overflow-x: auto; flex: none">
+  <aside aria-label="문서" class="sq float" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 600px; display: flex; flex-direction: column; overflow: hidden; z-index: 3">
+    <div role="tablist" aria-label="문서" class="seg" style="padding: var(--ref-spacing-06); flex: none; box-shadow: 0 1px 0 var(--iris-line)">
       <sc-for list="{{docs}}" as="d" hint-placeholder-count="3">
-        <button role="tab" aria-selected="{{d.on}}" onClick="{{d.pick}}" style="{{d.style}}">{{d.title}}</button>
+        <button role="tab" aria-selected="{{d.on}}" onClick="{{d.pick}}" class="{{d.cls}}">{{d.title}}</button>
       </sc-for>
-      <a href="AddDoc.dc.html" aria-label="문서 추가" class="ib" style="margin-left: auto; width: 32px; height: 32px; border-radius: var(--ref-radius-04)"><span class="ic i-plus" aria-hidden="true"></span></a>
+      <a href="AddDoc.dc.html" aria-label="문서 추가" class="ib" style="margin-left: auto"><span class="ic i-plus" aria-hidden="true"></span></a><a href="Main.dc.html" aria-label="문서 닫기" class="ib"><span class="ic i-close" aria-hidden="true"></span></a>
     </div>
 
     <div style="flex: 1; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-16) var(--ref-spacing-17)">
       <article style="max-width: 600px; display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
         <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
-          <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 700; color: var(--sys-color-common-black-default)">착한구독 개편 기획서 v1.2</h1>
+          <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 600; color: var(--sys-color-common-black-default)">착한구독 개편 기획서 v1.2</h1>
           <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-500)"><span>PDF · 11월 20일</span><a href="#" style="color: var(--sys-color-brand-primary-default); font-weight: 500">원본</a></div>
         </div>
 
@@ -94,7 +85,7 @@ a{color:inherit}a:hover{color:inherit}
       </article>
     </div>
   </aside>
-</div>
+  </div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
@@ -118,7 +109,7 @@ const DOCS = [
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
@@ -197,7 +188,7 @@ class Component extends DCLogic {
       docs: DOCS.map((d) => ({
         title: d.title, on: this.state.doc === d.id,
         pick: () => this.setState({ doc: d.id }),
-        style: 'flex:none;padding:var(--ref-spacing-08) 0 var(--ref-spacing-07);white-space:nowrap;' + (this.state.doc === d.id ? 'color:var(--sys-color-neutral-800);font-weight:600;box-shadow:inset 0 -1.5px 0 var(--sys-color-neutral-800)' : 'color:var(--sys-color-neutral-500);font-weight:500')
+        cls: 'sq seg-item' + (this.state.doc === d.id ? ' on' : '')
       })),
       reqBlocks: REQS.map((r) => {
         const on = this.state.req === r.code;

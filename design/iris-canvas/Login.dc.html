@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 로그인</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
+<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
 </head>
 <body>
 <x-dc>
@@ -14,7 +14,7 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; min-height: 900px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+<div style="width: 100%; min-height: 900px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
   <header style="position: relative; height: 60px; display: flex; align-items: center; padding: 0 var(--ref-spacing-12)">
     <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
       <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
@@ -25,10 +25,10 @@ a{color:inherit}a:hover{color:inherit}
   <main style="position: relative; flex: 1; display: grid; place-items: center; padding: var(--ref-spacing-16) var(--ref-spacing-10)">
     <div style="width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: stretch; gap: var(--ref-spacing-12)">
       <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--ref-spacing-08)">
-        <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 700; color: var(--sys-color-common-black-default)">로그인</h1>
+        <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 600; color: var(--sys-color-common-black-default)">로그인</h1>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+      <div class="sq float" style="display: flex; flex-direction: column; gap: var(--ref-spacing-10); padding: var(--ref-spacing-12)">
         <sc-if value="{{isEmail}}" hint-placeholder-val="{{true}}">
           <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
@@ -37,7 +37,7 @@ a{color:inherit}a:hover{color:inherit}
                 <input id="email" value="gildong" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
                 <span style="font-size: 14px; color: var(--sys-color-neutral-600)">@ba-dream.com</span>
               </div>            </div>
-            <button onClick="{{toCode}}" class="bd-button l primary" style="width: 100%">인증 코드 받기</button>
+            <button onClick="{{toCode}}" class="bd-button l ink" style="width: 100%">인증 코드 받기</button>
           </div>
         </sc-if>
         <sc-if value="{{isCode}}" hint-placeholder-val="{{false}}">
@@ -57,7 +57,7 @@ a{color:inherit}a:hover{color:inherit}
                 <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="여섯째 자리" value="" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
               </div>
             </fieldset>
-            <a href="Home.dc.html" class="bd-button l primary" style="width: 100%">로그인</a>
+            <a href="Home.dc.html" class="bd-button l ink" style="width: 100%">로그인</a>
             <div style="display: flex; justify-content: space-between; font-size: 13px">
               <button onClick="{{toEmail}}" style="color: var(--sys-color-neutral-600)">이메일 다시 입력</button>
               <button style="color: var(--sys-color-brand-primary-default); font-weight: 500">코드 다시 받기 0:42</button>
@@ -74,7 +74,7 @@ a{color:inherit}a:hover{color:inherit}
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 에디터 — 화면 인스펙터</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
+<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
 </head>
 <body>
 <x-dc>
@@ -14,29 +14,28 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-wrap: wrap; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
 
-  <aside aria-label="왼쪽 패널" style="flex: 0 0 240px; min-width: 0; height: 900px; display: flex; flex-direction: column; box-shadow: 1px 0 0 var(--iris-line-strong); position: relative; z-index: 1; background: var(--sys-color-common-white-default)">
-    <div style="padding: var(--ref-spacing-08) var(--ref-spacing-06) 0 var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
-      <div style="display: flex; align-items: center; justify-content: space-between">
-        <a href="Home.dc.html" class="sq hov" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-03)">
-          <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 12px; width: auto; display: block">
-          <span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
-        </a>
-        <button class="ib" aria-label="검색"><span class="ic i-search" aria-hidden="true"></span></button>
-      </div>
-      <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">착한구독 신청 플로우 개편</span>
-    </div>
+  <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 3">
+    <a href="Home.dc.html" class="sq hov" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none">
+      <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 12px; width: auto; display: block">
+      <span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
+    </a>
+    <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">착한구독 신청 플로우 개편</span>
+    <span style="flex: none; color: var(--sys-color-neutral-500)">저장됨</span>
+    <button class="ib" aria-label="검색" style="margin-left: auto"><span class="ic i-search" aria-hidden="true"></span></button>
+  </div>
 
-    <div role="tablist" aria-label="왼쪽 패널" style="display: flex; gap: var(--ref-spacing-10); padding: 0 var(--ref-spacing-10); box-shadow: inset 0 -1px 0 var(--iris-line-strong); flex: none">
+  <aside aria-label="왼쪽 패널" class="sq float" style="position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden">
+    <div role="tablist" aria-label="왼쪽 패널" class="seg" style="padding: var(--ref-spacing-06); flex: none">
       <sc-for list="{{left.tabs}}" as="t" hint-placeholder-count="3">
-        <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+        <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" class="{{t.cls}}">{{t.label}}</button>
       </sc-for>
     </div>
 
     <sc-if value="{{left.isFile}}" hint-placeholder-val="{{true}}">
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
-        <div style="padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-08); display: flex; flex-direction: column; box-shadow: inset 0 -1px 0 var(--iris-line)">
+        <div style="padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); display: flex; flex-direction: column; box-shadow: inset 0 -1px 0 var(--iris-line)">
           <div style="display: flex; align-items: center; justify-content: space-between; padding-right: var(--ref-spacing-02)"><span class="nav-label" style="padding-bottom: 0">페이지</span><button class="ib" aria-label="페이지 추가"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
           <button class="sq nav-item s on">신청 플로우</button>
           <button class="sq nav-item s">마이페이지</button>
@@ -61,7 +60,7 @@ a{color:inherit}a:hover{color:inherit}
     <sc-if value="{{left.isAssets}}" hint-placeholder-val="{{false}}">
       <sc-if value="{{ad.closed}}" hint-placeholder-val="{{true}}">
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
-        <div style="padding: var(--ref-spacing-08) var(--ref-spacing-08) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+        <div style="padding: var(--ref-spacing-02) var(--ref-spacing-08) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
           <label class="fld" style="height: 32px; border-radius: var(--ref-radius-04); padding: 0 var(--ref-spacing-06)">
             <span class="ic ic-14 i-search" aria-hidden="true"></span>
             <input value="{{assets.q}}" onInput="{{assets.type}}" placeholder="컴포넌트 찾기" aria-label="컴포넌트 찾기">
@@ -139,8 +138,8 @@ a{color:inherit}a:hover{color:inherit}
     </sc-if>
   </aside>
 
-  <main aria-label="캔버스" class="canvas-dots" onDragOver="{{canvas.over}}" onDrop="{{canvas.drop}}" style="flex: 999 1 560px; min-width: 0; height: 900px; position: relative; overflow: hidden">
-    <div style="position: absolute; left: 48px; top: 72px; display: flex; gap: 48px; align-items: flex-start">
+  <main aria-label="캔버스" class="canvas-dots" onDragOver="{{canvas.over}}" onDrop="{{canvas.drop}}" style="position: absolute; inset: 0; overflow: hidden">
+    <div style="position: absolute; left: 352px; top: 72px; display: flex; gap: 48px; align-items: flex-start">
 
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); width: 196px; flex: none">
         <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
@@ -260,44 +259,47 @@ a{color:inherit}a:hover{color:inherit}
       </div>
     </sc-for>
 
-    <div role="toolbar" aria-label="도구" style="position: absolute; left: 50%; bottom: var(--ref-spacing-10); transform: translateX(-50%); display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; filter: drop-shadow(0 6px 12px rgb(69 76 88 / 16%))" class="sq">
-      <button aria-label="이동 (V)" aria-pressed="true" class="sq" style="width: 32px; height: 32px; border-radius: var(--ref-radius-04); display: grid; place-items: center; --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.2l9.3 4.6-4 1.3-1.4 4z" fill="currentColor"></path></svg></button>
-      <button aria-label="프레임 (F)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
-      <button aria-label="사각형 (R)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.33" fill="none"></rect></svg></button>
-      <button aria-label="텍스트 (T)" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5V3h10v1.5M8 3v10M6 13h4" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
-      <button aria-label="이미지" class="ib" style="width: 32px; height: 32px"><span class="ic i-image" aria-hidden="true"></span></button>
-      <button aria-label="에셋 열기" onClick="{{left.toAssets}}" class="ib" style="width: 32px; height: 32px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
-      <button aria-label="코멘트" class="ib" style="width: 32px; height: 32px"><span class="ic i-comment" aria-hidden="true"></span></button>
-      <span style="width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-04)"></span>
-      <button class="sq hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-link" aria-hidden="true"></span>요구사항 연결</button>
-      <a href="FigmaLink.dc.html" class="sq hov" style="height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-800); font-weight: 500; white-space: nowrap; flex: none"><span class="ic i-arrow_up_right" aria-hidden="true"></span>피그마 화면</a>
-    </div>
   </main>
 
-  <aside aria-label="오른쪽 패널" style="{{right.style}}">
-    <div style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 48px; padding: 0 var(--ref-spacing-08); flex: none">
-      <div aria-label="지금 보고 있는 멤버 3명" style="display: flex; align-items: center; margin-right: auto">
-        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default)">김</span>
-        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default), inset 0 0 0 1px var(--ref-color-gray-900-20); margin-left: -4px">박</span>
-        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -4px">이</span>
-      </div>
-      <button aria-label="미리보기" class="btn-ink" style="width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center"><span class="ic ic-12 i-play" aria-hidden="true"></span></button>
-      <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}" style="height: 28px">문서</button>
-      <button class="bd-button s primary" style="height: 28px; padding: 0 var(--ref-spacing-08)">공유</button>
-    </div>
+  <div role="toolbar" aria-label="도구" aria-orientation="vertical" class="sq float s" style="position: absolute; left: 280px; top: 56px; width: 40px; box-sizing: border-box; padding: var(--ref-spacing-02); display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-02); z-index: 3">
+    <button aria-label="이동 (V)" aria-pressed="true" class="rail-btn on"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.2l9.3 4.6-4 1.3-1.4 4z" fill="currentColor"></path></svg></button>
+    <button aria-label="프레임 (F)" class="rail-btn"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+    <button aria-label="사각형 (R)" class="rail-btn"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.33" fill="none"></rect></svg></button>
+    <button aria-label="텍스트 (T)" class="rail-btn"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5V3h10v1.5M8 3v10M6 13h4" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+    <button aria-label="이미지" class="rail-btn"><span class="ic i-image" aria-hidden="true"></span></button>
+    <button aria-label="에셋 열기" onClick="{{left.toAssets}}" class="rail-btn"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+    <button aria-label="코멘트" class="rail-btn"><span class="ic i-comment" aria-hidden="true"></span></button>
+    <span style="width: 20px; height: 1px; background: var(--iris-line-strong); margin: var(--ref-spacing-02) 0"></span>
+    <button aria-label="요구사항 연결" class="rail-btn"><span class="ic i-link" aria-hidden="true"></span></button>
+    <a href="FigmaLink.dc.html" aria-label="피그마 화면 가져오기" class="rail-btn"><span class="ic i-arrow_up_right" aria-hidden="true"></span></a>
+  </div>
 
+  <div class="sq float s" style="{{zoom.style}}">
+    <button class="ib" aria-label="축소" style="width: 24px; height: 24px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" stroke="currentColor" stroke-width="1.3"></path></svg></button>
+    <span class="mono" style="min-width: 36px; text-align: center; color: var(--sys-color-neutral-800)">50%</span>
+    <button class="ib" aria-label="확대" style="width: 24px; height: 24px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" stroke="currentColor" stroke-width="1.3"></path></svg></button>
+  </div>
+
+  <div class="sq float s" style="{{right.pillStyle}}">
+    <div aria-label="지금 보고 있는 멤버 3명" style="display: flex; align-items: center; margin-right: auto; padding-left: var(--ref-spacing-02)">
+      <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default)">김</span>
+      <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default), inset 0 0 0 1px var(--ref-color-gray-900-20); margin-left: -4px">박</span>
+      <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -4px">이</span>
+    </div>
+    <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}">문서</button>
+    <button class="sq seg-item" style="color: var(--sys-color-neutral-800)">공유</button>
+    <button aria-label="미리보기" class="ib"><span class="ic ic-12 i-play" aria-hidden="true"></span></button>
+  </div>
+
+  <aside aria-label="오른쪽 패널" class="sq float" style="{{right.style}}">
     <sc-if value="{{right.inspector}}" hint-placeholder-val="{{true}}">
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-04); flex: none; box-shadow: 0 1px 0 var(--iris-line-strong)">
-          <div role="tablist" aria-label="인스펙터 탭" style="display: flex; gap: var(--ref-spacing-02)">
-            <button role="tab" aria-selected="{{tabs.designSel}}" onClick="{{tabs.toDesign}}" style="{{tabs.designStyle}}">디자인</button>
-            <button role="tab" aria-selected="{{tabs.planSel}}" onClick="{{tabs.toPlan}}" style="{{tabs.planStyle}}">기획</button>
-            <button role="tab" aria-selected="{{tabs.devSel}}" onClick="{{tabs.toDev}}" style="{{tabs.devStyle}}">개발</button>
-          </div>
-          <button class="sq hov" aria-label="확대 비율 50%" style="display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700)">50% <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+        <div role="tablist" aria-label="인스펙터 탭" class="seg" style="padding: var(--ref-spacing-06); flex: none">
+          <button role="tab" aria-selected="{{tabs.designSel}}" onClick="{{tabs.toDesign}}" class="{{tabs.designCls}}">디자인</button>
+          <button role="tab" aria-selected="{{tabs.planSel}}" onClick="{{tabs.toPlan}}" class="{{tabs.planCls}}">기획</button>
+          <button role="tab" aria-selected="{{tabs.devSel}}" onClick="{{tabs.toDev}}" class="{{tabs.devCls}}">개발</button>
         </div>
-
-        <div style="flex: none; padding: var(--ref-spacing-08) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+        <div style="flex: none; padding: var(--ref-spacing-02) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
             <span style="{{obj.nameStyle}}">
               <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
@@ -456,9 +458,9 @@ a{color:inherit}a:hover{color:inherit}
 
     <sc-if value="{{right.docOpen}}" hint-placeholder-val="{{false}}">
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
-        <div role="tablist" aria-label="문서" style="display: flex; align-items: center; gap: var(--ref-spacing-10); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-10); flex: none; box-shadow: 0 1px 0 var(--iris-line-strong)">
+        <div role="tablist" aria-label="문서" class="seg" style="padding: var(--ref-spacing-06); flex: none; box-shadow: 0 1px 0 var(--iris-line)">
           <sc-for list="{{reader.tabs}}" as="t" hint-placeholder-count="3">
-            <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+            <button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" class="{{t.cls}}">{{t.label}}</button>
           </sc-for>
           <button onClick="{{right.closeDoc}}" class="ib" aria-label="문서 닫기" style="margin-left: auto"><span class="ic i-close" aria-hidden="true"></span></button>
         </div>
@@ -561,7 +563,7 @@ const LAYERS = {
   s3: [['신청_03_보험옵션', 0, 'frame', [0, 0, 196, 424]], ['Header', 1, 'frame', [0, 0, 196, 59]], ['Title', 2, 'text', [10, 32, 140, 20]], ['보험', 1, 'text', [10, 59, 176, 13]], ['RadioCard', 1, 'frame', [10, 77, 176, 25]], ['RadioCard', 1, 'frame', [10, 109, 176, 25]], ['RadioCard', 1, 'frame', [10, 140, 176, 25]], ['추가 옵션', 1, 'text', [10, 177, 176, 13]], ['OptionRow', 1, 'frame', [10, 196, 176, 11]], ['OptionRow', 1, 'frame', [10, 213, 176, 11]], ['TotalBar', 1, 'frame', [0, 383, 196, 41]]],
   s4: [['신청_04_결제', 0, 'frame', [0, 0, 196, 424]], ['Header', 1, 'frame', [0, 0, 196, 59]], ['Title', 2, 'text', [10, 32, 150, 20]], ['지금 낼 금액', 1, 'frame', [10, 59, 176, 27]], ['금액 표', 1, 'frame', [10, 92, 176, 58]], ['약관 동의', 1, 'frame', [10, 160, 176, 11]], ['Banner', 1, 'image', [10, 180, 176, 44]], ['PayButton', 1, 'frame', [10, 386, 176, 26]]]
 };
-const FRAME_X = { s1: 48, s2: 292, s3: 536, s4: 780 };
+const FRAME_X = { s1: 352, s2: 596, s3: 840, s4: 1084 };
 const FRAME_Y = 94;
 /* 요구사항이 걸린 레이어 */
 const ANCHOR = { 'REQ-005': 'ProductCard', 'REQ-007': 'ProductCard', 'REQ-008': '', 'REQ-012': '비교표', 'REQ-013': '플랜 카드', 'REQ-014': 'Badge', 'REQ-015': '플랜 카드', 'REQ-021': 'BottomBar', 'REQ-030': 'RadioCard', 'REQ-031': 'TotalBar', 'REQ-040': '지금 낼 금액', 'REQ-041': '약관 동의', 'REQ-042': 'Banner', 'REQ-043': 'PayButton' };
@@ -606,7 +608,7 @@ const START = {};
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
@@ -678,7 +680,7 @@ class Component extends DCLogic {
   }
   place(name, x, y) {
     const n = this.state.dropped.length;
-    this.setState({ dropped: this.state.dropped.concat([{ name: name, x: x == null ? 300 + n * 16 : x, y: y == null ? 560 + n * 16 : y, s: this.state.sel }]) });
+    this.setState({ dropped: this.state.dropped.concat([{ name: name, x: x == null ? 380 + n * 16 : x, y: y == null ? 580 + n * 16 : y, s: this.state.sel }]) });
   }
   layerIndex(sid, name) {
     const i = LAYERS[sid].findIndex((l) => l[0] === name);
@@ -810,7 +812,7 @@ class Component extends DCLogic {
     }));
     const reader = D ? {
       title: D.title, meta: D.meta,
-      tabs: DOCS.map((d) => ({ label: d.short, on: d.id === D.id, style: lineTab(d.id === D.id), pick: () => this.setState({ doc: d.id }) })),
+      tabs: DOCS.map((d) => ({ label: d.short, on: d.id === D.id, cls: 'sq seg-item' + (d.id === D.id ? ' on' : ''), pick: () => this.setState({ doc: d.id }) })),
       sections: D.sections.map((x) => ({
         h: x.h, p: x.p,
         reqs: x.reqs.map((code) => {
@@ -829,7 +831,7 @@ class Component extends DCLogic {
     return {
       left: {
         isFile: s.left === 'file', isAssets: s.left === 'assets', isDocs: s.left === 'docs',
-        tabs: [['file', '파일'], ['assets', '에셋'], ['docs', '문서']].map((t) => ({ label: t[1], on: s.left === t[0], style: lineTab(s.left === t[0]), pick: () => this.setState({ left: t[0] }) })),
+        tabs: [['file', '파일'], ['assets', '에셋'], ['docs', '문서']].map((t) => ({ label: t[1], on: s.left === t[0], cls: 'sq seg-item' + (s.left === t[0] ? ' on' : ''), pick: () => this.setState({ left: t[0] }) })),
         toAssets: () => this.setState({ left: 'assets', asset: null })
       },
       assets: { q: s.q, type: (e) => this.setState({ q: e.target.value }), groups: groups, empty: !groups.length },
@@ -837,12 +839,14 @@ class Component extends DCLogic {
       docsNav: docsNav,
       right: {
         inspector: !D, docOpen: !!D,
-        style: 'flex:0 0 ' + (D ? '400px' : '300px') + ';min-width:0;height:900px;display:flex;flex-direction:column;box-shadow:-1px 0 0 var(--iris-line-strong);position:relative;z-index:1;background:var(--sys-color-common-white-default)',
-        docBtn: 'bd-button s ' + (D ? 'ink' : 'stroke'),
+        style: 'position:absolute;right:var(--iris-gap);top:56px;bottom:var(--iris-gap);width:' + (D ? 400 : 288) + 'px;display:flex;flex-direction:column;z-index:3;overflow:hidden',
+        pillStyle: 'position:absolute;right:var(--iris-gap);top:var(--iris-gap);width:' + (D ? 400 : 288) + 'px;height:40px;box-sizing:border-box;display:flex;align-items:center;gap:var(--ref-spacing-02);padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);z-index:3',
+        docBtn: 'sq seg-item' + (D ? ' on' : ''),
         toggleDoc: () => this.setState(D ? { doc: null } : { doc: DOC_OF(all[0] || REQS[0]) }),
         closeDoc: () => this.setState({ doc: null, req: null })
       },
       reader: reader,
+      zoom: { style: 'position:absolute;right:' + ((D ? 400 : 288) + 16) + 'px;bottom:var(--iris-gap);height:32px;box-sizing:border-box;display:flex;align-items:center;gap:var(--ref-spacing-02);padding:0 var(--ref-spacing-02);z-index:3' },
       hl: {
         show: hlShow, name: L[0], size: Math.round(box[2] * 375 / 196) + ' × ' + Math.round(box[3] * 375 / 196),
         box: 'position:absolute;left:' + (fx + box[0]) + 'px;top:' + (FRAME_Y + box[1]) + 'px;width:' + box[2] + 'px;height:' + box[3] + 'px;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default);pointer-events:none'
@@ -862,7 +866,7 @@ class Component extends DCLogic {
       },
       tabs: {
         planSel: s.tab === 'plan', devSel: s.tab === 'dev', designSel: s.tab === 'design',
-        planStyle: tabStyle(s.tab === 'plan'), devStyle: tabStyle(s.tab === 'dev'), designStyle: tabStyle(s.tab === 'design'),
+        planCls: 'sq seg-item' + (s.tab === 'plan' ? ' on' : ''), devCls: 'sq seg-item' + (s.tab === 'dev' ? ' on' : ''), designCls: 'sq seg-item' + (s.tab === 'design' ? ' on' : ''),
         toPlan: () => this.setState({ tab: 'plan' }), toDev: () => this.setState({ tab: 'dev' }), toDesign: () => this.setState({ tab: 'design' })
       },
       f1: this.frame('s1'), f2: this.frame('s2'), f3: this.frame('s3'), f4: this.frame('s4'),
