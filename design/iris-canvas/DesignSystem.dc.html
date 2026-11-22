@@ -36,7 +36,7 @@ a{color:inherit}a:hover{color:inherit}
   </div>
 
   <div style="display: contents">
-    <aside aria-label="컴포넌트 목록" class="sq float" style="flex: 0 0 240px; box-sizing: border-box; padding: var(--ref-spacing-08) var(--ref-spacing-04) var(--ref-spacing-12); overflow: auto; display: flex; flex-direction: column">
+    <aside aria-label="컴포넌트 목록" class="sq float" style="flex: 0 0 264px; box-sizing: border-box; padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-12); overflow: auto; display: flex; flex-direction: column">
       <sc-for list="{{nav.groups}}" as="g" hint-placeholder-count="5">
         <div style="{{g.style}}">
           <span class="nav-label">{{g.label}}</span>
@@ -212,7 +212,7 @@ class Component extends DCLogic {
       nav: {
         allClass: 'sq nav-item' + (s.filter === '' ? ' on' : ''),
         all: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ filter: '' }); },
-        groups: GROUPS.map((g, gi) => ({ label: g[0], style: 'display:flex;flex-direction:column;' + (gi ? 'margin-top:var(--ref-spacing-12)' : ''), items: g[1].map((c) => ({ name: c[1], pick: pick(c[0]), cls: 'sq nav-item' + (s.sel === c[0] ? ' on' : '') })) }))
+        groups: GROUPS.map((g, gi) => ({ label: g[0], style: 'display:flex;flex-direction:column;' + (gi ? 'margin-top:var(--ref-spacing-10)' : ''), items: g[1].map((c) => ({ name: c[1], pick: pick(c[0]), cls: 'sq nav-item s' + (s.sel === c[0] ? ' on' : '') })) }))
       },
       chips: [['', '전체']].concat(GROUPS.map((g) => [g[0], g[0]])).map((c) => ({ label: c[1], on: s.filter === c[0], cls: 'sq seg-item' + (s.filter === c[0] ? ' on' : ''), pick: () => this.setState({ filter: c[0] }) })),
       cards: cards,
