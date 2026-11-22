@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 피그마 화면 연결</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; flex-direction: column">
+    <div style="height: 56px; background: var(--sys-color-common-white-default)"></div>
+    <div style="flex: 1; display: flex"><div style="width: 248px; background: var(--sys-color-common-white-default)"></div><div style="flex: 1" class="canvas-dots"></div><div style="width: 336px; background: var(--sys-color-common-white-default)"></div></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: var(--dimmed-bg)"></div>
+
+  <div style="position: relative; min-height: 900px; display: grid; place-items: center; padding: var(--ref-spacing-12)">
+    <section role="dialog" aria-modal="true" aria-labelledby="figmaTitle" style="width: 100%; max-width: 640px; background: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); box-shadow: var(--shadow-05); display: flex; flex-direction: column; overflow: hidden">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-10)">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+          <h1 id="figmaTitle" style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600">피그마 화면 가져오기</h1>
+          <p style="margin: 0; color: var(--sys-color-neutral-600)">프레임 링크를 붙여넣으면 썸네일과 레이어 정보를 한 번 불러와 저장해요.</p>
+        </div>
+        <a href="Main.dc.html" aria-label="닫기" class="hov" style="width: 32px; height: 32px; flex: none; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-600)"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
+      </div>
+
+      <div style="padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+        <label for="figmaUrl" style="font-weight: 500">피그마 링크</label>
+        <div style="display: flex; gap: var(--ref-spacing-06)">
+          <div style="flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 48px; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong)">
+            <span class="ic i-link" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
+            <input id="figmaUrl" value="figma.com/design/Ab12Cd/착한구독-신청?node-id=12-345" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px">
+          </div>
+          <button class="bd-button xl secondary">불러오기</button>
+        </div>
+      </div>
+
+      <div style="padding: var(--ref-spacing-10) var(--ref-spacing-12); background: var(--sys-color-neutral-100); display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-weight: 600; font-size: 16px; line-height: 24px">프레임 4개를 찾았어요</span>
+          <button onClick="{{toggleAll}}" style="color: var(--sys-color-brand-primary-default); font-weight: 500">{{allLabel}}</button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-08)">
+          <sc-for list="{{frames}}" as="f" hint-placeholder-count="4">
+            <button onClick="{{f.toggle}}" aria-pressed="{{f.on}}" style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); text-align: left">
+              <span style="{{f.thumbStyle}}" aria-hidden="true">
+                <span style="height: 8px; width: 60%; border-radius: 4px; background: var(--ref-color-gray-900-10)"></span>
+                <span style="height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span>
+                <span style="height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span>
+                <span style="margin-top: auto; height: 16px; border-radius: 4px; background: var(--sys-color-brand-primary-default)"></span>
+                <span style="{{f.checkStyle}}"><span class="ic ic-12 i-check" aria-hidden="true"></span></span>
+              </span>
+              <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{f.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{f.meta}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding: var(--ref-spacing-10) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08)">
+          <span style="display: flex; flex-direction: column"><span style="font-weight: 500">어느 페이지에 놓을까요?</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">고른 프레임은 플로우 순서대로 옆에 놓여요.</span></span>
+          <button style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 40px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-weight: 500">신청 플로우 <span class="ic i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span></button>
+        </div>
+        <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-05); background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); font-size: 13px; line-height: 20px">
+          <span class="ic ic-20 i-info_solid" aria-hidden="true"></span>
+          <span>레이어 이름에서 바드림 컴포넌트 7개를 찾았어요. 가져오면 개발 탭에 바로 보여요.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-12) var(--ref-spacing-12)">
+        <a href="Main.dc.html" class="bd-button xl tertiary" style="flex: 1">취소</a>
+        <a href="Main.dc.html" class="bd-button xl primary" style="flex: 2.25">{{cta}}</a>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const FRAMES = [
+  { id: 'a', name: '신청_01_차종선택', meta: '375 × 812 · 컴포넌트 4' },
+  { id: 'b', name: '신청_02_구독료선택', meta: '375 × 812 · 컴포넌트 5' },
+  { id: 'c', name: '신청_02_상세시트', meta: '375 × 812 · 컴포넌트 3' },
+  { id: 'd', name: '신청_05_완료', meta: '375 × 812 · 컴포넌트 2' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: { a: true, b: true, c: true, d: false } };
+  }
+  renderVals() {
+    const p = this.state.picked;
+    const n = FRAMES.filter((f) => p[f.id]).length;
+    const all = n === FRAMES.length;
+    return {
+      cta: n ? '화면 ' + n + '개 가져오기' : '화면을 골라주세요',
+      allLabel: all ? '모두 빼기' : '모두 고르기',
+      toggleAll: () => { const next = {}; FRAMES.forEach((f) => { next[f.id] = !all; }); this.setState({ picked: next }); },
+      frames: FRAMES.map((f) => {
+        const on = !!p[f.id];
+        return {
+          name: f.name, meta: f.meta, on: on,
+          toggle: () => { const next = Object.assign({}, p); next[f.id] = !on; this.setState({ picked: next }); },
+          thumbStyle: 'position:relative;display:flex;flex-direction:column;gap:5px;height:190px;padding:12px 9px;box-sizing:border-box;border-radius:var(--ref-radius-04);background:var(--sys-color-common-white-default);' + (on ? 'box-shadow:inset 0 0 0 1.5px var(--sys-color-brand-primary-default)' : 'box-shadow:inset 0 0 0 1px var(--iris-line-strong);opacity:.6'),
+          checkStyle: 'position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;' + (on ? 'background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)' : 'background:var(--sys-color-common-white-default);color:transparent;box-shadow:inset 0 0 0 1px var(--sys-color-neutral-400)')
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

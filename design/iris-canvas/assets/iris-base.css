@@ -1,0 +1,124 @@
+/* Iris 시안 공용 스타일 — 값은 @ba-dream/design-system tokens.css 변수 이름을 그대로 씁니다 */
+@font-face{font-family:'Pretendard';src:url('/_blob/d80f4f0e1072fd75c015b3029823004b') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('/_blob/dc998423d6cfa92d1cc8df71962309d9') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('/_blob/a32818db75cbac4e464af06c8f1440c8') format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:'Pretendard';src:url('/_blob/046c750fdf3c77c2595a482ddf3a007a') format('woff2');font-weight:700;font-display:swap}
+
+:root{
+  --font-family-base:Pretendard,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-weight-regular:400;--font-weight-medium:500;--font-weight-semibold:600;--font-weight-bold:700;
+
+  --ref-color-blue-50:#EEF4FC;--ref-color-blue-100:#D0E3FE;--ref-color-blue-200:#B0D0FD;--ref-color-blue-300:#84B6FD;--ref-color-blue-500:#2C7BE2;--ref-color-blue-600:#2369C6;--ref-color-blue-700:#1A539E;--ref-color-blue-900:#0D2D57;
+  --ref-color-emerald-50:#EDF8F3;--ref-color-emerald-100:#C6EBDB;--ref-color-emerald-500:#33B289;
+  --ref-color-purple-50:#FAEFFC;--ref-color-purple-100:#EDC9F4;--ref-color-purple-500:#AF3BC6;--ref-color-purple-700:#7D298D;
+  --ref-color-turquoise-50:#E9FBF9;--ref-color-turquoise-100:#B6EEE8;--ref-color-turquoise-600:#00ACA2;--ref-color-turquoise-800:#046861;
+  --ref-color-red-50:#FFEDEB;--ref-color-red-100:#FCC4BF;--ref-color-red-500:#E72F37;--ref-color-red-700:#A32226;
+  --ref-color-green-50:#EBFAEB;--ref-color-green-100:#C3EFC3;--ref-color-green-600:#1F8F30;--ref-color-green-700:#1B7026;
+  --ref-color-orange-50:#FFF3ED;--ref-color-orange-100:#FFD8C3;--ref-color-orange-500:#FF792C;--ref-color-orange-800:#8D4219;
+  --ref-color-yellow-50:#FFF9EA;--ref-color-yellow-100:#FFEEBF;--ref-color-yellow-500:#FABF21;
+  --ref-color-gray-0:#FFFFFF;--ref-color-gray-50:#FDFDFD;--ref-color-gray-100:#F6F7F7;--ref-color-gray-200:#F1F2F3;--ref-color-gray-300:#DBDCDF;--ref-color-gray-400:#C2C4C8;--ref-color-gray-500:#8C9199;--ref-color-gray-600:#5B616C;--ref-color-gray-700:#454C58;--ref-color-gray-800:#202837;--ref-color-gray-900:#03091A;
+  --ref-color-gray-900-5:rgb(3 9 26 / 5%);--ref-color-gray-900-10:rgb(3 9 26 / 10%);--ref-color-gray-900-20:rgb(3 9 26 / 20%);--ref-color-gray-900-40:rgb(3 9 26 / 40%);
+  --ref-color-blue-500-20:rgb(44 123 226 / 20%);--ref-color-blue-500-40:rgb(44 123 226 / 40%);
+
+  --sys-color-brand-primary-lightest:var(--ref-color-blue-50);--sys-color-brand-primary-lighter:var(--ref-color-blue-100);--sys-color-brand-primary-light:var(--ref-color-blue-300);--sys-color-brand-primary-default:var(--ref-color-blue-500);--sys-color-brand-primary-dark:var(--ref-color-blue-700);
+  --sys-color-theme-purple-bg:var(--ref-color-purple-50);--sys-color-theme-purple-default:var(--ref-color-purple-500);
+  --sys-color-theme-turquoise-bg:var(--ref-color-turquoise-50);--sys-color-theme-turquoise-default:var(--ref-color-turquoise-600);
+  --sys-color-theme-destructed-bg:var(--ref-color-red-50);--sys-color-theme-destructed-default:var(--ref-color-red-500);
+  --sys-color-theme-success-bg:var(--ref-color-green-50);--sys-color-theme-success-default:var(--ref-color-green-600);
+  --sys-color-theme-warning-bg:var(--ref-color-orange-50);--sys-color-theme-warning-default:var(--ref-color-orange-500);
+  --sys-color-common-white-default:var(--ref-color-gray-50);--sys-color-common-white-emphasis:var(--ref-color-gray-0);--sys-color-common-black-default:var(--ref-color-gray-900);
+  --sys-color-neutral-100:var(--ref-color-gray-100);--sys-color-neutral-200:var(--ref-color-gray-200);--sys-color-neutral-300:var(--ref-color-gray-300);--sys-color-neutral-400:var(--ref-color-gray-400);--sys-color-neutral-500:var(--ref-color-gray-500);--sys-color-neutral-600:var(--ref-color-gray-600);--sys-color-neutral-700:var(--ref-color-gray-700);--sys-color-neutral-800:var(--ref-color-gray-800);
+
+  --interaction-light-gray-hover:rgb(3 9 26 / 5%);--interaction-light-gray-pressed:rgb(3 9 26 / 10%);--interaction-light-blue-hover:rgb(44 123 226 / 8%);
+
+  --ref-spacing-02:2px;--ref-spacing-04:4px;--ref-spacing-05:6px;--ref-spacing-06:8px;--ref-spacing-07:10px;--ref-spacing-08:12px;--ref-spacing-09:14px;--ref-spacing-10:16px;--ref-spacing-11:20px;--ref-spacing-12:24px;--ref-spacing-13:28px;--ref-spacing-14:32px;--ref-spacing-16:40px;--ref-spacing-17:48px;--ref-spacing-19:64px;
+  --ref-radius-02:4px;--ref-radius-03:6px;--ref-radius-04:8px;--ref-radius-05:10px;--ref-radius-06:12px;--ref-radius-07:16px;--ref-radius-08:20px;--ref-radius-09:24px;--ref-radius-12:999px;
+  --shadow-01:0 2px 4px 0 rgb(69 76 88 / 20%);--shadow-02:0 4px 6px -1px rgb(69 76 88 / 20%);--shadow-03:0 6px 12px -2px rgb(69 76 88 / 20%);--shadow-04:0 8px 20px -3px rgb(69 76 88 / 24%);--shadow-05:0 12px 24px -4px rgb(69 76 88 / 32%);
+  --typography-display-size:36px;--typography-heading-1-size:28px;--typography-heading-2-size:24px;--typography-title-size:20px;--typography-subtitle-size:18px;--typography-body-1-size:16px;--typography-body-2-size:14px;--typography-caption-1-size:12px;--typography-caption-2-size:10px;
+  --dimmed-bg:rgb(0 0 0 / 40%);
+
+  /* Iris 전용 — 툴 화면 크롬 */
+  --iris-line:var(--ref-color-gray-900-5);
+  --iris-line-strong:var(--ref-color-gray-900-10);
+  --iris-canvas:var(--sys-color-neutral-200);
+  --iris-component:var(--sys-color-theme-purple-default);
+}
+
+body{margin:0;font-family:var(--font-family-base);color:var(--sys-color-neutral-800);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left}
+input,textarea{font:inherit;color:inherit}
+.hov:hover{background-color:var(--interaction-light-gray-hover)}
+.hov:active{background-color:var(--interaction-light-gray-pressed)}
+.pri:hover{filter:brightness(.94)}
+.canvas-dots{background-color:var(--iris-canvas);background-image:radial-gradient(var(--ref-color-gray-900-10) 1px,transparent 1px);background-size:20px 20px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.aurora i{position:absolute;border-radius:50%;filter:blur(72px);opacity:.55}
+
+/* 아이콘 — 바드림 Icon(outlined/solid 16px) 원본 파일을 마스크로 칠해 글자색을 따릅니다 */
+.ic{display:inline-block;flex:none;width:16px;height:16px;background-color:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+.ic-12{width:12px;height:12px}.ic-14{width:14px;height:14px}.ic-20{width:20px;height:20px}.ic-24{width:24px;height:24px}
+.i-arrow_up_right{--i:url('/_blob/93d38d3d3d9a1884f56185c602cf3d62')}
+.i-bell{--i:url('/_blob/3696fa6fc90e00013873fd6d78476dce')}
+.i-check{--i:url('/_blob/140e3838f37f7d69c3a76e99f9ce1e31')}
+.i-check_in_circle{--i:url('/_blob/04eae5627ccec55a3748952aad487491')}
+.i-chevron_down{--i:url('/_blob/5cdf8d110589f53025e67d24f29c886e')}
+.i-chevron_left{--i:url('/_blob/3b0495ec2592dd243a81c55a0da3e227')}
+.i-chevron_right{--i:url('/_blob/9ffb3c4f69fd1364b0cd1b86f35b915b')}
+.i-clip{--i:url('/_blob/4570b5d5db9f7afad073c24a07b09e56')}
+.i-close{--i:url('/_blob/d3c2d74e763d79c076bc05edc6d58ba5')}
+.i-close_in_circle{--i:url('/_blob/56a9615652212b75feb407aa0578fe53')}
+.i-comment{--i:url('/_blob/45a2b0abedfccce9ede9ab3f14597b24')}
+.i-copy{--i:url('/_blob/b9713e28558e3464bb8d49611de3775d')}
+.i-document{--i:url('/_blob/0255204ea4d5587b06c64a69ef87388e')}
+.i-document_add{--i:url('/_blob/2595625160adeccd159f009e493f11c4')}
+.i-home{--i:url('/_blob/c0f92b782842d6c29352ce53c89ea7f8')}
+.i-image{--i:url('/_blob/536995df5f0e9476da8c20091f2d6d73')}
+.i-info{--i:url('/_blob/d7affaca9cbafb88619fb1f065154292')}
+.i-info_solid{--i:url('/_blob/0f9777222dda2805b63c029922dc2dc1')}
+.i-link{--i:url('/_blob/250a06f7e08fa384a7f9b98156681ff3')}
+.i-list{--i:url('/_blob/972fac91499fc6d103e222e5a1f5e501')}
+.i-menu_bento{--i:url('/_blob/de8e0a91fdf5995ea3d95e0f4150e835')}
+.i-menu_kebab{--i:url('/_blob/fe5d45462968f6678e8bcc53b3a299f5')}
+.i-minus_in_circle{--i:url('/_blob/49a632073b69a11a1f7fe97ca6ce6182')}
+.i-pencil{--i:url('/_blob/5693d320d30dfd012340da6e323c7836')}
+.i-person{--i:url('/_blob/9ffcc13e0cded6c01334828a008e20b7')}
+.i-play{--i:url('/_blob/75085436d4b4e08aa2d65e6df562e0fa')}
+.i-plus{--i:url('/_blob/18f148d6076ac1dd502bb824de17ac99')}
+.i-refresh{--i:url('/_blob/4427e89ffcadde67b613daa2041516af')}
+.i-search{--i:url('/_blob/15e87bb8cf6c2aff3d64fa5d92648b47')}
+.i-setting{--i:url('/_blob/794da9766c5446af41be27efdfd42079')}
+.i-share{--i:url('/_blob/0849b53c6853b1ec3a481ea10de28e33')}
+.i-table{--i:url('/_blob/6d2924902f7b3da01099e6ef83e32eb3')}
+.i-trashbin{--i:url('/_blob/6dfca3ea6f49e4cf5a723af1c815e7e9')}
+.i-upload{--i:url('/_blob/d360d6218445b609a897d82397cfbaa2')}
+.i-warning{--i:url('/_blob/b097fcbcd1ba00cd2b568ee53e5f2149')}
+.i-warning_solid{--i:url('/_blob/191ac452cbc26114e4fa42312c3ef5be')}
+.i-write{--i:url('/_blob/1b676d853f5100b1386d91ca889fe93e')}
+
+/* 바드림 Badge (size m · type alpha · form rounded) — 글자는 대비 4.5:1을 위해 한 단계 진한 색 */
+.bd-badge{display:inline-flex;align-items:center;gap:var(--ref-spacing-02);flex:none;padding:var(--ref-spacing-02) var(--ref-spacing-06);border-radius:var(--ref-radius-12);font-size:var(--typography-caption-1-size);line-height:18px;font-weight:var(--font-weight-semibold);white-space:nowrap}
+.bd-badge.s{padding:1px var(--ref-spacing-05) 2px;font-size:11px;line-height:16px}
+.bd-badge.angular{border-radius:var(--ref-radius-02)}
+.t-gray{background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
+.t-brand{background:var(--sys-color-brand-primary-lightest);color:var(--ref-color-blue-600)}
+.t-success{background:var(--sys-color-theme-success-bg);color:var(--ref-color-green-700)}
+.t-warning{background:var(--sys-color-theme-warning-bg);color:var(--ref-color-orange-800)}
+.t-destructed{background:var(--sys-color-theme-destructed-bg);color:var(--ref-color-red-700)}
+.t-purple{background:var(--sys-color-theme-purple-bg);color:var(--ref-color-purple-700)}
+.t-turquoise{background:var(--sys-color-theme-turquoise-bg);color:var(--ref-color-turquoise-800)}
+
+/* 바드림 Button */
+.bd-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--ref-spacing-02);box-sizing:border-box;white-space:nowrap;font-family:var(--font-family-base);text-align:center}
+.bd-button.s{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px;font-weight:600}
+.bd-button.m{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
+.bd-button.l{padding:var(--ref-spacing-06) var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
+.bd-button.xl{padding:var(--ref-spacing-08) var(--ref-spacing-10);border-radius:var(--ref-radius-06);font-size:16px;line-height:24px;font-weight:500}
+.bd-button.primary{background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+.bd-button.secondary{background:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
+.bd-button.tertiary{background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
+.bd-button.stroke{background:var(--sys-color-common-white-default);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-10);color:var(--sys-color-neutral-600)}
+.bd-button.primary:hover{box-shadow:inset 0 0 0 99px rgb(13 45 87 / 15%)}
+.bd-button.secondary:hover{box-shadow:inset 0 0 0 99px var(--interaction-light-blue-hover)}
+.bd-button.tertiary:hover,.bd-button.stroke:hover{box-shadow:inset 0 0 0 99px var(--interaction-light-gray-hover),inset 0 0 0 1px var(--ref-color-gray-900-10)}

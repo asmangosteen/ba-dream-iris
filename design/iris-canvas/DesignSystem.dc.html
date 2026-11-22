@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 디자인 시스템</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+
+  <header style="height: 60px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-14); padding: 0 var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line)">
+    <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+      <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
+      <span style="font-weight: 600; font-size: 17px; color: var(--sys-color-common-black-default)">Iris</span>
+    </a>
+    <nav aria-label="주 메뉴" style="display: flex; gap: var(--ref-spacing-04)">
+      <a href="Home.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">프로젝트</a>
+      <a href="Requirements.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">요구사항</a>
+      <a href="DesignSystem.dc.html" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 600; color: var(--sys-color-neutral-800)">디자인 시스템</a>
+    </nav>
+  </header>
+
+  <div style="flex: 1; display: flex; flex-wrap: wrap">
+    <aside aria-label="컴포넌트 분류" style="flex: 0 0 220px; padding: var(--ref-spacing-12) var(--ref-spacing-08); box-shadow: 1px 0 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-02); box-sizing: border-box">
+      <a href="#" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); font-weight: 600">전체 보기</a>
+      <span style="padding: var(--ref-spacing-12) var(--ref-spacing-08) var(--ref-spacing-04); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">컴포넌트</span>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); display: flex; justify-content: space-between">액션 <span>4</span></a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); display: flex; justify-content: space-between">선택 <span>8</span></a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); display: flex; justify-content: space-between">입력 <span>11</span></a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); display: flex; justify-content: space-between">내비게이션 <span>9</span></a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); display: flex; justify-content: space-between">피드백 <span>10</span></a>
+      <span style="padding: var(--ref-spacing-12) var(--ref-spacing-08) var(--ref-spacing-04); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">파운데이션</span>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">색</a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">타이포그래피</a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">간격 · 모서리</a>
+      <a href="#" class="hov" style="padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">아이콘</a>
+    </aside>
+
+    <main style="flex: 999 1 560px; min-width: 0; padding: var(--ref-spacing-17) var(--ref-spacing-16); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+        <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
+        <p style="margin: 0; font-size: 16px; line-height: 26px; color: var(--sys-color-neutral-600)">바드림 Design System V3를 Iris에 연결했어요. 컴포넌트를 누르면 어느 화면에서 쓰는지 볼 수 있어요.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-04)">
+          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">@ba-dream/design-system 1.0.0</span>
+          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">컴포넌트 133</span>
+          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">아이콘 884</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: var(--ref-spacing-08)">
+        <button onClick="{{pick.button}}" aria-pressed="{{on.button}}" style="{{card.button}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06)"><span class="bd-button l primary">신청하기</span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">Button</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 38</span></span>
+        </button>
+        <button onClick="{{pick.badge}}" aria-pressed="{{on.badge}}" style="{{card.badge}}">
+          <span aria-hidden="true" style="height: 112px; display: flex; align-items: center; justify-content: center; gap: var(--ref-spacing-04); background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06)"><span class="bd-badge t-brand">추천</span><span class="bd-badge t-purple">쿠폰</span><span class="bd-badge t-destructed">20%</span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">Badge</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 24</span></span>
+        </button>
+        <button onClick="{{pick.seg}}" aria-pressed="{{on.seg}}" style="{{card.seg}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06); padding: 0 var(--ref-spacing-10)"><span style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; padding: 4px; gap: 4px; border-radius: var(--ref-radius-06); background: var(--sys-color-neutral-200); font-size: 12px; text-align: center; color: var(--sys-color-neutral-600)"><span style="padding: 4px 0">1주</span><span style="padding: 4px 0; border-radius: var(--ref-radius-04); background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 600; box-shadow: var(--shadow-01)">4주</span><span style="padding: 4px 0">12주</span></span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">SegmentedControl</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 9</span></span>
+        </button>
+        <button onClick="{{pick.notice}}" aria-pressed="{{on.notice}}" style="{{card.notice}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06); padding: 0 var(--ref-spacing-08)"><span style="display: flex; gap: 6px; padding: 10px 12px; border-radius: var(--ref-radius-05); background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); font-size: 12px; line-height: 18px; text-align: left"><span class="ic i-info_solid"></span>반납일 3일 전에 알려드려요.</span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">NoticeBox</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 17</span></span>
+        </button>
+        <button onClick="{{pick.toggle}}" aria-pressed="{{on.toggle}}" style="{{card.toggle}}">
+          <span aria-hidden="true" style="height: 112px; display: flex; align-items: center; justify-content: center; gap: var(--ref-spacing-08); background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06)"><span style="width: 44px; height: 26px; border-radius: 13px; background: var(--sys-color-brand-primary-default); position: relative"><span style="position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--sys-color-common-white-default)"></span></span><span style="width: 44px; height: 26px; border-radius: 13px; background: var(--sys-color-neutral-300); position: relative"><span style="position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--sys-color-common-white-default)"></span></span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">Toggle</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 6</span></span>
+        </button>
+        <button onClick="{{pick.input}}" aria-pressed="{{on.input}}" style="{{card.input}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06); padding: 0 var(--ref-spacing-10)"><span style="width: 100%; display: flex; flex-direction: column; gap: 4px; text-align: left"><span style="font-size: 12px; font-weight: 500">이름</span><span style="height: 38px; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); display: flex; align-items: center; padding: 0 10px; font-size: 13px; color: var(--sys-color-neutral-500)">이름을 적어주세요</span></span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">TextInput</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 14</span></span>
+        </button>
+        <button onClick="{{pick.topbar}}" aria-pressed="{{on.topbar}}" style="{{card.topbar}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06); padding: 0 var(--ref-spacing-08)"><span style="width: 100%; height: 44px; border-radius: var(--ref-radius-04); background: var(--sys-color-common-white-default); display: flex; align-items: center; justify-content: space-between; padding: 0 10px"><span class="ic ic-20 i-chevron_left"></span><span style="font-size: 13px; font-weight: 600">신청하기</span><span class="ic ic-20 i-close"></span></span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">TopBar</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 41</span></span>
+        </button>
+        <button onClick="{{pick.product}}" aria-pressed="{{on.product}}" style="{{card.product}}">
+          <span aria-hidden="true" style="height: 112px; display: grid; place-items: center; background: var(--sys-color-neutral-100); border-radius: var(--ref-radius-06); padding: 0 var(--ref-spacing-08)"><span style="width: 100%; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: var(--ref-radius-07); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: left"><span style="width: 44px; height: 44px; border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); flex: none"></span><span style="display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 500">모델 A</span><span style="font-size: 12px; color: var(--sys-color-brand-primary-default); font-weight: 600">월 구독료</span></span></span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; padding: 0 var(--ref-spacing-02)"><span style="font-weight: 600">ProductCard</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">화면 11</span></span>
+        </button>
+      </div>
+    </main>
+
+    <aside aria-label="컴포넌트 상세" style="flex: 0 0 360px; min-width: 0; padding: var(--ref-spacing-17) var(--ref-spacing-12); box-sizing: border-box; box-shadow: -1px 0 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+        <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--iris-component)"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" fill="currentColor"></path></svg><span style="font-size: var(--typography-heading-2-size); line-height: 32px; font-weight: 700; color: var(--sys-color-common-black-default)">{{cur.name}}</span></span>
+        <span style="color: var(--sys-color-neutral-600)">{{cur.desc}}</span>
+      </div>
+      <div style="padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); background: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 21px; color: var(--sys-color-neutral-700); white-space: pre-wrap">{{cur.code}}</div>
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+        <div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600; font-size: 16px; line-height: 24px">쓰는 화면</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">{{cur.count}}</span></div>
+        <sc-for list="{{cur.uses}}" as="u" hint-placeholder-count="4">
+          <a href="Main.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
+            <span aria-hidden="true" style="width: 28px; height: 52px; border-radius: 3px; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); flex: none"></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">{{u.screen}}</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{u.project}}</span></span>
+            <span style="font-size: 12px; font-weight: 600; color: var(--sys-color-neutral-700)">×{{u.n}}</span>
+          </a>
+        </sc-for>
+      </div>
+      <a href="#" class="bd-button l stroke" style="width: 100%">스토리북에서 보기 <span class="ic i-arrow_up_right" aria-hidden="true"></span></a>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const DATA = {
+  button: { name: 'Button', desc: '화면에서 가장 중요한 행동을 실행하는 버튼이에요.', code: '<Button type="primary" size="xl">\n  신청하기\n</Button>', count: '13개 프로젝트 · 38개 화면', uses: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['신청_04_결제', '착한구독 신청 플로우 개편', 1], ['반납_01_반납일선택', '단기구독 반납 흐름', 2], ['내차고_홈', '내 차고 홈 리뉴얼', 3]] },
+  badge: { name: 'Badge', desc: '상태나 혜택을 짧게 알려주는 표시예요.', code: '<Badge theme="brand" type="alpha">\n  추천\n</Badge>', count: '6개 프로젝트 · 24개 화면', uses: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['쿠폰함', '마이페이지 정리', 4], ['피드_목록', '커뮤니티 피드 개선', 2]] },
+  seg: { name: 'SegmentedControl', desc: '같은 화면 안에서 보기를 바꾸는 선택지예요.', code: '<SegmentedControl\n  :items="[\'1주\', \'4주\', \'12주\']"\n  size="m" />', count: '4개 프로젝트 · 9개 화면', uses: [['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['구독현황', '단기구독 반납 흐름', 1]] },
+  notice: { name: 'NoticeBox', desc: '꼭 알아야 할 안내를 담는 상자예요. 아이콘은 늘 켜요.', code: '<NoticeBox type="primary"\n  contents="caption"\n  icon-name="info_solid" />', count: '7개 프로젝트 · 17개 화면', uses: [['반납_02_정산', '단기구독 반납 흐름', 1], ['신청_04_결제', '착한구독 신청 플로우 개편', 1]] },
+  toggle: { name: 'Toggle', desc: '켜고 끄는 설정에 써요.', code: '<Toggle size="l" :checked="true" />', count: '3개 프로젝트 · 6개 화면', uses: [['신청_03_보험옵션', '착한구독 신청 플로우 개편', 2], ['알림 설정', '마이페이지 정리', 5]] },
+  input: { name: 'TextInput', desc: '한 줄 글을 적는 칸이에요.', code: '<TextInput label="이름"\n  placeholder="이름을 적어주세요" />', count: '5개 프로젝트 · 14개 화면', uses: [['회원정보 수정', '마이페이지 정리', 4], ['게시글 쓰기', '커뮤니티 피드 개선', 1]] },
+  topbar: { name: 'TopBar', desc: '화면 맨 위에 고정되는 바예요. 흐름 안 화면은 가운데 제목을 꺼요.', code: '<TopBar mode="back" line />', count: '13개 프로젝트 · 41개 화면', uses: [['신청_01_차종선택', '착한구독 신청 플로우 개편', 1], ['신청_02_구독료선택', '착한구독 신청 플로우 개편', 1], ['피드_상세', '커뮤니티 피드 개선', 1]] },
+  product: { name: 'ProductCard', desc: '차량 같은 상품을 보여주는 카드예요.', code: '<ProductCard />', count: '3개 프로젝트 · 11개 화면', uses: [['신청_01_차종선택', '착한구독 신청 플로우 개편', 3], ['상품리스트', '단기구독 반납 흐름', 8]] }
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'button' };
+  }
+  renderVals() {
+    const s = this.state.sel;
+    const keys = Object.keys(DATA);
+    const pick = {}, on = {}, card = {};
+    keys.forEach((k) => {
+      pick[k] = () => this.setState({ sel: k });
+      on[k] = s === k;
+      card[k] = 'display:flex;flex-direction:column;gap:var(--ref-spacing-06);padding:var(--ref-spacing-04);border-radius:var(--ref-radius-07);text-align:left;' + (s === k ? 'box-shadow:inset 0 0 0 1.5px var(--sys-color-brand-primary-default)' : 'box-shadow:inset 0 0 0 1px var(--iris-line-strong)');
+    });
+    const d = DATA[s];
+    return {
+      pick: pick, on: on, card: card,
+      cur: { name: d.name, desc: d.desc, code: d.code, count: d.count, uses: d.uses.map((u) => ({ screen: u[0], project: u[1], n: u[2] })) }
+    };
+  }
+}
+</script>
+</body>
+</html>

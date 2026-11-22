@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 문서 함께 보기</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-10); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 2">
+  <a href="Home.dc.html" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+    <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 15px; width: auto; display: block">
+    <span style="font-weight: 600; font-size: 16px; color: var(--sys-color-common-black-default)">Iris</span>
+  </a>
+  <span style="width: 1px; height: 16px; background: var(--iris-line-strong)"></span>
+  <nav aria-label="위치" style="display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-600)">
+    <a href="Home.dc.html">착한구독 신청 플로우 개편</a>
+    <span class="ic ic-12 i-chevron_right" aria-hidden="true"></span>
+    <span style="color: var(--sys-color-neutral-800); font-weight: 600">신청 플로우</span>
+  </nav>
+  <div style="flex: 1"></div>
+  <a href="Main.dc.html" class="bd-button l stroke"><span class="ic i-close" aria-hidden="true"></span>함께 보기 닫기</a>
+</header>
+
+<div style="flex: 1; min-height: 0; display: flex; flex-wrap: wrap">
+  <main aria-label="캔버스" class="canvas-dots" style="flex: 1 1 520px; min-width: 0; position: relative; overflow: hidden">
+    <div style="position: absolute; left: var(--ref-spacing-11); top: var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{linkHint}}</div>
+    <div style="position: absolute; left: 40px; top: 60px; display: flex; gap: 44px">
+      <sc-for list="{{frames}}" as="fr" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 176px; flex: none">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px"><span style="{{fr.labelStyle}}">{{fr.name}}</span><sc-if value="{{fr.linked}}" hint-placeholder-val="{{false}}"><span class="bd-badge s t-brand">연결됨</span></sc-if></div>
+          <div style="{{fr.frameStyle}}" aria-hidden="true">
+            <div style="height: 26px"></div>
+            <div style="padding: 0 9px 10px; font-size: 11px; font-weight: 600; color: var(--sys-color-common-black-default)">{{fr.title}}</div>
+            <div style="padding: 0 9px; display: flex; flex-direction: column; gap: 6px">
+              <div style="height: 22px; border-radius: 6px; background: var(--sys-color-neutral-100)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+              <div style="height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></div>
+            </div>
+            <div style="position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: var(--sys-color-brand-primary-default)"></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+
+  <aside aria-label="문서" style="flex: 0 1 600px; min-width: 0; display: flex; flex-direction: column; box-shadow: -1px 0 0 var(--iris-line); background: var(--sys-color-common-white-default)">
+    <div style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 1px 0 var(--iris-line); overflow-x: auto">
+      <sc-for list="{{docs}}" as="d" hint-placeholder-count="3">
+        <button onClick="{{d.pick}}" style="{{d.style}}"><span class="{{d.icon}}" aria-hidden="true"></span>{{d.title}}</button>
+      </sc-for>
+      <a href="AddDoc.dc.html" aria-label="문서 추가" class="hov" style="margin-left: auto; width: 32px; height: 32px; flex: none; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-600)"><span class="ic i-plus" aria-hidden="true"></span></a>
+    </div>
+
+    <div style="flex: 1; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-16) var(--ref-spacing-17)">
+      <article style="max-width: 600px; display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)"><span class="bd-badge s t-destructed">PDF</span><span>파일 업로드 · 김기획 · 11월 20일</span><span aria-hidden="true">·</span><a href="#" style="color: var(--sys-color-brand-primary-default); font-weight: 500">원본 내려받기</a></div>
+          <h1 style="margin: 0; font-size: var(--typography-heading-1-size); line-height: 40px; letter-spacing: -0.28px; font-weight: 700; color: var(--sys-color-common-black-default)">착한구독 개편 기획서 v1.2</h1>
+          <p style="margin: 0; color: var(--sys-color-neutral-600)">요구사항 9개를 찾았어요. 하이라이트를 누르면 연결된 화면을 캔버스에서 보여드려요.</p>
+        </div>
+
+        <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <h2 style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">3. 구독료 선택</h2>
+          <p style="margin: 0; font-size: 16px; line-height: 26px; color: var(--sys-color-neutral-700)">고객은 약정 기간과 요금제를 한 화면에서 비교하고 고른다. 기존 화면은 요금제마다 상세로 들어가야 해서 비교가 어려웠다.</p>
+        </section>
+
+        <sc-for list="{{reqBlocks}}" as="rb" hint-placeholder-count="3">
+          <button onClick="{{rb.pick}}" aria-pressed="{{rb.on}}" style="{{rb.style}}">
+            <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-brand-primary-default)">{{rb.code}}</span>
+              <span class="{{rb.badge}}">{{rb.status}}</span>
+              <span style="margin-left: auto; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{rb.screens}}</span>
+            </span>
+            <span style="font-size: 16px; line-height: 26px; color: var(--sys-color-neutral-800)">{{rb.text}}</span>
+          </button>
+        </sc-for>
+
+        <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); position: relative">
+          <h2 style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">4. 예외 상황</h2>
+          <p style="margin: 0; font-size: 16px; line-height: 26px; color: var(--sys-color-neutral-700)">재고가 없는 차종은 목록 맨 아래로 내리고, <mark style="background: var(--sys-color-brand-primary-lighter); color: var(--sys-color-neutral-800); border-radius: 2px; padding: 1px 0">입고 알림 신청 버튼을 대신 보여준다.</mark> 알림은 입고되면 앱 푸시로 보낸다.</p>
+          <div role="dialog" aria-label="선택한 문장" style="position: absolute; left: 140px; top: 98px; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-06); background: var(--sys-color-neutral-800); box-shadow: var(--shadow-04)">
+            <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-common-white-default); font-weight: 500"><span class="ic i-plus" aria-hidden="true"></span>요구사항으로 만들기</button>
+            <span style="width: 1px; height: 16px; background: rgb(253 253 253 / 20%)"></span>
+            <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-common-white-default); font-weight: 500"><span class="ic i-comment" aria-hidden="true"></span>메모</button>
+          </div>
+        </section>
+      </article>
+    </div>
+  </aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const SCREENS = [
+  { id: 's1', name: '신청_01_차종선택', title: '차종을 골라주세요' },
+  { id: 's2', name: '신청_02_구독료선택', title: '구독료를 골라주세요' },
+  { id: 's3', name: '신청_03_보험옵션', title: '보험과 옵션을 골라주세요' }
+];
+const REQS = [
+  { code: 'REQ-012', status: '반영됨', badge: 't-success', screens: ['s2'], text: '구독료 비교표를 화면 위쪽에 보여준다. 라이트 · 스탠다드 · 프리미엄을 한눈에 비교할 수 있어야 한다.' },
+  { code: 'REQ-013', status: '일부 반영', badge: 't-warning', screens: ['s2'], text: '약정 기간(12 · 24 · 36개월)마다 할인 구독료와 원래 구독료를 함께 보여준다.' },
+  { code: 'REQ-014', status: '반영됨', badge: 't-success', screens: ['s2'], text: '가장 많이 고른 요금제에 ‘가장 많이 선택’ 배지를 달고 처음부터 골라둔다.' },
+  { code: 'REQ-030', status: '반영됨', badge: 't-success', screens: ['s3'], text: '보험은 기본형 · 안심형 · 프리미엄형 3종을 카드로 비교해 하나를 고른다.' }
+];
+const DOCS = [
+  { id: 'd1', title: '착한구독 개편 기획서 v1.2', icon: 'ic i-document' },
+  { id: 'd2', title: '구독료 정책 정리', icon: 'ic i-link' },
+  { id: 'd3', title: '개발 메모', icon: 'ic i-write' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { req: 'REQ-013', doc: 'd1' };
+  }
+  renderVals() {
+    const cur = REQS.find((r) => r.code === this.state.req);
+    const linked = cur ? cur.screens : [];
+    return {
+      linkHint: cur ? cur.code + '와 연결된 화면 ' + linked.length + '개를 보여주고 있어요' : '요구사항을 누르면 연결된 화면을 보여드려요',
+      frames: SCREENS.map((s) => {
+        const on = linked.indexOf(s.id) > -1;
+        return {
+          name: s.name, title: s.title, linked: on,
+          labelStyle: on ? 'color:var(--sys-color-brand-primary-default);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500',
+          frameStyle: 'position:relative;width:176px;height:381px;border-radius:2px;overflow:hidden;background:var(--sys-color-common-white-default);box-shadow:var(--shadow-01);' + (on ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:2px' : 'outline:1px solid var(--iris-line);opacity:.55')
+        };
+      }),
+      docs: DOCS.map((d) => ({
+        title: d.title, icon: d.icon,
+        pick: () => this.setState({ doc: d.id }),
+        style: 'display:flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:var(--ref-spacing-05) var(--ref-spacing-08);border-radius:var(--ref-radius-04);white-space:nowrap;' + (this.state.doc === d.id ? 'background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500')
+      })),
+      reqBlocks: REQS.map((r) => {
+        const on = this.state.req === r.code;
+        return {
+          code: r.code, status: r.status, badge: 'bd-badge s ' + r.badge, text: r.text, on: on,
+          screens: '화면 ' + r.screens.length + '개',
+          pick: () => this.setState({ req: on ? '' : r.code }),
+          style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-04);width:100%;padding:var(--ref-spacing-08) var(--ref-spacing-10);border-radius:var(--ref-radius-06);' + (on ? 'background:var(--sys-color-brand-primary-lightest);box-shadow:inset 0 0 0 1px var(--ref-color-blue-500-40)' : 'background:var(--sys-color-neutral-100)')
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 에디터 — 화면 인스펙터</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+
+<header style="height: 56px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-10); background: var(--sys-color-common-white-default); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 2">
+  <a href="Home.dc.html" aria-label="Iris 홈으로" style="display: flex; align-items: center; gap: var(--ref-spacing-06); padding-right: var(--ref-spacing-04)">
+    <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 15px; width: auto; display: block">
+    <span style="font-weight: 600; font-size: 16px; color: var(--sys-color-common-black-default)">Iris</span>
+  </a>
+  <span style="width: 1px; height: 16px; background: var(--iris-line-strong)"></span>
+  <nav aria-label="위치" style="display: flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-neutral-600)">
+    <a href="Home.dc.html" class="hov" style="padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04)">착한구독 신청 플로우 개편</a>
+    <span class="ic ic-12 i-chevron_right" aria-hidden="true"></span>
+    <button class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-800); font-weight: 600">신청 플로우 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+  </nav>
+  <div style="flex: 1"></div>
+  <a href="Requirements.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-05); height: 36px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); color: var(--sys-color-neutral-600); font-weight: 500">
+    <span class="ic i-list" aria-hidden="true"></span>요구사항 <span style="color: var(--sys-color-neutral-800); font-weight: 600">9/13</span>
+  </a>
+  <a href="DocSplit.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-05); height: 36px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); color: var(--sys-color-neutral-600); font-weight: 500">
+    <span class="ic i-document" aria-hidden="true"></span>문서 함께 보기
+  </a>
+  <div aria-label="지금 보고 있는 멤버 3명" style="display: flex; align-items: center; padding: 0 var(--ref-spacing-04)">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-theme-warning-bg); color: var(--ref-color-orange-800); display: grid; place-items: center; font-size: 12px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default)">김</span>
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-brand-primary-lightest); color: var(--ref-color-blue-600); display: grid; place-items: center; font-size: 12px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -6px">박</span>
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-theme-turquoise-bg); color: var(--ref-color-turquoise-800); display: grid; place-items: center; font-size: 12px; font-weight: 600; box-shadow: 0 0 0 2px var(--sys-color-common-white-default); margin-left: -6px">이</span>
+  </div>
+  <button class="bd-button l primary">공유</button>
+</header>
+
+<div style="flex: 1; min-height: 0; display: flex; flex-wrap: wrap" class="canvas-dots">
+
+  <aside aria-label="레이어 패널" style="flex: 0 0 248px; min-width: 0; background: var(--sys-color-common-white-default); box-shadow: 1px 0 0 var(--iris-line); display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 1">
+    <div role="tablist" style="display: flex; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08) var(--ref-spacing-08) var(--ref-spacing-06)">
+      <button role="tab" aria-selected="true" style="padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); font-weight: 600">레이어</button>
+      <a href="DesignSystem.dc.html" class="hov" style="padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">에셋</a>
+      <a href="DocSplit.dc.html" class="hov" style="padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">문서</a>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-08) var(--ref-spacing-08) var(--ref-spacing-04) var(--ref-spacing-10)">
+      <span style="font-size: var(--typography-caption-1-size); line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">페이지</span>
+      <button aria-label="페이지 추가" class="hov" style="width: 26px; height: 26px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-600)"><span class="ic i-plus" aria-hidden="true"></span></button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-06) var(--ref-spacing-08); box-shadow: 0 1px 0 var(--iris-line)">
+      <button style="display: flex; align-items: center; justify-content: space-between; padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); font-weight: 600">신청 플로우 <span style="font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-600)">4</span></button>
+      <button class="hov" style="display: flex; align-items: center; justify-content: space-between; padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">마이페이지 <span style="font-size: 12px">6</span></button>
+      <button class="hov" style="display: flex; align-items: center; justify-content: space-between; padding: 7px var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600)">홈 · 내 차고 <span style="font-size: 12px">3</span></button>
+    </div>
+    <div style="padding: var(--ref-spacing-10) var(--ref-spacing-10) var(--ref-spacing-04); font-size: var(--typography-caption-1-size); line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">레이어</div>
+    <div style="flex: 1; overflow: auto; padding: 0 var(--ref-spacing-06) var(--ref-spacing-10); display: flex; flex-direction: column; gap: 1px">
+      <sc-for list="{{layers}}" as="ly" hint-placeholder-count="10">
+        <div style="{{ly.rowStyle}}">
+          <sc-if value="{{ly.isFrame}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
+          <sc-if value="{{ly.isComp}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--iris-component)"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>
+          <sc-if value="{{ly.isText}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M2 3V2h8v1M6 2v8M4.5 10h3" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg></sc-if>
+          <sc-if value="{{ly.isRect}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><rect x="1.6" y="1.6" width="8.8" height="8.8" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"></rect></svg></sc-if>
+          <sc-if value="{{ly.isImage}}" hint-placeholder-val="{{false}}"><span class="ic ic-12 i-image" aria-hidden="true"></span></sc-if>
+          <span style="{{ly.nameStyle}}">{{ly.name}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </aside>
+
+  <main aria-label="캔버스" style="flex: 999 1 560px; min-width: 0; position: relative; overflow: hidden">
+    <div style="position: absolute; left: var(--ref-spacing-11); top: var(--ref-spacing-10); display: flex; align-items: center; gap: var(--ref-spacing-06); font-size: var(--typography-caption-1-size); line-height: 18px; color: var(--sys-color-neutral-600)">
+      <span style="font-weight: 600; color: var(--sys-color-neutral-800)">신청 플로우</span><span>화면 4개 · 피그마 연결 2 · Iris 캔버스 2</span>
+    </div>
+
+    <div style="position: absolute; left: 40px; top: 64px; display: flex; gap: 52px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 188px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f1.labelStyle}}">신청_01_차종선택</span>
+          <span class="{{f1.badgeClass}}">{{f1.count}}</span>
+        </div>
+        <button onClick="{{f1.select}}" aria-label="신청_01_차종선택 화면 선택" style="{{f1.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800)">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 12px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">차종을 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100); display: grid; place-items: center; color: var(--sys-color-neutral-500)"><span class="ic ic-14 i-image"></span></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 A</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">월 구독료 시작가</span></div>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100)"></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 B</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">월 구독료 시작가</span></div>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; gap: 7px; align-items: center">
+                <div style="width: 40px; height: 40px; border-radius: 4px; background: var(--sys-color-neutral-100)"></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; font-size: 9px">모델 C</span><span style="color: var(--sys-color-neutral-600)">주행거리 · 충전시간</span></div>
+              </div>
+            </div>
+          </div>
+        </button>
+        <sc-if value="{{f1.sel}}" hint-placeholder-val="{{false}}"><div style="align-self: center; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 11px; line-height: 18px; font-weight: 500">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 188px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f2.labelStyle}}">신청_02_구독료선택</span>
+          <span class="{{f2.badgeClass}}">{{f2.count}}</span>
+        </div>
+        <button onClick="{{f2.select}}" aria-label="신청_02_구독료선택 화면 선택" style="{{f2.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">구독료를 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--sys-color-neutral-100); border-radius: 6px; padding: 2px; text-align: center; color: var(--sys-color-neutral-600)">
+                <div style="padding: 3px 0">12개월</div><div style="padding: 3px 0; background: var(--sys-color-common-white-default); border-radius: 4px; font-weight: 600; color: var(--sys-color-neutral-800); box-shadow: 0 1px 2px rgb(3 9 26 / 8%)">24개월</div><div style="padding: 3px 0">36개월</div>
+              </div>
+              <div style="border-radius: 8px; background: var(--sys-color-neutral-100); padding: 6px 7px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; text-align: center; color: var(--sys-color-neutral-600)"><span>라이트</span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">스탠다드</span><span>프리미엄</span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span><span style="height: 3px; background: var(--ref-color-gray-900-10); border-radius: 2px; margin-top: 3px"></span></div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); padding: 7px; display: flex; flex-direction: column; gap: 3px">
+                <span style="align-self: flex-start; padding: 0 4px; border-radius: 99px; background: var(--sys-color-common-white-default); color: var(--sys-color-brand-primary-default); font-weight: 600">가장 많이 선택</span>
+                <span style="font-weight: 500; font-size: 9px">스탠다드</span>
+                <span><span style="color: var(--sys-color-brand-primary-default); font-weight: 600">할인 구독료</span> <span style="color: var(--sys-color-neutral-500)">원래 구독료</span></span>
+              </div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 500; font-size: 9px">라이트</span><span style="height: 3px; width: 50%; background: var(--ref-color-gray-900-10); border-radius: 2px"></span></div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; flex-direction: column; gap: 3px"><span style="font-weight: 500; font-size: 9px">프리미엄</span><span style="height: 3px; width: 50%; background: var(--ref-color-gray-900-10); border-radius: 2px"></span></div>
+            </div>
+            <div style="position: absolute; left: 10px; right: 10px; bottom: 12px; height: 26px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-weight: 500; font-size: 9px">다음</div>
+          </div>
+        </button>
+        <sc-if value="{{f2.sel}}" hint-placeholder-val="{{true}}"><div style="align-self: center; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 11px; line-height: 18px; font-weight: 500">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 188px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f3.labelStyle}}">신청_03_보험옵션</span>
+          <span class="{{f3.badgeClass}}">{{f3.count}}</span>
+        </div>
+        <button onClick="{{f3.select}}" aria-label="신청_03_보험옵션 화면 선택" style="{{f3.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">보험과 옵션을 골라주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-weight: 600; font-size: 9px">보험</span>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 3px var(--sys-color-brand-primary-default)"></span>기본형</div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400)"></span>안심형</div>
+              <div style="border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); padding: 7px; display: flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400)"></span>프리미엄형</div>
+              <span style="font-weight: 600; font-size: 9px; margin-top: 6px">추가 옵션</span>
+              <div style="display: flex; justify-content: space-between; align-items: center">헬멧 대여 <span style="width: 18px; height: 10px; border-radius: 6px; background: var(--sys-color-brand-primary-default)"></span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center">추가 배터리 <span style="width: 18px; height: 10px; border-radius: 6px; background: var(--sys-color-neutral-300)"></span></div>
+            </div>
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px 12px; box-shadow: 0 -1px 0 var(--iris-line); display: flex; justify-content: space-between; align-items: center"><span style="color: var(--sys-color-neutral-600)">월 구독료</span><span style="padding: 5px 12px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-weight: 500">다음</span></div>
+          </div>
+        </button>
+        <sc-if value="{{f3.sel}}" hint-placeholder-val="{{false}}"><div style="align-self: center; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 11px; line-height: 18px; font-weight: 500">375 × 812</div></sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 188px; flex: none">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; line-height: 18px">
+          <span style="{{f4.labelStyle}}">신청_04_결제</span>
+          <span class="{{f4.badgeClass}}">{{f4.count}}</span>
+        </div>
+        <button onClick="{{f4.select}}" aria-label="신청_04_결제 화면 선택" style="{{f4.frameStyle}}">
+          <div aria-hidden="true" style="height: 100%; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-size: 8px; line-height: 1.4; color: var(--sys-color-neutral-800); position: relative">
+            <div style="height: 28px; display: flex; align-items: center; padding: 0 10px"><span class="ic ic-12 i-chevron_left"></span></div>
+            <div style="padding: 4px 10px 10px; font-size: 12px; font-weight: 600; color: var(--sys-color-common-black-default)">결제할 금액을 확인해주세요</div>
+            <div style="padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+              <div style="border-radius: 8px; background: var(--sys-color-brand-primary-lightest); padding: 8px; display: flex; justify-content: space-between; color: var(--sys-color-brand-primary-default)"><span style="font-weight: 500">지금 낼 금액</span><span style="font-weight: 600">₩ —</span></div>
+              <div style="border-radius: 8px; background: var(--sys-color-neutral-100); padding: 8px; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">차종</span><span>모델 A</span></div>
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">구독료</span><span>스탠다드 · 24개월</span></div>
+                <div style="display: flex; justify-content: space-between"><span style="color: var(--sys-color-neutral-700)">보험</span><span>기본형</span></div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 5px; font-weight: 500; margin-top: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--sys-color-brand-primary-default)"></span>약관에 모두 동의해요</div>
+            </div>
+            <div style="position: absolute; left: 10px; right: 10px; bottom: 12px; height: 26px; border-radius: 6px; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-weight: 500; font-size: 9px">결제하기</div>
+          </div>
+        </button>
+        <sc-if value="{{f4.sel}}" hint-placeholder-val="{{false}}"><div style="align-self: center; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 11px; line-height: 18px; font-weight: 500">375 × 812</div></sc-if>
+      </div>
+    </div>
+
+    <div role="toolbar" aria-label="도구" style="position: absolute; left: 50%; bottom: var(--ref-spacing-11); transform: translateX(-50%); display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); background: var(--sys-color-common-white-default); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong), var(--shadow-04)">
+      <button aria-label="이동 (V)" aria-pressed="true" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.2l9.3 4.6-4 1.3-1.4 4z" fill="currentColor"></path></svg></button>
+      <button aria-label="프레임 (F)" class="hov" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-700)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+      <button aria-label="사각형 (R)" class="hov" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-700)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.33" fill="none"></rect></svg></button>
+      <button aria-label="텍스트 (T)" class="hov" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-700)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5V3h10v1.5M8 3v10M6 13h4" stroke="currentColor" stroke-width="1.33" fill="none"></path></svg></button>
+      <button aria-label="이미지" class="hov" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-700)"><span class="ic i-image" aria-hidden="true"></span></button>
+      <button aria-label="바드림 컴포넌트" class="hov" style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--iris-component)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" fill="currentColor"></path></svg></button>
+      <span style="width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-04)"></span>
+      <a href="FigmaLink.dc.html" class="hov" style="height: 36px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-700); font-weight: 500"><span class="ic i-arrow_up_right" aria-hidden="true"></span>피그마 화면</a>
+      <button class="hov" style="height: 36px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-700); font-weight: 500"><span class="ic i-link" aria-hidden="true"></span>요구사항 연결</button>
+      <span style="width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-04)"></span>
+      <button aria-label="확대 비율 50%" class="hov" style="height: 36px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-700); font-weight: 500; display: flex; align-items: center; gap: var(--ref-spacing-02)">50% <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+    </div>
+  </main>
+
+  <aside aria-label="인스펙터" style="flex: 0 0 336px; min-width: 0; background: var(--sys-color-common-white-default); box-shadow: -1px 0 0 var(--iris-line); display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 1">
+    <div role="tablist" aria-label="인스펙터 탭" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-08) 0">
+      <button role="tab" aria-selected="{{tabs.designSel}}" onClick="{{tabs.toDesign}}" style="{{tabs.designStyle}}">디자인</button>
+      <button role="tab" aria-selected="{{tabs.planSel}}" onClick="{{tabs.toPlan}}" style="{{tabs.planStyle}}">기획</button>
+      <button role="tab" aria-selected="{{tabs.devSel}}" onClick="{{tabs.toDev}}" style="{{tabs.devStyle}}">개발</button>
+    </div>
+
+    <div style="padding: var(--ref-spacing-10) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-02); box-shadow: 0 1px 0 var(--iris-line)">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
+        <span style="font-weight: 600; font-size: var(--typography-body-1-size); line-height: 24px; color: var(--sys-color-neutral-800)">{{cur.name}}</span>
+        <span class="bd-badge t-gray">{{cur.status}}</span>
+      </div>
+      <span style="color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">{{cur.source}}</span>
+    </div>
+
+    <div style="flex: 1; overflow: auto">
+      <sc-if value="{{tabs.planSel}}" hint-placeholder-val="{{true}}">
+        <div style="padding: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); background: var(--sys-color-neutral-100)">
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <span style="font-weight: 600">요구사항 반영</span>
+              <span style="font-weight: 600"><span style="color: var(--sys-color-brand-primary-default)">{{sum.done}}</span> / {{sum.total}}</span>
+            </div>
+            <div role="img" aria-label="{{sum.aria}}" style="display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; background: var(--ref-color-gray-900-5)">
+              <span style="{{sum.rBar}}"></span><span style="{{sum.pBar}}"></span><span style="{{sum.mBar}}"></span>
+            </div>
+            <div style="display: flex; gap: var(--ref-spacing-08); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">
+              <span>반영 {{sum.r}}</span><span>일부 {{sum.p}}</span><span>미반영 {{sum.m}}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <span style="font-weight: 600; font-size: var(--typography-body-1-size); line-height: 24px">연결된 요구사항</span>
+              <button class="bd-button s secondary"><span class="ic ic-12 i-plus" aria-hidden="true"></span>연결</button>
+            </div>
+            <sc-for list="{{reqs}}" as="rq" hint-placeholder-count="4">
+              <div style="border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--iris-line-strong); padding: var(--ref-spacing-08) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
+                  <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">{{rq.code}}</span>
+                  <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" class="{{rq.chipClass}}">
+                    <sc-if value="{{rq.isR}}" hint-placeholder-val="{{true}}"><span class="ic ic-12 i-check_in_circle" aria-hidden="true"></span></sc-if>
+                    <sc-if value="{{rq.isP}}" hint-placeholder-val="{{false}}"><span class="ic ic-12 i-minus_in_circle" aria-hidden="true"></span></sc-if>
+                    <sc-if value="{{rq.isM}}" hint-placeholder-val="{{false}}"><span class="ic ic-12 i-close_in_circle" aria-hidden="true"></span></sc-if>
+                    {{rq.label}}
+                  </button>
+                </div>
+                <div style="color: var(--sys-color-neutral-800)">{{rq.title}}</div>
+                <sc-if value="{{rq.hasNote}}" hint-placeholder-val="{{false}}">
+                  <div style="display: flex; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-05); background: var(--sys-color-theme-warning-bg); color: var(--ref-color-orange-800); font-size: 12px; line-height: 18px"><span class="ic ic-14 i-warning_solid" aria-hidden="true" style="margin-top: 2px"></span><span>{{rq.note}}</span></div>
+                </sc-if>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600); padding-top: var(--ref-spacing-02)">
+                  <span style="display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0"><span class="ic ic-12 i-document" aria-hidden="true"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rq.doc}}</span></span>
+                  <a href="DocSplit.dc.html" style="flex: none; display: flex; align-items: center; gap: 2px; color: var(--sys-color-brand-primary-default); font-weight: 500">원문 보기<span class="ic ic-12 i-chevron_right" aria-hidden="true"></span></a>
+                </div>
+              </div>
+            </sc-for>
+            <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">상태를 누르면 반영됨 → 일부 반영 → 미반영 → 해당 없음 순으로 바뀌어요.</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+            <span style="font-weight: 600; font-size: var(--typography-body-1-size); line-height: 24px; margin-bottom: var(--ref-spacing-04)">관련 문서</span>
+            <a href="DocSplit.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
+              <span style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); background: var(--sys-color-theme-destructed-bg); color: var(--ref-color-red-700); display: grid; place-items: center; font-size: 10px; font-weight: 600">PDF</span>
+              <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-weight: 500">착한구독 개편 기획서 v1.2</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">파일 업로드 · 요구사항 9개</span></span>
+            </a>
+            <a href="DocSplit.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
+              <span style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); display: grid; place-items: center"><span class="ic i-link" aria-hidden="true"></span></span>
+              <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-weight: 500">구독료 정책 정리</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">외부 링크 · 요구사항 3개</span></span>
+            </a>
+            <a href="DocSplit.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
+              <span style="width: 36px; height: 36px; border-radius: var(--ref-radius-04); background: var(--sys-color-theme-turquoise-bg); color: var(--ref-color-turquoise-800); display: grid; place-items: center"><span class="ic i-write" aria-hidden="true"></span></span>
+              <span style="display: flex; flex-direction: column; min-width: 0"><span style="font-weight: 500">신청 플로우 개발 메모</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">Iris 문서 · 요구사항 2개</span></span>
+            </a>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabs.devSel}}" hint-placeholder-val="{{false}}">
+        <div style="padding: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--ref-spacing-04)"><span style="font-weight: 600; font-size: var(--typography-body-1-size); line-height: 24px">사용 컴포넌트</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{dev.summary}}</span></div>
+            <sc-for list="{{dev.comps}}" as="c" hint-placeholder-count="4">
+              <a href="DesignSystem.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
+                <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; color: var(--iris-component)"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" fill="currentColor"></path></svg>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">{{c.name}}</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600); font-family: ui-monospace, Menlo, monospace">{{c.code}}</span></span>
+                <span style="font-size: 12px; font-weight: 600; color: var(--sys-color-neutral-700)">×{{c.count}}</span>
+              </a>
+            </sc-for>
+            <sc-if value="{{dev.hasUnmatched}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-05); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); font-size: 12px; line-height: 18px; margin-top: var(--ref-spacing-04)"><span class="ic i-info_solid" aria-hidden="true" style="color: var(--sys-color-neutral-500); margin-top: 1px"></span><span>{{dev.unmatched}}</span></div>
+            </sc-if>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+            <span style="font-weight: 600; font-size: var(--typography-body-1-size); line-height: 24px; margin-bottom: var(--ref-spacing-02)">사용 토큰</span>
+            <div style="display: flex; align-items: center; gap: var(--ref-spacing-08)"><span style="width: 20px; height: 20px; border-radius: var(--ref-radius-03); background: var(--sys-color-brand-primary-default)"></span><span style="flex: 1; font-size: 12px; line-height: 18px; font-family: ui-monospace, Menlo, monospace">sys-color-brand-primary-default</span></div>
+            <div style="display: flex; align-items: center; gap: var(--ref-spacing-08)"><span style="width: 20px; height: 20px; border-radius: var(--ref-radius-03); background: var(--sys-color-brand-primary-lightest)"></span><span style="flex: 1; font-size: 12px; line-height: 18px; font-family: ui-monospace, Menlo, monospace">sys-color-brand-primary-lightest</span></div>
+            <div style="display: flex; align-items: center; gap: var(--ref-spacing-08)"><span style="width: 20px; height: 20px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); box-shadow: inset 0 0 0 1px var(--iris-line-strong)"></span><span style="flex: 1; font-size: 12px; line-height: 18px; font-family: ui-monospace, Menlo, monospace">sys-color-neutral-100</span></div>
+            <div style="display: flex; align-items: center; gap: var(--ref-spacing-08)"><span style="width: 20px; height: 20px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); display: grid; place-items: center; font-size: 10px; font-weight: 600">Aa</span><span style="flex: 1; font-size: 12px; line-height: 18px; font-family: ui-monospace, Menlo, monospace">Heading 2/24 SB</span></div>
+          </div>
+          <div style="display: flex; gap: var(--ref-spacing-06)">
+            <button class="bd-button l stroke" style="flex: 1">{{dev.openLabel}}</button>
+            <button disabled="disabled" class="bd-button l tertiary" style="flex: 1; color: var(--sys-color-neutral-500); cursor: not-allowed">코드 보기 · Phase 3</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabs.designSel}}" hint-placeholder-val="{{false}}">
+        <div style="padding: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+          <sc-if value="{{cur.isFigma}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-05); background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-dark); font-size: 12px; line-height: 18px">
+              <span style="display: flex; gap: var(--ref-spacing-06)"><span class="ic i-info_solid" aria-hidden="true" style="color: var(--sys-color-brand-primary-default); margin-top: 1px"></span>피그마에서 연결한 화면이에요. 레이어는 피그마에서 고치고, Iris에서는 기획 연결과 검수를 해요.</span>
+              <span style="display: flex; gap: var(--ref-spacing-04); padding-left: 22px"><button class="bd-button s stroke"><span class="ic ic-12 i-refresh" aria-hidden="true"></span>다시 불러오기</button><button class="bd-button s stroke"><span class="ic ic-12 i-arrow_up_right" aria-hidden="true"></span>피그마에서 열기</button></span>
+            </div>
+          </sc-if>
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+            <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">프레임</span>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-06)">
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">X</span><input value="{{cur.x}}" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">Y</span><input value="0" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">W</span><input value="375" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">H</span><input value="812" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+            <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">채우기</span>
+            <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="width: 16px; height: 16px; border-radius: var(--ref-radius-02); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong)"></span><span style="font-size: 12px">common / white-default</span></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+            <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-600)">모양</span>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-06)">
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">Radius</span><input value="radius/07" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+              <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100)"><span style="font-size: 12px; color: var(--sys-color-neutral-600)">Opacity</span><input value="100%" readonly="readonly" style="width: 100%; border: 0; outline: 0; background: transparent; font-size: 12px"></label>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong); color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">
+            <span>오토 레이아웃</span><span class="bd-badge s t-gray">Phase 2</span>
+          </div>
+          <button class="bd-button l stroke" style="width: 100%"><span class="ic i-upload" aria-hidden="true"></span>PNG 1x 내보내기</button>
+        </div>
+      </sc-if>
+    </div>
+  </aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const STATUS = {
+  reflected: { label: '반영됨', cls: 't-success' },
+  partial: { label: '일부 반영', cls: 't-warning' },
+  missing: { label: '미반영', cls: 't-destructed' },
+  na: { label: '해당 없음', cls: 't-gray' }
+};
+const NEXT = { reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' };
+const SCREENS = {
+  s1: { name: '신청_01_차종선택', status: '승인', source: '피그마 연결 · 오늘 09:40에 불러옴', isFigma: true, x: '0' },
+  s2: { name: '신청_02_구독료선택', status: '검토 중', source: '피그마 연결 · 2시간 전에 불러옴', isFigma: true, x: '455' },
+  s3: { name: '신청_03_보험옵션', status: '작업 중', source: 'Iris 캔버스 · 자동 저장되었어요', isFigma: false, x: '910' },
+  s4: { name: '신청_04_결제', status: '작업 중', source: 'Iris 캔버스 · 자동 저장되었어요', isFigma: false, x: '1365' }
+};
+const REQS = [
+  { s: 's1', code: 'REQ-005', title: '차종 카드에 1회 충전 주행거리와 충전 시간을 보여준다', doc: '착한구독 개편 기획서 v1.2 · 2쪽' },
+  { s: 's1', code: 'REQ-007', title: '차종 카드에 월 구독료 시작가를 보여준다', doc: '착한구독 개편 기획서 v1.2 · 2쪽' },
+  { s: 's1', code: 'REQ-008', title: '비교하기로 차종을 최대 3대까지 비교할 수 있다', doc: '착한구독 개편 기획서 v1.2 · 3쪽' },
+  { s: 's2', code: 'REQ-012', title: '구독료 비교표를 화면 위쪽에 보여준다', doc: '착한구독 개편 기획서 v1.2 · 4쪽' },
+  { s: 's2', code: 'REQ-013', title: '약정 기간(12·24·36개월)마다 할인 구독료를 보여준다', doc: '구독료 정책 정리 · 2. 할인', note: '할인 구독료는 있지만 원래 구독료 취소선이 빠져 있어요.' },
+  { s: 's2', code: 'REQ-014', title: '추천 요금제에 ‘가장 많이 선택’ 배지를 단다', doc: '착한구독 개편 기획서 v1.2 · 4쪽' },
+  { s: 's2', code: 'REQ-015', title: '요금제를 누르면 혜택 상세 바텀시트를 연다', doc: '착한구독 개편 기획서 v1.2 · 5쪽' },
+  { s: 's2', code: 'REQ-021', title: '다음 버튼은 화면 아래에 고정한다', doc: '신청 플로우 개발 메모' },
+  { s: 's3', code: 'REQ-030', title: '보험 3종을 카드로 비교해 하나를 고른다', doc: '착한구독 개편 기획서 v1.2 · 6쪽' },
+  { s: 's3', code: 'REQ-031', title: '옵션을 켜고 끌 때 월 구독료를 바로 다시 계산한다', doc: '구독료 정책 정리 · 3. 옵션', note: '월 구독료 자리는 있지만 금액이 아직 비어 있어요.' },
+  { s: 's4', code: 'REQ-040', title: '지금 낼 금액을 연파랑 박스로 강조한다', doc: '착한구독 개편 기획서 v1.2 · 7쪽' },
+  { s: 's4', code: 'REQ-041', title: '약관 전체 동의를 한 번에 할 수 있다', doc: '착한구독 개편 기획서 v1.2 · 7쪽' },
+  { s: 's4', code: 'REQ-042', title: '첫 달 무료 혜택 안내를 보여준다', doc: '구독료 정책 정리 · 4. 혜택' },
+  { s: 's4', code: 'REQ-043', title: '결제 수단을 바꿀 수 있는 버튼을 둔다', doc: '신청 플로우 개발 메모' }
+];
+const INITIAL = { 'REQ-005': 'reflected', 'REQ-007': 'reflected', 'REQ-008': 'missing', 'REQ-012': 'reflected', 'REQ-013': 'partial', 'REQ-014': 'reflected', 'REQ-015': 'missing', 'REQ-021': 'reflected', 'REQ-030': 'reflected', 'REQ-031': 'partial', 'REQ-040': 'reflected', 'REQ-041': 'reflected', 'REQ-042': 'na', 'REQ-043': 'missing' };
+const LAYERS = {
+  s1: [['신청_01_차종선택', 0, 'frame'], ['TopBar', 1, 'comp'], ['Title Area', 1, 'frame'], ['Title', 2, 'text'], ['Content Area', 1, 'frame'], ['ProductCard', 2, 'comp'], ['ProductCard', 2, 'comp'], ['ProductCard', 2, 'comp']],
+  s2: [['신청_02_구독료선택', 0, 'frame'], ['TopBar', 1, 'comp'], ['Title Area', 1, 'frame'], ['Title', 2, 'text'], ['Content Area', 1, 'frame'], ['SegmentedControl', 2, 'comp'], ['비교표', 2, 'frame'], ['플랜 카드', 2, 'frame'], ['Badge', 3, 'comp'], ['플랜 카드', 2, 'frame'], ['Rectangle 12', 2, 'rect'], ['BottomBar', 1, 'comp'], ['Button', 2, 'comp']],
+  s3: [['신청_03_보험옵션', 0, 'frame'], ['Header', 1, 'frame'], ['Title', 2, 'text'], ['보험', 1, 'text'], ['RadioCard', 1, 'frame'], ['RadioCard', 1, 'frame'], ['RadioCard', 1, 'frame'], ['추가 옵션', 1, 'text'], ['OptionRow', 1, 'frame'], ['OptionRow', 1, 'frame'], ['TotalBar', 1, 'frame']],
+  s4: [['신청_04_결제', 0, 'frame'], ['Header', 1, 'frame'], ['Title', 2, 'text'], ['지금 낼 금액', 1, 'frame'], ['금액 표', 1, 'frame'], ['약관 동의', 1, 'frame'], ['Banner', 1, 'image'], ['PayButton', 1, 'frame']]
+};
+const COMPS = {
+  s1: { list: [['TopBar', '<TopBar mode="back">', 1], ['ProductCard', '<ProductCard>', 3]], unmatched: '' },
+  s2: { list: [['TopBar', '<TopBar mode="back">', 1], ['SegmentedControl', '<SegmentedControl size="m">', 1], ['Badge', '<Badge theme="brand" type="alpha">', 1], ['BottomBar', '<BottomBar>', 1], ['Button', '<Button type="primary" size="xl">', 1]], unmatched: '디자인 시스템과 이어지지 않은 레이어가 1개 있어요. Rectangle 12' },
+  s3: { list: [], unmatched: 'Iris 캔버스 화면은 Phase 2부터 컴포넌트를 세요. 이름이 같은 RadioCard 3개는 CheckboxCard 후보예요.' },
+  s4: { list: [], unmatched: 'Iris 캔버스 화면은 Phase 2부터 컴포넌트를 세요.' }
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'plan', sel: 's2', st: Object.assign({}, INITIAL) };
+  }
+  cycle(code) {
+    const st = Object.assign({}, this.state.st);
+    st[code] = NEXT[st[code]];
+    this.setState({ st: st });
+  }
+  frame(id) {
+    const sel = this.state.sel === id;
+    const list = REQS.filter((r) => r.s === id);
+    const done = list.filter((r) => this.state.st[r.code] === 'reflected').length;
+    const all = list.filter((r) => this.state.st[r.code] !== 'na').length;
+    return {
+      sel: sel,
+      count: done + '/' + all,
+      select: () => this.setState({ sel: id }),
+      labelStyle: sel ? 'color:var(--sys-color-brand-primary-default);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500',
+      badgeClass: 'bd-badge s ' + (done === all ? 't-success' : 't-gray'),
+      frameStyle: 'display:block;width:188px;height:407px;border-radius:2px;overflow:hidden;background:var(--sys-color-common-white-default);box-shadow:var(--shadow-01);' + (sel ? 'outline:1.5px solid var(--sys-color-brand-primary-default);outline-offset:2px' : 'outline:1px solid var(--iris-line)')
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const tabStyle = (on) => 'padding:var(--ref-spacing-05) 0;border-radius:var(--ref-radius-04);text-align:center;' + (on ? 'background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600' : 'color:var(--sys-color-neutral-600);font-weight:500');
+    const list = REQS.filter((r) => r.s === s.sel).map((r) => {
+      const k = s.st[r.code];
+      return {
+        code: r.code, title: r.title, doc: r.doc, note: r.note || '', hasNote: !!r.note && k !== 'reflected',
+        label: STATUS[k].label,
+        aria: r.code + ' 상태 ' + STATUS[k].label + ', 눌러서 바꾸기',
+        chipClass: 'bd-badge ' + STATUS[k].cls,
+        isR: k === 'reflected', isP: k === 'partial', isM: k === 'missing',
+        cycle: () => this.cycle(r.code)
+      };
+    });
+    const r = list.filter((x) => x.isR).length, p = list.filter((x) => x.isP).length, m = list.filter((x) => x.isM).length;
+    const total = r + p + m || 1;
+    const bar = (n, c) => 'display:block;width:' + (n / total * 100) + '%;background:' + c;
+    const cur = SCREENS[s.sel];
+    const layers = LAYERS[s.sel].map((l, i) => ({
+      name: l[0], isFrame: l[2] === 'frame', isComp: l[2] === 'comp', isText: l[2] === 'text', isRect: l[2] === 'rect', isImage: l[2] === 'image',
+      rowStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;border-radius:var(--ref-radius-04);padding-left:' + (10 + l[1] * 14) + 'px;color:var(--sys-color-neutral-600);' + (i === 0 ? 'background:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)' : ''),
+      nameStyle: 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;' + (l[2] === 'comp' ? 'color:var(--ref-color-purple-700);font-weight:500' : (i === 0 ? 'font-weight:600' : 'color:var(--sys-color-neutral-800)'))
+    }));
+    const cm = COMPS[s.sel];
+    const totalComps = cm.list.reduce((a, c) => a + c[2], 0);
+    return {
+      tabs: {
+        planSel: s.tab === 'plan', devSel: s.tab === 'dev', designSel: s.tab === 'design',
+        planStyle: tabStyle(s.tab === 'plan'), devStyle: tabStyle(s.tab === 'dev'), designStyle: tabStyle(s.tab === 'design'),
+        toPlan: () => this.setState({ tab: 'plan' }), toDev: () => this.setState({ tab: 'dev' }), toDesign: () => this.setState({ tab: 'design' })
+      },
+      f1: this.frame('s1'), f2: this.frame('s2'), f3: this.frame('s3'), f4: this.frame('s4'),
+      cur: cur,
+      reqs: list,
+      sum: { done: r, total: r + p + m, r: r, p: p, m: m, rBar: bar(r, 'var(--sys-color-theme-success-default)'), pBar: bar(p, 'var(--sys-color-theme-warning-default)'), mBar: bar(m, 'var(--sys-color-theme-destructed-default)'), aria: '반영 ' + r + '개, 일부 반영 ' + p + '개, 미반영 ' + m + '개' },
+      layers: layers,
+      dev: {
+        comps: cm.list.map((c) => ({ name: c[0], code: c[1], count: c[2] })),
+        summary: cm.list.length ? cm.list.length + '종 · ' + totalComps + '개' : '아직 세지 않았어요',
+        unmatched: cm.unmatched, hasUnmatched: !!cm.unmatched,
+        openLabel: cur.isFigma ? '피그마에서 열기' : '캔버스에서 고치기'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

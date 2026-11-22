@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 요구사항 보드</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+
+  <header style="height: 60px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-14); padding: 0 var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line)">
+    <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+      <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
+      <span style="font-weight: 600; font-size: 17px; color: var(--sys-color-common-black-default)">Iris</span>
+    </a>
+    <nav aria-label="주 메뉴" style="display: flex; gap: var(--ref-spacing-04)">
+      <a href="Home.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">프로젝트</a>
+      <a href="Requirements.dc.html" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 600; color: var(--sys-color-neutral-800)">요구사항</a>
+      <a href="DesignSystem.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">디자인 시스템</a>
+    </nav>
+  </header>
+
+  <main style="flex: 1; padding: var(--ref-spacing-17) var(--ref-spacing-16); box-sizing: border-box">
+    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10); flex-wrap: wrap">
+        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+          <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-600); font-weight: 500">착한구독 신청 플로우 개편 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+          <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">요구사항</h1>
+        </div>
+        <div style="display: flex; gap: var(--ref-spacing-06)">
+          <button class="bd-button l stroke"><span class="ic i-upload" aria-hidden="true"></span>내보내기</button>
+          <a href="AddDoc.dc.html" class="bd-button l primary"><span class="ic i-plus" aria-hidden="true"></span>요구사항 추가</a>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--ref-spacing-08)">
+        <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
+          <button onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="{{s.style}}">
+            <span style="color: var(--sys-color-neutral-600)">{{s.label}}</span>
+            <span style="font-size: var(--typography-heading-2-size); line-height: 32px; font-weight: 600; color: var(--sys-color-neutral-800)">{{s.count}}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--iris-line-strong); overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); flex-wrap: wrap">
+          <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 36px; min-width: 260px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500)">
+            <span class="ic i-search" aria-hidden="true"></span><span class="sr">요구사항 검색</span>
+            <input placeholder="번호나 내용으로 찾기" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--sys-color-neutral-800)">
+          </label>
+          <div style="display: flex; gap: var(--ref-spacing-04)">
+            <button class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-12); box-shadow: inset 0 0 0 1px var(--iris-line-strong); color: var(--sys-color-neutral-700); font-weight: 500">문서 전체 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+            <button class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-12); box-shadow: inset 0 0 0 1px var(--iris-line-strong); color: var(--sys-color-neutral-700); font-weight: 500">페이지 전체 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
+          </div>
+        </div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; min-width: 880px; border-collapse: collapse; text-align: left">
+            <thead>
+              <tr style="background: var(--sys-color-neutral-200); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-10); font-weight: 600; width: 96px">번호</th>
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600">요구사항</th>
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 190px">문서</th>
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 170px">화면</th>
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 104px">상태</th>
+                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-10); font-weight: 600; width: 110px">확인</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+                <tr style="box-shadow: inset 0 -1px 0 var(--iris-line)">
+                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 13px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.code}}</td>
+                  <td style="padding: var(--ref-spacing-08)">{{r.title}}</td>
+                  <td style="padding: var(--ref-spacing-08); color: var(--sys-color-neutral-600)">{{r.doc}}</td>
+                  <td style="padding: var(--ref-spacing-08)"><a href="Main.dc.html" style="{{r.screenStyle}}">{{r.screen}}</a></td>
+                  <td style="padding: var(--ref-spacing-08)"><span class="{{r.badge}}">{{r.status}}</span></td>
+                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.who}}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+          <div style="padding: var(--ref-spacing-17) var(--ref-spacing-10); display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-04); text-align: center">
+            <span class="ic ic-24 i-check_in_circle" aria-hidden="true" style="color: var(--sys-color-theme-success-default)"></span>
+            <span style="font-weight: 600; font-size: 16px; line-height: 24px">이 상태의 요구사항이 없어요</span>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const ROWS = [
+  ['REQ-005', '차종 카드에 1회 충전 주행거리와 충전 시간을 보여준다', '기획서 v1.2 · 2쪽', '신청_01_차종선택', 'reflected', '박디자 · 오늘'],
+  ['REQ-007', '차종 카드에 월 구독료 시작가를 보여준다', '기획서 v1.2 · 2쪽', '신청_01_차종선택', 'reflected', '박디자 · 오늘'],
+  ['REQ-008', '비교하기로 차종을 최대 3대까지 비교할 수 있다', '기획서 v1.2 · 3쪽', '', 'missing', '—'],
+  ['REQ-012', '구독료 비교표를 화면 위쪽에 보여준다', '기획서 v1.2 · 4쪽', '신청_02_구독료선택', 'reflected', '김기획 · 어제'],
+  ['REQ-013', '약정 기간마다 할인 구독료를 보여준다', '구독료 정책 정리', '신청_02_구독료선택', 'partial', '김기획 · 어제'],
+  ['REQ-014', '추천 요금제에 ‘가장 많이 선택’ 배지를 단다', '기획서 v1.2 · 4쪽', '신청_02_구독료선택', 'reflected', '김기획 · 어제'],
+  ['REQ-015', '요금제를 누르면 혜택 상세 바텀시트를 연다', '기획서 v1.2 · 5쪽', '', 'missing', '—'],
+  ['REQ-021', '다음 버튼은 화면 아래에 고정한다', '개발 메모', '신청_02_구독료선택', 'reflected', '이개발 · 11월 20일'],
+  ['REQ-030', '보험 3종을 카드로 비교해 하나를 고른다', '기획서 v1.2 · 6쪽', '신청_03_보험옵션', 'reflected', '박디자 · 11월 19일'],
+  ['REQ-031', '옵션을 켜고 끌 때 월 구독료를 바로 다시 계산한다', '구독료 정책 정리', '신청_03_보험옵션', 'partial', '박디자 · 11월 19일'],
+  ['REQ-040', '지금 낼 금액을 연파랑 박스로 강조한다', '기획서 v1.2 · 7쪽', '신청_04_결제', 'reflected', '김기획 · 11월 18일'],
+  ['REQ-042', '첫 달 무료 혜택 안내를 보여준다', '구독료 정책 정리', '신청_04_결제', 'na', '김기획 · 11월 18일'],
+  ['REQ-043', '결제 수단을 바꿀 수 있는 버튼을 둔다', '개발 메모', '신청_04_결제', 'missing', '—']
+];
+const ST = { reflected: ['반영됨', 't-success'], partial: ['일부 반영', 't-warning'], missing: ['미반영', 't-destructed'], na: ['해당 없음', 't-gray'] };
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { f: 'all' };
+  }
+  renderVals() {
+    const f = this.state.f;
+    const defs = [['all', '전체'], ['reflected', '반영됨'], ['partial', '일부 반영'], ['missing', '미반영'], ['na', '해당 없음']];
+    const rows = ROWS.filter((r) => f === 'all' || r[4] === f);
+    return {
+      empty: rows.length === 0,
+      stats: defs.map((d) => ({
+        label: d[1], on: f === d[0],
+        count: d[0] === 'all' ? ROWS.length : ROWS.filter((r) => r[4] === d[0]).length,
+        pick: () => this.setState({ f: d[0] }),
+        style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);padding:var(--ref-spacing-10);border-radius:var(--ref-radius-07);text-align:left;' + (f === d[0] ? 'background:var(--sys-color-brand-primary-lightest);box-shadow:inset 0 0 0 1px var(--ref-color-blue-500-40)' : 'background:var(--sys-color-neutral-100)')
+      })),
+      rows: rows.map((r) => ({
+        code: r[0], title: r[1], doc: r[2], screen: r[3] || '연결 안 됨', who: r[5],
+        status: ST[r[4]][0], badge: 'bd-badge ' + ST[r[4]][1],
+        screenStyle: r[3] ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-600)'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

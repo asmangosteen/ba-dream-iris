@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Iris 로그인</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="/_blob/f23a52a1626256e5f05c10be1c30a377">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+  <div class="aurora" aria-hidden="true">
+    <i style="width: 560px; height: 420px; left: -120px; top: -100px; background: var(--ref-color-blue-200)"></i>
+    <i style="width: 480px; height: 360px; left: 34%; top: -160px; background: var(--ref-color-yellow-100)"></i>
+    <i style="width: 520px; height: 400px; right: -120px; top: 80px; background: var(--ref-color-turquoise-100)"></i>
+    <i style="width: 460px; height: 360px; left: -60px; bottom: -120px; background: var(--ref-color-purple-100)"></i>
+    <i style="width: 420px; height: 320px; right: 18%; bottom: -140px; background: var(--ref-color-red-100)"></i>
+  </div>
+
+  <header style="position: relative; height: 60px; display: flex; align-items: center; padding: 0 var(--ref-spacing-12)">
+    <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+      <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
+      <span style="font-weight: 600; font-size: 17px; color: var(--sys-color-common-black-default)">Iris</span>
+    </span>
+  </header>
+
+  <main style="position: relative; flex: 1; display: grid; place-items: center; padding: var(--ref-spacing-16) var(--ref-spacing-10)">
+    <div style="width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: stretch; gap: var(--ref-spacing-14)">
+      <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--ref-spacing-08)">
+        <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="바드림" style="height: 48px; width: auto; display: block; margin-bottom: var(--ref-spacing-08)">
+        <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">기획과 화면을 잇다</h1>
+        <p style="margin: 0; font-size: var(--typography-body-1-size); line-height: 26px; color: var(--sys-color-neutral-600)">화면을 누르면 반영된 기획이 보여요.<br>바드림 회사 이메일로 들어와주세요.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10); padding: var(--ref-spacing-12); border-radius: var(--ref-radius-08); background: rgb(253 253 253 / 86%); box-shadow: inset 0 0 0 1px var(--iris-line-strong), var(--shadow-03)">
+        <sc-if value="{{isEmail}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
+              <label for="email" style="font-weight: 500; color: var(--sys-color-neutral-800)">회사 이메일</label>
+              <div style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 48px; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default)">
+                <input id="email" value="gildong" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px">
+                <span style="font-size: 16px; color: var(--sys-color-neutral-600)">@ba-dream.com</span>
+              </div>
+              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">ba-dream.com 계정만 들어올 수 있어요.</span>
+            </div>
+            <button onClick="{{toCode}}" class="bd-button xl primary" style="width: 100%">인증 코드 받기</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{isCode}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
+            <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
+              <span style="font-weight: 600; font-size: var(--typography-subtitle-size); line-height: 24px; color: var(--sys-color-neutral-800)">메일함을 확인해주세요</span>
+              <span style="color: var(--sys-color-neutral-600)">gildong@ba-dream.com으로 6자리 코드를 보냈어요.</span>
+            </div>
+            <fieldset style="border: 0; padding: 0; margin: 0">
+              <legend class="sr">인증 코드 6자리</legend>
+              <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--ref-spacing-06)">
+                <input aria-label="첫째 자리" value="4" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 20px; font-weight: 600">
+                <input aria-label="둘째 자리" value="8" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 20px; font-weight: 600">
+                <input aria-label="셋째 자리" value="1" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 20px; font-weight: 600">
+                <input aria-label="넷째 자리" value="" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); text-align: center; font-size: 20px; font-weight: 600">
+                <input aria-label="다섯째 자리" value="" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 20px; font-weight: 600">
+                <input aria-label="여섯째 자리" value="" style="height: 52px; border: 0; border-radius: var(--ref-radius-06); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 20px; font-weight: 600">
+              </div>
+            </fieldset>
+            <a href="Home.dc.html" class="bd-button xl primary" style="width: 100%">로그인</a>
+            <div style="display: flex; justify-content: space-between; font-size: 13px">
+              <button onClick="{{toEmail}}" style="color: var(--sys-color-neutral-600)">이메일 다시 입력</button>
+              <button style="color: var(--sys-color-brand-primary-default); font-weight: 500">코드 다시 받기 0:42</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <p style="margin: 0; text-align: center; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">처음 들어오면 이름과 하는 일(기획 · 디자인 · 개발)을 한 번만 적어요.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 'email' };
+  }
+  renderVals() {
+    return {
+      isEmail: this.state.step === 'email',
+      isCode: this.state.step === 'code',
+      toCode: () => this.setState({ step: 'code' }),
+      toEmail: () => this.setState({ step: 'email' })
+    };
+  }
+}
+</script>
+</body>
+</html>
