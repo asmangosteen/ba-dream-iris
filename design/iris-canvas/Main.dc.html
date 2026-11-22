@@ -322,7 +322,7 @@ a{color:inherit}a:hover{color:inherit}
               <sc-if value="{{obj.isComp}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg></sc-if>
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{obj.name}}</span>
             </span>
-            <span class="bd-badge s t-gray">{{obj.badge}}</span>
+            <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><span class="bd-badge s t-gray">{{obj.badge}}</span></sc-if>
           </div>
           <span class="t11" style="color: var(--sys-color-neutral-500)">{{obj.source}}</span>
         </div>
@@ -340,9 +340,9 @@ a{color:inherit}a:hover{color:inherit}
                     <span style="{{sum.rBar}}"></span><span style="{{sum.pBar}}"></span><span style="{{sum.mBar}}"></span>
                   </div>
                   <div class="t11" style="display: flex; gap: var(--ref-spacing-08); color: var(--sys-color-neutral-600)">
-                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default)"></span>반영 {{sum.r}}</span>
-                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--sys-color-neutral-800)"></span>일부 {{sum.p}}</span>
-                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-neutral-800)"></span>미반영 {{sum.m}}</span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="{{sum.rIcon}}"></span>반영 {{sum.r}}</span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="{{sum.pIcon}}"></span>일부 {{sum.p}}</span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-02)"><span style="{{sum.mIcon}}"></span>미반영 {{sum.m}}</span>
                   </div>
                 </div>
               </sc-if>
@@ -351,17 +351,17 @@ a{color:inherit}a:hover{color:inherit}
                 <div class="sec-h" style="height: 24px; padding: 0 0 0 var(--ref-spacing-04)"><span>{{plan.title}}</span><button class="ib" aria-label="요구사항 연결" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
                 <sc-for list="{{reqGroups}}" as="g" hint-placeholder-count="3">
                   <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
-                    <span class="t11" style="padding: 0 var(--ref-spacing-04); font-weight: 500; color: var(--sys-color-neutral-500)">{{g.label}} {{g.n}}</span>
+                    <span class="t11" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04); font-weight: 600; color: var(--sys-color-neutral-600)"><span style="{{g.icon}}" aria-hidden="true"></span>{{g.label}}<span style="font-weight: 500; color: var(--sys-color-neutral-400)">{{g.n}}</span></span>
                     <sc-for list="{{g.items}}" as="rq" hint-placeholder-count="2">
-                      <div class="sq hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-04); border-radius: var(--ref-radius-04); display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06)">
-                          <span class="t11" style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="mono" style="font-size: 11px">{{rq.code}}</span> · {{rq.anchor}}</span>
-                          <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" class="{{rq.chipClass}}">{{rq.label}}</button>
-                        </div>
+                      <div class="sq hov" style="display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: var(--ref-spacing-02) var(--ref-spacing-05); padding: var(--ref-spacing-05) var(--ref-spacing-04); border-radius: var(--ref-radius-04)">
+                        <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" title="{{rq.label}} · 눌러서 바꾸기" style="width: 14px; height: 18px; display: grid; place-items: center"><span style="{{rq.icon}}" aria-hidden="true"></span></button>
                         <span style="font-weight: 500; color: var(--sys-color-neutral-800)">{{rq.title}}</span>
+                        <span></span>
+                        <span class="t11" style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="mono" style="font-size: 11px">{{rq.code}}</span> · {{rq.anchor}}</span>
                         <sc-if value="{{rq.hasNote}}" hint-placeholder-val="{{false}}">
-                          <span class="t11" style="display: flex; gap: var(--ref-spacing-02); color: var(--sys-color-neutral-700)"><span class="ic ic-12 i-warning" aria-hidden="true" style="margin-top: 2px"></span>{{rq.note}}</span>
+                          <span></span><span class="t11" style="color: var(--sys-color-neutral-700)">{{rq.note}}</span>
                         </sc-if>
+                        <span></span>
                         <div class="t11" style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-500)">
                           <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rq.doc}}</span>
                           <button onClick="{{rq.openDoc}}" class="t11" style="flex: none; color: var(--sys-color-brand-primary-default); font-weight: 500">원문</button>
@@ -401,8 +401,8 @@ a{color:inherit}a:hover{color:inherit}
                     </sc-for>
                   </div>
                   <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
-                    <span style="font-weight: 600">코드</span>
-                    <div class="sq" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-700); white-space: pre-wrap; overflow-wrap: anywhere">{{dev.code}}</div>
+                    <span style="font-size: 12px; font-weight: 600">코드</span>
+                    <div class="sq" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-700); white-space: pre-wrap; overflow-wrap: anywhere">{{dev.code}}</div>
                   </div>
                 </div>
               </sc-if>
@@ -413,7 +413,7 @@ a{color:inherit}a:hover{color:inherit}
                     <sc-for list="{{dev.comps}}" as="c" hint-placeholder-count="4">
                       <button onClick="{{c.open}}" class="sq hov" style="display: flex; align-items: center; gap: var(--ref-spacing-06); width: calc(100% - 8px); margin: 0 var(--ref-spacing-02); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-04)">
                         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="flex: none; color: var(--iris-component)"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor"></path></svg>
-                        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500; color: var(--iris-component)">{{c.name}}</span><span style="font-size: 12px; color: var(--sys-color-neutral-500); font-family: ui-monospace, Menlo, monospace">{{c.code}}</span></span>
+                        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500; color: var(--iris-component)">{{c.name}}</span><span style="font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); font-family: ui-monospace, Menlo, monospace">{{c.code}}</span></span>
                         <span style="font-weight: 600; color: var(--sys-color-neutral-700)">×{{c.count}}</span>
                       </button>
                     </sc-for>
@@ -423,9 +423,9 @@ a{color:inherit}a:hover{color:inherit}
                   </div>
                   <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
                     <div class="pn-h"><span>사용 토큰</span></div>
-                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">brand/primary-default</span></div>
-                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-800)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">neutral/800</span></div>
-                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px">neutral/100</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-brand-primary-default)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 11px">brand/primary-default</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-800)"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 11px">neutral/800</span></div>
+                    <div style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; padding: 0 var(--ref-spacing-10)"><span class="sq" style="width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"></span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 11px">neutral/100</span></div>
                   </div>
                 </div>
               </sc-if>
@@ -683,6 +683,14 @@ const TYPE_INK = { primary: 'var(--sys-color-common-white-default)', secondary: 
 const RADII = [['radius/04', 8], ['radius/05', 10], ['radius/06', 12], ['radius/12', 999]];
 const TEXTS = [['Body 1/16 M', 16, 24], ['Body 2/14 M', 14, 22], ['Caption 1/12 SB', 12, 18]];
 const BTN_H = { s: 26, m: 30, l: 38, xl: 48 };
+const STATUS_ICON = (k, n) => {
+  n = n || 12;
+  const base = 'display:block;flex:none;width:' + n + 'px;height:' + n + 'px;border-radius:50%;box-sizing:border-box;';
+  if (k === 'reflected') return base + 'background:var(--sys-color-brand-primary-default) ' + CHECK_BG.replace('12px no-repeat', Math.round(n * 0.7) + 'px no-repeat');
+  if (k === 'partial') return base + 'border:1.5px solid var(--sys-color-neutral-800);background:conic-gradient(var(--sys-color-neutral-800) 0 50%, transparent 0)';
+  if (k === 'missing') return base + 'border:1.5px dashed var(--sys-color-neutral-500)';
+  return base + 'background:linear-gradient(#fff, #fff) center/' + Math.round(n / 2) + 'px 1.5px no-repeat, var(--sys-color-neutral-300)';
+};
 const START = {};
 /* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
 function irisSquircle() {
@@ -829,7 +837,7 @@ class Component extends DCLogic {
       return {
         code: r.code, title: r.title, doc: r.doc, anchor: ANCHOR[r.code] || '연결 안 됨', note: r.note || '', hasNote: !!r.note && k !== 'reflected',
         label: STATUS[k].label, aria: r.code + ' 상태 ' + STATUS[k].label + ', 눌러서 바꾸기',
-        chipClass: 'bd-badge s ' + STATUS[k].cls, isR: k === 'reflected',
+        chipClass: 'bd-badge s ' + STATUS[k].cls, isR: k === 'reflected', icon: STATUS_ICON(k, 12),
         cycle: () => this.cycle(r.code),
         openDoc: () => this.setState({ doc: DOC_OF(r), req: r.code })
       };
@@ -837,7 +845,7 @@ class Component extends DCLogic {
     const list = scoped.map(mk);
     const reqGroups = [['missing', '미반영'], ['partial', '일부 반영'], ['reflected', '반영됨'], ['na', '해당 없음']].map((g) => {
       const items = scoped.filter((r) => s.st[r.code] === g[0]).map(mk);
-      return { label: g[1], n: items.length, items: items };
+      return { label: g[1], n: items.length, items: items, icon: STATUS_ICON(g[0], 10) };
     }).filter((g) => g.n);
     const cnt = (lab) => all.filter((r) => STATUS[s.st[r.code]].label === lab).length;
     const r = cnt('반영됨'), p = cnt('일부 반영'), m = cnt('미반영');
@@ -1000,7 +1008,7 @@ class Component extends DCLogic {
       reqs: list, reqGroups: reqGroups, cv: cv, ds: ds,
       rail: { style: 'position:absolute;left:' + Math.round((280 + 1440 - (D ? 400 : 288) - 16) / 2) + 'px;bottom:var(--iris-gap);transform:translateX(-50%);height:40px;box-sizing:border-box;padding:var(--ref-spacing-02) var(--ref-spacing-04);display:flex;align-items:center;gap:var(--ref-spacing-02);z-index:3' },
       relDocs: DOCS.map((d) => ({ title: d.title, icon: d.icon, kind: d.kind, open: () => this.setState({ doc: d.id }) })),
-      sum: { done: r, total: r + p + m, r: r, p: p, m: m, rBar: bar(r, 'background:var(--sys-color-brand-primary-default)'), pBar: bar(p, 'box-shadow:inset 0 0 0 1px var(--sys-color-neutral-800)'), mBar: bar(m, 'background:var(--sys-color-neutral-800)'), aria: '반영 ' + r + '개, 일부 반영 ' + p + '개, 미반영 ' + m + '개' },
+      sum: { done: r, total: r + p + m, r: r, p: p, m: m, rBar: bar(r, 'background:var(--sys-color-brand-primary-default)'), pBar: bar(p, 'box-shadow:inset 0 0 0 1px var(--sys-color-neutral-800)'), mBar: bar(m, 'background:var(--sys-color-neutral-800)'), aria: '반영 ' + r + '개, 일부 반영 ' + p + '개, 미반영 ' + m + '개', rIcon: STATUS_ICON('reflected', 10), pIcon: STATUS_ICON('partial', 10), mIcon: STATUS_ICON('missing', 10) },
       layers: layers,
       dev: {
         isFrame: isFrameSel, isComp: !!inst, isPlain: !isFrameSel && !inst,
