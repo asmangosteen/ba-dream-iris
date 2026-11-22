@@ -20,10 +20,10 @@ async function sendCode() {
   }
   busy.value = true
   error.value = ''
-  const { error: e } = await supabase.auth.signInWithOtp({ email: email.value, options: { shouldCreateUser: true } })
+  const { error: e } = await supabase.auth.signInWithOtp({ email: email.value, options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/confirm` } })
   busy.value = false
   if (e) {
-    error.value = e.message.includes('rate') ? '잠시 뒤 다시 시도해주세요.' : '인증 코드를 보내지 못했어요. 이메일을 확인해주세요.'
+    error.value = e.message.includes('회사 이메일') ? e.message : e.message.includes('rate') ? '잠시 뒤 다시 시도해주세요.' : '메일을 보내지 못했어요. 이메일을 확인해주세요.'
     return
   }
   step.value = 'code'
@@ -58,7 +58,7 @@ async function verify() {
         </template>
         <template v-else>
           <div class="col">
-            <span class="tx-head">메일함을 확인해주세요</span>
+            <span class="tx-head">메일의 링크를 누르거나 코드를 적어주세요</span>
             <span class="tx-meta">{{ email }}</span>
           </div>
           <label for="code" class="sr">인증 코드 6자리</label>
@@ -67,10 +67,10 @@ async function verify() {
           </div>
         </template>
         <p v-if="error" class="err" role="alert">{{ error }}</p>
-        <Button size="s" type="primary" :loading="busy" class="full" @click="step === 'email' ? sendCode() : verify()">{{ step === 'email' ? '인증 코드 받기' : '로그인' }}</Button>
+        <Button size="s" type="primary" :loading="busy" class="full" @click="step === 'email' ? sendCode() : verify()">{{ step === 'email' ? '로그인 메일 받기' : '로그인' }}</Button>
         <div v-if="step === 'code'" class="row">
           <button type="button" class="tx-meta" @click="step = 'email'; code = ''">이메일 다시 입력</button>
-          <button type="button" class="link" :disabled="busy" @click="sendCode">코드 다시 받기</button>
+          <button type="button" class="link" :disabled="busy" @click="sendCode">메일 다시 받기</button>
         </div>
       </form>
     </main>
