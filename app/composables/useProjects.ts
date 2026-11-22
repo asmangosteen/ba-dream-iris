@@ -17,7 +17,9 @@ export const STATUS_LABEL: Record<ProjectStatus, string> = {
 /** 프로젝트 목록 (RLS 로 멤버만 읽힘) */
 export function useProjects() {
   const supabase = useSupabaseClient()
+  const preview = usePreviewMode()
   return useAsyncData('projects', async () => {
+    if (preview) return PREVIEW_PROJECTS
     const { data, error } = await supabase
       .from('projects')
       .select('id, name, status, updated_at')

@@ -18,6 +18,7 @@ export default defineNuxtConfig({
     figmaAccessToken: '',
     public: {
       allowedEmailDomain: 'ba-dream.com',
+      devPreview: '',
     },
   },
 })

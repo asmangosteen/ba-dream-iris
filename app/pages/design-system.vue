@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { EmptyState } from '@ba-dream/design-system'
 </script>
 
 <template>
@@ -7,7 +6,7 @@ import { EmptyState } from '@ba-dream/design-system'
     <AppTopBar />
     <main class="sq float body">
       <h1 class="tx-title">디자인 시스템</h1>
-      <EmptyState on="section" title="아직 준비 중이에요" :show-icon="false" />
+      <p class="tx-meta" style="margin: var(--ref-spacing-08) 0 0">아직 준비 중이에요</p>
     </main>
   </div>
 </template>

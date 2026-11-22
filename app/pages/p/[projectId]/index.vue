@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, EmptyState, Icon, Skeleton } from '@ba-dream/design-system'
+import { Button, Icon, Skeleton } from '@ba-dream/design-system'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 
 const route = useRoute()
@@ -58,7 +58,7 @@ const frameStyle = (s: { x: number; y: number; width: number; height: number }) 
           <p v-if="screens.status.value === 'success' && !screens.data.value?.length" class="tx-meta empty">화면이 아직 없어요</p>
         </section>
       </template>
-      <EmptyState v-else on="section" :title="left === 'assets' ? '에셋은 D3에 열려요' : '문서는 D4에 열려요'" :show-icon="false" />
+      <p v-else class="tx-meta empty pad">{{ left === 'assets' ? '에셋은 D3에 열려요' : '문서는 D4에 열려요' }}</p>
     </aside>
 
     <!-- 오른쪽 위 알약 -->
@@ -78,7 +78,7 @@ const frameStyle = (s: { x: number; y: number; width: number; height: number }) 
         <span class="tx-head">{{ current.name }}</span>
         <span class="tx-meta">{{ current.source === 'figma' ? '피그마' : 'Iris 캔버스' }}</span>
       </div>
-      <EmptyState v-else on="section" title="화면을 골라주세요" :show-icon="false" />
+      <p v-else class="tx-meta empty pad">캔버스에서 화면을 골라주세요</p>
     </aside>
 
     <EditorToolbar v-model="tool" />
@@ -104,6 +104,7 @@ const frameStyle = (s: { x: number; y: number; width: number; height: number }) 
 .layers { flex: 1; min-height: 0; overflow: auto; }
 .sec-h { padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-08); }
 .empty { padding: 0 var(--ref-spacing-08); margin: 0; }
+.empty.pad { padding: var(--ref-spacing-08) var(--ref-spacing-12); }
 .obj { display: flex; flex-direction: column; padding: var(--ref-spacing-02) var(--ref-spacing-10) var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
 .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; }
 </style>

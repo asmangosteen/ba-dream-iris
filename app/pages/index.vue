@@ -14,7 +14,9 @@ const count = (k: string) => (projects.value ?? []).filter((p) => k === 'all' ||
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const creating = ref(false)
+const preview = usePreviewMode()
 async function createProject() {
+  if (preview) return navigateTo('/p/preview-1')
   if (creating.value || !user.value) return
   creating.value = true
   const { data: ws } = await supabase.from('workspaces').select('id').limit(1).single()
@@ -70,7 +72,7 @@ async function createProject() {
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
             <span class="sq thumb" aria-hidden="true" />
             <span class="col">
-              <span class="tx-head name">{{ p.name }}</span>
+              <span class="tx-body name">{{ p.name }}</span>
               <span class="tx-meta">{{ STATUS_LABEL[p.status] }} · {{ relativeTime(p.updated_at) }}</span>
             </span>
           </NuxtLink>
@@ -91,5 +93,5 @@ async function createProject() {
 .thumb { height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .proj:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }
 .col { display: flex; flex-direction: column; }
-.name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
