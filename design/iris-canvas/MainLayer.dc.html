@@ -326,7 +326,7 @@ a{color:inherit}a:hover{color:inherit}
                   <div class="sq" style="padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); display: flex; flex-direction: column; gap: var(--ref-spacing-05)">
                     <div style="display: flex; align-items: baseline; justify-content: space-between">
                       <span style="font-weight: 600">요구사항 반영</span>
-                      <span class="num" style="font-weight: 600"><span style="color: var(--sys-color-brand-primary-default)">{{sum.done}}</span>/{{sum.total}}</span>
+                      <span class="num" style="font-weight: 500"><span style="color: var(--sys-color-brand-primary-default)">{{sum.done}}</span>/{{sum.total}}</span>
                     </div>
                     <div role="img" aria-label="{{sum.aria}}" style="display: flex; height: 4px; gap: 2px">
                       <span style="{{sum.rBar}}"></span><span style="{{sum.pBar}}"></span><span style="{{sum.mBar}}"></span>
@@ -344,12 +344,12 @@ a{color:inherit}a:hover{color:inherit}
                 <div class="sec-h" style="height: 24px; padding: 0"><span>{{plan.title}}</span><button class="ib" aria-label="요구사항 연결" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></div>
                 <sc-for list="{{reqGroups}}" as="g" hint-placeholder-count="3">
                   <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
-                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-04); font-weight: 600; color: var(--sys-color-neutral-700)"><span style="{{g.icon}}" aria-hidden="true"></span>{{g.label}}<span class="sq num" style="padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-12); --sq-fill: var(--sys-color-neutral-100); font-weight: 500; color: var(--sys-color-neutral-600)">{{g.n}}</span></span>
+                    <span style="display: flex; align-items: center; gap: var(--ref-spacing-04); font-weight: 500; color: var(--sys-color-neutral-600)"><span style="{{g.icon}}" aria-hidden="true"></span>{{g.label}}<span class="sq num" style="padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-12); --sq-fill: var(--sys-color-neutral-100); font-weight: 500; color: var(--sys-color-neutral-600)">{{g.n}}</span></span>
                     <sc-for list="{{g.items}}" as="rq" hint-placeholder-count="2">
                       <div class="sq" style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-07) var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px">
                         <div style="display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 0 var(--ref-spacing-04)">
                           <button onClick="{{rq.cycle}}" aria-label="{{rq.aria}}" title="{{rq.label}} · 눌러서 바꾸기" style="width: 16px; height: 18px; display: grid; place-items: center"><span style="{{rq.icon}}" aria-hidden="true"></span></button>
-                          <span style="font-weight: 600; color: var(--sys-color-neutral-800)">{{rq.title}}</span>
+                          <span style="font-weight: 500; color: var(--sys-color-neutral-800)">{{rq.title}}</span>
                           <span></span>
                           <span style="color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span class="num">{{rq.code}}</span> · {{rq.anchor}}</span>
                         </div>
@@ -358,7 +358,7 @@ a{color:inherit}a:hover{color:inherit}
                         </sc-if>
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); margin-left: var(--ref-spacing-10); padding-top: var(--ref-spacing-04); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500)">
                           <span style="display: flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0"><span class="ic ic-12 i-document" aria-hidden="true" style="flex: none"></span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rq.doc}}</span></span>
-                          <button onClick="{{rq.openDoc}}" style="flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-brand-primary-default); font-weight: 600">원문<span class="ic ic-12 i-chevron_right" aria-hidden="true"></span></button>
+                          <button onClick="{{rq.openDoc}}" style="flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-brand-primary-default); font-weight: 500">원문<span class="ic ic-12 i-chevron_right" aria-hidden="true"></span></button>
                         </div>
                       </div>
                     </sc-for>
@@ -932,7 +932,7 @@ class Component extends DCLogic {
     const ds = {
       isInst: isBtn || L[2] === 'comp', instName: L[0],
       kind: (L[2] === 'comp') ? L[0] : ({ frame: '프레임', text: '텍스트', rect: '사각형', image: '이미지' })[L[2]],
-      kindStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);margin-left:calc(-1 * var(--ref-spacing-04));padding:var(--ref-spacing-02) var(--ref-spacing-04);border-radius:var(--ref-radius-03);font-weight:600;font-size:14px;line-height:22px;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : ''),
+      kindStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);margin-left:calc(-1 * var(--ref-spacing-04));padding:var(--ref-spacing-02) var(--ref-spacing-04);border-radius:var(--ref-radius-03);font-weight:600;font-size:12px;line-height:18px;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : ''),
       flow: [['free', '자유 배치', 'M3 3h3v3H3zM8 8h3v3H8zM8 3h3v3'], ['col', '세로로 쌓기', 'M3 2h8v3H3zM3 9h8v3H3z'], ['row', '가로로 쌓기', 'M2 3h3v8H2zM9 3h3v8H9z'], ['grid', '격자', 'M2.5 2.5h4v4h-4zM7.5 2.5h4v4h-4zM2.5 7.5h4v4h-4zM7.5 7.5h4v4h-4z']].map((f) => { const cur = s.flow || (isBtn ? 'row' : (L[2] === 'frame' ? 'col' : 'free')); return { label: f[1], on: cur === f[0], cls: 'ib' + (cur === f[0] ? ' on' : ''), pick: () => this.setState({ flow: f[0] }), icon: 'display:block;width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 14 14\'><path d=\'' + f[2] + '\' stroke=\'black\' stroke-width=\'1.2\' fill=\'none\'/></svg>') + '") center/contain no-repeat;mask:url("data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 14 14\'><path d=\'' + f[2] + '\' stroke=\'black\' stroke-width=\'1.2\' fill=\'none\'/></svg>') + '") center/contain no-repeat' }; }),
       hasGap: isBtn || L[2] === 'frame', gap: isBtn ? '2' : '8', pad: isBtn ? '12' : '0',
       clipCls: 'cb' + (s.clip === false ? '' : ' on'), clipFlip: () => this.setState({ clip: s.clip === false }),
@@ -1024,7 +1024,7 @@ class Component extends DCLogic {
         name: L[0], isFrame: isFrameSel, isComp: L[2] === 'comp',
         badge: isFrameSel ? cur.status : ({ comp: '인스턴스', frame: '프레임', text: '텍스트', rect: '사각형', image: '이미지' })[L[2]],
         source: isFrameSel ? cur.source : cur.name + ' 안',
-        nameStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);min-width:0;font-weight:600;font-size:14px;line-height:22px;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : 'color:var(--sys-color-neutral-800)')
+        nameStyle: 'display:flex;align-items:center;gap:var(--ref-spacing-04);min-width:0;font-weight:600;font-size:12px;line-height:18px;' + (L[2] === 'comp' ? 'color:var(--iris-component)' : 'color:var(--sys-color-neutral-800)')
       },
       plan: { title: isFrameSel ? '연결된 요구사항' : '이 레이어의 요구사항', empty: !list.length },
       reqs: list, reqGroups: reqGroups, cv: cv, ds: ds,
