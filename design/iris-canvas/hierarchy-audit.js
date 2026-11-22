@@ -9,7 +9,8 @@
     if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return;
     const cs = getComputedStyle(e), k = cs.fontSize + '/' + cs.lineHeight;
     const code = /monospace|Menlo/.test(cs.fontFamily), avatar = e.offsetWidth <= 28 && cs.borderRadius === '50%';
-    if (k === '14px/22px') { cs.fontWeight === '600' ? titles.push(e.innerText.trim()) : e.innerText.trim() !== 'Iris' && bad.push(k + ' ' + e.innerText.trim()); return; }
+    if (k === '16px/24px' && cs.fontWeight === '600') { titles.push(e.innerText.trim()); return; }
+    if (k === '14px/22px' && (cs.fontWeight === '600' && e.closest('aside[aria-label="오른쪽 패널"]') || e.innerText.trim() === 'Iris')) return;
     if ((code && k === '11px/16px') || avatar) return;
     if (k !== '12px/18px' && k !== '12px/20px') bad.push(k + ' ' + e.innerText.trim().slice(0, 20));
   });

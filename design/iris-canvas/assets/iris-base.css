@@ -224,7 +224,7 @@ button:active{cursor:grabbing}
 /* ============================================================
    화면 위계 가이드 (PRD/05_UI_GUIDE.md) — 기준: 03-5 에디터
    ============================================================ */
-.tx-title{font-size:14px;line-height:22px;font-weight:600;color:var(--sys-color-neutral-800);margin:0;letter-spacing:0}
+.tx-title{font-size:16px;line-height:24px;font-weight:600;color:var(--sys-color-neutral-800);margin:0;letter-spacing:0}
 .tx-head{font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800);margin:0}
 .tx-body{font-size:12px;line-height:18px;font-weight:400;color:var(--sys-color-neutral-800)}
 .tx-meta{font-size:12px;line-height:18px;font-weight:400;color:var(--sys-color-neutral-500)}
@@ -242,3 +242,4 @@ button:active{cursor:grabbing}
 .field.focus{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
 .field input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;font-family:var(--font-family-base);font-size:12px;color:var(--sys-color-neutral-800)}
 .field input::placeholder{color:var(--sys-color-neutral-500)}
+.tx-panel{font-size:14px;line-height:22px;font-weight:600;color:var(--sys-color-neutral-800)}
