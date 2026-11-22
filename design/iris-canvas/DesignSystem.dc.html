@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 디자인 시스템</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
+<link rel="stylesheet" href="/_blob/c940a4f4b9c664b237fbc677fb6aed82">
 </head>
 <body>
 <x-dc>
@@ -48,9 +48,9 @@ a{color:inherit}a:hover{color:inherit}
     </aside>
 
     <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box">
-      <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 600; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
+      <h1 style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
       <p class="mono" style="margin: var(--ref-spacing-02) 0 0; color: var(--sys-color-neutral-500)">@ba-dream/design-system 1.0.0</p>
-      <div class="seg" style="flex-wrap: wrap; margin: var(--ref-spacing-12) 0 var(--ref-spacing-12) calc(-1 * var(--ref-spacing-08))">
+      <div class="seg" style="flex-wrap: wrap; margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06))">
         <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
           <button onClick="{{c.pick}}" aria-pressed="{{c.on}}" class="{{c.cls}}">{{c.label}}</button>
         </sc-for>
@@ -62,8 +62,8 @@ a{color:inherit}a:hover{color:inherit}
               <sc-for list="{{k.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
             </span>
             <span style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--ref-spacing-06)">
-              <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">{{k.name}}</span>
-              <span style="color: var(--sys-color-neutral-500)">화면 {{k.n}}</span>
+              <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800)">{{k.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">화면 {{k.n}}</span>
             </span>
           </button>
         </sc-for>
@@ -137,7 +137,7 @@ GROUPS.forEach((g) => g[1].forEach((c) => ALL.push({ g: g[0], id: c[0], name: c[
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
@@ -215,7 +215,7 @@ class Component extends DCLogic {
         all: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ filter: '' }); },
         groups: GROUPS.map((g, gi) => ({ label: g[0], style: 'display:flex;flex-direction:column;' + (gi ? 'margin-top:var(--ref-spacing-12)' : ''), items: g[1].map((c) => ({ name: c[1], pick: pick(c[0]), cls: 'sq nav-item' + (s.sel === c[0] ? ' on' : '') })) }))
       },
-      chips: [['', '전체']].concat(GROUPS.map((g) => [g[0], g[0]])).map((c) => ({ label: c[1], on: s.filter === c[0], cls: 'sq seg-item m' + (s.filter === c[0] ? ' on' : ''), pick: () => this.setState({ filter: c[0] }) })),
+      chips: [['', '전체']].concat(GROUPS.map((g) => [g[0], g[0]])).map((c) => ({ label: c[1], on: s.filter === c[0], cls: 'sq seg-item' + (s.filter === c[0] ? ' on' : ''), pick: () => this.setState({ filter: c[0] }) })),
       cards: cards,
       cur: { name: cur.name, code: cur.code, uses: (USES[cur.id] || FALLBACK).map((u) => ({ screen: u[0], project: u[1], n: u[2] })) }
     };

@@ -125,10 +125,10 @@ input,textarea{font:inherit;color:inherit}
    figma-squircle 경로를 계산해 clip-path 로 자릅니다. 작업 캔버스 안의 화면에는 쓰지 않습니다.
    ============================================================ */
 :root{--bd-corner-smoothing:.6}
-:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
-.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
-.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before,.float::before,.seg-item::before,.rail-btn::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
-.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after,.float::after,.seg-item::after,.rail-btn::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
+:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
+.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after,.dd::before,.dd::after,.menu::before,.menu::after,.menu-item::before,.menu-item::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
+.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
+.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
 [data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
 [data-sq]::before{clip-path:var(--sq-path)}
 [data-sq]::after{box-shadow:none!important;background:var(--sq-line);clip-path:var(--sq-ring)}
@@ -188,6 +188,23 @@ button:active{cursor:grabbing}
 .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px}
 .rail-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--ref-radius-04);color:var(--sys-color-neutral-700)}
 .rail-btn:hover{--sq-overlay:var(--interaction-light-gray-hover)}
-.rail-btn.on{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.rail-btn.on{--sq-fill:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
 .sec-h{display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 var(--ref-spacing-06) 0 var(--ref-spacing-08);font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-800)}
 .sec{box-shadow:0 -1px 0 var(--iris-line)}
+
+/* 피그마식 속성 컨트롤 — 드롭다운 · 토글 · 입력 */
+.prop-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--ref-spacing-06);min-height:28px}
+.prop-row>.k{color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd{display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-100);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
+.dd:hover{--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px}
+.dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:1px}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-neutral-800);border-radius:var(--ref-radius-04);filter:drop-shadow(0 8px 16px rgb(3 9 26 / 20%))}
+.menu-item{display:flex;align-items:center;gap:var(--ref-spacing-04);height:26px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);font-size:12px;line-height:18px;color:var(--sys-color-common-white-default);text-align:left}
+.menu-item:hover,.menu-item.on{--sq-fill:var(--sys-color-brand-primary-default)}
+.tg{width:28px;height:16px;border-radius:999px;flex:none;background:var(--sys-color-neutral-300);position:relative}
+.tg::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s}
+.tg.on{background:var(--sys-color-brand-primary-default)}.tg.on::after{left:14px}
+.txt-in{width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border:0;outline:0;border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-100);font-size:12px;color:var(--sys-color-neutral-800)}
+.txt-in:focus{box-shadow:inset 0 0 0 1px var(--sys-color-brand-primary-default)}
+.handle{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 0 1px var(--sys-color-brand-primary-default)}
+.t11{font-size:11px;line-height:16px}

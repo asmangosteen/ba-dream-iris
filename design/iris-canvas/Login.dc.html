@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 로그인</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/c7ce1ed6dd53c111cfff568be29869c3">
+<link rel="stylesheet" href="/_blob/c940a4f4b9c664b237fbc677fb6aed82">
 </head>
 <body>
 <x-dc>
@@ -37,7 +37,7 @@ a{color:inherit}a:hover{color:inherit}
                 <input id="email" value="gildong" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
                 <span style="font-size: 14px; color: var(--sys-color-neutral-600)">@ba-dream.com</span>
               </div>            </div>
-            <button onClick="{{toCode}}" class="bd-button l ink" style="width: 100%">인증 코드 받기</button>
+            <button onClick="{{toCode}}" class="bd-button l primary" style="width: 100%">인증 코드 받기</button>
           </div>
         </sc-if>
         <sc-if value="{{isCode}}" hint-placeholder-val="{{false}}">
@@ -57,7 +57,7 @@ a{color:inherit}a:hover{color:inherit}
                 <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="여섯째 자리" value="" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
               </div>
             </fieldset>
-            <a href="Home.dc.html" class="bd-button l ink" style="width: 100%">로그인</a>
+            <a href="Home.dc.html" class="bd-button l primary" style="width: 100%">로그인</a>
             <div style="display: flex; justify-content: space-between; font-size: 13px">
               <button onClick="{{toEmail}}" style="color: var(--sys-color-neutral-600)">이메일 다시 입력</button>
               <button style="color: var(--sys-color-brand-primary-default); font-weight: 500">코드 다시 받기 0:42</button>
@@ -74,7 +74,7 @@ a{color:inherit}a:hover{color:inherit}
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
