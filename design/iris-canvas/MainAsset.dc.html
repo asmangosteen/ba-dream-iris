@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 에디터 — 에셋 상세</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/eebf870e222b54f624261230a100b7c4">
+<link rel="stylesheet" href="/_blob/3564395045f9743ee72fe9b9e90fc1f3">
 </head>
 <body>
 <x-dc>
@@ -22,7 +22,6 @@ a{color:inherit}a:hover{color:inherit}
       <span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
     </a>
     <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">착한구독 신청 플로우 개편</span>
-    <span style="flex: none; color: var(--sys-color-neutral-500)">저장됨</span>
     <button class="ib" aria-label="검색" style="margin-left: auto"><span class="ic i-search" aria-hidden="true"></span></button>
   </div>
 
@@ -65,10 +64,6 @@ a{color:inherit}a:hover{color:inherit}
             <span class="ic ic-14 i-search" aria-hidden="true"></span>
             <input value="{{assets.q}}" onInput="{{assets.type}}" placeholder="컴포넌트 찾기" aria-label="컴포넌트 찾기">
           </label>
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-02)">
-            <span style="font-weight: 600; color: var(--sys-color-neutral-800)">바드림 디자인 시스템</span>
-            <span style="color: var(--sys-color-neutral-500)">1.0.0</span>
-          </div>
         </div>
         <div style="flex: 1; min-height: 0; overflow: auto; padding: 0 var(--ref-spacing-08) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
           <sc-for list="{{assets.groups}}" as="g" hint-placeholder-count="4">
@@ -96,10 +91,7 @@ a{color:inherit}a:hover{color:inherit}
       <div style="flex: 1; min-height: 0; display: flex; flex-direction: column">
         <div style="display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-06) var(--ref-spacing-04) var(--ref-spacing-04); flex: none">
           <button class="ib" aria-label="에셋 목록으로" onClick="{{ad.back}}"><span class="ic i-chevron_left" aria-hidden="true"></span></button>
-          <span style="display: flex; flex-direction: column; min-width: 0">
-            <span class="t11" style="color: var(--sys-color-neutral-500)">바드림 디자인 시스템 · {{ad.group}}</span>
-            <span style="font-weight: 600; color: var(--sys-color-neutral-800)">{{ad.name}}</span>
-          </span>
+          <span style="font-weight: 600; color: var(--sys-color-neutral-800)">{{ad.name}}</span>
         </div>
         <div style="flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column">
           <div style="padding: 0 var(--ref-spacing-08) var(--ref-spacing-08)">
@@ -324,7 +316,7 @@ a{color:inherit}a:hover{color:inherit}
             </span>
             <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><span class="bd-badge s t-gray">{{obj.badge}}</span></sc-if>
           </div>
-          <span class="t11" style="color: var(--sys-color-neutral-500)">{{obj.source}}</span>
+          <sc-if value="{{obj.isFrame}}" hint-placeholder-val="{{true}}"><span class="t11" style="color: var(--sys-color-neutral-500)">{{obj.source}}</span></sc-if>
         </div>
 
         <div style="flex: 1; min-height: 0; overflow: auto">
