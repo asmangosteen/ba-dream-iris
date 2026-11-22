@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 피그마 화면 연결</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
+<link rel="stylesheet" href="/_blob/2ed3e1c80d493af60c43508d35a3d683">
 </head>
 <body>
 <x-dc>
@@ -14,7 +14,7 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+<div style="width: 100%; min-height: 900px; height: 900px; position: relative; overflow: hidden; background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
   <div aria-hidden="true" style="position: absolute; inset: 0">
     <div class="sq float s" style="position: absolute; left: 8px; top: 8px; width: 264px; height: 40px"></div>
     <div class="sq float" style="position: absolute; left: 8px; top: 56px; bottom: 8px; width: 264px"></div>
@@ -27,18 +27,18 @@ a{color:inherit}a:hover{color:inherit}
   <div style="position: relative; min-height: 900px; display: grid; place-items: center; padding: var(--ref-spacing-12)">
     <section role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq" style="width: 100%; max-width: 640px; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); display: flex; flex-direction: column; overflow: hidden">
       <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-10)">
-        <h1 id="figmaTitle" style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600">피그마 화면 가져오기</h1>
-        <a href="Main.dc.html" aria-label="닫기" class="ib" style="width: 32px; height: 32px; border-radius: var(--ref-radius-04)"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
+        <h1 id="figmaTitle" style="margin: 0; font-size: 14px; line-height: 22px; font-weight: 600">피그마 화면 가져오기</h1>
+        <a href="Main.dc.html" aria-label="닫기" class="ib"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
       </div>
 
       <div style="padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
         <label for="figmaUrl" style="font-weight: 500">피그마 링크</label>
         <div style="display: flex; gap: var(--ref-spacing-06)">
-          <div class="sq" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 38px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-line: var(--iris-line-strong); --sq-line-w: 1px">
+          <div class="sq" style="--sq-fill: var(--sys-color-neutral-200); flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-03)">
             <span class="ic i-link" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span>
-            <input id="figmaUrl" value="figma.com/design/Ab12Cd/착한구독-신청?node-id=12-345" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
+            <input id="figmaUrl" value="figma.com/design/Ab12Cd/착한구독-신청?node-id=12-345" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 12px">
           </div>
-          <button class="bd-button l stroke" style="color: var(--sys-color-neutral-800)">불러오기</button>
+          <button class="act m line" style="color: var(--sys-color-neutral-800)">불러오기</button>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ a{color:inherit}a:hover{color:inherit}
         <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-08)">
           <sc-for list="{{frames}}" as="f" hint-placeholder-count="4">
             <button onClick="{{f.toggle}}" aria-pressed="{{f.on}}" style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); text-align: left">
-              <span class="sq" style="{{f.thumbStyle}}" aria-hidden="true">
+              <span class="sq" data-preview style="{{f.thumbStyle}}" aria-hidden="true">
                 <span style="height: 8px; width: 60%; border-radius: 4px; background: var(--ref-color-gray-900-10)"></span>
                 <span style="height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span>
                 <span style="height: 34px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span>
@@ -66,12 +66,12 @@ a{color:inherit}a:hover{color:inherit}
       <div style="padding: var(--ref-spacing-10) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08)">
           <span style="font-weight: 500">놓을 페이지</span>
-          <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 40px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 500">신청 플로우 <span class="ic i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span></button>
+          <button class="sq" style="--sq-fill: var(--sys-color-neutral-200); display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); border-radius: var(--ref-radius-03); font-weight: 500">신청 플로우 <span class="ic i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span></button>
         </div>      </div>
 
       <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-12) var(--ref-spacing-12)">
-        <a href="Main.dc.html" class="bd-button l tertiary" style="flex: 1">취소</a>
-        <a href="Main.dc.html" class="bd-button l primary" style="flex: 2.25">{{cta}}</a>
+        <a href="Main.dc.html" class="act m gray" style="flex: 1">취소</a>
+        <a href="Main.dc.html" class="act m pri" style="flex: 2.25">{{cta}}</a>
       </div>
     </section>
   </div>
@@ -88,7 +88,7 @@ const FRAMES = [
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 에디터 — 문서 열람</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
+<link rel="stylesheet" href="/_blob/2ed3e1c80d493af60c43508d35a3d683">
 </head>
 <body>
 <x-dc>
@@ -73,7 +73,7 @@ a{color:inherit}a:hover{color:inherit}
               <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-08) var(--ref-spacing-06)">
                 <sc-for list="{{g.items}}" as="c" hint-placeholder-count="3">
                   <button draggable="true" onDragStart="{{c.drag}}" onClick="{{c.open}}" aria-label="{{c.aria}}" style="display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; cursor: grab">
-                    <span class="sq asset-thumb" style="{{c.wrap}}">
+                    <span class="sq asset-thumb" data-preview style="{{c.wrap}}">
                       <sc-for list="{{c.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
                     </span>
                     <span style="padding: 0 var(--ref-spacing-02); font-weight: 500; color: var(--sys-color-neutral-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.name}}</span>
@@ -96,7 +96,7 @@ a{color:inherit}a:hover{color:inherit}
         </div>
         <div style="flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column">
           <div style="padding: 0 var(--ref-spacing-08) var(--ref-spacing-08)">
-            <span class="sq" draggable="true" onDragStart="{{ad.drag}}" style="{{ad.wrap}}" aria-label="{{ad.aria}}">
+            <span class="sq" data-preview draggable="true" onDragStart="{{ad.drag}}" style="{{ad.wrap}}" aria-label="{{ad.aria}}">
               <sc-for list="{{ad.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
             </span>
           </div>
@@ -125,7 +125,7 @@ a{color:inherit}a:hover{color:inherit}
           </section>
         </div>
         <div style="flex: none; display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line)">
-          <button onClick="{{ad.add}}" class="bd-button s primary">넣기 <kbd class="num" style="opacity: .7">↵</kbd></button>
+          <button onClick="{{ad.add}}" class="act pri">넣기 <kbd class="num" style="opacity: .7">↵</kbd></button>
         </div>
       </div>
       </sc-if>
@@ -291,7 +291,7 @@ a{color:inherit}a:hover{color:inherit}
     </div>
     <button aria-label="미리보기" class="ib"><span class="ic ic-12 i-play" aria-hidden="true"></span></button>
     <button onClick="{{right.toggleDoc}}" aria-pressed="{{right.docOpen}}" class="{{right.docBtn}}">문서</button>
-    <button class="bd-button s primary">공유</button>
+    <button class="act pri">공유</button>
   </div>
 
 
@@ -364,7 +364,7 @@ a{color:inherit}a:hover{color:inherit}
                 <sc-if value="{{plan.empty}}" hint-placeholder-val="{{false}}">
                   <div style="padding: 0 var(--ref-spacing-04); display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06)">
                     <span style="color: var(--sys-color-neutral-500)">연결된 요구사항이 없어요</span>
-                    <button class="bd-button s stroke" style="color: var(--sys-color-neutral-800)"><span class="ic ic-12 i-link" aria-hidden="true"></span>요구사항 연결</button>
+                    <button class="act line" style="color: var(--sys-color-neutral-800)"><span class="ic ic-12 i-link" aria-hidden="true"></span>요구사항 연결</button>
                   </div>
                 </sc-if>
               </section>
@@ -423,7 +423,7 @@ a{color:inherit}a:hover{color:inherit}
               <sc-if value="{{dev.isPlain}}" hint-placeholder-val="{{false}}">
                 <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06)">
                   <span style="color: var(--sys-color-neutral-500)">{{dev.plainText}}</span>
-                  <sc-if value="{{dev.canSwap}}" hint-placeholder-val="{{false}}"><button onClick="{{dev.toAssets}}" class="bd-button s stroke" style="color: var(--sys-color-neutral-800)">컴포넌트로 바꾸기</button></sc-if>
+                  <sc-if value="{{dev.canSwap}}" hint-placeholder-val="{{false}}"><button onClick="{{dev.toAssets}}" class="act line" style="color: var(--sys-color-neutral-800)">컴포넌트로 바꾸기</button></sc-if>
                 </div>
               </sc-if>
             </div>
@@ -510,7 +510,7 @@ a{color:inherit}a:hover{color:inherit}
               <section style="padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line)">
                 <div class="sec-h" style="height: 24px; padding: 0"><span>내보내기</span><span style="display: flex"><button class="ib" aria-label="내보내기 추가" style="width: 24px; height: 24px"><span class="ic ic-14 i-plus" aria-hidden="true"></span></button></span></div>
                 <div style="display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto; gap: var(--ref-spacing-04); align-items: center"><button class="sq dd">2x<span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button><button class="sq dd">PNG<span class="ic ic-12 i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-500)"></span></button><button class="ib" aria-label="내보내기 설정" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="3" cy="7" r="1" fill="currentColor"></circle><circle cx="7" cy="7" r="1" fill="currentColor"></circle><circle cx="11" cy="7" r="1" fill="currentColor"></circle></svg></button><button class="ib" aria-label="내보내기 빼기" style="width: 24px; height: 24px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"></path></svg></button></div>
-                <button class="bd-button s stroke" style="width: 100%; color: var(--sys-color-neutral-800); margin-top: var(--ref-spacing-02)">{{ds.exportLabel}}</button>
+                <button class="act line" style="width: 100%; color: var(--sys-color-neutral-800); margin-top: var(--ref-spacing-02)">{{ds.exportLabel}}</button>
               </section>
             </div>
           </sc-if>
@@ -705,7 +705,7 @@ const START = {"left": "docs", "doc": "d2", "req": "REQ-013", "sel": "s2", "laye
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {

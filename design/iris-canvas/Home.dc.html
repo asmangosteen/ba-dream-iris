@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 프로젝트 홈</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
+<link rel="stylesheet" href="/_blob/2ed3e1c80d493af60c43508d35a3d683">
 </head>
 <body>
 <x-dc>
@@ -14,7 +14,7 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
   <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); z-index: 3">
     <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04)">
       <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 13px; width: auto; display: block">
@@ -29,7 +29,7 @@ a{color:inherit}a:hover{color:inherit}
   <div class="sq float s" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); z-index: 3">
     <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; min-width: 200px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); font-size: 12px; line-height: 18px">
       <span class="ic ic-14 i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
-      <kbd class="mono" style="font-size: 11px; line-height: 16px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
+      <kbd class="num" style="line-height: 18px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
     </button>
     <button aria-label="알림" class="ib"><span class="ic i-bell" aria-hidden="true"></span></button>
     <button aria-label="내 계정" style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600">김</button>
@@ -38,10 +38,10 @@ a{color:inherit}a:hover{color:inherit}
   <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19)">
     <div style="max-width: 1120px; margin: 0 auto">
       <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10)">
-        <h1 style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-common-black-default)">프로젝트</h1>
+        <h1 style="margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-common-black-default)">프로젝트</h1>
         <div style="display: flex; gap: var(--ref-spacing-06)">
-          <a href="AddDoc.dc.html" class="bd-button m stroke" style="color: var(--sys-color-neutral-800)">문서로 시작</a>
-          <a href="Main.dc.html" class="bd-button m primary"><span class="ic i-plus" aria-hidden="true"></span>새 프로젝트</a>
+          <a href="AddDoc.dc.html" class="act line" style="color: var(--sys-color-neutral-800)">문서로 시작</a>
+          <a href="Main.dc.html" class="act pri"><span class="ic i-plus" aria-hidden="true"></span>새 프로젝트</a>
         </div>
       </div>
       <div role="tablist" aria-label="프로젝트 거르기" class="seg" style="margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06))">
@@ -52,13 +52,13 @@ a{color:inherit}a:hover{color:inherit}
       <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08)">
         <sc-for list="{{projects}}" as="p" hint-placeholder-count="4">
           <a href="Main.dc.html" class="proj" style="display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0">
-            <span class="sq proj-thumb" aria-hidden="true" style="height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: flex; align-items: flex-end; justify-content: center; gap: var(--ref-spacing-08); padding-top: var(--ref-spacing-14); box-sizing: border-box; overflow: hidden">
+            <span class="sq proj-thumb" data-preview aria-hidden="true" style="height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: flex; align-items: flex-end; justify-content: center; gap: var(--ref-spacing-08); padding-top: var(--ref-spacing-14); box-sizing: border-box; overflow: hidden">
               <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 70%; background: var(--ref-color-gray-900-10)"></span><span style="height: 32px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span><span style="height: 32px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10)"></span></span>
               <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 55%; background: var(--ref-color-gray-900-10)"></span><span style="height: 44px; background: var(--sys-color-brand-primary-lightest)"></span><span style="margin-top: auto; height: 14px; background: var(--sys-color-brand-primary-default)"></span></span>
               <span style="width: 84px; height: 168px; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong); display: flex; flex-direction: column; gap: 6px; padding: 10px; box-sizing: border-box"><span style="height: 7px; width: 80%; background: var(--ref-color-gray-900-10)"></span><span style="height: 48px; background: var(--sys-color-neutral-100)"></span></span>
             </span>
             <span style="display: flex; flex-direction: column">
-              <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.name}}</span>
               <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">{{p.meta}}</span>
             </span>
           </a>
@@ -80,7 +80,7 @@ const PROJECTS = [
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {

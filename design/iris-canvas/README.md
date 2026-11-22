@@ -24,3 +24,5 @@ Phase 1 화면 8장의 HTML 시안 소스입니다. 바드림 디자인 시스�
 | Requirements.dc.html | 08 요구사항 보드 |
 
 > 디자인 시스템 아이콘 원본은 라이선스(바드림 사내 서비스 전용, 재배포 금지) 때문에 이 공개 저장소에 넣지 않았습니다. 개발할 때는 `@ba-dream/design-system`의 `<Icon name="...">`을 씁니다.
+
+글자 · 버튼 크기는 [`PRD/05_UI_GUIDE.md`](../../PRD/05_UI_GUIDE.md)를 따릅니다. `hierarchy-audit.js`를 각 화면 콘솔에서 돌려 위반 0개를 확인합니다.

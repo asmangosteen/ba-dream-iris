@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 디자인 시스템</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/5de540f20970f9a8cf20c091c67199e9">
+<link rel="stylesheet" href="/_blob/2ed3e1c80d493af60c43508d35a3d683">
 </head>
 <body>
 <x-dc>
@@ -14,7 +14,7 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
+<div style="width: 100%; height: 900px; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: 12px; line-height: 18px">
   <div class="sq float s" style="position: absolute; left: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); z-index: 3">
     <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04)">
       <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 13px; width: auto; display: block">
@@ -29,7 +29,7 @@ a{color:inherit}a:hover{color:inherit}
   <div class="sq float s" style="position: absolute; right: var(--iris-gap); top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); z-index: 3">
     <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; min-width: 200px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); font-size: 12px; line-height: 18px">
       <span class="ic ic-14 i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
-      <kbd class="mono" style="font-size: 11px; line-height: 16px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
+      <kbd class="num" style="line-height: 18px; padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500)">⌘K</kbd>
     </button>
     <button aria-label="알림" class="ib"><span class="ic i-bell" aria-hidden="true"></span></button>
     <button aria-label="내 계정" style="width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600">김</button>
@@ -48,7 +48,7 @@ a{color:inherit}a:hover{color:inherit}
     </aside>
 
     <main class="sq float" style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box">
-      <h1 style="margin: 0; font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
+      <h1 style="margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
       <div class="seg" style="flex-wrap: wrap; margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06))">
         <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
           <button onClick="{{c.pick}}" aria-pressed="{{c.on}}" class="{{c.cls}}">{{c.label}}</button>
@@ -57,11 +57,11 @@ a{color:inherit}a:hover{color:inherit}
       <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-10)">
         <sc-for list="{{cards}}" as="k" hint-placeholder-count="9">
           <button onClick="{{k.pick}}" aria-pressed="{{k.on}}" style="display: flex; flex-direction: column; gap: var(--ref-spacing-08); text-align: left; min-width: 0">
-            <span class="sq" style="{{k.thumb}}" aria-hidden="true">
+            <span class="sq" data-preview style="{{k.thumb}}" aria-hidden="true">
               <sc-for list="{{k.parts}}" as="pt" hint-placeholder-count="2"><span class="{{pt.cls}}" style="{{pt.style}}">{{pt.text}}</span></sc-for>
             </span>
             <span style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--ref-spacing-06)">
-              <span style="font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800)">{{k.name}}</span>
+              <span style="font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{k.name}}</span>
               <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500)">화면 {{k.n}}</span>
             </span>
           </button>
@@ -71,11 +71,11 @@ a{color:inherit}a:hover{color:inherit}
 
     <aside aria-label="컴포넌트 상세" class="sq float" style="flex: 0 0 320px; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-11) var(--ref-spacing-16); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-14)">
       <section style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
-        <h2 style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">{{cur.name}}</h2>
-        <div class="sq" style="padding: var(--ref-spacing-10) var(--ref-spacing-11); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-700); white-space: pre-wrap">{{cur.code}}</div>
+        <h2 style="margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800)">{{cur.name}}</h2>
+        <div class="sq" style="padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-700); white-space: pre-wrap">{{cur.code}}</div>
       </section>
       <section style="display: flex; flex-direction: column">
-        <h3 style="margin: 0 0 var(--ref-spacing-06); font-size: 14px; line-height: 22px; font-weight: 600">쓰는 화면</h3>
+        <h3 style="margin: 0 0 var(--ref-spacing-06); font-size: 12px; line-height: 18px; font-weight: 600">쓰는 화면</h3>
         <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 0 0 var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); font-size: 12px; line-height: 20px; font-weight: 600; color: var(--sys-color-neutral-600)"><span>화면</span><span>개수</span></div>
         <sc-for list="{{cur.uses}}" as="u" hint-placeholder-count="4">
           <a href="Main.dc.html" style="display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) 0; box-shadow: inset 0 -1px 0 var(--iris-line)">
@@ -84,7 +84,7 @@ a{color:inherit}a:hover{color:inherit}
           </a>
         </sc-for>
       </section>
-      <a href="#" class="bd-button m stroke" style="align-self: flex-start; color: var(--sys-color-neutral-800)">스토리북 <span class="ic ic-14 i-arrow_up_right" aria-hidden="true"></span></a>
+      <a href="#" class="act line" style="align-self: flex-start; color: var(--sys-color-neutral-800)">스토리북 <span class="ic ic-14 i-arrow_up_right" aria-hidden="true"></span></a>
     </aside>
   </div>
 </div>
@@ -136,7 +136,7 @@ GROUPS.forEach((g) => g[1].forEach((c) => ALL.push({ g: g[0], id: c[0], name: c[
 function irisSquircle() {
   if (window.__irisSq) return;
   window.__irisSq = true;
-  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp';
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
   const S = 0.6;
   const f = (n) => n.toFixed(3);
   const corner = (r, budget) => {
