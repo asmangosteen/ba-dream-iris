@@ -103,6 +103,8 @@ iris/
 - [ ] 디자인 시스템에 있는 부품(Button, Badge, TextInput, Tab, PopUp, Toast, NoticeBox…)을 직접 다시 만들지 마
 - [ ] 색, 간격, 모서리, 글자 크기를 숫자나 hex로 쓰지 마. 디자인 시스템 토큰 변수만 써. 토큰에 정말 없는 값만 예외로 두고 보고해
 - [ ] 글자를 Bold(700)로 쓰지 마. 최대 SemiBold(600)다 (AUTO-MAKE 4장). 화면 대제목만 디자인 시스템 사이트처럼 예외로 한다
+- [ ] 둥근 요소를 `border-radius` 원호만으로 그리지 마. 모든 둥근 요소에 Corner smoothing 60%를 준다(AUTO-MAKE 5장). 디자인 시스템 컴포넌트는 이미 `Squircle` 레이어(`.bd-sq`)를 품고 있고, Iris가 직접 만드는 상자 · 버튼 · 칩도 같은 레이어로 채우기와 선을 그린다. 작업 캔버스 안의 사용자 화면은 사용자가 정한 모서리 그대로 둔다
+- [ ] 화면 구조는 design-system.ba-dream.com과 같은 위계로 만든다: 사이드바는 글자만(그룹 라벨 12 M neutral-500, 항목 14 R neutral-600, 선택 soft 채움 + SB), 카드는 선 있는 썸네일 상자 + 아래 이름, 거르기는 Chip, 표는 머리 줄 아래 neutral-800 선
 - [ ] 캔버스를 `<canvas>`, Konva, Fabric, tldraw로 바꾸지 마 (DOM 캔버스는 확정된 결정이다)
 - [ ] 외부 링크와 업로드 문서의 HTML을 정제(DOMPurify) 없이 `v-html`로 넣지 마
 - [ ] 피그마 API를 화면을 그릴 때마다 호출하지 마. 불러온 결과는 저장해서 다시 써

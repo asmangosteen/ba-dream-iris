@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 로그인</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/da39174b83e31e0b43a8b80c495f7e3a">
+<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
 </head>
 <body>
 <x-dc>
@@ -15,18 +15,10 @@ a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
 <div style="width: 100%; min-height: 900px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
-  <div class="aurora" aria-hidden="true">
-    <i style="width: 560px; height: 420px; left: -120px; top: -100px; background: var(--ref-color-blue-200)"></i>
-    <i style="width: 480px; height: 360px; left: 34%; top: -160px; background: var(--ref-color-yellow-100)"></i>
-    <i style="width: 520px; height: 400px; right: -120px; top: 80px; background: var(--ref-color-turquoise-100)"></i>
-    <i style="width: 460px; height: 360px; left: -60px; bottom: -120px; background: var(--ref-color-purple-100)"></i>
-    <i style="width: 420px; height: 320px; right: 18%; bottom: -140px; background: var(--ref-color-red-100)"></i>
-  </div>
-
   <header style="position: relative; height: 60px; display: flex; align-items: center; padding: 0 var(--ref-spacing-12)">
     <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
       <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
-      <span style="font-weight: 600; font-size: 17px; color: var(--sys-color-common-black-default)">Iris</span>
+      <span style="font-weight: 700; font-size: 18px; line-height: 24px; color: var(--sys-color-common-black-default)">Iris</span>
     </span>
   </header>
 
@@ -36,12 +28,12 @@ a{color:inherit}a:hover{color:inherit}
         <h1 style="margin: 0; font-size: var(--typography-heading-2-size); line-height: 32px; letter-spacing: -0.12px; font-weight: 700; color: var(--sys-color-common-black-default)">로그인</h1>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10); padding: var(--ref-spacing-11); border-radius: var(--ref-radius-07); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong)">
+      <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
         <sc-if value="{{isEmail}}" hint-placeholder-val="{{true}}">
           <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-10)">
             <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
               <label for="email" style="font-weight: 500; color: var(--sys-color-neutral-800)">회사 이메일</label>
-              <div style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 40px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default)">
+              <div class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-04); height: 40px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px">
                 <input id="email" value="gildong" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px">
                 <span style="font-size: 14px; color: var(--sys-color-neutral-600)">@ba-dream.com</span>
               </div>            </div>
@@ -57,12 +49,12 @@ a{color:inherit}a:hover{color:inherit}
             <fieldset style="border: 0; padding: 0; margin: 0">
               <legend class="sr">인증 코드 6자리</legend>
               <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--ref-spacing-06)">
-                <input aria-label="첫째 자리" value="4" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 16px; font-weight: 600">
-                <input aria-label="둘째 자리" value="8" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 16px; font-weight: 600">
-                <input aria-label="셋째 자리" value="1" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 16px; font-weight: 600">
-                <input aria-label="넷째 자리" value="" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); text-align: center; font-size: 16px; font-weight: 600">
-                <input aria-label="다섯째 자리" value="" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 16px; font-weight: 600">
-                <input aria-label="여섯째 자리" value="" style="height: 44px; border: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); text-align: center; font-size: 16px; font-weight: 600">
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="첫째 자리" value="4" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="둘째 자리" value="8" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="셋째 자리" value="1" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px"><input aria-label="넷째 자리" value="" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="다섯째 자리" value="" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
+                <span class="sq" style="display: flex; height: 44px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px"><input aria-label="여섯째 자리" value="" style="text-align: center; font-size: 16px; font-weight: 600; width: 100%; min-width: 0; height: 100%; box-sizing: border-box; border: 0; outline: 0; background: transparent"></span>
               </div>
             </fieldset>
             <a href="Home.dc.html" class="bd-button l primary" style="width: 100%">로그인</a>
@@ -78,7 +70,70 @@ a{color:inherit}a:hover{color:inherit}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
 class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
   constructor(props) {
     super(props);
     this.state = { step: 'email' };

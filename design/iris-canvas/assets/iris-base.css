@@ -112,22 +112,63 @@ input,textarea{font:inherit;color:inherit}
 .pn-h{display:flex;align-items:center;justify-content:space-between;height:36px;padding:0 var(--ref-spacing-08) 0 var(--ref-spacing-10);font-size:12px;font-weight:600;color:var(--sys-color-neutral-800)}
 .pn-sec{box-shadow:0 -1px 0 var(--iris-line-strong)}
 .ib{width:28px;height:28px;flex:none;border-radius:var(--ref-radius-03);display:grid;place-items:center;color:var(--sys-color-neutral-700)}
-.ib:hover{background:var(--interaction-light-gray-hover)}
-.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);background:var(--sys-color-neutral-100);font-size:12px;box-sizing:border-box}
+.ib:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.fld{display:flex;align-items:center;gap:var(--ref-spacing-06);height:28px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-100);font-size:12px;box-sizing:border-box}
 .fld>span{color:var(--sys-color-neutral-600);flex:none}
 .fld input{width:100%;min-width:0;border:0;outline:0;background:transparent;font-size:12px;color:var(--sys-color-neutral-800)}
-.btn-ink{background:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.btn-ink{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
 
-/* 바드림 Button */
+/* ============================================================
+   Squircle — @ba-dream/design-system 의 Squircle 레이어와 같은 방식 (Corner smoothing 60%)
+   요소는 배경 · 선을 직접 칠하지 않고 --sq-fill · --sq-line · --sq-line-w 로 넘깁니다.
+   ::before 가 채우기, ::after 가 안쪽 선을 그리고, 각 요소의 script(irisSquircle)가
+   figma-squircle 경로를 계산해 clip-path 로 자릅니다. 작업 캔버스 안의 화면에는 쓰지 않습니다.
+   ============================================================ */
+:root{--bd-corner-smoothing:.6}
+:where(.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
+.sq::before,.sq::after,.bd-button::before,.bd-button::after,.bd-chip::before,.bd-chip::after,.ib::before,.ib::after,.fld::before,.fld::after,.btn-ink::before,.btn-ink::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
+.sq::before,.bd-button::before,.bd-chip::before,.ib::before,.fld::before,.btn-ink::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
+.sq::after,.bd-button::after,.bd-chip::after,.ib::after,.fld::after,.btn-ink::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
+[data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
+[data-sq]::before{clip-path:var(--sq-path)}
+[data-sq]::after{box-shadow:none!important;background:var(--sq-line);clip-path:var(--sq-ring)}
+.sq-clip[data-sq]{clip-path:var(--sq-clip)}
+.sq.hov:hover,.sq.hov:active{background-color:transparent}
+.sq.hov:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.sq.hov:active{--sq-overlay:var(--interaction-light-gray-pressed)}
+
+/* 사이트(design-system.ba-dream.com) 사이드바 위계 — 그룹 라벨 12 M neutral-500 · 항목 14/20 R neutral-600 · 선택 soft 채움 + SB */
+.nav-label{display:block;padding:0 var(--ref-spacing-08) var(--ref-spacing-04);font-size:12px;line-height:18px;font-weight:500;color:var(--sys-color-neutral-500)}
+.nav-item{display:flex;align-items:center;gap:var(--ref-spacing-06);padding:7px var(--ref-spacing-08);border-radius:var(--ref-radius-04);font-size:14px;line-height:20px;color:var(--sys-color-neutral-600);white-space:nowrap}
+.nav-item:hover{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800)}
+.nav-item.on{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-800);font-weight:600}
+.nav-item.s{padding:5px var(--ref-spacing-08);font-size:12px;line-height:18px}
+
+/* 사이트 Chip — 34 높이 · radius 10 · 14 M. 선택은 primary 글자 + 연파랑 + primary 선 */
+.bd-chip{display:inline-flex;align-items:center;gap:var(--ref-spacing-04);flex:none;padding:6px var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500;white-space:nowrap;color:var(--sys-color-neutral-600);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px}
+.bd-chip.s{padding:var(--ref-spacing-02) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px}
+.bd-chip.on{color:var(--sys-color-brand-primary-default);--sq-fill:var(--sys-color-brand-primary-lightest);--sq-line:var(--ref-color-blue-500-40)}
+.bd-chip:not(.on):hover{--sq-overlay:var(--interaction-light-gray-hover)}
+.chip-n{font-weight:500;color:inherit;opacity:.7}
+
+/* 바드림 Button — 배경 · 선은 squircle 레이어로 */
 .bd-button{display:inline-flex;align-items:center;justify-content:center;gap:var(--ref-spacing-02);box-sizing:border-box;white-space:nowrap;font-family:var(--font-family-base);text-align:center}
 .bd-button.s{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-04);font-size:12px;line-height:18px;font-weight:600}
 .bd-button.m{padding:var(--ref-spacing-04) var(--ref-spacing-06);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
 .bd-button.l{padding:var(--ref-spacing-06) var(--ref-spacing-08);border-radius:var(--ref-radius-05);font-size:14px;line-height:22px;font-weight:500}
 .bd-button.xl{padding:var(--ref-spacing-08) var(--ref-spacing-10);border-radius:var(--ref-radius-06);font-size:16px;line-height:24px;font-weight:500}
-.bd-button.primary{background:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
-.bd-button.secondary{background:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
-.bd-button.tertiary{background:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
-.bd-button.stroke{background:var(--sys-color-common-white-default);box-shadow:inset 0 0 0 1px var(--ref-color-gray-900-10);color:var(--sys-color-neutral-600)}
-.bd-button.primary:hover{box-shadow:inset 0 0 0 99px rgb(13 45 87 / 15%)}
-.bd-button.secondary:hover{box-shadow:inset 0 0 0 99px var(--interaction-light-blue-hover)}
-.bd-button.tertiary:hover,.bd-button.stroke:hover{box-shadow:inset 0 0 0 99px var(--interaction-light-gray-hover),inset 0 0 0 1px var(--ref-color-gray-900-10)}
+.bd-button.primary{--sq-fill:var(--sys-color-brand-primary-default);color:var(--sys-color-common-white-default)}
+.bd-button.secondary{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
+.bd-button.tertiary{--sq-fill:var(--sys-color-neutral-100);color:var(--sys-color-neutral-600)}
+.bd-button.stroke{--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;color:var(--sys-color-neutral-600)}
+.bd-button.ink{--sq-fill:var(--sys-color-neutral-800);color:var(--sys-color-common-white-default)}
+.bd-button.primary:hover,.bd-button.ink:hover{--sq-overlay:rgb(13 45 87 / 15%)}
+.bd-button.secondary:hover{--sq-overlay:var(--interaction-light-blue-hover)}
+.bd-button.tertiary:hover,.bd-button.stroke:hover{--sq-overlay:var(--interaction-light-gray-hover)}
+
+/* 에셋 패널 썸네일 */
+button:hover>.asset-thumb{--sq-line:var(--ref-color-gray-900-20)}
+button:active{cursor:grabbing}
+
+/* 프로젝트 카드 hover — 썸네일 선만 진하게 (사이트 ccard 와 같음) */
+.proj:hover>.proj-thumb{--sq-line:var(--ref-color-gray-900-20)}

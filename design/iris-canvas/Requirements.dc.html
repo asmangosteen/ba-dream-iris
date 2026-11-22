@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Iris 요구사항 보드</title>
 <script src="./support.js"></script>
-<link rel="stylesheet" href="/_blob/da39174b83e31e0b43a8b80c495f7e3a">
+<link rel="stylesheet" href="/_blob/b4d270cbbef028af7e4122bed2e21bfb">
 </head>
 <body>
 <x-dc>
@@ -14,88 +14,88 @@ body{margin:0}
 a{color:inherit}a:hover{color:inherit}
 </style>
 </helmet>
-<div style="width: 100%; min-height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px">
-
-  <header style="height: 60px; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-14); padding: 0 var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line)">
-    <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-06)">
+<div style="width: 100%; min-height: 900px; height: 900px; display: flex; flex-direction: column; background: var(--sys-color-common-white-default); font-family: var(--font-family-base); color: var(--sys-color-neutral-800); font-size: var(--typography-body-2-size); line-height: 22px; overflow: hidden">
+  <header style="height: 60px; flex: none; display: flex; align-items: center; padding: 0 var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line); background: var(--sys-color-common-white-default); position: relative; z-index: 2">
+    <a href="Home.dc.html" aria-label="Iris 홈" style="display: flex; align-items: center; gap: var(--ref-spacing-06); margin-right: var(--ref-spacing-14)">
       <img src="/_blob/cc75c291bd789b4d958c366f3abe86ce" alt="" style="height: 16px; width: auto; display: block">
-      <span style="font-weight: 600; font-size: 17px; color: var(--sys-color-common-black-default)">Iris</span>
+      <span style="font-weight: 700; font-size: 18px; line-height: 24px; color: var(--sys-color-common-black-default)">Iris</span>
     </a>
-    <nav aria-label="주 메뉴" style="display: flex; gap: var(--ref-spacing-04)">
-      <a href="Home.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">프로젝트</a>
-      <a href="Requirements.dc.html" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 600; color: var(--sys-color-neutral-800)">요구사항</a>
-      <a href="DesignSystem.dc.html" class="hov" style="padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-04); font-weight: 500; color: var(--sys-color-neutral-600)">디자인 시스템</a>
+    <nav aria-label="주 메뉴" style="display: flex; height: 60px">
+      <a href="Home.dc.html" style="display: flex; align-items: center; padding: 0 var(--ref-spacing-09); font-weight: 500; color: var(--sys-color-neutral-600)">프로젝트</a>
+      <a href="Requirements.dc.html" style="display: flex; align-items: center; padding: 0 var(--ref-spacing-09); font-weight: 600; color: var(--sys-color-neutral-800)">요구사항</a>
+      <a href="DesignSystem.dc.html" style="display: flex; align-items: center; padding: 0 var(--ref-spacing-09); font-weight: 500; color: var(--sys-color-neutral-600)">디자인 시스템</a>
     </nav>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-10)">
+      <button class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 36px; min-width: 220px; padding: 0 var(--ref-spacing-07) 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; color: var(--sys-color-neutral-500)">
+        <span class="ic i-search" aria-hidden="true"></span><span style="flex: 1">검색</span>
+        <kbd class="sq" style="font-family: inherit; font-size: 11px; line-height: 18px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px">⌘K</kbd>
+      </button>
+      <button aria-label="알림" class="ib" style="width: 32px; height: 32px; border-radius: var(--ref-radius-04)"><span class="ic ic-20 i-bell" aria-hidden="true"></span></button>
+      <button aria-label="내 계정" style="width: 32px; height: 32px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 12px; font-weight: 600">김</button>
+    </div>
   </header>
 
-  <main style="flex: 1; padding: var(--ref-spacing-17) var(--ref-spacing-16); box-sizing: border-box">
-    <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
-      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10); flex-wrap: wrap">
-        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
-          <button style="display: flex; align-items: center; gap: var(--ref-spacing-04); color: var(--sys-color-neutral-600); font-weight: 500">착한구독 신청 플로우 개편 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
-          <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">요구사항</h1>
-        </div>
+  <div style="flex: 1; min-height: 0; display: flex">
+    <aside aria-label="프로젝트" style="flex: 0 0 248px; box-sizing: border-box; padding: var(--ref-spacing-12) var(--ref-spacing-08) var(--ref-spacing-16); box-shadow: 1px 0 0 var(--iris-line); display: flex; flex-direction: column">
+      <span class="nav-label">진행 중</span>
+      <a href="#" class="sq nav-item on">착한구독 신청 플로우 개편</a>
+      <a href="#" class="sq nav-item">내 차고 홈 리뉴얼</a>
+      <a href="#" class="sq nav-item">커뮤니티 피드 개선</a>
+      <a href="#" class="sq nav-item">단기구독 반납 흐름</a>
+      <span class="nav-label" style="margin-top: var(--ref-spacing-12)">완료</span>
+      <a href="#" class="sq nav-item">마이페이지 정리</a>
+    </aside>
+
+    <main style="flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-16) var(--ref-spacing-19); box-sizing: border-box">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10)">
+        <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">요구사항</h1>
         <div style="display: flex; gap: var(--ref-spacing-06)">
-          <button class="bd-button l stroke"><span class="ic i-upload" aria-hidden="true"></span>내보내기</button>
+          <button class="bd-button l stroke" style="color: var(--sys-color-neutral-800)">내보내기</button>
           <a href="AddDoc.dc.html" class="bd-button l primary"><span class="ic i-plus" aria-hidden="true"></span>요구사항 추가</a>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--ref-spacing-08)">
-        <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
-          <button onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="{{s.style}}">
-            <span style="color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px">{{s.label}}</span>
-            <span style="font-size: var(--typography-title-size); line-height: 28px; font-weight: 600; color: var(--sys-color-neutral-800)">{{s.count}}</span>
-          </button>
-        </sc-for>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-14) 0 var(--ref-spacing-10)">
+        <div style="display: flex; gap: var(--ref-spacing-04)">
+          <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
+            <button onClick="{{s.pick}}" aria-pressed="{{s.on}}" class="{{s.cls}}">{{s.label}} <span class="chip-n">{{s.count}}</span></button>
+          </sc-for>
+        </div>
+        <label class="sq" style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 36px; width: 240px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500)">
+          <span class="ic i-search" aria-hidden="true"></span><span class="sr">요구사항 검색</span>
+          <input placeholder="번호나 내용으로 찾기" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--sys-color-neutral-800)">
+        </label>
       </div>
 
-      <div style="border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--iris-line-strong); overflow: hidden">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); flex-wrap: wrap">
-          <label style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 36px; min-width: 260px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-05); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500)">
-            <span class="ic i-search" aria-hidden="true"></span><span class="sr">요구사항 검색</span>
-            <input placeholder="번호나 내용으로 찾기" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--sys-color-neutral-800)">
-          </label>
-          <div style="display: flex; gap: var(--ref-spacing-04)">
-            <button class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-12); box-shadow: inset 0 0 0 1px var(--iris-line-strong); color: var(--sys-color-neutral-700); font-weight: 500">문서 전체 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
-            <button class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-08); border-radius: var(--ref-radius-12); box-shadow: inset 0 0 0 1px var(--iris-line-strong); color: var(--sys-color-neutral-700); font-weight: 500">페이지 전체 <span class="ic ic-12 i-chevron_down" aria-hidden="true"></span></button>
-          </div>
-        </div>
-        <div style="overflow-x: auto">
-          <table style="width: 100%; min-width: 880px; border-collapse: collapse; text-align: left; font-size: 13px; line-height: 20px">
-            <thead>
-              <tr style="box-shadow: inset 0 -1px 0 var(--iris-line-strong), inset 0 1px 0 var(--iris-line-strong); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-10); font-weight: 600; width: 96px">번호</th>
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600">요구사항</th>
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 190px">문서</th>
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 170px">화면</th>
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-08); font-weight: 600; width: 104px">상태</th>
-                <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-10); font-weight: 600; width: 110px">확인</th>
-              </tr>
-            </thead>
-            <tbody>
-              <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
-                <tr style="box-shadow: inset 0 -1px 0 var(--iris-line)">
-                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.code}}</td>
-                  <td style="padding: var(--ref-spacing-08)">{{r.title}}</td>
-                  <td style="padding: var(--ref-spacing-08); color: var(--sys-color-neutral-600)">{{r.doc}}</td>
-                  <td style="padding: var(--ref-spacing-08)"><a href="Main.dc.html" style="{{r.screenStyle}}">{{r.screen}}</a></td>
-                  <td style="padding: var(--ref-spacing-08)"><span class="{{r.badge}}">{{r.status}}</span></td>
-                  <td style="padding: var(--ref-spacing-08) var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600); white-space: nowrap">{{r.who}}</td>
-                </tr>
-              </sc-for>
-            </tbody>
-          </table>
-        </div>
-        <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
-          <div style="padding: var(--ref-spacing-17) var(--ref-spacing-10); display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-04); text-align: center">
-            <span class="ic ic-24 i-check_in_circle" aria-hidden="true" style="color: var(--sys-color-theme-success-default)"></span>
-            <span style="font-weight: 600; font-size: 16px; line-height: 24px">이 상태의 요구사항이 없어요</span>
-          </div>
-        </sc-if>
-      </div>
-    </div>
-  </main>
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; line-height: 20px">
+        <thead>
+          <tr style="box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-600)">
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 84px">번호</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600">요구사항</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 150px">문서</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 150px">화면</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 88px">상태</th>
+            <th scope="col" style="padding: var(--ref-spacing-06) var(--ref-spacing-04); font-weight: 600; width: 110px">확인</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+            <tr style="box-shadow: inset 0 -1px 0 var(--iris-line)">
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); font-weight: 600; white-space: nowrap">{{r.code}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)">{{r.title}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); color: var(--sys-color-neutral-600)">{{r.doc}}</td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)"><a href="Main.dc.html" style="{{r.screenStyle}}">{{r.screen}}</a></td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04)"><span class="{{r.badge}}">{{r.status}}</span></td>
+              <td style="padding: var(--ref-spacing-08) var(--ref-spacing-04); font-size: 12px; color: var(--sys-color-neutral-500); white-space: nowrap">{{r.who}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+        <div style="padding: var(--ref-spacing-17) 0; text-align: center; color: var(--sys-color-neutral-500)">이 상태의 요구사항이 없어요</div>
+      </sc-if>
+    </main>
+  </div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
@@ -115,7 +115,70 @@ const ROWS = [
   ['REQ-043', '결제 수단을 바꿀 수 있는 버튼을 둔다', '개발 메모', '신청_04_결제', 'missing', '—']
 ];
 const ST = { reflected: ['반영됨', 't-success'], partial: ['일부 반영', 't-warning'], missing: ['미반영', 't-destructed'], na: ['해당 없음', 't-gray'] };
+/* Corner smoothing 60% — @ba-dream/design-system squircle-apply 와 같은 figma-squircle 경로 (작업 캔버스 안 화면 제외) */
+function irisSquircle() {
+  if (window.__irisSq) return;
+  window.__irisSq = true;
+  const SEL = '.sq,.bd-button,.bd-chip,.ib,.fld,.btn-ink';
+  const S = 0.6;
+  const f = (n) => n.toFixed(3);
+  const corner = (r, budget) => {
+    if (!r) return null;
+    const sm = Math.min(S, budget / r - 1);
+    const p = Math.min((1 + S) * r, budget);
+    const arc = 90 * (1 - sm);
+    const L = Math.sin((arc / 2) * Math.PI / 180) * r * Math.SQRT2;
+    const p34 = r * Math.tan(((90 - arc) / 4) * Math.PI / 180);
+    const beta = (45 * sm) * Math.PI / 180;
+    const c = p34 * Math.cos(beta), d = c * Math.tan(beta);
+    const b = (p - L - c - d) / 3, a = 2 * b;
+    return { r, a, b, c, d, p, L };
+  };
+  const path = (w, h, rad, x, y) => {
+    const budget = Math.min(w, h) / 2;
+    const k = corner(Math.min(rad, budget), budget);
+    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
+    return 'M ' + f(x + w - p) + ' ' + f(y) +
+      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
+      ' L ' + f(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
+      ' L ' + f(x + p) + ' ' + f(y + h) +
+      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
+      ' L ' + f(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+  };
+  const last = new WeakMap(), seen = new WeakSet();
+  const apply = (el) => {
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!(w > 0 && h > 0)) return;
+    const cs = getComputedStyle(el);
+    const raw = cs.borderTopLeftRadius;
+    let r = parseFloat(raw) || 0;
+    if (raw.trim().endsWith('%')) r = Math.min(w, h) * r / 100;
+    const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
+    const key = w + '|' + h + '|' + r + '|' + lw;
+    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    last.set(el, key);
+    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    const outer = path(w, h, r, 1, 1);
+    el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-ring', lw > 0 && w > lw * 2 && h > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(w - lw * 2, h - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(w, h, r, 0, 0) + "')");
+    if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
+  };
+  let raf = 0;
+  const ro = new ResizeObserver((es) => es.forEach((e) => apply(e.target)));
+  const tick = () => {
+    raf = 0;
+    document.querySelectorAll(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
+  };
+  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  tick();
+  if (document.fonts) document.fonts.ready.then(tick);
+}
 class Component extends DCLogic {
+  componentDidMount() { irisSquircle(); }
   constructor(props) {
     super(props);
     this.state = { f: 'all' };
@@ -130,12 +193,12 @@ class Component extends DCLogic {
         label: d[1], on: f === d[0],
         count: d[0] === 'all' ? ROWS.length : ROWS.filter((r) => r[4] === d[0]).length,
         pick: () => this.setState({ f: d[0] }),
-        style: 'display:flex;flex-direction:column;gap:var(--ref-spacing-02);padding:var(--ref-spacing-10);border-radius:var(--ref-radius-07);text-align:left;' + (f === d[0] ? 'box-shadow:inset 0 0 0 1.5px var(--sys-color-brand-primary-default)' : 'box-shadow:inset 0 0 0 1px var(--iris-line-strong)')
+        cls: 'bd-chip' + (f === d[0] ? ' on' : '')
       })),
       rows: rows.map((r) => ({
         code: r[0], title: r[1], doc: r[2], screen: r[3] || '연결 안 됨', who: r[5],
         status: ST[r[4]][0], badge: 'bd-badge ' + ST[r[4]][1],
-        screenStyle: r[3] ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-600)'
+        screenStyle: r[3] ? 'color:var(--sys-color-brand-primary-default);font-weight:500' : 'color:var(--sys-color-neutral-500)'
       }))
     };
   }

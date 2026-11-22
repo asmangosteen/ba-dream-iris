@@ -6,6 +6,7 @@ Phase 1 화면 8장의 HTML 시안 소스입니다. 바드림 디자인 시스�
 - `*.dc.html`: 화면(아트보드) 하나당 파일 하나입니다. 캔버스 런타임(`support.js`)에서만 그대로 열립니다.
 - `canvas.json`: 아트보드 배치 정보입니다.
 - `assets/iris-base.css`: 공용 스타일입니다. 디자인 시스템 토큰 이름을 그대로 쓰고, 아이콘 · 폰트는 아티팩트에 올린 파일(`/_blob/...`)을 참조합니다.
+- 모서리: 작업 캔버스 안 화면을 뺀 모든 둥근 요소에 Corner smoothing 60%를 줍니다. 디자인 시스템 `Squircle`과 같은 figma-squircle 경로를 각 아트보드 스크립트(`irisSquircle`)가 계산해 `clip-path`로 자릅니다. 요소는 배경 · 선을 직접 칠하지 않고 `--sq-fill` · `--sq-line` · `--sq-line-w`로 넘깁니다.
 
 | 파일 | 화면 |
 |---|---|
