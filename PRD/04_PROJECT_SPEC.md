@@ -174,8 +174,8 @@ npx vitest run
 
 | 변수명 | 설명 | 어디서 발급 |
 |---|---|---|
-| `SUPABASE_URL` | Supabase 프로젝트 주소 (`@nuxtjs/supabase`가 읽음) | Supabase 대시보드 > Settings > API |
-| `SUPABASE_KEY` | 브라우저용 공개 키(anon). RLS로 보호된다 | 같은 곳 |
+| `NUXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 주소 (`@nuxtjs/supabase` 2.x가 읽음) | Supabase 대시보드 > Settings > API |
+| `NUXT_PUBLIC_SUPABASE_KEY` | 브라우저용 공개 키(anon · publishable). RLS로 보호된다 | 같은 곳 |
 | `SUPABASE_SERVICE_KEY` | 서버 전용 관리자 키 (**브라우저 노출 금지**) | 같은 곳 |
 | `NUXT_FIGMA_ACCESS_TOKEN` | 피그마 Personal Access Token (서버 전용 `runtimeConfig`) | Figma > Settings > Security > Personal access tokens |
 | `NUXT_PUBLIC_ALLOWED_EMAIL_DOMAIN` | 로그인 허용 도메인 | 직접 입력: `ba-dream.com` |

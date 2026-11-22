@@ -25,3 +25,15 @@
 - **백엔드**: Supabase (DB · 로그인 · 파일 저장)
 - **배포**: Vercel
 - **캔버스**: 자체 개발한 DOM 기반 캔버스. 화면 요소를 실제 HTML 요소로 그리는 방식으로, 토스 Deus와 같은 접근입니다.
+
+## 개발
+
+```bash
+npm install
+cp .env.example .env   # Supabase 키를 채웁니다
+npm run dev            # http://localhost:3000
+```
+
+- 앱: `app/` (Nuxt 4 + `@ba-dream/design-system`), DB: `supabase/migrations/`
+- 화면 기준: `design/iris-canvas/`(캔버스 시안), `prototype/`(브라우저용 HTML 프로토타입)
+- 글자 · 버튼 위계: `PRD/05_UI_GUIDE.md`

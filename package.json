@@ -1,0 +1,22 @@
+{
+  "name": "iris",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@ba-dream/design-system": "1.0.0",
+    "@nuxtjs/supabase": "2.1.0",
+    "nuxt": "4.6.4",
+    "vue": "3.5.46"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.14"
+  }
+}

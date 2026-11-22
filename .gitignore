@@ -7,3 +7,10 @@ node_modules/
 
 # 디자인 시스템 아이콘 원본(사내 전용, 재배포 금지)
 prototype/assets/icons/
+
+# Nuxt
+.nuxt/
+.output/
+.data/
+public/bd-symbol.svg
+.claude/launch.json
