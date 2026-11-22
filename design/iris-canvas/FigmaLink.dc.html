@@ -24,10 +24,7 @@ a{color:inherit}a:hover{color:inherit}
   <div style="position: relative; min-height: 900px; display: grid; place-items: center; padding: var(--ref-spacing-12)">
     <section role="dialog" aria-modal="true" aria-labelledby="figmaTitle" style="width: 100%; max-width: 640px; background: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); box-shadow: var(--shadow-05); display: flex; flex-direction: column; overflow: hidden">
       <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-10)">
-        <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-02)">
-          <h1 id="figmaTitle" style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600">피그마 화면 가져오기</h1>
-          <p style="margin: 0; color: var(--sys-color-neutral-600)">프레임 링크를 붙여넣으면 썸네일과 레이어 정보를 한 번 불러와 저장해요.</p>
-        </div>
+        <h1 id="figmaTitle" style="margin: 0; font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600">피그마 화면 가져오기</h1>
         <a href="Main.dc.html" aria-label="닫기" class="hov" style="width: 32px; height: 32px; flex: none; border-radius: var(--ref-radius-04); display: grid; place-items: center; color: var(--sys-color-neutral-600)"><span class="ic ic-20 i-close" aria-hidden="true"></span></a>
       </div>
 
@@ -58,7 +55,6 @@ a{color:inherit}a:hover{color:inherit}
                 <span style="{{f.checkStyle}}"><span class="ic ic-12 i-check" aria-hidden="true"></span></span>
               </span>
               <span style="font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{f.name}}</span>
-              <span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">{{f.meta}}</span>
             </button>
           </sc-for>
         </div>
@@ -66,14 +62,9 @@ a{color:inherit}a:hover{color:inherit}
 
       <div style="padding: var(--ref-spacing-10) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08)">
-          <span style="display: flex; flex-direction: column"><span style="font-weight: 500">어느 페이지에 놓을까요?</span><span style="font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-600)">고른 프레임은 플로우 순서대로 옆에 놓여요.</span></span>
+          <span style="font-weight: 500">놓을 페이지</span>
           <button style="display: flex; align-items: center; gap: var(--ref-spacing-06); height: 40px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-weight: 500">신청 플로우 <span class="ic i-chevron_down" aria-hidden="true" style="color: var(--sys-color-neutral-600)"></span></button>
-        </div>
-        <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-05); background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); font-size: 13px; line-height: 20px">
-          <span class="ic ic-20 i-info_solid" aria-hidden="true"></span>
-          <span>레이어 이름에서 바드림 컴포넌트 7개를 찾았어요. 가져오면 개발 탭에 바로 보여요.</span>
-        </div>
-      </div>
+        </div>      </div>
 
       <div style="display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-12) var(--ref-spacing-12)">
         <a href="Main.dc.html" class="bd-button l tertiary" style="flex: 1">취소</a>

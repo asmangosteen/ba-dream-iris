@@ -47,12 +47,8 @@ a{color:inherit}a:hover{color:inherit}
     <main style="flex: 999 1 560px; min-width: 0; padding: var(--ref-spacing-17) var(--ref-spacing-16); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-08)">
         <h1 style="margin: 0; font-size: var(--typography-display-size); line-height: 48px; letter-spacing: -0.36px; font-weight: 700; color: var(--sys-color-common-black-default)">디자인 시스템</h1>
-        <p style="margin: 0; font-size: 16px; line-height: 26px; color: var(--sys-color-neutral-600)">바드림 Design System V3를 Iris에 연결했어요. 컴포넌트를 누르면 어느 화면에서 쓰는지 볼 수 있어요.</p>
         <div style="display: flex; flex-wrap: wrap; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-04)">
-          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">@ba-dream/design-system 1.0.0</span>
-          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">컴포넌트 133</span>
-          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">아이콘 884</span>
-        </div>
+          <span style="padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--iris-line-strong); font-size: 12px; line-height: 26px; font-weight: 600">@ba-dream/design-system 1.0.0</span>        </div>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: var(--ref-spacing-08)">
@@ -94,11 +90,10 @@ a{color:inherit}a:hover{color:inherit}
     <aside aria-label="컴포넌트 상세" style="flex: 0 0 360px; min-width: 0; padding: var(--ref-spacing-17) var(--ref-spacing-12); box-sizing: border-box; box-shadow: -1px 0 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-12)">
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-04)">
         <span style="display: flex; align-items: center; gap: var(--ref-spacing-06)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="color: var(--iris-component)"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" fill="currentColor"></path></svg><span style="font-size: var(--typography-subtitle-size); line-height: 24px; font-weight: 600; color: var(--sys-color-neutral-800)">{{cur.name}}</span></span>
-        <span style="color: var(--sys-color-neutral-600)">{{cur.desc}}</span>
       </div>
       <div style="padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); background: var(--sys-color-neutral-100); font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 21px; color: var(--sys-color-neutral-700); white-space: pre-wrap">{{cur.code}}</div>
       <div style="display: flex; flex-direction: column; gap: var(--ref-spacing-06)">
-        <div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600">쓰는 화면</span><span style="font-size: 12px; color: var(--sys-color-neutral-600)">{{cur.count}}</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center"><span style="font-weight: 600">쓰는 화면</span></div>
         <sc-for list="{{cur.uses}}" as="u" hint-placeholder-count="4">
           <a href="Main.dc.html" class="hov" style="display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06)">
             <span aria-hidden="true" style="width: 28px; height: 52px; border-radius: 3px; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--iris-line-strong); flex: none"></span>

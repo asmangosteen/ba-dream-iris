@@ -25,10 +25,7 @@ a{color:inherit}a:hover{color:inherit}
         </a>
         <button class="ib" aria-label="검색"><span class="ic i-search" aria-hidden="true"></span></button>
       </div>
-      <div style="display: flex; flex-direction: column">
-        <span style="font-size: 13px; font-weight: 600; color: var(--sys-color-neutral-800)">착한구독 신청 플로우 개편</span>
-        <span style="color: var(--sys-color-neutral-600)">디자인 단계</span>
-      </div>
+      <span style="font-size: 13px; font-weight: 600; color: var(--sys-color-neutral-800)">착한구독 신청 플로우 개편</span>
     </div>
     <div role="tablist" style="display: flex; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-06) var(--ref-spacing-06)">
       <button role="tab" aria-selected="true" style="padding: var(--ref-spacing-02) var(--ref-spacing-06); border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); font-weight: 600">파일</button>
@@ -252,7 +249,6 @@ a{color:inherit}a:hover{color:inherit}
                 </div>
               </div>
             </sc-for>
-            <div style="padding: var(--ref-spacing-06) var(--ref-spacing-10) var(--ref-spacing-08); color: var(--sys-color-neutral-600)">상태를 누르면 반영됨 → 일부 반영 → 미반영 → 해당 없음 순으로 바뀌어요.</div>
           </div>
 
           <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
@@ -288,7 +284,6 @@ a{color:inherit}a:hover{color:inherit}
           </div>
           <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10); display: flex; gap: var(--ref-spacing-06)">
             <button class="bd-button m stroke" style="flex: 1; color: var(--sys-color-neutral-800); font-size: 12px">{{dev.openLabel}}</button>
-            <button disabled="disabled" class="bd-button m stroke" style="flex: 1; color: var(--sys-color-neutral-500); font-size: 12px; cursor: not-allowed">코드 보기 · Phase 3</button>
           </div>
         </div>
       </sc-if>
@@ -297,7 +292,6 @@ a{color:inherit}a:hover{color:inherit}
         <div>
           <sc-if value="{{cur.isFigma}}" hint-placeholder-val="{{true}}">
             <div class="pn-sec" style="padding: var(--ref-spacing-08) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-700)">
-              <span style="display: flex; gap: var(--ref-spacing-04)"><span class="ic ic-12 i-info" aria-hidden="true" style="margin-top: 3px"></span>피그마에서 연결한 화면이에요. 레이어는 피그마에서 고치고, Iris에서는 기획 연결과 검수를 해요.</span>
               <span style="display: flex; gap: var(--ref-spacing-04)"><button class="bd-button s stroke" style="color: var(--sys-color-neutral-800)"><span class="ic ic-12 i-refresh" aria-hidden="true"></span>다시 불러오기</button><button class="bd-button s stroke" style="color: var(--sys-color-neutral-800)"><span class="ic ic-12 i-arrow_up_right" aria-hidden="true"></span>피그마에서 열기</button></span>
             </div>
           </sc-if>
@@ -309,7 +303,7 @@ a{color:inherit}a:hover{color:inherit}
             </div>
           </div>
           <div class="pn-sec" style="padding-bottom: var(--ref-spacing-08)">
-            <div class="pn-h"><span>레이아웃</span><span class="bd-badge s t-gray">오토 레이아웃 · Phase 2</span></div>
+            <div class="pn-h"><span>레이아웃</span></div>
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04) var(--ref-spacing-06); padding: 0 var(--ref-spacing-10)">
               <label class="fld"><span>W</span><input value="375" readonly="readonly"></label>
               <label class="fld"><span>H</span><input value="812" readonly="readonly"></label>
@@ -344,10 +338,10 @@ const STATUS = {
 };
 const NEXT = { reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' };
 const SCREENS = {
-  s1: { name: '신청_01_차종선택', status: '승인', source: '피그마 연결 · 오늘 09:40에 불러옴', isFigma: true, x: '0' },
-  s2: { name: '신청_02_구독료선택', status: '검토 중', source: '피그마 연결 · 2시간 전에 불러옴', isFigma: true, x: '455' },
-  s3: { name: '신청_03_보험옵션', status: '작업 중', source: 'Iris 캔버스 · 자동 저장되었어요', isFigma: false, x: '910' },
-  s4: { name: '신청_04_결제', status: '작업 중', source: 'Iris 캔버스 · 자동 저장되었어요', isFigma: false, x: '1365' }
+  s1: { name: '신청_01_차종선택', status: '승인', source: '피그마 · 오늘 09:40', isFigma: true, x: '0' },
+  s2: { name: '신청_02_구독료선택', status: '검토 중', source: '피그마 · 2시간 전', isFigma: true, x: '455' },
+  s3: { name: '신청_03_보험옵션', status: '작업 중', source: 'Iris 캔버스', isFigma: false, x: '910' },
+  s4: { name: '신청_04_결제', status: '작업 중', source: 'Iris 캔버스', isFigma: false, x: '1365' }
 };
 const REQS = [
   { s: 's1', code: 'REQ-005', title: '차종 카드에 1회 충전 주행거리와 충전 시간을 보여준다', doc: '착한구독 개편 기획서 v1.2 · 2쪽' },
@@ -374,9 +368,9 @@ const LAYERS = {
 };
 const COMPS = {
   s1: { list: [['TopBar', '<TopBar mode="back">', 1], ['ProductCard', '<ProductCard>', 3]], unmatched: '' },
-  s2: { list: [['TopBar', '<TopBar mode="back">', 1], ['SegmentedControl', '<SegmentedControl size="m">', 1], ['Badge', '<Badge theme="brand" type="alpha">', 1], ['BottomBar', '<BottomBar>', 1], ['Button', '<Button type="primary" size="xl">', 1]], unmatched: '디자인 시스템과 이어지지 않은 레이어가 1개 있어요. Rectangle 12' },
-  s3: { list: [], unmatched: 'Iris 캔버스 화면은 Phase 2부터 컴포넌트를 세요. 이름이 같은 RadioCard 3개는 CheckboxCard 후보예요.' },
-  s4: { list: [], unmatched: 'Iris 캔버스 화면은 Phase 2부터 컴포넌트를 세요.' }
+  s2: { list: [['TopBar', '<TopBar mode="back">', 1], ['SegmentedControl', '<SegmentedControl size="m">', 1], ['Badge', '<Badge theme="brand" type="alpha">', 1], ['BottomBar', '<BottomBar>', 1], ['Button', '<Button type="primary" size="xl">', 1]], unmatched: '연결 안 된 레이어 · Rectangle 12' },
+  s3: { list: [], unmatched: '' },
+  s4: { list: [], unmatched: '' }
 };
 class Component extends DCLogic {
   constructor(props) {
@@ -439,7 +433,7 @@ class Component extends DCLogic {
       layers: layers,
       dev: {
         comps: cm.list.map((c) => ({ name: c[0], code: c[1], count: c[2] })),
-        summary: cm.list.length ? cm.list.length + '종 · ' + totalComps + '개' : '아직 세지 않았어요',
+        summary: cm.list.length ? totalComps + '개' : '없음',
         unmatched: cm.unmatched, hasUnmatched: !!cm.unmatched,
         openLabel: cur.isFigma ? '피그마에서 열기' : '캔버스에서 고치기'
       }
