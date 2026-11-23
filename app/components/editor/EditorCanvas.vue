@@ -85,6 +85,7 @@ type Drag =
   | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; before: string; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; corner: Corner; sx: number; sy: number; o: { x: number; y: number; w: number; h: number }; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
+  | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean }
 let drag: Drag | null = null
 
 const isNative = (s: ScreenRow) => s.source === 'native'
@@ -144,6 +145,14 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     drag = { kind: 'layers', sid: screen.id, ids, sx: e.clientX, sy: e.clientY, orig: Object.fromEntries(ids.map((id) => [id, { x: d.nodes[id]!.x, y: d.nodes[id]!.y }])), before: store.begin(screen.id), moved: false }
     return
   }
+  // Shift + 화면 빈 곳 끌기: 상자 안의 레이어 고르기
+  if (e.shiftKey && isNative(screen)) {
+    const base = store.screenId.value === screen.id ? [...store.layerIds.value] : []
+    if (store.screenId.value !== screen.id) store.selectScreen(screen.id)
+    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base, moved: false }
+    marqueeOn.value = true
+    return
+  }
   store.selectScreen(screen.id)
   drag = { kind: 'screen', id: screen.id, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, moved: false }
 }
@@ -196,6 +205,23 @@ function move(e: PointerEvent) {
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
     draft.value = { x: Math.round(Math.min(w.x, drag.wx)), y: Math.round(Math.min(w.y, drag.wy)), width: Math.round(Math.abs(w.x - drag.wx)), height: Math.round(Math.abs(w.y - drag.wy)) }
+  } else if (drag.kind === 'marquee') {
+    const w = toWorld(e.clientX, e.clientY)
+    if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
+    drag.moved = true
+    const r = { x: Math.min(w.x, drag.wx), y: Math.min(w.y, drag.wy), width: Math.abs(w.x - drag.wx), height: Math.abs(w.y - drag.wy) }
+    draft.value = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
+    const s = props.screens.find((v) => v.id === drag!.sid)
+    if (!s) return
+    const d = store.doc(s.id)
+    // 맨 위 단계 레이어 중 상자와 겹치는 것 (프레임 안쪽은 프레임째로)
+    const hit = d.rootIds.filter((id) => {
+      const n = d.nodes[id]
+      if (!n || n.hidden || n.locked) return false
+      const b = layerWorld(s, id)!
+      return b.x < r.x + r.width && b.x + b.w > r.x && b.y < r.y + r.height && b.y + b.h > r.y
+    })
+    store.layerIds.value = [...new Set([...drag.base, ...hit])]
   } else if (drag.kind === 'drawLayer') {
     const s = props.screens.find((v) => v.id === drag!.sid)
     if (!s) return
@@ -222,6 +248,7 @@ function end(e: PointerEvent) {
     if (s) emit('move', d.id, s.x, s.y, true)
   }
   if ((d.kind === 'layers' || d.kind === 'resize') && d.moved) store.commit(d.sid, d.before)
+  if (d.kind === 'marquee') { draft.value = null; marqueeOn.value = false }
   if (d.kind === 'draw') {
     const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 375, height: 812 }
     draft.value = null
@@ -365,6 +392,7 @@ const single = computed(() => {
   const b = selBoxes.value[0]!
   return { ...b, locked: !!store.node(selScreen.value!.id, b.id)?.locked }
 })
+const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
 
@@ -397,7 +425,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
           <LayerView v-for="id in store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
         </template>
       </div>
-      <div v-if="draft" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
+ <div v-if="draft && !marqueeOn" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
     </div>
 
     <div class="overlay" aria-hidden="true">
@@ -424,7 +452,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
         </template>
         <span class="size num">{{ Math.round(single.w) }} × {{ Math.round(single.h) }}</span>
       </div>
-      <div v-if="draft" class="sel" :style="box(draft)"><span class="size num">{{ draft.width }} × {{ draft.height }}</span></div>
+      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size num">{{ draft.width }} × {{ draft.height }}</span></div>
+      <div v-if="draft && marqueeOn" class="marq" :style="box(draft)" />
     </div>
   </main>
 </template>
@@ -448,4 +477,5 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
 .handle.ne { right: -4px; top: -4px; cursor: nesw-resize; }
 .handle.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
 .size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: var(--ref-spacing-04); padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.marq { position: absolute; box-shadow: 0 0 0 1px var(--sys-color-brand-primary-default); background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
 </style>

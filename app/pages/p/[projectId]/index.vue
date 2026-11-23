@@ -12,6 +12,7 @@ import EditorAssets from '~/components/editor/EditorAssets.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
+import ProjectModal from '~/components/project/ProjectModal.vue'
 import type { Viewport } from '~/components/editor/EditorCanvas.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
@@ -94,20 +95,34 @@ async function onRename(id: string, e: Event) {
   try { await renamePage(id, (e.target as HTMLInputElement).value) } catch { say('이름을 바꾸지 못했어요.') }
 }
 
+const moveFrom = new Map<string, { x: number; y: number }>()
 function onMove(id: string, x: number, y: number, done: boolean) {
   const s = list.value.find((v) => v.id === id)
   if (!s) return
-  if (!done) { s.x = x; s.y = y; return }
-  updateScreen(id, { x, y }).catch(() => say('위치를 저장하지 못했어요. 다시 시도해주세요.'))
+  if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
+  const from = moveFrom.get(id) ?? { x, y }
+  moveFrom.delete(id)
+  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요.')
+  updateScreen(id, { x, y }).catch(fail)
+  store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
 }
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
   try {
     const row = await addScreen(rect)
-    if (row) { store.selectScreen(row.id); tab.value = 'design' }
+    if (row) {
+      store.selectScreen(row.id); tab.value = 'design'
+      let cur = row.id
+      store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
+    }
   } catch { say('화면을 만들지 못했어요. 다시 시도해주세요.') }
 }
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
-  if (current.value) updateScreen(current.value.id, patch).catch(() => say('저장하지 못했어요. 다시 시도해주세요.'))
+  const s = current.value
+  if (!s) return
+  const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
+  const fail = () => say('저장하지 못했어요. 다시 시도해주세요.')
+  updateScreen(s.id, patch).catch(fail)
+  store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
@@ -235,6 +250,8 @@ async function share() {
 }
 
 const zoomOpen = ref(false)
+const projMenu = ref(false)
+const settingsOpen = ref(false)
 const ZOOMS = [0.25, 0.5, 1, 2]
 const me = useSupabaseUser()
 const initial = computed(() => (me.value?.email ?? '나').slice(0, 1).toUpperCase())
@@ -262,7 +279,15 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 
     <!-- 왼쪽 위: 파일 알약 -->
     <div class="sq float s pill-left">
-      <NuxtLink to="/" class="sq hov home" aria-label="Iris 홈으로"><img src="/bd-symbol.svg" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></NuxtLink>
+      <div class="home-wrap">
+        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><img src="/bd-symbol.svg" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></button>
+        <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
+          <NuxtLink to="/" class="sq menu-item" role="menuitem">프로젝트 홈으로</NuxtLink>
+          <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">프로젝트 설정</button>
+          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">요구사항 보드</NuxtLink>
+          <NuxtLink to="/design-system" class="sq menu-item" role="menuitem">디자인 시스템</NuxtLink>
+        </div>
+      </div>
       <span class="tx-head ellipsis">{{ project.data.value?.name ?? '' }}</span>
       <span v-if="store.saveState.state === 'saving'" class="tx-meta save">저장 중</span>
       <button v-else-if="store.saveState.state === 'error'" class="tx-meta save err" @click="store.flushAll()">저장 못 함 · 다시</button>
@@ -358,7 +383,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           </div>
           <div class="scroll">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
-            <InspectorDev v-else-if="tab === 'dev'" :screen="current" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
+             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <InspectorLayer v-else-if="store.layerIds.value.length" :screen="current" @replace-image="pickImage" />
             <InspectorDesign v-else :screen="current" @update="onUpdate" @remove="onRemove" />
           </div>
@@ -375,6 +400,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <Transition name="toast"><div v-if="toast" class="sq toast" role="status">{{ toast }}</div></Transition>
 
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
+    <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
   </div>
@@ -386,7 +412,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .canvas-empty .row { display: flex; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); pointer-events: auto; }
 .save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
 .save.err { color: var(--sys-color-theme-error-default); }
-.pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 3; }
+.pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 4; }
+.home-wrap { position: relative; flex: none; }
+.pmenu { left: 0; right: auto; width: 180px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }

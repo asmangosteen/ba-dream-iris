@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { Button, EmptyState, Skeleton } from '@ba-dream/design-system'
+import { Button, EmptyState, Icon, Skeleton } from '@ba-dream/design-system'
+import ProjectModal from '~/components/project/ProjectModal.vue'
+import ScreenThumb from '~/components/editor/ScreenThumb.vue'
 
 const { data: projects, status, error, refresh } = useProjects()
 const { data: progress } = useProjectProgress()
@@ -12,26 +14,11 @@ const filters = [
 const list = computed(() => (projects.value ?? []).filter((p) => filter.value === 'all' || (filter.value === 'done' ? p.status === 'done' : p.status !== 'done')))
 const count = (k: string) => (projects.value ?? []).filter((p) => k === 'all' || (k === 'done' ? p.status === 'done' : p.status !== 'done')).length
 
-const supabase = useSupabaseClient()
-const user = useSupabaseUser()
-const creating = ref(false)
-const preview = useDevPreview()
-async function createProject() {
-  if (preview) return navigateTo('/p/preview-1')
-  if (creating.value || !user.value) return
-  creating.value = true
-  const { data: ws } = await supabase.from('workspaces').select('id').limit(1).single()
-  const { data, error: e } = await supabase
-    .from('projects')
-    .insert({ name: '새 프로젝트', workspace_id: ws?.id, created_by: user.value.sub as string })
-    .select('id')
-    .single()
-  if (!e && data) {
-    await supabase.from('pages').insert({ project_id: data.id, name: '페이지 1', sort_order: 0 })
-    await navigateTo(`/p/${data.id}`)
-  }
-  creating.value = false
-}
+const newOpen = ref(false)
+const settingsId = ref<string | null>(null)
+const settingsOpen = computed({ get: () => !!settingsId.value, set: (v) => { if (!v) settingsId.value = null } })
+const { data: covers } = useProjectCovers()
+function createProject() { newOpen.value = true }
 </script>
 
 <template>
@@ -41,7 +28,7 @@ async function createProject() {
       <div class="inner">
         <div class="head">
           <h1 class="tx-title">프로젝트</h1>
-          <Button size="s" type="primary" contents="icon-text" icon-name="plus" :loading="creating" @click="createProject">새 프로젝트</Button>
+          <Button size="s" type="primary" contents="icon-text" icon-name="plus" @click="createProject">새 프로젝트</Button>
         </div>
         <div class="seg filters" role="tablist" aria-label="프로젝트 거르기">
           <button v-for="f in filters" :key="f.key" role="tab" :aria-selected="filter === f.key" :class="['sq', 'seg-item', { on: filter === f.key }]" @click="filter = f.key">
@@ -71,7 +58,8 @@ async function createProject() {
         />
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
-            <span class="sq thumb" aria-hidden="true" />
+            <span class="sq thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span>
+            <button class="ib more" :aria-label="`${p.name} 설정`" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
               <span class="tx-meta">{{ STATUS_LABEL[p.status] }}<template v-if="progress?.[p.id]?.total"> · 반영 <span class="num">{{ progress[p.id]!.done }}/{{ progress[p.id]!.total }}</span></template> · {{ relativeTime(p.updated_at) }}</span>
@@ -80,6 +68,8 @@ async function createProject() {
         </div>
       </div>
     </main>
+    <ProjectModal v-model:open="newOpen" @created="(id: string) => navigateTo(`/p/${id}`)" />
+    <ProjectModal v-model:open="settingsOpen" :project-id="settingsId" />
   </div>
 </template>
 
@@ -90,8 +80,11 @@ async function createProject() {
 .head { display: flex; align-items: center; justify-content: space-between; }
 .filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08); }
-.card { display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
+.card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
 .thumb { height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
+.sq-clip-inner { position: absolute; inset: 12px 24% 0; overflow: hidden; border-radius: 6px 6px 0 0; box-shadow: 0 0 0 1px var(--iris-line); }
+.more { position: absolute; top: var(--ref-spacing-04); right: var(--ref-spacing-04); opacity: 0; --sq-fill: var(--sys-color-common-white-emphasis); }
+.proj:hover .more, .more:focus-visible { opacity: 1; }
 .proj:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }
 .col { display: flex; flex-direction: column; }
 .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

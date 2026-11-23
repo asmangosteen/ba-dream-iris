@@ -7,7 +7,9 @@ import type { ScreenRow } from '~/composables/useEditor'
  * 모든 변경은 mutate() 를 거칩니다 → 바뀌기 전 모습을 기록에 남기고, 잠시 뒤 DB 에 저장합니다.
  */
 export interface SaveState { state: 'idle' | 'saving' | 'saved' | 'error' }
-type Entry = { screenId: string; before: string; after: string }
+type Entry =
+  | { kind?: 'layers'; screenId: string; before: string; after: string }
+  | { kind: 'action'; screenId: string | null; undo: () => unknown; redo: () => unknown }
 
 export function createLayerStore(opts: {
   screens: Ref<ScreenRow[]>
@@ -60,13 +62,18 @@ export function createLayerStore(opts: {
   function record(sid: string, before: string) {
     const after = snap(sid)
     if (after === before) return
-    undoStack.push({ screenId: sid, before, after })
+    push({ screenId: sid, before, after })
+    scheduleSave(sid)
+  }
+  function push(e: Entry) {
+    undoStack.push(e)
     if (undoStack.length > 200) undoStack.shift()
     redoStack.length = 0
     canUndo.value = true
     canRedo.value = false
-    scheduleSave(sid)
   }
+  /** 레이어 밖의 변경(화면 옮기기 · 만들기 · 속성)도 실행취소 기록에 넣습니다 */
+  const pushAction = (screenId: string | null, undo: () => unknown, redo: () => unknown) => push({ kind: 'action', screenId, undo, redo })
   /** 바꾸기 전 모습을 받아 두는 시작점 (끌기처럼 여러 번 바뀌다가 끝에 한 번 기록할 때) */
   const begin = (sid: string) => snap(sid)
   const commit = (sid: string, before: string) => record(sid, before)
@@ -86,8 +93,8 @@ export function createLayerStore(opts: {
     const e = undoStack.pop()
     if (!e) return
     redoStack.push(e)
-    restore(e.screenId, e.before)
-    screenId.value = e.screenId
+    if (e.kind === 'action') e.undo()
+    else { restore(e.screenId, e.before); screenId.value = e.screenId }
     canUndo.value = !!undoStack.length
     canRedo.value = true
   }
@@ -95,8 +102,8 @@ export function createLayerStore(opts: {
     const e = redoStack.pop()
     if (!e) return
     undoStack.push(e)
-    restore(e.screenId, e.after)
-    screenId.value = e.screenId
+    if (e.kind === 'action') e.redo()
+    else { restore(e.screenId, e.after); screenId.value = e.screenId }
     canUndo.value = true
     canRedo.value = !!redoStack.length
   }
@@ -234,7 +241,7 @@ export function createLayerStore(opts: {
 
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
-    doc, node, begin, commit, mutate, undo, redo, flushAll,
+    doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     selectScreen, selectLayer, add, update, style, remove, arrange, moveTo, copy, paste, duplicate, color,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),
   }
