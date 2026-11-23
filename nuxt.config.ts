@@ -15,8 +15,9 @@ export default defineNuxtConfig({
   supabase: {
     redirect: false,
     types: '~~/shared/types/database.ts',
-    // 로그인 유지 규칙(PRD/06_AUTH_SESSION.md): 마지막으로 쓴 날부터 30일. 쓰는 동안 토큰이 갱신될 때마다 쿠키 기한도 다시 30일로 늘어납니다
-    cookieOptions: { maxAge: 60 * 60 * 24 * 30, sameSite: 'lax', secure: true },
+    // 로그인 쿠키 기한은 @supabase/ssr 가 400일로 고정합니다(maxAge 설정은 무시됨).
+    // 30일 쉬면 다시 인증하는 규칙은 app/middleware/auth.global.ts 가 맡습니다 — PRD/06_AUTH_SESSION.md
+    cookieOptions: { sameSite: 'lax', secure: true },
   },
   runtimeConfig: {
     // 서버 전용 (브라우저에 노출되지 않음)

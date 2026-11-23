@@ -9,7 +9,7 @@ const step = ref<'email' | 'code'>('email')
 const local = ref('')
 const code = ref('')
 const busy = ref(false)
-const error = ref(route.query.blocked ? `회사 이메일(@${domain})로만 로그인할 수 있어요.` : '')
+const error = ref(route.query.blocked ? `회사 이메일(@${domain})로만 로그인할 수 있어요.` : route.query.expired ? '30일 동안 쓰지 않아서 다시 로그인해 주세요.' : '')
 const email = computed(() => `${local.value.trim()}@${domain}`)
 
 async function sendCode() {
