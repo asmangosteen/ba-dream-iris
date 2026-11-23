@@ -1,9 +1,27 @@
 <!-- Supabase › Authentication › Emails › Templates › Magic link or OTP
-     제목: Iris 로그인 코드 {{ .Token }} -->
-<div style="font-family:'Pretendard',-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:400px;margin:0 auto;padding:32px 24px;color:#202837;font-size:14px;line-height:22px">
-  <p style="margin:0 0 16px;font-size:16px;line-height:24px;font-weight:600">Iris 로그인</p>
-  <p style="margin:0 0 8px">로그인 화면에 아래 코드를 적어주세요.</p>
-  <p style="margin:0 0 24px;padding:12px 0;background:#F1F2F3;border-radius:8px;text-align:center;font-size:24px;line-height:32px;font-weight:600;letter-spacing:6px;font-variant-numeric:tabular-nums">{{ .Token }}</p>
-  <p style="margin:0 0 24px">또는 <a href="{{ .ConfirmationURL }}" style="color:#2C7BE2;font-weight:500">이 링크</a>를 눌러 바로 들어가도 돼요.</p>
-  <p style="margin:0;color:#8C9199;font-size:12px;line-height:18px">직접 요청하지 않았다면 이 메일은 무시해도 괜찮아요. 코드는 1시간 동안만 쓸 수 있어요.</p>
-</div>
+     Subject: Your Iris sign-in code: {{ .Token }}
+     이 파일은 design/email/build-templates.py 로 만들어요(직접 고치지 말고 스크립트를 고쳐서 다시 실행) -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F7F7;padding:40px 16px;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#202837">
+  <tr>
+    <td align="center">
+      <div style="max-width:440px;margin:0 auto;text-align:left">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate">
+  <tr><td width="26" height="26" style="width:26px;height:26px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-card-tl.png" width="26" height="26" alt="" style="display:block;border:0;width:26px;height:26px"></td><td height="25" style="height:25px;background:#FFFFFF;border-top:1px solid #E9EBED;font-size:0;line-height:0">&nbsp;</td><td width="26" height="26" style="width:26px;height:26px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-card-tr.png" width="26" height="26" alt="" style="display:block;border:0;width:26px;height:26px"></td></tr>
+  <tr><td style="background:#FFFFFF;border-left:1px solid #E9EBED;font-size:0;line-height:0">&nbsp;</td><td style="background:#FFFFFF;padding:14px 10px 10px">
+            <img src="https://ba-dream-iris.vercel.app/email/iris-logo.png" width="69" height="28" alt="Iris" style="display:block;border:0;height:28px;width:auto">
+            <h1 style="margin:32px 0 8px;font-size:22px;line-height:30px;font-weight:600;color:#202837">Sign in to Iris</h1>
+            <p style="margin:0 0 24px;font-size:14px;line-height:22px;color:#454C58">Enter this code on the Iris sign-in screen.</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate">
+  <tr><td width="20" height="20" style="width:20px;height:20px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-code-tl.png" width="20" height="20" alt="" style="display:block;border:0;width:20px;height:20px"></td><td height="20" style="height:20px;background:#F1F2F3;font-size:0;line-height:0">&nbsp;</td><td width="20" height="20" style="width:20px;height:20px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-code-tr.png" width="20" height="20" alt="" style="display:block;border:0;width:20px;height:20px"></td></tr>
+  <tr><td style="background:#F1F2F3;font-size:0;line-height:0">&nbsp;</td><td style="background:#F1F2F3;padding:0"><div style="text-align:center;padding-left:10px;font-size:32px;line-height:40px;font-weight:600;letter-spacing:10px;font-variant-numeric:tabular-nums;color:#202837">{{ .Token }}</div></td><td style="background:#F1F2F3;font-size:0;line-height:0">&nbsp;</td></tr>
+  <tr><td width="20" height="20" style="width:20px;height:20px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-code-bl.png" width="20" height="20" alt="" style="display:block;border:0;width:20px;height:20px"></td><td height="20" style="height:20px;background:#F1F2F3;font-size:0;line-height:0">&nbsp;</td><td width="20" height="20" style="width:20px;height:20px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-code-br.png" width="20" height="20" alt="" style="display:block;border:0;width:20px;height:20px"></td></tr>
+</table>
+            <p style="margin:24px 0 0;font-size:14px;line-height:22px;color:#202837">Or click <a href="{{ .ConfirmationURL }}" style="color:#2C7BE2;font-weight:500;text-decoration:none">this link</a> to sign in right away.</p>
+            <p style="margin:32px 0 0;padding-top:20px;border-top:1px solid #F1F2F3;font-size:12px;line-height:18px;color:#8C9199">This code expires in 1 hour. If you didn't request it, you can safely ignore this email.</p>
+</td><td style="background:#FFFFFF;border-right:1px solid #E9EBED;font-size:0;line-height:0">&nbsp;</td></tr>
+  <tr><td width="26" height="26" style="width:26px;height:26px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-card-bl.png" width="26" height="26" alt="" style="display:block;border:0;width:26px;height:26px"></td><td height="25" style="height:25px;background:#FFFFFF;border-bottom:1px solid #E9EBED;font-size:0;line-height:0">&nbsp;</td><td width="26" height="26" style="width:26px;height:26px;font-size:0;line-height:0;vertical-align:top"><img src="https://ba-dream-iris.vercel.app/email/sq-card-br.png" width="26" height="26" alt="" style="display:block;border:0;width:26px;height:26px"></td></tr>
+</table>
+      </div>
+    </td>
+  </tr>
+</table>
