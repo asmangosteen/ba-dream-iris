@@ -309,12 +309,14 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <!-- 왼쪽 위: 파일 알약 -->
     <div class="sq float s pill-left">
       <div class="home-wrap">
-        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><img :src="BD_SYMBOL" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></button>
+        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><IrisLogo kind="symbol" :height="16" /><Icon name="chevron_down" :size="12" /></button>
         <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
           <NuxtLink to="/" class="sq menu-item" role="menuitem">프로젝트 홈으로</NuxtLink>
           <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">프로젝트 설정</button>
           <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">요구사항 보드</NuxtLink>
           <NuxtLink to="/design-system" class="sq menu-item" role="menuitem">디자인 시스템</NuxtLink>
+          <div class="psep" role="separator" />
+          <ThemeSwitch />
         </div>
       </div>
       <span class="tx-head ellipsis">{{ project.data.value?.name ?? '' }}</span>
@@ -456,7 +458,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
 .pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 4; }
 .home-wrap { position: relative; flex: none; }
-.pmenu { left: 0; right: auto; width: 180px; }
+.psep { height: 1px; margin: var(--ref-spacing-02) 0; background: var(--iris-line); }
+.pmenu { left: 0; right: auto; width: 232px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }

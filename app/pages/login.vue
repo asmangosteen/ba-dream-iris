@@ -69,9 +69,9 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 <template>
   <div class="page">
     <section class="side">
-      <header class="logo"><img :src="BD_SYMBOL" alt="" height="16" onerror="this.remove()"><span>Iris</span></header>
 
       <form class="form" novalidate @submit.prevent="submit">
+        <IrisLogo kind="horizontal" :height="44" class="brand" />
         <div class="head">
           <h1 class="tx-title">{{ step === 'email' ? '로그인' : '메일을 확인해주세요' }}</h1>
           <p class="tx-meta m0">
@@ -156,7 +156,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 <style scoped>
 .page { min-height: 100vh; display: grid; grid-template-columns: minmax(400px, 520px) 1fr; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
 .side { display: flex; flex-direction: column; padding: var(--ref-spacing-14) var(--ref-spacing-20); box-sizing: border-box; min-height: 100vh; }
-.logo { display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.brand { margin-bottom: var(--ref-spacing-12); }
 .form { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--ref-spacing-10); width: 100%; max-width: 360px; margin: 0 auto; }
 .head { display: flex; flex-direction: column; gap: var(--ref-spacing-02); margin-bottom: var(--ref-spacing-04); }
 .who { font-weight: 500; color: var(--sys-color-neutral-700); }
@@ -172,15 +172,15 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 .fr { display: flex; flex-direction: column; gap: 6px; }
 .fl { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
 .fr.on .fl { color: var(--sys-color-brand-primary-default); font-weight: 500; }
-.sheet { width: 188px; height: 408px; box-sizing: border-box; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); padding: 36px 14px 0; display: flex; flex-direction: column; gap: 8px; position: relative; }
+.sheet { width: 188px; height: 408px; box-sizing: border-box; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); padding: 36px 14px 0; display: flex; flex-direction: column; gap: 8px; position: relative; }
 .fr.on .sheet { box-shadow: 0 0 0 1.5px var(--sys-color-brand-primary-default), 0 1px 3px rgb(3 9 26 / 6%); }
-.b { display: block; height: 8px; border-radius: 4px; background: var(--sys-color-neutral-200); }
-.b.dark { height: 12px; background: var(--sys-color-neutral-700); }
+.b { display: block; height: 8px; border-radius: 4px; background: #F1F2F3; } /* 종이(화면) 안은 다크모드에서도 밝은 그대로 */
+.b.dark { height: 12px; background: #454C58; }
 .b.light { background: rgb(255 255 255 / 70%); }
 .w40 { width: 40%; } .w50 { width: 50%; } .w60 { width: 60%; } .w70 { width: 70%; } .w80 { width: 80%; }
-.card { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; height: 84px; margin: 6px 0; padding: 12px; box-sizing: border-box; border-radius: 10px; background: var(--sys-color-neutral-100); }
-.card.blue { background: var(--sys-color-brand-primary-default); }
-.tab { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; box-shadow: inset 0 1px 0 var(--iris-line-strong); }
+.card { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; height: 84px; margin: 6px 0; padding: 12px; box-sizing: border-box; border-radius: 10px; background: #F6F7F7; }
+.card.blue { background: #2C7BE2; }
+.tab { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; box-shadow: inset 0 1px 0 var(--iris-paper-line); }
 .insp { position: absolute; right: 48px; top: 50%; transform: translateY(-50%); width: 248px; padding: var(--ref-spacing-08); box-sizing: border-box; border-radius: var(--ref-radius-07); background: var(--sys-color-common-white-emphasis); box-shadow: 0 0 0 1px var(--ref-color-gray-900-10), 0 6px 16px rgb(3 9 26 / 6%); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .ih { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .badge { padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-weight: 500; }

@@ -145,3 +145,41 @@ button:active{cursor:grabbing}
 .menu-item:focus-visible{outline-offset:-2px}
 .ib:disabled,.act:disabled,.menu-item:disabled{opacity:.45;cursor:default}
 @media (prefers-reduced-motion: reduce){*{transition-duration:0s!important}}
+
+
+/* ============================================================
+   다크모드 — 디자인 시스템에 다크 토큰이 없어서 회색 단계 · 선 · 상호작용 색을 다크용으로 바꿔 끼웁니다.
+   sys 토큰이 이 ref 를 가리키므로 컴포넌트 · Iris 부품이 함께 바뀝니다.
+   캔버스 위 화면(실제 디자인 결과물)은 --iris-paper 로 늘 흰색입니다.
+   모드: <html data-theme="dark|light">, 없으면 기기 설정(prefers-color-scheme)
+   ============================================================ */
+:root{--iris-paper:#FFFFFF;--iris-paper-line:rgb(3 9 26 / 10%)}
+:root[data-theme="dark"]{
+  --ref-color-gray-0:#1B2029;--ref-color-gray-50:#171B22;--ref-color-gray-100:#101318;--ref-color-gray-200:#252B35;--ref-color-gray-300:#343B47;--ref-color-gray-400:#4B5361;--ref-color-gray-500:#8C9199;--ref-color-gray-600:#A7ACB4;--ref-color-gray-700:#C3C7CD;--ref-color-gray-800:#E6E8EB;--ref-color-gray-900:#F6F7F7;--ref-color-gray-1000:#FFFFFF;
+  --ref-color-gray-900-2:rgb(255 255 255 / 2%);--ref-color-gray-900-5:rgb(255 255 255 / 6%);--ref-color-gray-900-10:rgb(255 255 255 / 10%);--ref-color-gray-900-20:rgb(255 255 255 / 18%);--ref-color-gray-900-40:rgb(255 255 255 / 36%);--ref-color-gray-900-60:rgb(255 255 255 / 56%);--ref-color-gray-900-80:rgb(255 255 255 / 78%);
+  --interaction-light-gray-hover:rgb(255 255 255 / 6%);--interaction-light-gray-pressed:rgb(255 255 255 / 11%);--interaction-gray-hover:rgb(255 255 255 / 14%);--interaction-gray-pressed:rgb(255 255 255 / 24%);
+  --ref-color-blue-50:#16263D;--ref-color-blue-100:#1B3352;--sys-color-brand-primary-default:#3D8AEE;
+  --iris-float-shadow:drop-shadow(0 1px 2px rgb(0 0 0 / 30%)) drop-shadow(0 8px 20px rgb(0 0 0 / 28%));
+  --dimmed-bg:rgb(0 0 0 / 60%);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ref-color-gray-0:#1B2029;--ref-color-gray-50:#171B22;--ref-color-gray-100:#101318;--ref-color-gray-200:#252B35;--ref-color-gray-300:#343B47;--ref-color-gray-400:#4B5361;--ref-color-gray-500:#8C9199;--ref-color-gray-600:#A7ACB4;--ref-color-gray-700:#C3C7CD;--ref-color-gray-800:#E6E8EB;--ref-color-gray-900:#F6F7F7;--ref-color-gray-1000:#FFFFFF;
+  --ref-color-gray-900-2:rgb(255 255 255 / 2%);--ref-color-gray-900-5:rgb(255 255 255 / 6%);--ref-color-gray-900-10:rgb(255 255 255 / 10%);--ref-color-gray-900-20:rgb(255 255 255 / 18%);--ref-color-gray-900-40:rgb(255 255 255 / 36%);--ref-color-gray-900-60:rgb(255 255 255 / 56%);--ref-color-gray-900-80:rgb(255 255 255 / 78%);
+  --interaction-light-gray-hover:rgb(255 255 255 / 6%);--interaction-light-gray-pressed:rgb(255 255 255 / 11%);--interaction-gray-hover:rgb(255 255 255 / 14%);--interaction-gray-pressed:rgb(255 255 255 / 24%);
+  --ref-color-blue-50:#16263D;--ref-color-blue-100:#1B3352;--sys-color-brand-primary-default:#3D8AEE;
+  --iris-float-shadow:drop-shadow(0 1px 2px rgb(0 0 0 / 30%)) drop-shadow(0 8px 20px rgb(0 0 0 / 28%));
+  --dimmed-bg:rgb(0 0 0 / 60%);
+  color-scheme:dark;
+  }
+}
+html,body{background:var(--iris-canvas)}
+
+/* 다크모드: 색 위에 얹는 글자(파란 버튼 등)는 흰색 그대로 — DS 가 흰 바탕과 흰 글자에 같은 토큰을 써서 따로 고정합니다 */
+:root[data-theme="dark"] :is(.bd-button[data-type=primary],.bd-button[data-type=destructed],.bd-button[data-type=tertiary][data-on=dark],.bd-icon-button[data-type=primary],.bd-icon-button[data-type=destructed],.bd-icon-button[data-type=tertiary][data-icon-color=white],.bd-badge[data-type=solid],.bd-chip[data-type=filled][data-selected=true]){--bd-btn-fg:#FFFFFF;--bd-ib-fg:#FFFFFF;--bd-badge-fg:#FFFFFF;--bd-chip-fg:#FFFFFF}
+:root[data-theme="dark"] :is(.bd-spinner[data-tone=on-fill],.bd-checkbox__box,.bd-text-input__button,.bd-fu-action[data-state=default],.bd-date-cell[data-type=pinned],.act.pri,.rail-btn.on){color:#FFFFFF}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) :is(.bd-button[data-type=primary],.bd-button[data-type=destructed],.bd-button[data-type=tertiary][data-on=dark],.bd-icon-button[data-type=primary],.bd-icon-button[data-type=destructed],.bd-icon-button[data-type=tertiary][data-icon-color=white],.bd-badge[data-type=solid],.bd-chip[data-type=filled][data-selected=true]){--bd-btn-fg:#FFFFFF;--bd-ib-fg:#FFFFFF;--bd-badge-fg:#FFFFFF;--bd-chip-fg:#FFFFFF}
+  :root:not([data-theme="light"]) :is(.bd-spinner[data-tone=on-fill],.bd-checkbox__box,.bd-text-input__button,.bd-fu-action[data-state=default],.bd-date-cell[data-type=pinned],.act.pri,.rail-btn.on){color:#FFFFFF}
+}

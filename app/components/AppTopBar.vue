@@ -77,8 +77,7 @@ async function signOut(scope: 'local' | 'global' = 'local') {
 <template>
   <div class="sq float s bar left">
     <NuxtLink to="/" class="brand" aria-label="Iris 홈">
-      <img :src="BD_SYMBOL" alt="" height="13" onerror="this.remove()">
-      <span>Iris</span>
+      <IrisLogo kind="horizontal" :height="18" />
     </NuxtLink>
     <nav aria-label="주 메뉴" class="seg">
       <NuxtLink v-for="n in nav" :key="n.to" :to="n.to" :class="['sq', 'seg-item', { on: isOn(n.to) }]">{{ n.label }}</NuxtLink>
@@ -107,6 +106,8 @@ async function signOut(scope: 'local' | 'global' = 'local') {
           <span class="tx-head ellipsis">{{ me?.name || '이름 없음' }}</span>
           <span class="tx-meta ellipsis">{{ email }}</span>
         </div>
+        <div class="sep" role="separator" />
+        <ThemeSwitch />
         <div class="sep" role="separator" />
         <button type="button" role="menuitem" class="menu-item" tabindex="-1" @click="openProfile">
           <Icon name="pencil" :size="14" color="var(--sys-color-neutral-600)" />프로필 고치기

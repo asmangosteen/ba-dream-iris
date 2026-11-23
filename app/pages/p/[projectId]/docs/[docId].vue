@@ -389,17 +389,17 @@ async function removeDoc() {
 .frame-col.lit .frame-label { color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .frame-page { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); }
 /* 375 × 812 화면을 176 폭으로 줄인 틀 (썸네일 전까지 자리만) */
-.frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 2px; overflow: hidden; background: var(--sys-color-common-white-default); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
+.frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 2px; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
 .frame-col:hover .frame { outline-color: var(--ref-color-gray-900-20); }
 .frame-col.lit .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .frame-col:focus-visible { outline: none; }
 .frame-col:focus-visible .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .f-status { display: block; height: 26px; }
-.f-title { display: block; padding: 0 9px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--sys-color-common-black-default); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-title { display: block; padding: 0 9px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: #03091A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-body { display: flex; flex-direction: column; gap: 6px; padding: 0 9px; }
-.f-bar { height: 22px; border-radius: 6px; background: var(--sys-color-neutral-100); }
-.f-card { height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
-.f-cta { position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: var(--sys-color-brand-primary-default); }
+.f-bar { height: 22px; border-radius: 6px; background: #F6F7F7; }
+.f-card { height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--iris-paper-line); }
+.f-cta { position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: #2C7BE2; }
 
 .doc { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); z-index: 3; width: 600px; max-width: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
 .doc-tabs { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06); box-shadow: 0 1px 0 var(--iris-line); }

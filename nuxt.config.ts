@@ -9,6 +9,7 @@ export default defineNuxtConfig({
       htmlAttrs: { lang: 'ko' },
       title: 'Iris',
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
+      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/logo/iris-symbol.svg' }],
     },
   },
   // 로그인 · 도메인 확인은 app/middleware/auth.global.ts 한 곳에서 합니다

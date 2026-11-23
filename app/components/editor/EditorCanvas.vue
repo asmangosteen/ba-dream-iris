@@ -463,7 +463,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
 <style scoped>
 .canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
-.frame { position: absolute; pointer-events: auto; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
+.frame { position: absolute; pointer-events: auto; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
 .overlay { position: absolute; inset: 0; pointer-events: none; }

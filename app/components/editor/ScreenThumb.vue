@@ -46,5 +46,5 @@ onBeforeUnmount(() => ro?.disconnect())
 <style scoped>
 .sthumb { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sthumb img { width: 100%; display: block; }
-.page { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--sys-color-common-white-default); }
+.page { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--iris-paper); }
 </style>
