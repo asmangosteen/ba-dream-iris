@@ -17,7 +17,7 @@ const count = (k: string) => (projects.value ?? []).filter((p) => k === 'all' ||
 const newOpen = ref(false)
 const settingsId = ref<string | null>(null)
 const settingsOpen = computed({ get: () => !!settingsId.value, set: (v) => { if (!v) settingsId.value = null } })
-const { data: covers } = useProjectCovers()
+const { data: covers, status: coverStatus } = useProjectCovers()
 function createProject() { newOpen.value = true }
 </script>
 
@@ -58,7 +58,7 @@ function createProject() { newOpen.value = true }
         />
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
-            <span class="sq thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span>
+            <span class="sq thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="ghost" /><span class="tx-meta">아직 화면이 없어요</span></span></span>
             <button class="ib more" :aria-label="`${p.name} 설정`" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
@@ -83,6 +83,12 @@ function createProject() { newOpen.value = true }
 .card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
 .thumb { height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .sq-clip-inner { position: absolute; inset: 12px 24% 0; overflow: hidden; border-radius: 6px 6px 0 0; box-shadow: 0 0 0 1px var(--iris-line); }
+.no-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-06); }
+.ghost { width: 44px; height: 72px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); background: var(--sys-color-common-white-default); }
+.proj:focus-visible { outline: 0; }
+.proj:focus-visible .thumb { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
+.proj:hover .name { color: var(--sys-color-neutral-900, var(--sys-color-neutral-800)); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--ref-color-gray-900-20); }
+.thumb { transition: box-shadow .12s ease; }
 .more { position: absolute; top: var(--ref-spacing-04); right: var(--ref-spacing-04); opacity: 0; --sq-fill: var(--sys-color-common-white-emphasis); }
 .proj:hover .more, .more:focus-visible { opacity: 1; }
 .proj:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }

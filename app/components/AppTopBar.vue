@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Avatar, Icon } from '@ba-dream/design-system'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import AppProfileModal from '~/components/app/ProfileModal.vue'
 import { useMe } from '~/composables/useMembers'
@@ -9,7 +9,6 @@ const user = useSupabaseUser()
 const { data: me } = useMe()
 const email = computed(() => me.value?.email ?? user.value?.email ?? '')
 const displayName = computed(() => me.value?.name || email.value)
-const initial = computed(() => (displayName.value || '?').slice(0, 1).toUpperCase())
 const nav = [
   { to: '/', label: '프로젝트' },
   { to: '/requirements', label: '요구사항' },
@@ -86,10 +85,10 @@ async function signOut(scope: 'local' | 'global' = 'local') {
     </nav>
   </div>
   <div class="sq float s bar right">
-    <button class="field search" type="button" aria-keyshortcuts="Meta+K Control+K" @click="paletteOpen = true">
-      <Icon name="search" :size="14" />
-      <span>검색</span>
-      <kbd class="num">⌘K</kbd>
+    <button class="search" type="button" aria-keyshortcuts="Meta+K Control+K" aria-label="프로젝트 · 화면 · 문서 · 요구사항 검색" @click="paletteOpen = true">
+      <Icon name="search" :size="14" color="var(--sys-color-neutral-500)" />
+      <span class="ph">검색</span>
+      <kbd class="key">⌘K</kbd>
     </button>
     <div ref="accountEl" class="account">
       <button
@@ -102,7 +101,7 @@ async function signOut(scope: 'local' | 'global' = 'local') {
         :aria-label="`계정 메뉴 · ${displayName}`"
         @click="toggleMenu()"
         @keydown="onAvatarKey"
-      >{{ initial }}</button>
+      ><Avatar :alt="displayName" :size="24" /></button>
       <div v-if="menuOpen" id="accountMenu" ref="menuEl" class="menu acct-menu" role="menu" aria-label="계정" @keydown="onMenuKey">
         <div class="who">
           <span class="tx-head ellipsis">{{ me?.name || '이름 없음' }}</span>
@@ -127,17 +126,23 @@ async function signOut(scope: 'local' | 'global' = 'local') {
 
 <style scoped>
 .bar { position: absolute; top: var(--iris-gap); height: 40px; box-sizing: border-box; display: flex; align-items: center; z-index: 3; }
-.left { left: var(--iris-gap); gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); }
-.right { right: var(--iris-gap); gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04); }
-.brand { display: flex; align-items: center; gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-04); font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-common-black-default); }
-.search { min-width: 200px; color: var(--sys-color-neutral-500); }
-.search span { flex: 1; text-align: left; }
-.search:hover { --sq-overlay: var(--interaction-light-gray-hover); }
+.left { left: var(--iris-gap); gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); }
+.right { right: var(--iris-gap); gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-04); }
+.brand { display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); border-radius: var(--ref-radius-03); }
+.brand:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+/* 검색 열기: 디자인 시스템 Search Field(contained · S)와 같은 생김새 — 누르면 ⌘K 검색 창이 열려요 */
+.search { display: flex; align-items: center; gap: var(--ref-spacing-04); width: 240px; height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); text-align: left; transition: background-color .12s ease, box-shadow .12s ease; }
+.search:hover { background: var(--sys-color-neutral-200); }
+.search:active { background: var(--sys-color-neutral-300); }
+.search:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.ph { flex: 1; min-width: 0; font-size: 12px; line-height: 18px; }
+.key { flex: none; padding: 0 var(--ref-spacing-02); min-width: 20px; height: 18px; box-sizing: border-box; display: inline-grid; place-items: center; border-radius: var(--ref-radius-02); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10), 0 1px 0 var(--ref-color-gray-900-10); font-family: var(--font-family-base); font-size: 10px; line-height: 16px; font-weight: 500; color: var(--sys-color-neutral-600); }
 .account { position: relative; display: flex; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; text-align: center; }
-.avatar:hover, .avatar[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--sys-color-common-white-default), 0 0 0 3px var(--ref-color-gray-900-20); }
-.avatar:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--sys-color-common-white-default), 0 0 0 3px var(--sys-color-brand-primary-default); }
-.acct-menu { left: auto; right: 0; top: calc(100% + 10px); width: 220px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; transition: background-color .12s ease; }
+.avatar:hover, .avatar[aria-expanded='true'] { background: var(--interaction-light-gray-hover); }
+.avatar:active { background: var(--interaction-light-gray-pressed); }
+.avatar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 0; }
+.acct-menu { left: auto; right: 0; top: calc(100% + 8px); width: 232px; }
 .who { display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-06); min-width: 0; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sep { height: 1px; margin: var(--ref-spacing-02) 0; background: var(--iris-line); }

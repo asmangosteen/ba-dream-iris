@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, TextInput } from '@ba-dream/design-system'
 import { KIND_INFO, type ProjectKind } from '~/composables/useProjectActions'
 import { STATUS_LABEL, type ProjectStatus } from '~/composables/useProjects'
 
@@ -89,12 +89,10 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
         </header>
 
         <form class="body" @submit.prevent="submit">
-          <label for="projName" class="tx-head">이름</label>
-          <span class="sq field m"><input id="projName" v-model="name" placeholder="예: 착한구독 신청 플로우 개편" maxlength="60"></span>
+          <TextInput v-model:value="name" size="s" label="이름" placeholder="예: 착한구독 신청 플로우 개편" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projName', maxlength: 60 }" :label-props="{ htmlFor: 'projName' }" />
 
           <template v-if="editing">
-            <label for="projDesc" class="tx-head mt">설명</label>
-            <span class="sq field m"><input id="projDesc" v-model="description" placeholder="무엇을 바꾸는 프로젝트인지 한 줄로" maxlength="120"></span>
+            <TextInput v-model:value="description" class="mt" size="s" label="설명" placeholder="무엇을 바꾸는 프로젝트인지 한 줄로" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projDesc', maxlength: 120 }" :label-props="{ htmlFor: 'projDesc' }" />
           </template>
 
           <span class="tx-head mt">종류</span>
@@ -121,17 +119,17 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
         <div v-if="editing" class="danger-zone">
           <template v-if="!confirmDelete">
             <span class="tx-meta">프로젝트를 지우면 페이지 · 화면 · 문서 · 요구사항이 모두 함께 지워져요.</span>
-            <button type="button" class="act line red" @click="confirmDelete = true"><Icon name="trashbin" :size="12" />지우기</button>
+            <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">지우기</Button>
           </template>
           <template v-else>
             <span class="tx-meta red">정말 지울까요? 되돌릴 수 없어요.</span>
-            <span class="row"><button type="button" class="act gray" @click="confirmDelete = false">취소</button><button type="button" class="act line red" :disabled="busy" @click="remove">지우기</button></span>
+            <span class="row"><Button size="s" type="tertiary" @click="confirmDelete = false">취소</Button><Button size="s" type="destructed" :loading="busy" @click="remove">지우기</Button></span>
           </template>
         </div>
 
         <footer class="foot">
-          <button type="button" class="act m gray" @click="close">취소</button>
-          <button type="button" class="act m pri" :disabled="busy" @click="submit">{{ editing ? '저장' : '만들기' }}</button>
+          <Button size="m" type="tertiary" class="w" @click="close">취소</Button>
+          <Button size="m" type="primary" class="w" :loading="busy" :disabled="!name.trim()" @click="submit">{{ editing ? '저장' : '만들기' }}</Button>
         </footer>
       </section>
     </div>
@@ -158,5 +156,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 .row { display: flex; gap: var(--ref-spacing-04); flex: none; }
 .red { color: var(--sys-color-theme-error-default); }
 .foot { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
-.act:disabled { opacity: .5; cursor: default; }
+.w { width: 100%; }
+.kind:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.mt { margin-top: var(--ref-spacing-06); }
 </style>

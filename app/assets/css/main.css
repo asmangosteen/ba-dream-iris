@@ -134,3 +134,14 @@ button:active{cursor:grabbing}
 .field input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;font-family:var(--font-family-base);font-size:12px;color:var(--sys-color-neutral-800)}
 .field input::placeholder{color:var(--sys-color-neutral-500)}
 .tx-panel{font-size:14px;line-height:22px;font-weight:600;color:var(--sys-color-neutral-800)}
+
+/* ============================================================
+   인터랙션 — 디자인 시스템과 같은 hover · 눌림 · 키보드 포커스 (컴포넌트로 못 바꾼 Iris 부품)
+   ============================================================ */
+.seg-item,.nav-item,.menu-item,.ib,.rail-btn,.act,.dd,.hov{transition:background-color .12s ease,color .12s ease,box-shadow .12s ease}
+.sq::before,.ib::before,.seg-item::before,.rail-btn::before,.menu-item::before,.act::before,.dd::before{transition:background-color .12s ease}
+.seg-item:active,.nav-item:active,.menu-item:active,.ib:active,.rail-btn:not(.on):active{--sq-overlay:var(--interaction-light-gray-pressed)}
+.seg-item:focus-visible,.nav-item:focus-visible,.menu-item:focus-visible,.ib:focus-visible,.rail-btn:focus-visible,.act:focus-visible,.dd:focus-visible,.hov:focus-visible{outline:2px solid var(--sys-color-brand-primary-default);outline-offset:1px}
+.menu-item:focus-visible{outline-offset:-2px}
+.ib:disabled,.act:disabled,.menu-item:disabled{opacity:.45;cursor:default}
+@media (prefers-reduced-motion: reduce){*{transition-duration:0s!important}}

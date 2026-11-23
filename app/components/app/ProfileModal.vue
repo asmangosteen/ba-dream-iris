@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, TextInput } from '@ba-dream/design-system'
 import { ROLE_LABEL, useMe, useUpdateMe, type MemberRole, type MemberRow } from '~/composables/useMembers'
 
 /** 내 프로필(이름 · 역할) 고치기. v-model:open 으로 엽니다 */
@@ -101,10 +101,7 @@ function onRoleKey(e: KeyboardEvent) {
 
         <form class="content" @submit.prevent="save">
           <div class="col6">
-            <label for="profileName" class="tx-head">이름</label>
-            <span class="field m">
-              <input id="profileName" v-model="name" :maxlength="MAX_NAME" autocomplete="name" placeholder="팀에서 부르는 이름" :aria-invalid="!!error && !trimmed">
-            </span>
+            <TextInput v-model:value="name" size="s" label="이름" placeholder="팀에서 부르는 이름" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :destructed="!!error && !trimmed" :input-props="{ id: 'profileName', maxlength: MAX_NAME, autocomplete: 'name' }" :label-props="{ htmlFor: 'profileName' }" />
           </div>
           <div class="col6">
             <span class="tx-head">메일</span>
@@ -130,8 +127,8 @@ function onRoleKey(e: KeyboardEvent) {
         </form>
 
         <div class="foot">
-          <button type="button" class="act m gray grow1" @click="close">취소</button>
-          <button type="button" class="act m pri grow2" :disabled="!canSave" @click="save">{{ saving ? '저장하는 중' : '저장' }}</button>
+          <Button size="m" type="tertiary" class="grow1" @click="close">취소</Button>
+          <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave" @click="save">저장</Button>
         </div>
       </section>
     </div>
