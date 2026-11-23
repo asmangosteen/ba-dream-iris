@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon, TextButton } from '@ba-dream/design-system'
 import type { PageRow, PageSettings } from '~/composables/useEditor'
+import ColorField from '~/components/editor/ColorField.vue'
 
 /**
  * 오른쪽 패널 · 아무것도 고르지 않았을 때(피그마의 Page 패널): 페이지 이름 · 캔버스 배경색 · 픽셀 격자 · 확대 · 스타일 바로가기
@@ -11,6 +12,20 @@ const { tokens } = useDesignSystem()
 
 const bg = computed(() => props.page.viewport?.background ?? null)
 const hex = computed(() => (bg.value && /^#[0-9a-f]{6}$/i.test(bg.value) ? bg.value : '#F6F7F7'))
+// 색 판을 끄는 동안은 화면에만 바로 보이고, 잠시 멈추면(또는 창을 닫으면) 저장해요
+const live = ref<string | null>(null)
+let bgTimer: ReturnType<typeof setTimeout> | undefined
+function liveBg(v: string) {
+  live.value = v.slice(0, 7).toUpperCase()
+  clearTimeout(bgTimer)
+  bgTimer = setTimeout(flushBg, 250)
+}
+function flushBg() {
+  clearTimeout(bgTimer)
+  if (live.value && live.value !== bg.value) emit('settings', { background: live.value })
+  live.value = null
+}
+onBeforeUnmount(flushBg)
 const PRESETS = ['#F6F7F7', '#E5E5E5', '#FFFFFF', '#1E1E1E', '#101318']
 function setHex(e: Event) {
   let v = (e.target as HTMLInputElement).value.trim()
@@ -40,7 +55,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         </button>
       </div>
       <div v-if="bg" class="color-row">
-        <label class="sq fld"><input type="color" class="swatch" :value="hex" aria-label="Canvas background color" @change="emit('settings', { background: ($event.target as HTMLInputElement).value.toUpperCase() })"><input :value="bg.toUpperCase()" aria-label="Background color value" @change="setHex" @keydown="blur"></label>
+        <label class="sq fld"><ColorField :model-value="live ?? hex" label="Canvas background color" @update:model-value="liveBg" @close="flushBg" /><input :key="bg" :value="(live ?? bg).toUpperCase()" aria-label="Background color value" @change="setHex" @keydown="blur"></label>
       </div>
       <p v-else class="tx-meta m0">Default background that follows the theme (light or dark)</p>
       <div class="presets" role="group" aria-label="Common backgrounds">

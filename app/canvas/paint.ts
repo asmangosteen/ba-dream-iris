@@ -21,9 +21,10 @@ export function paintLayer(p: Paint, color: ColorFn, img: ImgFn): { image: strin
     const c = alpha(color(p.color) ?? p.color, p.opacity)
     return { image: `linear-gradient(${c}, ${c})`, size: 'auto', position: '0 0', repeat: 'no-repeat' }
   }
-  if (p.type === 'linear' || p.type === 'radial') {
+  if (p.type === 'linear' || p.type === 'radial' || p.type === 'angular') {
     const stops = [...p.stops].sort((a, b) => a.pos - b.pos).map((s) => `${alpha(color(s.color) ?? s.color, p.opacity)} ${Math.round(s.pos * 1000) / 10}%`).join(', ')
-    return { image: p.type === 'linear' ? `linear-gradient(${p.angle ?? 180}deg, ${stops})` : `radial-gradient(farthest-side, ${stops})`, size: 'auto', position: '0 0', repeat: 'no-repeat' }
+    const image = p.type === 'linear' ? `linear-gradient(${p.angle ?? 180}deg, ${stops})` : p.type === 'radial' ? `radial-gradient(farthest-side, ${stops})` : `conic-gradient(from ${p.angle ?? 0}deg, ${stops})`
+    return { image, size: 'auto', position: '0 0', repeat: 'no-repeat' }
   }
   if (p.type !== 'image') return null
   const url = img(p.src)

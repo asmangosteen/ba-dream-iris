@@ -11,7 +11,7 @@ import InspectorScreens from '~/components/editor/InspectorScreens.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
-import { uploadImage } from '~/canvas/images'
+import { isMediaFile, isVideoFile, mediaLimit, uploadImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
@@ -358,31 +358,37 @@ async function onImageFile(e: Event) {
  * 이미지 넣기(도구 · 끌어 놓기 · 붙여넣기 공용). at 이 있으면 그 캔버스 좌표에, 없으면 고른 화면 가운데(없으면 보이는 캔버스 가운데)에.
  * at 이 Iris 화면 위면 그 화면 안으로, 아니면 캔버스 위로 들어가요.
  */
-async function insertImage(file: File, at?: { x: number; y: number }) {
-  if (!file.type.startsWith('image/')) return say('Only image files can be added')
-  if (file.size > 10 * 1024 * 1024) return say('Images must be smaller than 10MB')
+async function insertImage(file: File, at?: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
+  if (!isMediaFile(file)) return say('Only image or video files can be added')
+  if (file.size > mediaLimit(file)) return say(isVideoFile(file) ? 'Videos must be smaller than 50MB' : 'Images must be smaller than 10MB')
   const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
-  const s = (at ? hitScreen : current.value) ?? canvasScreen.value
+  const s = (place ? list.value.find((v) => v.id === place.sid) : null) ?? (at ? hitScreen : current.value) ?? canvasScreen.value
   if (!s) return
   try {
     const img = await uploadImage(file, s.id.replace(':', '-'), { supabase, preview })
     if (replaceId && !at) { const target = store.screenId.value ?? s.id; const id = replaceId; replaceId = null; store.update(target, [id], { src: img.src }); return }
     const onCanvas = isPageCanvas(s.id)
-    const k = onCanvas ? Math.min(1, 480 / img.w, 480 / img.h) : Math.min(1, (s.width * 0.7) / img.w, (s.height * 0.5) / img.h)
-    const w = Math.round(img.w * k), h = Math.round(img.h * k)
+    // 놓은 프레임 안이면 그 프레임 크기에 맞춰 줄여요
+    const parentId = place?.sid === s.id ? place.parentId : null
+    const pn = parentId ? store.node(s.id, parentId) : null
+    const box = pn ? { w: pn.w, h: pn.h } : onCanvas ? null : { w: s.width, h: s.height }
+    const k = box ? Math.min(1, (box.w * 0.9) / img.w, (box.h * 0.9) / img.h) : Math.min(1, 480 / img.w, 480 / img.h)
+    const w = Math.max(1, Math.round(img.w * k)), h = Math.max(1, Math.round(img.h * k))
     let cx: number, cy: number
-    if (at) { cx = Math.round(at.x - s.x); cy = Math.round(at.y - s.y) }
+    if (at) { cx = Math.round(at.x - (onCanvas ? 0 : s.x)); cy = Math.round(at.y - (onCanvas ? 0 : s.y)) }
     else if (onCanvas) { cx = Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom); cy = Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
     else { cx = Math.round(s.width / 2); cy = Math.round(s.height / 2) }
-    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: cx - Math.round(w / 2), y: cy - Math.round(h / 2), w, h, lockRatio: true })
+    const p0 = parentId ? store.absPos(s.id, parentId) : { x: 0, y: 0 }
+    const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || (img.video ? 'Video' : 'Image')
+    store.add(s.id, parentId, { type: 'image', name, src: img.src, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true })
     tab.value = 'design'
-  } catch { say('Couldn\'t upload the image. Try again') }
+  } catch { say(isVideoFile(file) ? 'Couldn\'t upload the video. Try again' : 'Couldn\'t upload the image. Try again') }
 }
-/** 캔버스에 파일 끌어 놓기 */
-async function onDropFiles(files: File[], at: { x: number; y: number }) {
-  const imgs = files.filter((f) => f.type.startsWith('image/'))
-  if (!imgs.length) return say('Only image files (PNG, JPG, SVG…) can be added')
-  for (const [i, f] of imgs.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 })
+/** 캔버스에 파일 끌어 놓기: 이미지 · 영상. 놓은 화면 · 프레임 안으로 */
+async function onDropFiles(files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
+  const media = files.filter(isMediaFile)
+  if (!media.length) return say('Only image or video files (PNG, JPG, SVG, MP4…) can be added')
+  for (const [i, f] of media.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 }, place)
 }
 /** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
 function onPaste(e: ClipboardEvent) {
@@ -634,7 +640,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       <Transition name="toast"><div v-if="toast" class="sq toast">{{ toast }}</div></Transition>
     </div>
 
-    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
+    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
     <AppCommandPalette />
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />

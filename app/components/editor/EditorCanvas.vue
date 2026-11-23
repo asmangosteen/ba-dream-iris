@@ -10,6 +10,8 @@ import CanvasRulers from '~/components/editor/CanvasRulers.vue'
 import { layerMenuItems, useLastCopy } from '~/composables/useLayerMenu'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
+import { GHOST_KEY } from '~/canvas/ghost'
+import { useImageSrc } from '~/canvas/images'
 
 /**
  * 무한 캔버스 + 화면 안 레이어 편집.
@@ -34,7 +36,8 @@ const emit = defineEmits<{
   hint: [text: string]
   /** 화면(프레임) 단위 동작 — 레이어를 고르지 않고 화면만 골랐을 때 */
   /** 캔버스에 파일을 끌어 놓았을 때(캔버스 좌표) */
-  'drop-files': [files: File[], at: { x: number; y: number }]
+  /** place: 놓은 자리의 화면(또는 캔버스) · 가장 안쪽 프레임 */
+  'drop-files': [files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }]
   'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx?: number, dy?: number]
   /** 가이드선 바뀜 */
   guides: [g: { x: number[]; y: number[] }]
@@ -167,6 +170,24 @@ function frameAt(sid: string, lx: number, ly: number, exclude?: Set<string>): st
  * 화면 밖(다른 화면 · 캔버스)으로 나가면 놓을 때 옮겨요(out)
  */
 const dragOut = ref<string | null>(null)
+const dragOutIds = ref<string[]>([])
+/**
+ * 화면 밖으로 끄는 레이어는 화면 자르기와 상관없이 맨 위에 따로 그려요(원래 자리는 숨김).
+ * 화면은 계속 잘린 채라 같은 화면의 다른 레이어(넘친 이미지 등)가 함께 딸려 나와 보이지 않아요
+ */
+const ghost = computed(() => {
+  const sid = dragOut.value
+  const s = sid ? props.screens.find((v) => v.id === sid) : null
+  if (!sid || !s) return null
+  const d = store.doc(sid)
+  const items = dragOutIds.value.filter((id) => d.nodes[id]).map((id) => {
+    const p = d.nodes[id]!.parentId
+    const o = p ? store.absPos(sid, p) : { x: 0, y: 0 }
+    return { id, x: o.x, y: o.y }
+  })
+  return { sid, x: s.x, y: s.y, items }
+})
+provide(GHOST_KEY, computed(() => (ghost.value ? { sid: ghost.value.sid, ids: new Set(dragOutIds.value) } : null)))
 function screenUnder(wx: number, wy: number) {
   return [...realScreens.value].reverse().find((v) => isNative(v) && wx >= v.x && wy >= v.y && wx <= v.x + v.width && wy <= v.y + v.height) ?? null
 }
@@ -177,10 +198,11 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
   const under = screenUnder(w.x, w.y)
   const out = isCanvas(sc) ? !!under : under?.id !== sc.id
   dg.out = out
-  dragOut.value = out && !isCanvas(sc) ? sc.id : null
-  if (out) return
   const d = store.doc(sc.id)
   const roots = dg.ids.filter((id) => !dg.ids.some((o) => o !== id && descendants(d, o).includes(id)))
+  dragOut.value = out && !isCanvas(sc) ? sc.id : null
+  dragOutIds.value = dragOut.value ? roots : []
+  if (out) return
   const ex = new Set(roots.flatMap((id) => descendants(d, id)))
   const target = frameAt(sc.id, w.x - sc.x, w.y - sc.y, ex)
   const moving = roots.filter((id) => d.nodes[id] && d.nodes[id]!.parentId !== target)
@@ -650,6 +672,7 @@ function end(e: PointerEvent) {
   }
   if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany') && d.moved) store.commit(d.sid, d.before)
   dragOut.value = null
+  dragOutIds.value = []
   // 화면 밖으로 끌어 놓기: 다른 화면 안으로, 아니면 캔버스 위로
   if (d.kind === 'layers' && d.moved && d.out) {
     const src = props.screens.find((v) => v.id === d.sid)
@@ -1082,11 +1105,39 @@ const singleHug = computed(() => {
 // 파일 끌어 놓기(이미지 · SVG)
 function onDragOver(e: DragEvent) { if (e.dataTransfer) e.dataTransfer.dropEffect = [...e.dataTransfer.types].includes('Files') ? 'copy' : 'none' }
 function onDrop(e: DragEvent) {
+  dropAt.value = null
   const files = [...(e.dataTransfer?.files ?? [])]
-  if (files.length) emit('drop-files', files, toWorld(e.clientX, e.clientY))
+  if (!files.length) return
+  const w = toWorld(e.clientX, e.clientY)
+  const t = dropTarget(w.x, w.y)
+  emit('drop-files', files, w, t ? { sid: t.sid, parentId: t.parentId } : undefined)
 }
+/**
+ * 이미지 · 영상 파일을 놓을 곳(피그마와 같아요): 포인터 아래 Iris 화면 → 그 안 가장 안쪽 프레임, 화면 밖이면 캔버스 위 프레임 · 캔버스.
+ * 피그마에서 가져온 화면 위는 넣을 수 없어서 캔버스 위로
+ */
+function dropTarget(wx: number, wy: number) {
+  const scr = screenUnder(wx, wy)
+  const target = scr ?? canvasDoc.value
+  if (!target) return null
+  const lx = scr ? wx - scr.x : wx, ly = scr ? wy - scr.y : wy
+  const parentId = frameAt(target.id, lx, ly)
+  return { sid: target.id, screen: scr, parentId }
+}
+/** 파일을 끌고 있는 동안 놓일 자리(화면 · 프레임) 테두리 */
+const dropAt = ref<Rect | null>(null)
+function onFileDragOver(e: DragEvent) {
+  if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return
+  const w = toWorld(e.clientX, e.clientY)
+  const t = dropTarget(w.x, w.y)
+  const sc = t ? props.screens.find((v) => v.id === t.sid) : null
+  const r = t && sc ? (t.parentId ? layerWorld(sc, t.parentId) : t.screen ? rectOf(t.screen) : null) : null
+  if (r?.x !== dropAt.value?.x || r?.y !== dropAt.value?.y || r?.w !== dropAt.value?.w || r?.h !== dropAt.value?.h) dropAt.value = r ?? null
+}
+function onDragLeave(e: DragEvent) { if (!e.relatedTarget || !el.value?.contains(e.relatedTarget as Node)) dropAt.value = null }
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
-const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color) : {})
+const frameImg = useImageSrc()
+const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color, frameImg) : {})
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' || tool.value === 'scale' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -1101,7 +1152,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @pointermove="move"
     @pointerup="end"
     @pointercancel="end"
-    @dragover.prevent="onDragOver"
+    @dragover.prevent="onDragOver($event); onFileDragOver($event)"
+    @dragleave="onDragLeave"
     @drop.prevent="onDrop"
     @contextmenu="onContext"
   >
@@ -1114,7 +1166,6 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         v-for="s in realScreens"
         :key="s.id"
         class="frame"
-        :class="{ out: dragOut === s.id }"
         role="button"
         tabindex="-1"
         :data-screen="s.id"
@@ -1133,6 +1184,14 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-if="canvasDoc" class="free" :data-screen="canvasDoc.id" @pointerdown.stop="start($event, canvasDoc)" @dblclick="onDbl($event, canvasDoc)">
         <LayerView v-for="id in canvasRoots.over" :key="id" :doc="store.doc(canvasDoc.id)" :id="id" :screen-id="canvasDoc.id" />
       </div>
+      <!-- 화면 밖으로 끄는 레이어: 잘리지 않게 맨 위에 -->
+      <div v-if="ghost" class="ghost" :style="{ left: ghost.x + 'px', top: ghost.y + 'px' }">
+        <div v-for="g in ghost.items" :key="g.id" class="ghost-at" :style="{ left: g.x + 'px', top: g.y + 'px' }">
+          <LayerView :doc="store.doc(ghost.sid)" :id="g.id" :screen-id="ghost.sid" ghost />
+        </div>
+      </div>
+      <!-- 파일 끌어 놓을 자리 -->
+      <div v-if="dropAt" class="drop-at" :style="{ left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
  <div v-if="draft && !marqueeOn" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
     </div>
 
@@ -1199,7 +1258,10 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }
 .frame { position: absolute; pointer-events: auto; background: var(--iris-paper); overflow: hidden; outline: none; }
 /* 피그마처럼 기본 테두리 · 그림자 없음. 마우스를 올리면 얇은 파란 선(확대와 상관없이 1px) */
-.frame.out { overflow: visible; z-index: 2; }
+.ghost { position: absolute; width: 0; height: 0; overflow: visible; pointer-events: none; z-index: 3; }
+.ghost-at { position: absolute; width: 0; height: 0; overflow: visible; }
+.ghost :deep(.ly) { pointer-events: none !important; }
+.drop-at { position: absolute; pointer-events: none; outline: calc(2px / var(--z, 1)) solid var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); z-index: 4; }
 .frame:hover { outline: calc(1px / var(--z, 1)) solid var(--iris-select); }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }

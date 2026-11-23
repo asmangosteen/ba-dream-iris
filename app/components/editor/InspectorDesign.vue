@@ -6,6 +6,8 @@ import { colorLabel, parseColor, type CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
+import InspectorPaints from '~/components/editor/InspectorPaints.vue'
+import ColorField from '~/components/editor/ColorField.vue'
 
 /** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기 · 모양(채우기 · 선 · 모서리 · 투명도 · 내용 자르기). 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
 const props = defineProps<{ screen: ScreenRow }>()
@@ -154,19 +156,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i />Clip content</button>
       </section>
 
-      <section class="s">
-        <div class="sec-h h24"><span>Fill</span><button v-if="!hasFill" class="ib s24" aria-label="Add fill" @click="fstyle({ fill: undefined })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="Remove fill" @click="fstyle({ fill: '' })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
-        <div v-if="hasFill" class="color-row">
-          <label class="sq fld"><input type="color" class="swatch" :value="hex(fillColor)" aria-label="Frame fill color" @change="fstyle({ fill: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('fill')" :key="'f' + fillColor" :value="colorText(fillColor)" aria-label="Frame fill value" @change="setHex('fill', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('fill')" label="Frame fill color" @pick="(t) => pickColor('fill', t)" @unbind="unbindKey('fill')" /></label>
-          <TokenPicker v-if="!vb('fill')" :kinds="['color']" label="Frame fill color" @pick="(t) => pickColor('fill', t)" />
-        </div>
-      </section>
+      <InspectorPaints :sid="screen.id" :ids="[]" kind="fill" title="Fill" frame />
 
       <section class="s">
         <div class="sec-h h24"><span>Stroke</span><button v-if="!hasStroke" class="ib s24" aria-label="Add stroke" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="Remove stroke" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
         <template v-if="hasStroke">
           <div class="color-row">
-            <label class="sq fld"><input type="color" class="swatch" :value="hex(look.stroke)" aria-label="Frame stroke color" @change="fstyle({ stroke: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="Frame stroke color value" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
+            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="Frame stroke color value" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
             <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
           </div>
           <div class="grid2">

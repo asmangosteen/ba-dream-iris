@@ -2,11 +2,13 @@
 import { frameCss, migrate } from '~/canvas/schema'
 import { LAYER_STORE, type LayerStore } from '~/canvas/store'
 import LayerView from '~/components/editor/LayerView.vue'
+import { useImageSrc } from '~/canvas/images'
 
 /** 화면 축소 미리보기(읽기 전용): 피그마 화면은 썸네일, Iris 화면은 레이어를 그대로 줄여서 그립니다. 너비에 맞추고 위쪽부터 보여요 */
 const props = defineProps<{ screen: { id: string; source: 'figma' | 'native'; width: number; height: number; thumbnail_path?: string | null; layers?: unknown } }>()
 const { tokens } = useDesignSystem()
 const doc = computed(() => migrate(props.screen.layers))
+const thumbImg = useImageSrc()
 
 // LayerView 가 쓰는 것만 담은 읽기 전용 저장소
 const stub = {
@@ -37,7 +39,7 @@ onBeforeUnmount(() => ro?.disconnect())
 <template>
   <div ref="el" class="sthumb" aria-hidden="true" inert>
     <img v-if="screen.source === 'figma' && screen.thumbnail_path" :src="screen.thumbnail_path" alt="">
-    <div v-else-if="scale" class="page" :style="{ width: screen.width + 'px', height: screen.height + 'px', transform: `scale(${scale})`, ...frameCss(doc.frame, stub.color) }">
+    <div v-else-if="scale" class="page" :style="{ width: screen.width + 'px', height: screen.height + 'px', transform: `scale(${scale})`, ...frameCss(doc.frame, stub.color, thumbImg) }">
       <LayerView v-for="id in doc.rootIds" :key="id" :doc="doc" :id="id" :screen-id="screen.id" />
     </div>
   </div>

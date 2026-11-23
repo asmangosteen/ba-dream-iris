@@ -3,6 +3,7 @@ import { Icon } from '@ba-dream/design-system'
 import type { Effect, LayerNode } from '~/canvas/schema'
 import { colorLabel, parseColor } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
+import ColorField from '~/components/editor/ColorField.vue'
 
 /** Effects: Drop shadow · Inner shadow · Layer blur · Background blur (피그마와 같아요) */
 const props = defineProps<{ sid: string; ids: string[] }>()
@@ -69,7 +70,7 @@ const shadow = (e: Effect): e is Extract<Effect, { type: 'drop' | 'inner' }> => 
             <label class="sq fld"><span>Spread</span><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" aria-label="Spread" @change="num(i, 'spread', $event)" @keydown="blur"></label>
           </div>
           <label class="sq fld">
-            <input type="color" class="swatch" :value="hex(e.color)" aria-label="Shadow color" @change="set(i, { color: withA(($event.target as HTMLInputElement).value.toUpperCase(), alpha(e.color)) })">
+            <ColorField :model-value="e.color" :sid="sid" label="Shadow color" @update:model-value="(v) => set(i, { color: v })" />
             <input :key="'c' + e.color" :value="colorLabel(e.color).split(' ')[0]" aria-label="Shadow hex" @change="(ev) => { const v = (ev.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(e.color)) }) }" @keydown="blur">
             <input :key="'a' + e.color" class="pct" :value="Math.round(alpha(e.color) * 100) + '%'" aria-label="Shadow opacity" @change="(ev) => { const a = Number((ev.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(e.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur">
           </label>

@@ -2,12 +2,15 @@
 import { Icon } from '@ba-dream/design-system'
 import type { LayoutGrid } from '~/canvas/schema'
 import { colorLabel, parseColor } from '~/canvas/tokens'
+import { useLayerStore } from '~/canvas/store'
+import ColorField from '~/components/editor/ColorField.vue'
 
 /** Layout grid (피그마와 같아요): Columns · Rows · Grid. ⌃G 로 모두 숨기기 · 보이기 */
 const props = defineProps<{ grids: LayoutGrid[] }>()
 const emit = defineEmits<{ change: [grids: LayoutGrid[] | undefined] }>()
 const open = ref<number | null>(null)
 const TYPES: { k: LayoutGrid['type']; label: string }[] = [{ k: 'columns', label: 'Columns' }, { k: 'rows', label: 'Rows' }, { k: 'grid', label: 'Grid' }]
+const store = useLayerStore()
 const out = (l: LayoutGrid[]) => emit('change', l.length ? l : undefined)
 function add() { out([...props.grids, { type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }]); open.value = props.grids.length }
 function set(i: number, patch: Partial<LayoutGrid>) { out(props.grids.map((g, k) => (k === i ? { ...g, ...patch } : g))) }
@@ -47,7 +50,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
           <label class="sq fld"><span>Margin</span><input :key="'m' + g.margin" :value="g.margin ?? 16" inputmode="numeric" aria-label="Margin" @change="num(i, 'margin', $event)" @keydown="blur"></label>
         </div>
         <label class="sq fld">
-          <input type="color" class="swatch" :value="hex(g.color)" aria-label="Grid color" @change="set(i, { color: withA(($event.target as HTMLInputElement).value.toUpperCase(), alpha(g.color)) })">
+          <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" label="Grid color" @update:model-value="(v) => set(i, { color: v })" />
           <span class="grow">{{ colorLabel(hex(g.color)) }}</span>
           <input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100) + '%'" aria-label="Grid opacity" @change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur">
         </label>

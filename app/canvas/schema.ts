@@ -2,6 +2,8 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
+import { backgroundCss } from './paint'
+
 export const SCHEMA_VERSION = 6
 
 export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section'
@@ -9,7 +11,7 @@ export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line'
 /** 칠(채우기 · 선 색). solid 는 한 색, linear · radial 은 그라디언트, image 는 이미지 채우기 (v5) */
 export type Paint =
   | { type: 'solid'; color: string; opacity?: number; visible?: boolean }
-  | { type: 'linear' | 'radial'; stops: { pos: number; color: string }[]; angle?: number; opacity?: number; visible?: boolean }
+  | { type: 'linear' | 'radial' | 'angular'; stops: { pos: number; color: string }[]; angle?: number; opacity?: number; visible?: boolean }
   | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean }
 export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
 
@@ -255,11 +257,13 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
 
 export const TYPE_LABEL: Record<LayerType, string> = { frame: 'Frame', rect: 'Rectangle', text: 'Text', image: 'Image', ellipse: 'Ellipse', line: 'Line', polygon: 'Polygon', star: 'Star', path: 'Vector', section: 'Section' }
 
-/** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기 */
-export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined): Record<string, string | number> {
+/** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기, img: 'storage://' 이미지 주소 풀기 */
+export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined, img: (src?: string) => string | undefined = (s) => s): Record<string, string | number> {
   if (!f) return {}
   const css: Record<string, string | number> = {}
   if (f.fill !== undefined) css.background = f.fill ? (color(f.fill) ?? f.fill) : 'transparent'
+  // 덧붙인 칠(그라디언트 · 이미지): 바탕 칠 위로
+  if (f.fills?.length) Object.assign(css, backgroundCss({ fills: f.fills }, color, img))
   if (f.radii) css.borderRadius = f.radii.map((r) => r + 'px').join(' ')
   else if (f.radius) css.borderRadius = f.radius + 'px'
   if (f.stroke && f.strokeWidth) css.boxShadow = `inset 0 0 0 ${f.strokeWidth}px ${color(f.stroke) ?? f.stroke}`

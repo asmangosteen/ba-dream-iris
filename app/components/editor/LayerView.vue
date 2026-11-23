@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { useImageSrc } from '~/canvas/images'
+import { isVideoSrc, useImageSrc } from '~/canvas/images'
+import { GHOST_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import { backgroundCss, defaultAlign, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
@@ -10,9 +11,13 @@ import { backgroundCss, defaultAlign, effectCss, ellipsePath, hasFill, radiiOf, 
  * 상자 도형(프레임 · 섹션 · 사각형 · 원 · 이미지)은 CSS, 선 · 다각형 · 별 · 연필은 SVG — 모두 벡터라 확대해도 선명해요.
  */
 defineOptions({ name: 'LayerView' })
-const props = defineProps<{ doc: LayerDoc; id: string; screenId: string }>()
+const props = defineProps<{ doc: LayerDoc; id: string; screenId: string; ghost?: boolean }>()
 const store = useLayerStore()
 const imageSrc = useImageSrc()
+// 화면 밖으로 끄는 중이면 원래 자리는 숨겨요(캔버스가 맨 위에 따로 그려요)
+const ghostOf = inject(GHOST_KEY, null)
+const ghosted = computed(() => !props.ghost && !!ghostOf?.value && ghostOf.value.sid === props.screenId && ghostOf.value.ids.has(props.id))
+const video = computed(() => isVideoSrc(n.value?.src))
 const uid = useId()
 const n = computed(() => props.doc.nodes[props.id])
 const editingThis = computed(() => store.editing.value === props.id && store.screenId.value === props.screenId)
@@ -158,12 +163,13 @@ function onKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="style">
+  <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="ghosted ? { ...style, visibility: 'hidden' } : style">
     <span v-if="n.type === 'section'" class="sec-name">{{ n.name }}</span>
     <template v-if="isContainer(n)">
       <LayerView v-for="c in n.children ?? []" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
       <GridOverlay v-if="n.style.grids" :grids="n.style.grids" :w="n.w" :h="n.h" />
     </template>
+    <video v-else-if="n.type === 'image' && video" :src="imageSrc(n.src)" :style="imgStyle" autoplay muted loop playsinline disablepictureinpicture aria-hidden="true" />
     <img v-else-if="n.type === 'image'" :src="imageSrc(n.src)" alt="" draggable="false" :style="imgStyle">
     <template v-else-if="n.type === 'text'">
       <component :is="n.style.list === 'number' ? 'ol' : 'ul'" v-if="blockText && n.style.list" class="txt list" :style="textFill">
@@ -224,7 +230,7 @@ function onKey(e: KeyboardEvent) {
 .ly:not(.lk):hover:not(:has(.ly:hover)) { outline: calc(1px / var(--z, 1)) solid var(--iris-select, #0D99FF); }
 .ly.line, .ly.path { outline-offset: 0; }
 .ly.line:hover, .ly.path:hover { outline: none !important; }
-.image img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--sys-color-neutral-100); }
+.image img, .image video { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--sys-color-neutral-100); }
 .image { overflow: hidden; }
 .txt { display: block; outline: none; min-width: 1px; cursor: inherit; }
 .txt[contenteditable='true'] { cursor: text; user-select: text; -webkit-user-select: text; }

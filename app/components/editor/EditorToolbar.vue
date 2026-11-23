@@ -26,7 +26,8 @@ const ITEMS: Record<Tool, Item> = {
 const GROUPS: { id: string; tools: Tool[] }[] = [
   { id: 'move', tools: ['move', 'hand', 'scale'] },
   { id: 'frame', tools: ['frame', 'section'] },
-  { id: 'shape', tools: ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star', 'image'] },
+  // 이미지 · 영상은 캔버스에 끌어 놓거나 Fill 의 Image 칠로(피그마와 같아요). ⇧⌘K 로 파일 고르기는 그대로
+  { id: 'shape', tools: ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star'] },
   { id: 'draw', tools: ['pencil'] },
   { id: 'text', tools: ['text'] },
 ]

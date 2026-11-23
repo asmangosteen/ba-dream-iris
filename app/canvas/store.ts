@@ -98,7 +98,20 @@ export function createLayerStore(opts: {
   /** 바꾸기 전 모습을 받아 두는 시작점 (끌기처럼 여러 번 바뀌다가 끝에 한 번 기록할 때) */
   const begin = (sid: string) => snap(sid)
   const commit = (sid: string, before: string) => { layoutDoc(doc(sid)); record(sid, before) }
+  /**
+   * 잡아 두기(색 판 · 슬라이더를 끄는 동안): 그 사이 바뀐 것은 기록하지 않다가 release 에서 한 번에 기록 · 저장해요.
+   * hold 를 여러 번 불러도 처음 모습이 기준이에요
+   */
+  const held = new Map<string, string>()
+  function hold(sid: string) { if (!held.has(sid)) held.set(sid, snap(sid)) }
+  function release(sid: string) {
+    const before = held.get(sid)
+    if (before === undefined) return
+    held.delete(sid)
+    commit(sid, before)
+  }
   function mutate<T>(sid: string, fn: (d: LayerDoc) => T): T {
+    if (held.has(sid)) { const out = fn(doc(sid)); layoutDoc(doc(sid)); return out }
     const before = snap(sid)
     const out = fn(doc(sid))
     layoutDoc(doc(sid)) // 오토 레이아웃은 바뀔 때마다 다시 계산
@@ -539,6 +552,7 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
+    hold, release,
     selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
