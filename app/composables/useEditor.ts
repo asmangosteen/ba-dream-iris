@@ -1,4 +1,6 @@
-export interface PageRow { id: string; name: string; sort_order: number; layers?: unknown }
+/** 페이지 설정(pages.viewport jsonb): 캔버스 배경색 · 픽셀 격자 */
+export interface PageSettings { background?: string | null; pixelGrid?: boolean }
+export interface PageRow { id: string; name: string; sort_order: number; layers?: unknown; viewport?: PageSettings | null }
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId
 export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
@@ -16,7 +18,7 @@ export function useEditor(projectId: string) {
   }, { deep: true })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
     if (preview) return PREVIEW_PAGES
-    const { data, error } = await supabase.from('pages').select('id, name, sort_order, layers').eq('project_id', projectId).order('sort_order')
+    const { data, error } = await supabase.from('pages').select('id, name, sort_order, layers, viewport').eq('project_id', projectId).order('sort_order')
     if (error) throw error
     return (data ?? []) as PageRow[]
   }, { deep: true })
@@ -51,6 +53,17 @@ export function useEditor(projectId: string) {
     } else PREVIEW_SCREENS[row.id] = []
     pages.data.value = [...list, row]
     pageId.value = row.id
+  }
+
+  /** 페이지 설정 저장 (배경색 · 픽셀 격자) */
+  async function updatePageSettings(id: string, patch: PageSettings) {
+    const p = pages.data.value?.find((x) => x.id === id)
+    if (!p) return
+    const before = p.viewport ?? null
+    p.viewport = { ...(p.viewport ?? {}), ...patch }
+    if (preview) return
+    const { error } = await supabase.from('pages').update({ viewport: p.viewport }).eq('id', id)
+    if (error) { p.viewport = before; throw error }
   }
 
   async function renamePage(id: string, name: string) {
@@ -117,5 +130,5 @@ export function useEditor(projectId: string) {
     screens.data.value = list.filter((x) => x.id !== id)
   }
 
-  return { project, pages, pageId, screens, addPage, renamePage, addScreen, updateScreen, removeScreen }
+  return { project, pages, pageId, screens, addPage, renamePage, updatePageSettings, addScreen, updateScreen, removeScreen }
 }

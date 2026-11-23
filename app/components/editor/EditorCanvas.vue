@@ -16,7 +16,7 @@ import LayerView from '~/components/editor/LayerView.vue'
  */
 export interface Viewport { x: number; y: number; zoom: number }
 
-const props = defineProps<{ screens: ScreenRow[]; highlight?: string[] }>()
+const props = defineProps<{ screens: ScreenRow[]; highlight?: string[]; background?: string | null; pixelGrid?: boolean }>()
 const tool = defineModel<Tool>('tool', { required: true })
 const vp = defineModel<Viewport>('viewport', { required: true })
 const emit = defineEmits<{
@@ -731,24 +731,20 @@ function ticks(l: { x1: number; y1: number; x2: number; y2: number }) {
   return [[l.x1, l.y1], [l.x2, l.y2]].map(([x, y]) => (horiz ? { x1: sx(x!), y1: sy(y!) - k, x2: sx(x!), y2: sy(y!) + k } : { x1: sx(x!) - k, y1: sy(y!), x2: sx(x!) + k, y2: sy(y!) }))
 }
 /**
- * 캔버스 격자(피그마 기준): 칸은 캔버스 좌표에 고정돼 화면과 같은 비율로 커지고 작아져요.
- * - 8px 칸 · 80px 진한 선(10칸). 화면에서 칸이 6px 보다 작아지면 옅게 사라지고 진한 선만 남아요
- * - 400% 넘게 확대하면 피그마처럼 1px 픽셀 격자가 나와요
+ * 캔버스 배경(피그마와 같아요): 평소엔 단색, 800% 이상 확대하면 1px 픽셀 격자가 아주 옅게 나와요.
+ * 배경색은 페이지 설정(오른쪽 패널, 아무것도 안 골랐을 때)에서 바꿔요.
  */
 const gridStyle = computed(() => {
   const z = vp.value.zoom
-  const pos = `${vp.value.x}px ${vp.value.y}px`
-  const layers: { size: number; color: string }[] = []
-  if (z >= 4) layers.push({ size: z, color: '--grid-minor' })
-  const minor = 8 * z, major = 80 * z
-  if (minor >= 6) layers.push({ size: minor, color: z >= 4 ? '--grid-major' : '--grid-minor' })
-  if (major >= 6) layers.push({ size: major, color: '--grid-major' })
-  const imgs: string[] = [], sizes: string[] = []
-  for (const l of layers.reverse()) {
-    imgs.push(`linear-gradient(to right, var(${l.color}) 1px, transparent 1px)`, `linear-gradient(to bottom, var(${l.color}) 1px, transparent 1px)`)
-    sizes.push(`${l.size}px ${l.size}px`, `${l.size}px ${l.size}px`)
-  }
-  return { backgroundImage: imgs.join(',') || 'none', backgroundSize: sizes.join(','), backgroundPosition: imgs.map(() => pos).join(',') }
+  const style: Record<string, string> = {}
+  if (props.background) style.backgroundColor = props.background
+  if (props.pixelGrid !== false && z >= 8) {
+    const pos = `${vp.value.x}px ${vp.value.y}px`
+    style.backgroundImage = 'linear-gradient(to right, var(--grid-pixel) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-pixel) 1px, transparent 1px)'
+    style.backgroundSize = `${z}px ${z}px, ${z}px ${z}px`
+    style.backgroundPosition = `${pos}, ${pos}`
+  } else style.backgroundImage = 'none'
+  return style
 })
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
@@ -833,7 +829,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 </template>
 
 <style scoped>
-.canvas { --grid-minor: var(--ref-color-gray-900-2); --grid-major: var(--ref-color-gray-900-5); position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
+.canvas { --grid-pixel: rgb(128 128 128 / 14%); position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }

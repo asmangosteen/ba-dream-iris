@@ -5,6 +5,7 @@ import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
+import InspectorPage from '~/components/editor/InspectorPage.vue'
 import InspectorScreens from '~/components/editor/InspectorScreens.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
@@ -17,13 +18,13 @@ import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/EditorCanvas.vue'
-import type { ScreenRow } from '~/composables/useEditor'
+import type { PageSettings, ScreenRow } from '~/composables/useEditor'
 import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = route.params.projectId as string
-const { project, pages, pageId, screens, addPage, renamePage, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+const { project, pages, pageId, screens, addPage, renamePage, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const allScreens = useProjectScreens(projectId)
@@ -33,7 +34,7 @@ const { addRequirement, setLink } = useIrisMutations()
 // 상태
 // ---------------------------------------------------------------------------
 const left = ref<'file' | 'assets' | 'docs'>('file')
-const tab = ref<'design' | 'plan' | 'dev'>('plan')
+const tab = ref<'design' | 'plan' | 'dev'>('design')
 const tool = ref<Tool>('move')
 const asset = ref<string | null>(null)
 const docId = ref<string | null>(null)
@@ -50,6 +51,16 @@ const canvasScreen = computed<ScreenRow | null>(() => {
   const p = pages.data.value?.find((x) => x.id === pageId.value)
   return p ? { id: pageCanvasId(p.id), name: '캔버스', source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
 })
+const currentPage = computed(() => pages.data.value?.find((x) => x.id === pageId.value) ?? null)
+async function onPageSettings(patch: PageSettings) {
+  const p = currentPage.value
+  if (!p) return
+  const before = { ...(p.viewport ?? {}) }
+  try {
+    await updatePageSettings(p.id, patch)
+    store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
+  } catch { say('페이지 설정을 저장하지 못했어요') }
+}
 const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
 const supabase = useSupabaseClient()
@@ -388,6 +399,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       v-model:viewport="vp"
       v-model:multi="multiScreens"
       :screens="canvasList"
+      :background="currentPage?.viewport?.background ?? null"
+      :pixel-grid="currentPage?.viewport?.pixelGrid !== false"
       :highlight="highlight"
       @move="onMove"
       @resize-screen="onResizeScreen"
@@ -527,6 +540,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         <!-- 캔버스 위 레이어를 골랐을 때: 디자인 속성만 -->
         <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll">
           <InspectorLayer :screen="canvasScreen" @replace-image="pickImage" />
+        </div>
+        <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
+        <div v-else-if="tab === 'design' && currentPage" class="scroll">
+          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say('이름을 바꾸지 못했어요'))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
           <span class="tx-head">화면을 골라주세요</span>
