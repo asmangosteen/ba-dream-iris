@@ -222,14 +222,14 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
 .vb:hover, .vb.open { color: var(--sys-color-neutral-800); }
 .vb.open { --sq-fill: var(--sys-color-neutral-300); }
 .vb.reveal { width: 20px; height: 20px; margin-right: calc(-1 * var(--ref-spacing-04)); opacity: 0; transition: opacity .12s ease, background-color .12s ease, color .12s ease; }
-:global(.fld:hover) .vb.reveal, :global(.fld:focus-within) .vb.reveal, .vb.reveal.open, .vb.reveal:focus-visible { opacity: 1; }
+.fld:hover .vb.reveal, .fld:focus-within .vb.reveal, .vb.reveal.open, .vb.reveal:focus-visible { opacity: 1; }
 
 /* 연결된 값: 입력칸 자리를 채우는 칩 */
 .tchip-w { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
 /* 연결 끊기: 마우스를 올리면 칩 오른쪽 끝에 겹쳐 보여요(자리를 차지하지 않게) */
 .tchip-x { position: absolute; right: 0; top: 50%; width: 20px; height: 20px; margin-top: -10px; --sq-fill: var(--sys-color-common-white-emphasis); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
 .tchip-x:hover { color: var(--sys-color-neutral-800); }
-:global(.fld:hover) .tchip-x, .tchip-x:focus-visible { opacity: 1; }
+.fld:hover .tchip-x, .tchip-x:focus-visible { opacity: 1; }
 .tchip { flex: 1; min-width: 0; height: 20px; display: flex; align-items: center; gap: var(--ref-spacing-03); padding: 0 var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; transition: box-shadow .12s ease; }
 .tchip:hover { --sq-line: var(--ref-color-gray-900-20); }
 .tchip.open { --sq-line: var(--sys-color-brand-primary-default); }
