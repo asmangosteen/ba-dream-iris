@@ -87,7 +87,7 @@ watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.val
 
     <section class="s">
       <div class="sec-h h24"><span>레이어</span></div>
-      <p class="tx-meta m0">화면 안 사각형 · 텍스트 · 이미지 편집은 다음 단계에서 열려요.</p>
+      <p class="tx-meta m0">캔버스나 왼쪽 레이어 목록에서 레이어를 고르면 여기서 고쳐요. 도구: 사각형 R · 텍스트 T · 프레임 F · 이미지</p>
     </section>
 
     <section class="s">

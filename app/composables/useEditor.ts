@@ -1,5 +1,5 @@
 export interface PageRow { id: string; name: string; sort_order: number }
-export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null }
+export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown }
 
 /** 에디터 데이터: 프로젝트 · 페이지 · 선택한 페이지의 화면 */
 export function useEditor(projectId: string) {
@@ -26,7 +26,7 @@ export function useEditor(projectId: string) {
     }
     if (!pageId.value) return [] as ScreenRow[]
     if (preview) return PREVIEW_SCREENS[pageId.value] ?? []
-    const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url').eq('page_id', pageId.value).order('sort_order')
+    const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers').eq('page_id', pageId.value).order('sort_order')
     if (error) throw error
     return (data ?? []) as ScreenRow[]
   }, { watch: [pageId] })
@@ -79,9 +79,15 @@ export function useEditor(projectId: string) {
   }
 
   /** 화면 속성 저장 (위치 · 크기 · 이름 · 상태). 화면에는 먼저 반영하고, 저장이 실패하면 되돌립니다 */
-  async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
+  async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status' | 'layers'>>) {
     const s = screens.data.value?.find((x) => x.id === id)
-    if (!s) return
+    if (!s) {
+      // 다른 페이지로 옮긴 뒤 늦게 도착한 저장(레이어 자동저장 등)
+      if (preview) { for (const list of Object.values(PREVIEW_SCREENS)) { const p = list.find((x) => x.id === id); if (p) Object.assign(p, patch) } return }
+      const { error } = await supabase.from('screens').update({ ...patch, updated_by: me() }).eq('id', id)
+      if (error) throw error
+      return
+    }
     const before = { ...s }
     Object.assign(s, patch)
     if (preview) return

@@ -1,28 +1,33 @@
 <script setup lang="ts">
 import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
+import type { LayerType } from '~/canvas/schema'
+import { useLayerStore } from '~/canvas/store'
+import LayerView from '~/components/editor/LayerView.vue'
 
 /**
- * 무한 캔버스: 이동(빈 곳 드래그 · 스페이스+드래그 · 가운데 버튼 · 트랙패드 스크롤), 확대(⌘/Ctrl+휠 · 핀치 · 단축키),
- * 화면 선택 · 끌어서 옮기기, 프레임 도구로 새 화면 그리기.
- * 좌표: 화면(px) = 캔버스 좌표 × zoom + (x, y)
+ * 무한 캔버스 + 화면 안 레이어 편집.
+ * - 이동: 빈 곳 드래그 · 스페이스+드래그 · 가운데 버튼 · 트랙패드 스크롤 / 확대: ⌘·Ctrl+휠 · 핀치 · 단축키
+ * - 화면: 고르기 · 끌어 옮기기, 빈 곳에 프레임 도구 → 새 화면
+ * - 레이어: 고르기(Shift 여러 개) · 끌어 옮기기 · 모서리로 크기 · 두 번 눌러 글자 고치기, 화면 안에 사각형 · 프레임 · 텍스트 그리기
+ * 좌표: 화면(px) = 캔버스 좌표 × zoom + (x, y). 레이어 좌표는 화면(또는 부모 프레임) 왼쪽 위 기준
  */
 export interface Viewport { x: number; y: number; zoom: number }
 
-const props = defineProps<{ screens: ScreenRow[]; selected: string | null; highlight?: string[] }>()
+const props = defineProps<{ screens: ScreenRow[]; highlight?: string[] }>()
 const tool = defineModel<Tool>('tool', { required: true })
 const vp = defineModel<Viewport>('viewport', { required: true })
 const emit = defineEmits<{
-  select: [id: string | null]
   move: [id: string, x: number, y: number, done: boolean]
   create: [rect: { x: number; y: number; width: number; height: number }]
   hint: [text: string]
 }>()
+const store = useLayerStore()
 
 const el = ref<HTMLElement | null>(null)
 const space = ref(false)
 const panning = ref(false)
-const draft = ref<{ x: number; y: number; width: number; height: number } | null>(null)
+const draft = ref<{ x: number; y: number; width: number; height: number } | null>(null) // 캔버스 좌표
 
 const MIN = 0.05
 const MAX = 8
@@ -32,8 +37,6 @@ function toWorld(clientX: number, clientY: number) {
   const r = el.value!.getBoundingClientRect()
   return { x: (clientX - r.left - vp.value.x) / vp.value.zoom, y: (clientY - r.top - vp.value.y) / vp.value.zoom }
 }
-
-/** (cx, cy) 화면 지점을 고정한 채 확대 비율 바꾸기 */
 function zoomAt(z: number, cx?: number, cy?: number) {
   const r = el.value?.getBoundingClientRect()
   const px = cx ?? (r ? r.width / 2 : 0)
@@ -42,29 +45,28 @@ function zoomAt(z: number, cx?: number, cy?: number) {
   const k = nz / vp.value.zoom
   vp.value = { zoom: nz, x: px - (px - vp.value.x) * k, y: py - (py - vp.value.y) * k }
 }
-
-/** 패널에 가리지 않는 가운데 영역에 화면 전체 맞추기 */
+/** 패널에 가리지 않는 가운데 영역에 맞추기 */
+function fitRect(x0: number, y0: number, x1: number, y1: number, maxZoom = 1) {
+  const r = el.value?.getBoundingClientRect()
+  if (!r) return
+  const area = { left: 288, right: r.width - 312, top: 72, bottom: r.height - 72 }
+  const w = Math.max(1, area.right - area.left), h = Math.max(1, area.bottom - area.top)
+  const zoom = clamp(Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0), maxZoom) * 0.92)
+  vp.value = { zoom, x: area.left + (w - (x1 - x0) * zoom) / 2 - x0 * zoom, y: area.top + (h - (y1 - y0) * zoom) / 2 - y0 * zoom }
+}
 function fit(ids?: string[]) {
   const list = ids?.length ? props.screens.filter((s) => ids.includes(s.id)) : props.screens
   const r = el.value?.getBoundingClientRect()
   if (!r) return
-  const area = { left: 288, right: r.width - 312, top: 72, bottom: r.height - 72 }
-  if (!list.length) { vp.value = { zoom: 0.5, x: area.left + 64, y: area.top + 32 }; return }
-  const x0 = Math.min(...list.map((s) => s.x)), y0 = Math.min(...list.map((s) => s.y))
-  const x1 = Math.max(...list.map((s) => s.x + s.width)), y1 = Math.max(...list.map((s) => s.y + s.height))
-  const w = Math.max(1, area.right - area.left), h = Math.max(1, area.bottom - area.top)
-  const zoom = clamp(Math.min(w / (x1 - x0), h / (y1 - y0), 1) * 0.92)
-  vp.value = { zoom, x: area.left + (w - (x1 - x0) * zoom) / 2 - x0 * zoom, y: area.top + (h - (y1 - y0) * zoom) / 2 - y0 * zoom }
+  if (!list.length) { vp.value = { zoom: 0.5, x: 352, y: 104 }; return }
+  fitRect(Math.min(...list.map((s) => s.x)), Math.min(...list.map((s) => s.y)), Math.max(...list.map((s) => s.x + s.width)), Math.max(...list.map((s) => s.y + s.height)))
 }
-defineExpose({ fit, zoomAt })
-
 function onWheel(e: WheelEvent) {
+  if ((e.target as HTMLElement).closest?.('[contenteditable="true"]')) return
   e.preventDefault()
   const r = el.value!.getBoundingClientRect()
-  if (e.ctrlKey || e.metaKey) {
-    // 트랙패드 핀치는 ctrlKey 가 붙은 휠로 들어옵니다
-    zoomAt(vp.value.zoom * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)), e.clientX - r.left, e.clientY - r.top)
-  } else {
+  if (e.ctrlKey || e.metaKey) zoomAt(vp.value.zoom * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)), e.clientX - r.left, e.clientY - r.top)
+  else {
     const k = e.deltaMode ? 16 : 1
     const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX
     const dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY
@@ -73,53 +75,139 @@ function onWheel(e: WheelEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// 끌기: 이동 · 화면 옮기기 · 프레임 그리기
+// 끌기
 // ---------------------------------------------------------------------------
+type Corner = 'nw' | 'ne' | 'sw' | 'se'
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean }
-  | { kind: 'frame'; id: string; sx: number; sy: number; ox: number; oy: number; moved: boolean }
+  | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; moved: boolean }
   | { kind: 'draw'; wx: number; wy: number; moved: boolean }
+  | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; before: string; moved: boolean }
+  | { kind: 'resize'; sid: string; id: string; corner: Corner; sx: number; sy: number; o: { x: number; y: number; w: number; h: number }; before: string; moved: boolean }
+  | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
 let drag: Drag | null = null
+
+const isNative = (s: ScreenRow) => s.source === 'native'
+const drawType = (t: Tool): LayerType | null => (t === 'rect' ? 'rect' : t === 'text' ? 'text' : t === 'frame' ? 'frame' : null)
+
+/** 화면 안 좌표에서, 그 위치를 품는 가장 안쪽 프레임 레이어 */
+function frameAt(sid: string, lx: number, ly: number): string | null {
+  const d = store.doc(sid)
+  let found: string | null = null
+  const walk = (ids: string[]) => {
+    for (const id of ids) {
+      const n = d.nodes[id]
+      if (!n || n.type !== 'frame' || n.hidden || n.locked) continue
+      const p = store.absPos(sid, id)
+      if (lx >= p.x && ly >= p.y && lx <= p.x + n.w && ly <= p.y + n.h) { found = id; walk(n.children ?? []) }
+    }
+  }
+  walk(d.rootIds)
+  return found
+}
 
 function start(e: PointerEvent, screen?: ScreenRow) {
   if (e.button !== 0 && e.button !== 1) return
-  ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+  if (store.editing.value) (document.activeElement as HTMLElement | null)?.blur?.()
+  el.value?.setPointerCapture?.(e.pointerId)
   if (e.button === 1 || space.value || (!screen && tool.value === 'move')) {
     drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: vp.value.x, vy: vp.value.y, moved: false }
     panning.value = true
     return
   }
-  if (tool.value === 'frame') {
-    const w = toWorld(e.clientX, e.clientY)
-    drag = { kind: 'draw', wx: w.x, wy: w.y, moved: false }
+  const t = drawType(tool.value)
+  // 빈 캔버스에 프레임 도구 → 새 화면
+  if (!screen) {
+    if (tool.value === 'frame') { const w = toWorld(e.clientX, e.clientY); drag = { kind: 'draw', wx: w.x, wy: w.y, moved: false }; return }
+    emit('hint', '사각형 · 텍스트는 화면 안에 그려요')
     return
   }
-  if (screen && tool.value === 'move') {
-    emit('select', screen.id)
-    drag = { kind: 'frame', id: screen.id, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, moved: false }
+  const w = toWorld(e.clientX, e.clientY)
+  const lx = w.x - screen.x, ly = w.y - screen.y
+  // 화면 안에 그리기
+  if (t) {
+    if (!isNative(screen)) { emit('hint', '피그마 화면은 피그마에서 고쳐요'); tool.value = 'move'; return }
+    const parentId = frameAt(screen.id, lx, ly)
+    const p = parentId ? store.absPos(screen.id, parentId) : { x: 0, y: 0 }
+    drag = { kind: 'drawLayer', sid: screen.id, type: t, parentId, px: p.x, py: p.y, lx, ly, moved: false }
     return
   }
-  // 사각형 · 텍스트 · 이미지는 화면 안 편집(다음 단계)에서 열립니다
-  emit('hint', '사각형 · 텍스트 · 이미지 도구는 화면 안 편집과 함께 열려요')
-  tool.value = 'move'
+  if (tool.value !== 'move') return
+  // 레이어 고르기 · 끌기
+  const layerEl = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
+  const lid = layerEl?.dataset.layer
+  if (lid && isNative(screen)) {
+    if (e.shiftKey) { store.selectLayer(screen.id, lid, true); return }
+    if (!(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
+    const d = store.doc(screen.id)
+    const ids = store.layerIds.value.filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
+    drag = { kind: 'layers', sid: screen.id, ids, sx: e.clientX, sy: e.clientY, orig: Object.fromEntries(ids.map((id) => [id, { x: d.nodes[id]!.x, y: d.nodes[id]!.y }])), before: store.begin(screen.id), moved: false }
+    return
+  }
+  store.selectScreen(screen.id)
+  drag = { kind: 'screen', id: screen.id, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, moved: false }
+}
+
+function startResize(e: PointerEvent, corner: Corner) {
+  const sid = store.screenId.value
+  const id = store.layerIds.value[0]
+  if (!sid || !id) return
+  const n = store.node(sid, id)
+  if (!n) return
+  el.value?.setPointerCapture?.(e.pointerId)
+  drag = { kind: 'resize', sid, id, corner, sx: e.clientX, sy: e.clientY, o: { x: n.x, y: n.y, w: n.w, h: n.h }, before: store.begin(sid), moved: false }
 }
 
 function move(e: PointerEvent) {
   if (!drag) return
-  const dx = e.clientX - (drag.kind === 'draw' ? 0 : drag.sx)
-  const dy = e.clientY - (drag.kind === 'draw' ? 0 : drag.sy)
+  const z = vp.value.zoom
   if (drag.kind === 'pan') {
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy
     if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true
     vp.value = { ...vp.value, x: drag.vx + dx, y: drag.vy + dy }
-  } else if (drag.kind === 'frame') {
+  } else if (drag.kind === 'screen') {
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return
     drag.moved = true
-    emit('move', drag.id, Math.round(drag.ox + dx / vp.value.zoom), Math.round(drag.oy + dy / vp.value.zoom), false)
-  } else {
+    emit('move', drag.id, Math.round(drag.ox + dx / z), Math.round(drag.oy + dy / z), false)
+  } else if (drag.kind === 'layers') {
+    let dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
+    if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 3) return
+    drag.moved = true
+    if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0 } // Shift: 가로나 세로로만
+    const d = store.doc(drag.sid)
+    for (const id of drag.ids) { const n = d.nodes[id]; if (n) { n.x = Math.round(drag.orig[id]!.x + dx); n.y = Math.round(drag.orig[id]!.y + dy) } }
+  } else if (drag.kind === 'resize') {
+    const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
+    drag.moved = true
+    const o = drag.o
+    let { x, y, w, h } = o
+    if (drag.corner.includes('e')) w = o.w + dx
+    if (drag.corner.includes('s')) h = o.h + dy
+    if (drag.corner.includes('w')) { w = o.w - dx; x = o.x + dx }
+    if (drag.corner.includes('n')) { h = o.h - dy; y = o.y + dy }
+    if (e.shiftKey && o.w && o.h) { const k = Math.max(w / o.w, h / o.h); w = o.w * k; h = o.h * k; if (drag.corner.includes('w')) x = o.x + o.w - w; if (drag.corner.includes('n')) y = o.y + o.h - h }
+    if (w < 1) { x += w - 1; w = 1 }
+    if (h < 1) { y += h - 1; h = 1 }
+    const n = store.node(drag.sid, drag.id)
+    if (n) { Object.assign(n, { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }); if (n.type === 'text') n.style.autoWidth = false }
+  } else if (drag.kind === 'draw') {
     const w = toWorld(e.clientX, e.clientY)
-    if (!drag.moved && Math.abs(w.x - drag.wx) * vp.value.zoom + Math.abs(w.y - drag.wy) * vp.value.zoom < 4) return
+    if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
     draft.value = { x: Math.round(Math.min(w.x, drag.wx)), y: Math.round(Math.min(w.y, drag.wy)), width: Math.round(Math.abs(w.x - drag.wx)), height: Math.round(Math.abs(w.y - drag.wy)) }
+  } else if (drag.kind === 'drawLayer') {
+    const s = props.screens.find((v) => v.id === drag!.sid)
+    if (!s) return
+    const w = toWorld(e.clientX, e.clientY)
+    const lx = w.x - s.x, ly = w.y - s.y
+    if (!drag.moved && (Math.abs(lx - drag.lx) + Math.abs(ly - drag.ly)) * z < 4) return
+    drag.moved = true
+    let x0 = drag.lx, y0 = drag.ly, ww = lx - drag.lx, hh = ly - drag.ly
+    if (e.shiftKey) { const m = Math.max(Math.abs(ww), Math.abs(hh)); ww = Math.sign(ww || 1) * m; hh = Math.sign(hh || 1) * m }
+    if (ww < 0) { x0 += ww; ww = -ww }
+    if (hh < 0) { y0 += hh; hh = -hh }
+    draft.value = { x: Math.round(s.x + x0), y: Math.round(s.y + y0), width: Math.round(ww), height: Math.round(hh) }
   }
 }
 
@@ -128,39 +216,99 @@ function end(e: PointerEvent) {
   const d = drag
   drag = null
   panning.value = false
-  if (d.kind === 'pan' && !d.moved && e.target === el.value) emit('select', null)
-  if (d.kind === 'frame' && d.moved) {
+  if (d.kind === 'pan' && !d.moved && e.target === el.value) store.selectScreen(null)
+  if (d.kind === 'screen' && d.moved) {
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('move', d.id, s.x, s.y, true)
   }
+  if ((d.kind === 'layers' || d.kind === 'resize') && d.moved) store.commit(d.sid, d.before)
   if (d.kind === 'draw') {
-    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16
-      ? draft.value
-      : { x: Math.round(d.wx), y: Math.round(d.wy), width: 375, height: 812 } // 한 번 누르면 모바일 화면 크기
+    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 375, height: 812 }
     draft.value = null
     emit('create', rect)
     tool.value = 'move'
   }
+  if (d.kind === 'drawLayer') {
+    const s = props.screens.find((v) => v.id === d.sid)
+    const r = draft.value
+    draft.value = null
+    tool.value = 'move'
+    if (!s) return
+    const big = d.moved && r && r.width >= 2 && r.height >= 2
+    if (d.type === 'text') {
+      const id = store.add(d.sid, d.parentId, { type: 'text', text: '텍스트', x: Math.round(d.lx - d.px), y: Math.round(d.ly - d.py), w: big ? r!.width : 60, h: 24, style: big ? { autoWidth: false } : {} })
+      store.editing.value = id
+      return
+    }
+    const size = d.type === 'frame' ? { w: 200, h: 200 } : { w: 100, h: 100 }
+    const x = big ? r!.x - s.x - d.px : Math.round(d.lx - d.px - size.w / 2)
+    const y = big ? r!.y - s.y - d.py : Math.round(d.ly - d.py - size.h / 2)
+    store.add(d.sid, d.parentId, { type: d.type, x, y, w: big ? r!.width : size.w, h: big ? r!.height : size.h })
+  }
+}
+
+function onDbl(e: MouseEvent, screen: ScreenRow) {
+  const lid = ((e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null)?.dataset.layer
+  if (!lid || !isNative(screen)) return
+  const n = store.node(screen.id, lid)
+  if (n?.type === 'text' && !n.locked) { store.selectLayer(screen.id, lid); store.editing.value = lid }
 }
 
 // ---------------------------------------------------------------------------
-// 단축키: 스페이스(손), ⌘/Ctrl + = − 0, Shift+1(전체 맞추기), Shift+2(선택 맞추기)
+// 단축키
 // ---------------------------------------------------------------------------
 const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable="true"]')
 function onKeyDown(e: KeyboardEvent) {
   if (typing(e)) return
-  if (e.code === 'Space') { space.value = true; e.preventDefault(); return }
   const mod = e.metaKey || e.ctrlKey
-  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomAt(vp.value.zoom * 1.25) }
-  else if (mod && e.key === '-') { e.preventDefault(); zoomAt(vp.value.zoom / 1.25) }
-  else if (mod && e.key === '0') { e.preventDefault(); zoomAt(1) }
-  else if (e.shiftKey && e.code === 'Digit1') fit()
-  else if (e.shiftKey && e.code === 'Digit2' && props.selected) fit([props.selected])
-  else if (e.shiftKey && e.code === 'Digit0') zoomAt(1)
-  else if (e.key === 'Escape') { emit('select', null); tool.value = 'move' }
+  const sid = store.screenId.value
+  const ids = store.layerIds.value
+  if (e.code === 'Space') { space.value = true; e.preventDefault(); return }
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); return }
+  if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); store.redo(); return }
+  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomAt(vp.value.zoom * 1.25); return }
+  if (mod && e.key === '-') { e.preventDefault(); zoomAt(vp.value.zoom / 1.25); return }
+  if (mod && e.key === '0') { e.preventDefault(); zoomAt(1); return }
+  if (e.shiftKey && e.code === 'Digit1') { fit(); return }
+  if (e.shiftKey && e.code === 'Digit2' && sid) { fitSelection(); return }
+  if (e.shiftKey && e.code === 'Digit0') { zoomAt(1); return }
+  if (mod && e.key.toLowerCase() === 'c') { if (store.copy()) e.preventDefault(); return }
+  if (mod && e.key.toLowerCase() === 'v') { const s = props.screens.find((v) => v.id === sid); if (s && isNative(s)) { e.preventDefault(); store.paste() } return }
+  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); store.duplicate(); return }
+  if (e.key === 'Escape') {
+    if (ids.length && sid) store.selectLayer(sid, null)
+    else store.selectScreen(null)
+    tool.value = 'move'
+    return
+  }
+  if (!sid || !ids.length) return
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); store.remove(sid, ids); return }
+  if (mod && e.key === ']') { e.preventDefault(); store.arrange(sid, ids, e.altKey ? 'top' : 1); return }
+  if (mod && e.key === '[') { e.preventDefault(); store.arrange(sid, ids, e.altKey ? 'bottom' : -1); return }
+  if (e.key === 'Enter' && ids.length === 1) {
+    const n = store.node(sid, ids[0]!)
+    if (n?.type === 'text') { e.preventDefault(); store.editing.value = n.id }
+    return
+  }
+  const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+  const a = arrows[e.key]
+  if (a) {
+    e.preventDefault()
+    const k = e.shiftKey ? 10 : 1
+    store.update(sid, ids, (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k }))
+  }
 }
 function onKeyUp(e: KeyboardEvent) { if (e.code === 'Space') space.value = false }
-// Safari 핀치(gesture 이벤트)
+function fitSelection() {
+  const sid = store.screenId.value
+  const s = props.screens.find((v) => v.id === sid)
+  if (!s) return
+  const boxes = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b) => !!b)
+  if (!boxes.length) return fit([s.id])
+  fitRect(Math.min(...boxes.map((b) => b!.x)), Math.min(...boxes.map((b) => b!.y)), Math.max(...boxes.map((b) => b!.x + b!.w)), Math.max(...boxes.map((b) => b!.y + b!.h)), 4)
+}
+defineExpose({ fit, zoomAt, fitSelection })
+
 let gz = 1
 const onGestureStart = (e: Event) => { e.preventDefault(); gz = vp.value.zoom }
 const onGestureChange = (e: Event) => {
@@ -169,7 +317,6 @@ const onGestureChange = (e: Event) => {
   const r = el.value!.getBoundingClientRect()
   zoomAt(gz * g.scale, g.clientX - r.left, g.clientY - r.top)
 }
-
 onMounted(() => {
   el.value?.addEventListener('wheel', onWheel, { passive: false })
   el.value?.addEventListener('gesturestart', onGestureStart)
@@ -183,15 +330,42 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', onKeyUp)
 })
 
-// 화면 좌표(라벨 · 선택 상자는 확대해도 글자 크기가 그대로이도록 바깥 층에 그립니다)
+// ---------------------------------------------------------------------------
+// 화면 좌표 계산 (라벨 · 선택 상자는 확대해도 같은 크기로 바깥 층에)
+// ---------------------------------------------------------------------------
 const box = (s: { x: number; y: number; width: number; height: number }) => ({
   left: s.x * vp.value.zoom + vp.value.x + 'px',
   top: s.y * vp.value.zoom + vp.value.y + 'px',
   width: s.width * vp.value.zoom + 'px',
   height: s.height * vp.value.zoom + 'px',
 })
-const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab' : tool.value === 'frame' ? 'crosshair' : 'default'))
-const selectedScreen = computed(() => props.screens.find((s) => s.id === props.selected) ?? null)
+/** 레이어의 캔버스 좌표 상자. 글자 길이에 맞추는 텍스트는 실제 그려진 크기를 씁니다 */
+function layerWorld(s: ScreenRow, id: string) {
+  const n = store.node(s.id, id)
+  if (!n) return null
+  const p = store.absPos(s.id, id)
+  let w = n.w, h = n.h
+  if (n.type === 'text' && import.meta.client) {
+    const node = el.value?.querySelector(`[data-screen="${s.id}"] [data-layer="${id}"]`) as HTMLElement | null
+    if (node) { w = node.offsetWidth; h = node.offsetHeight }
+  }
+  return { x: s.x + p.x, y: s.y + p.y, w, h }
+}
+const tick = ref(0) // 텍스트 크기 다시 재기
+watch(() => [store.docs, store.editing.value], () => nextTick(() => tick.value++), { deep: true })
+const selScreen = computed(() => props.screens.find((s) => s.id === store.screenId.value) ?? null)
+const selBoxes = computed(() => {
+  void tick.value
+  const s = selScreen.value
+  if (!s) return []
+  return store.layerIds.value.map((id) => ({ id, b: layerWorld(s, id) })).filter((x) => x.b).map((x) => ({ id: x.id, ...x.b! }))
+})
+const single = computed(() => {
+  if (selBoxes.value.length !== 1 || store.editing.value) return null
+  const b = selBoxes.value[0]!
+  return { ...b, locked: !!store.node(selScreen.value!.id, b.id)?.locked }
+})
+const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
 
 <template>
@@ -205,37 +379,50 @@ const selectedScreen = computed(() => props.screens.find((s) => s.id === props.s
     @pointerup="end"
     @pointercancel="end"
   >
-    <div class="world" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }">
-      <button
+    <div class="world" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
+      <div
         v-for="s in screens"
         :key="s.id"
         class="frame"
-        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : tool === 'move' ? 'default' : 'crosshair' }"
-        :aria-label="`${s.name} 화면 선택`"
-        :aria-pressed="selected === s.id"
+        role="button"
+        tabindex="-1"
+        :data-screen="s.id"
+        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor }"
+        :aria-label="`${s.name} 화면`"
         @pointerdown.stop="start($event, s)"
-        @keydown.enter="emit('select', s.id)"
+        @dblclick="onDbl($event, s)"
       >
-        <img v-if="s.thumbnail_path" :src="s.thumbnail_path" alt="" draggable="false">
-      </button>
+        <img v-if="s.thumbnail_path && s.source === 'figma'" :src="s.thumbnail_path" alt="" draggable="false" class="thumb">
+        <template v-else>
+          <LayerView v-for="id in store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
+        </template>
+      </div>
       <div v-if="draft" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
     </div>
 
-    <!-- 화면 이름 · 선택 상자 · 연결 강조 (확대와 상관없이 같은 크기) -->
     <div class="overlay" aria-hidden="true">
       <span
         v-for="s in screens"
         :key="'l' + s.id"
         class="label"
-        :class="{ on: selected === s.id }"
+        :class="{ on: store.screenId.value === s.id }"
         :style="{ left: box(s).left, top: `calc(${box(s).top} - 20px)`, maxWidth: box(s).width }"
-        @pointerdown.stop="start($event, s)"
+        @pointerdown.stop="tool = 'move'; start($event, s)"
       >{{ s.name }}</span>
       <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
-      <div v-if="selectedScreen" class="sel" :style="box(selectedScreen)">
-        <span class="handle" style="left: -4px; top: -4px" /><span class="handle" style="right: -4px; top: -4px" />
-        <span class="handle" style="left: -4px; bottom: -4px" /><span class="handle" style="right: -4px; bottom: -4px" />
-        <span class="size num">{{ Math.round(selectedScreen.width) }} × {{ Math.round(selectedScreen.height) }}</span>
+      <div v-if="selScreen" class="sel" :class="{ dim: selBoxes.length }" :style="box(selScreen)">
+        <template v-if="!selBoxes.length">
+          <span class="handle" style="left: -4px; top: -4px" /><span class="handle" style="right: -4px; top: -4px" />
+          <span class="handle" style="left: -4px; bottom: -4px" /><span class="handle" style="right: -4px; bottom: -4px" />
+          <span class="size num">{{ Math.round(selScreen.width) }} × {{ Math.round(selScreen.height) }}</span>
+        </template>
+      </div>
+      <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :style="box({ x: b.x, y: b.y, width: b.w, height: b.h })" />
+      <div v-if="single" class="sel none" :style="box({ x: single.x, y: single.y, width: single.w, height: single.h })">
+        <template v-if="!single.locked">
+          <span v-for="c in (['nw', 'ne', 'sw', 'se'] as const)" :key="c" :class="['handle', 'live', c]" @pointerdown.stop.prevent="startResize($event, c)" />
+        </template>
+        <span class="size num">{{ Math.round(single.w) }} × {{ Math.round(single.h) }}</span>
       </div>
       <div v-if="draft" class="sel" :style="box(draft)"><span class="size num">{{ draft.width }} × {{ draft.height }}</span></div>
     </div>
@@ -243,15 +430,22 @@ const selectedScreen = computed(() => props.screens.find((s) => s.id === props.s
 </template>
 
 <style scoped>
-.canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); }
+.canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
-.frame { position: absolute; pointer-events: auto; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; }
-.frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
-.draft { position: absolute; background: rgb(255 255 255 / 70%); }
+.frame { position: absolute; pointer-events: auto; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
+.thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
+.draft { position: absolute; background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
 .overlay { position: absolute; inset: 0; pointer-events: none; }
 .label { position: absolute; pointer-events: auto; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
 .label.on { color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .sel { position: absolute; box-shadow: 0 0 0 1.5px var(--sys-color-brand-primary-default); }
+.sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); }
+.sel.none { box-shadow: none; }
 .hl { position: absolute; box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default); background: color-mix(in srgb, var(--sys-color-brand-primary-default) 6%, transparent); }
+.handle.live { pointer-events: auto; width: 8px; height: 8px; }
+.handle.nw { left: -4px; top: -4px; cursor: nwse-resize; }
+.handle.se { right: -4px; bottom: -4px; cursor: nwse-resize; }
+.handle.ne { right: -4px; top: -4px; cursor: nesw-resize; }
+.handle.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
 .size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: var(--ref-spacing-04); padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 500; white-space: nowrap; }
 </style>

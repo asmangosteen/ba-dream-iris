@@ -4,6 +4,10 @@ import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
+import InspectorLayer from '~/components/editor/InspectorLayer.vue'
+import LayerTree from '~/components/editor/LayerTree.vue'
+import { createLayerStore, LAYER_STORE } from '~/canvas/store'
+import { uploadImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
@@ -27,17 +31,27 @@ const { addRequirement, setLink } = useIrisMutations()
 const left = ref<'file' | 'assets' | 'docs'>('file')
 const tab = ref<'design' | 'plan' | 'dev'>('plan')
 const tool = ref<Tool>('move')
-const selected = ref<string | null>(null)
 const asset = ref<string | null>(null)
 const docId = ref<string | null>(null)
 const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
+const { tokens } = useDesignSystem()
+const supabase = useSupabaseClient()
+const preview = useDevPreview()
+// 화면 안 레이어: 고르기 · 실행취소 · 자동저장
+const store = createLayerStore({
+  screens: list,
+  save: (sid, doc) => updateScreen(sid, { layers: doc }),
+  tokens: computed(() => (tokens.data.value ?? []).map((t) => ({ name: t.name, value: t.value }))),
+})
+provide(LAYER_STORE, store)
+const selected = store.screenId
 const current = computed(() => list.value.find((s) => s.id === selected.value) ?? null)
 const openDoc = computed(() => (docs.data.value ?? []).find((d) => d.id === docId.value) ?? null)
 const docReqs = computed(() => (reqs.data.value ?? []).filter((r) => r.document_id === docId.value))
@@ -60,7 +74,7 @@ const views = new Map<string, Viewport>() // 페이지마다 보던 위치 기�
 let fitted: string | null = null
 watch(pageId, (next, prev) => {
   if (prev) views.set(prev, { ...vp.value })
-  selected.value = null
+  store.selectScreen(null)
   const v = next ? views.get(next) : undefined
   if (v) { vp.value = v; fitted = next }
 })
@@ -89,7 +103,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
   try {
     const row = await addScreen(rect)
-    if (row) { selected.value = row.id; tab.value = 'design' }
+    if (row) { store.selectScreen(row.id); tab.value = 'design' }
   } catch { say('화면을 만들지 못했어요. 다시 시도해주세요.') }
 }
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
@@ -98,7 +112,7 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); selected.value = null; say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요.') }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요.') }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 async function onFigmaCreated() {
@@ -114,7 +128,7 @@ async function pickScreen(id: string, focus = false) {
     pageId.value = s.page_id
     await until(() => screens.status.value === 'success' && list.value.some((v) => v.id === id))
   }
-  selected.value = id
+  store.selectScreen(id)
   if (focus) setTimeout(() => canvas.value?.fit([id]), 60)
 }
 function until(ok: () => boolean, ms = 3000) {
@@ -168,6 +182,43 @@ onMounted(async () => {
   if (q.doc || q.screen) router.replace({ query: {} })
 })
 
+// ---------------------------------------------------------------------------
+// 그리기 도구: 그린 뒤에는 디자인 탭, 이미지는 파일 고르기
+// ---------------------------------------------------------------------------
+watch(tool, (t, prev) => {
+  if (t === 'move' && (prev === 'rect' || prev === 'text' || prev === 'frame') && store.layerIds.value.length) tab.value = 'design'
+  if (t === 'image') { tool.value = 'move'; pickImage() }
+})
+const fileInput = ref<HTMLInputElement | null>(null)
+let replaceId: string | null = null
+function pickImage(replace?: string) {
+  const s = current.value
+  if (!s || s.source !== 'native') return say('이미지를 넣을 Iris 캔버스 화면을 먼저 골라주세요')
+  replaceId = typeof replace === 'string' ? replace : null
+  fileInput.value?.click()
+}
+async function onImageFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  const s = current.value
+  if (!file || !s) return
+  if (!file.type.startsWith('image/')) return say('이미지 파일만 넣을 수 있어요')
+  if (file.size > 10 * 1024 * 1024) return say('10MB 보다 작은 이미지만 넣을 수 있어요')
+  try {
+    const img = await uploadImage(file, s.id, { supabase, preview })
+    if (replaceId) { store.update(s.id, [replaceId], { src: img.src }); return }
+    const k = Math.min(1, (s.width * 0.7) / img.w, (s.height * 0.5) / img.h)
+    const w = Math.round(img.w * k), h = Math.round(img.h * k)
+    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: Math.round((s.width - w) / 2), y: Math.round((s.height - h) / 2), w, h })
+    tab.value = 'design'
+  } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요.') }
+}
+// 저장이 끝나기 전에 떠나면 알리기
+function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error') { e.preventDefault(); e.returnValue = '' } }
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
+onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnload); store.flushAll() })
+
 // 툴바 버튼
 function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   if (k === 'assets') { left.value = 'assets'; asset.value = null }
@@ -198,9 +249,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       v-model:tool="tool"
       v-model:viewport="vp"
       :screens="list"
-      :selected="selected"
       :highlight="highlight"
-      @select="(id) => (selected = id)"
       @move="onMove"
       @create="onCreate"
       @hint="say"
@@ -215,6 +264,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <div class="sq float s pill-left">
       <NuxtLink to="/" class="sq hov home" aria-label="Iris 홈으로"><img src="/bd-symbol.svg" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></NuxtLink>
       <span class="tx-head ellipsis">{{ project.data.value?.name ?? '' }}</span>
+      <span v-if="store.saveState.state === 'saving'" class="tx-meta save">저장 중</span>
+      <button v-else-if="store.saveState.state === 'error'" class="tx-meta save err" @click="store.flushAll()">저장 못 함 · 다시</button>
     </div>
 
     <!-- 왼쪽 패널 -->
@@ -234,11 +285,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         </section>
         <section class="layers">
           <span class="nav-label">레이어</span>
-          <button v-for="s in list" :key="s.id" :class="['sq', 'nav-item', 's', { on: selected === s.id }]" @click="pickScreen(s.id)">
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="flex-none"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
-            <span class="ellipsis">{{ s.name }}</span>
-            <Icon v-if="s.source === 'figma'" name="arrow_up_right" :size="12" class="lead-auto muted" />
-          </button>
+          <LayerTree :screens="list" @pick-screen="pickScreen" />
           <p v-if="screens.status.value === 'success' && !list.length" class="tx-meta empty">화면이 아직 없어요</p>
         </section>
       </template>
@@ -295,7 +342,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
               <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">확대</span><span class="tx-meta">⌘ +</span></button>
               <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">축소</span><span class="tx-meta">⌘ −</span></button>
               <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">전체 보기</span><span class="tx-meta">⇧ 1</span></button>
-              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fit([selected])"><span class="f1">선택 보기</span><span class="tx-meta">⇧ 2</span></button>
+              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">선택 보기</span><span class="tx-meta">⇧ 2</span></button>
               <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">{{ z * 100 }}%</button>
             </div>
           </div>
@@ -312,6 +359,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           <div class="scroll">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
+            <InspectorLayer v-else-if="store.layerIds.value.length" :screen="current" @replace-image="pickImage" />
             <InspectorDesign v-else :screen="current" @update="onUpdate" @remove="onRemove" />
           </div>
         </template>
@@ -326,6 +374,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 
     <Transition name="toast"><div v-if="toast" class="sq toast" role="status">{{ toast }}</div></Transition>
 
+    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
   </div>
@@ -335,6 +384,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .editor { height: 100vh; position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
 .canvas-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-02); pointer-events: none; }
 .canvas-empty .row { display: flex; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); pointer-events: auto; }
+.save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
+.save.err { color: var(--sys-color-theme-error-default); }
 .pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 3; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
