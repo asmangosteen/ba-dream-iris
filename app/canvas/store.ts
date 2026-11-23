@@ -1,4 +1,6 @@
 import type { InjectionKey, Ref } from 'vue'
+import { relayout as layoutDoc, constrain, boxes0 } from './layout'
+import { guessAxis, currentGap } from './geom'
 import { absPos, bindLiteral, descendants, isContainer, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
@@ -95,13 +97,16 @@ export function createLayerStore(opts: {
   const pushAction = (screenId: string | null, undo: () => unknown, redo: () => unknown) => push({ kind: 'action', screenId, undo, redo })
   /** 바꾸기 전 모습을 받아 두는 시작점 (끌기처럼 여러 번 바뀌다가 끝에 한 번 기록할 때) */
   const begin = (sid: string) => snap(sid)
-  const commit = (sid: string, before: string) => record(sid, before)
+  const commit = (sid: string, before: string) => { layoutDoc(doc(sid)); record(sid, before) }
   function mutate<T>(sid: string, fn: (d: LayerDoc) => T): T {
     const before = snap(sid)
     const out = fn(doc(sid))
+    layoutDoc(doc(sid)) // 오토 레이아웃은 바뀔 때마다 다시 계산
     record(sid, before)
     return out
   }
+  /** 끄는 중(기록 없이) 오토 레이아웃 다시 계산 */
+  const relayout = (sid: string) => layoutDoc(doc(sid))
 
   function restore(sid: string, json: string) {
     docs[sid] = JSON.parse(json)
@@ -286,6 +291,62 @@ export function createLayerStore(opts: {
   function duplicate() { if (copy()) paste() }
   /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름 */
   function duplicateInPlace() { const keep = clipboard; if (copy()) paste(undefined, 0); clipboard = keep }
+
+  /**
+   * ⇧A 오토 레이아웃 더하기(피그마와 같아요): 프레임 하나면 그 프레임에, 아니면 고른 것들을 새 프레임으로 감싸서.
+   * 방향 · 간격은 지금 놓인 모양에서 짐작하고, 크기는 내용에 맞춤(Hug)
+   */
+  function addAutoLayout(sid: string, ids: string[]) {
+    const d0 = doc(sid)
+    const one = ids.length === 1 ? d0.nodes[ids[0]!] : undefined
+    let fid = one && one.type === 'frame' && !one.style.layout ? one.id : null
+    if (!fid) {
+      if (one?.style.layout) return
+      wrap(sid, ids, 'frame')
+      fid = layerIds.value[0] ?? null
+      if (!fid) return
+    }
+    const target = fid
+    mutate(sid, (d) => {
+      const f = d.nodes[target]!
+      const kids = (f.children ?? []).map((c) => d.nodes[c]!).filter(Boolean)
+      const rs = kids.map((k) => ({ x: k.x, y: k.y, w: k.w, h: k.h }))
+      const axis = rs.length >= 2 ? guessAxis(rs) : 'y'
+      const gap = rs.length >= 2 ? Math.max(0, currentGap(rs, axis) ?? 10) : 10
+      const minX = Math.min(...rs.map((r) => r.x), f.w), minY = Math.min(...rs.map((r) => r.y), f.h)
+      const pad = one?.type === 'frame' && rs.length ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
+      // 진행 방향 순서대로
+      f.children = [...(f.children ?? [])].sort((a, b) => (axis === 'x' ? d.nodes[a]!.x - d.nodes[b]!.x : d.nodes[a]!.y - d.nodes[b]!.y))
+      f.style = { ...f.style, layout: { mode: axis === 'x' ? 'horizontal' : 'vertical', gap, padding: [pad, pad, pad, pad], align: 'start', cross: 'start' } }
+      f.sizeH = 'hug'; f.sizeV = 'hug'
+      if (!one || one.type !== 'frame') f.style.fill = undefined // 감쌀 때는 바탕 없이(피그마와 같아요)
+    })
+    layerIds.value = [target]
+  }
+  function removeAutoLayout(sid: string, ids: string[]) {
+    mutate(sid, (d) => { for (const id of ids) { const n = d.nodes[id]; if (n?.style.layout) { const s2 = { ...n.style }; delete s2.layout; n.style = s2; delete n.sizeH; delete n.sizeV } } })
+  }
+  /** 크기 바꾸기(제약 적용): 오토 레이아웃이 아닌 프레임이면 자식이 제약대로 따라와요 */
+  function sizeTo(sid: string, ids: string[], fn: (n: LayerNode) => Partial<LayerNode>) {
+    mutate(sid, (d) => {
+      for (const id of ids) {
+        const n = d.nodes[id]
+        if (!n) continue
+        const ow = n.w, oh = n.h
+        Object.assign(n, fn(n))
+        if (isContainer(n) && !n.style.layout && (ow !== n.w || oh !== n.h)) {
+          const kids = (n.children ?? []).map((c) => d.nodes[c]!).filter(Boolean)
+          constrain(kids, boxes0(kids), ow, oh, n.w, n.h)
+        }
+      }
+    })
+  }
+  /** 화면 크기가 바뀔 때 맨 위 레이어들을 제약대로. kids0 이 있으면 그 상자 기준(끄는 중) */
+  function constrainRoot(sid: string, ow: number, oh: number, nw: number, nh: number, kids0?: Record<string, { x: number; y: number; w: number; h: number }>, record0 = true) {
+    const run = (d: LayerDoc) => { const kids = d.rootIds.map((c) => d.nodes[c]!).filter(Boolean); constrain(kids, kids0 ?? boxes0(kids), ow, oh, nw, nh) }
+    if (record0) mutate(sid, run)
+    else { run(doc(sid)); layoutDoc(doc(sid)) }
+  }
 
   /**
    * 같은 화면 안에서 부모 바꾸기(끌어서 프레임 밖으로 · 안으로). 화면 위 위치는 그대로.
@@ -478,7 +539,7 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

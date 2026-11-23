@@ -170,13 +170,15 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
   const fail = () => say('Couldn\'t save. Try again')
+  // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요(실행취소는 레이어 기록이 따로)
+  if (s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
   updateScreen(s.id, patch).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); store.selectScreen(null); say(`Deleted ${name}`) } catch { say('화면을 지우지 못했어요') }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(`Deleted ${name}`) } catch { say('Couldn\'t delete the frame') }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 
@@ -441,6 +443,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       :background="currentPage?.viewport?.background ?? null"
       :pixel-grid="currentPage?.viewport?.pixelGrid !== false"
       :highlight="highlight"
+      :guides="currentPage?.viewport?.guides ?? { x: [], y: [] }"
+      @guides="(g) => onPageSettings({ guides: g })"
       @move="onMove"
       @resize-screen="onResizeScreen"
       @arrange-screens="onArrangeScreens"

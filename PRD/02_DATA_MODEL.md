@@ -126,7 +126,7 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
             "rotation": 90, "flipX": true, "lockRatio": true,
             "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 5
+  "schemaVersion": 6
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
@@ -176,6 +176,18 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 | style.sides · points · inner | 다각형 꼭짓점 · 별 꼭짓점 · 별 안쪽 비율 | `5`, `5`, `0.38` | 3, 5, 0.38 |
 | style.fit · crop | 이미지 채우기(fill · fit · crop · tile), 자르기 { scale, x, y } | `"crop"`, `{"scale":1.5,"x":50,"y":30}` | fill |
 | style.decoration · textCase · list · paraSpacing | 밑줄 · 취소선, 대소문자, 글머리 · 번호 목록, 문단 간격 | `"underline"`, `"upper"`, `"bullet"`, `8` | 없음 |
+
+- **schemaVersion 6 (2026-11-23)**: 3묶음(레이아웃). 모두 비어 있어도 되는 값이라 v1~v5 문서는 그대로 읽힌다. 오토 레이아웃은 바뀔 때마다 자식 x · y · w · h 를 다시 계산해 써 넣는다(`app/canvas/layout.ts`).
+
+| 필드 | 설명 | 예시 | 기본 |
+|---|---|---|---|
+| style.layout | 오토 레이아웃: mode(horizontal · vertical) · wrap · gap(숫자 또는 'auto' = 사이 띄우기) · rowGap · padding[위, 오른, 아래, 왼] · align · cross(start · center · end) | `{"mode":"vertical","gap":12,"padding":[20,20,20,20],"align":"start","cross":"start"}` | 없음 |
+| sizeH · sizeV | 크기 방식 fixed · hug(내용에 맞춤) · fill(부모 채우기) | `"hug"` | fixed(텍스트 autoWidth 는 가로 hug) |
+| absolute | 오토 레이아웃 안에서 자리 무시 | `true` | 없음 |
+| constraints | 제약 { h: left · right · leftright · center · scale, v: top · bottom · topbottom · center · scale } — 부모 프레임 · 화면 크기가 바뀔 때 | `{"h":"right","v":"top"}` | left · top |
+| style.grids · frame.grids | 레이아웃 그리드 columns · rows(count · gutter · margin) · grid(size), color · visible | `[{"type":"columns","count":4,"gutter":16,"margin":16,"color":"#FF000019"}]` | 없음 |
+
+- **페이지 설정** `pages.viewport.guides`: 가이드선 { x: number[], y: number[] } (캔버스 좌표). 눈금자에서 끌어 만들고, 레이어 · 화면을 옮길 때 붙는 대상이 된다.
 - **토큰 id**: 디자인 시스템 CSS 변수 이름(`--sys-color-…` · `--ref-color-…` · `--ref-spacing-…` · `--ref-radius-…` · `--ref-borderwidth-…` · `--ref-opacity-…` · `--font-weight-…` · `--typography-<스타일>-size|line-height|letter-spacing`), 글자 스타일 묶음 `ts:<스타일>`(예: `ts:body-1` = 크기 · 행간 · 자간 함께), DB 에 등록한 토큰 `db:<이름>`.
 - **값은 함께 저장한다**: 연결할 때 실제 값(밝은 모드 기준, 예: `fill: "#2C7BE2"`, `radius: 8`)도 그 속성에 써 둔다. 그래서 그리기 · 썸네일 · 내보내기는 `vars` 를 몰라도 되고, 앱을 다크모드로 바꿔도 캔버스 결과물 색은 바뀌지 않는다.
 - **연결 풀기**: 연결은 그대로인데 그 속성 값이 바뀌면(직접 입력 · ↑↓ · 캔버스에서 끌어 옮기기 · 크기 바꾸기) 그 키의 연결을 자동으로 푼다(`app/canvas/store.ts` 의 `record()` → `detachEdited`). 글자 크기 · 행간 · 자간 중 하나가 바뀌면 `textStyle` 도 풀린다.

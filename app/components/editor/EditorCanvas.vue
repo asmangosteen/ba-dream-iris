@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
-import { descendants, isContainer, normAngle, ratioLocked, frameCss, type LayerType } from '~/canvas/schema'
+import { descendants, isContainer, normAngle, ratioLocked, frameCss, type LayerNode, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { simplify } from '~/canvas/paint'
+import { boxes0, constrain, slotIndex } from '~/canvas/layout'
+import GridOverlay from '~/components/editor/GridOverlay.vue'
+import CanvasRulers from '~/components/editor/CanvasRulers.vue'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
 
@@ -17,7 +20,7 @@ import LayerView from '~/components/editor/LayerView.vue'
  */
 export interface Viewport { x: number; y: number; zoom: number }
 
-const props = defineProps<{ screens: ScreenRow[]; highlight?: string[]; background?: string | null; pixelGrid?: boolean }>()
+const props = defineProps<{ screens: ScreenRow[]; highlight?: string[]; background?: string | null; pixelGrid?: boolean; guides?: { x: number[]; y: number[] } }>()
 const tool = defineModel<Tool>('tool', { required: true })
 const vp = defineModel<Viewport>('viewport', { required: true })
 const emit = defineEmits<{
@@ -32,6 +35,8 @@ const emit = defineEmits<{
   /** 캔버스에 파일을 끌어 놓았을 때(캔버스 좌표) */
   'drop-files': [files: File[], at: { x: number; y: number }]
   'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx?: number, dy?: number]
+  /** 가이드선 바뀜 */
+  guides: [g: { x: number[]; y: number[] }]
 }>()
 const store = useLayerStore()
 
@@ -100,8 +105,8 @@ type Drag =
   | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
-  | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean }
-  | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean }
+  | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
+  | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
   | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean }
@@ -177,8 +182,7 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
   const ex = new Set(roots.flatMap((id) => descendants(d, id)))
   const target = frameAt(sc.id, w.x - sc.x, w.y - sc.y, ex)
   const moving = roots.filter((id) => d.nodes[id] && d.nodes[id]!.parentId !== target)
-  if (!moving.length) return
-  store.reparent(sc.id, moving, target)
+  if (moving.length) store.reparent(sc.id, moving, target)
   for (const id of moving) {
     const n = d.nodes[id]
     if (!n) continue
@@ -186,6 +190,41 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
     const v = applyVec(dg.inv[id]!, dx, dy)
     dg.orig[id] = { x: n.x - v.x, y: n.y - v.y }
   }
+  // 오토 레이아웃 안: 포인터 자리로 순서 바꾸기(자리는 레이아웃이 정해요)
+  const p = target ? d.nodes[target] : null
+  if (p?.style.layout) {
+    const flow = roots.filter((id) => d.nodes[id]?.parentId === target && !d.nodes[id]!.absolute)
+    if (flow.length) {
+      const pp = store.absPos(sc.id, p.id)
+      const idx = slotIndex(d, p, { x: w.x - sc.x - pp.x, y: w.y - sc.y - pp.y }, new Set(flow))
+      const rest = (p.children ?? []).filter((c) => !flow.includes(c))
+      const next = [...rest.slice(0, idx), ...flow, ...rest.slice(idx)]
+      if (next.join() !== (p.children ?? []).join()) p.children = next
+    }
+  }
+  store.relayout(sc.id)
+}
+
+/** 스케일 도구(K): 끌기 전 모습(sub0)에서 k 배로 — 안쪽 레이어 자리 · 크기와 선 · 글자 · 모서리 · 효과까지 */
+function scaleSubtree(sid: string, sub0: string, k: number, x: number, y: number) {
+  const d = store.doc(sid)
+  const orig = JSON.parse(sub0) as LayerNode[]
+  const sc = (v?: number) => (v === undefined ? v : Math.round(v * k * 100) / 100)
+  orig.forEach((o, i) => {
+    const n = d.nodes[o.id]
+    if (!n) return
+    const st = { ...o.style }
+    st.strokeWidth = sc(o.style.strokeWidth); st.radius = sc(o.style.radius); st.fontSize = sc(o.style.fontSize); st.lineHeight = sc(o.style.lineHeight)
+    st.letterSpacing = sc(o.style.letterSpacing); st.paraSpacing = sc(o.style.paraSpacing)
+    if (o.style.radii) st.radii = o.style.radii.map((r) => sc(r)!) as [number, number, number, number]
+    if (o.style.dash) st.dash = [sc(o.style.dash[0])!, sc(o.style.dash[1])!]
+    if (o.style.effects) st.effects = o.style.effects.map((e) => (e.type === 'drop' || e.type === 'inner' ? { ...e, x: sc(e.x)!, y: sc(e.y)!, blur: sc(e.blur)!, spread: sc(e.spread) } : { ...e, blur: sc(e.blur)! }))
+    if (o.style.layout) st.layout = { ...o.style.layout, gap: o.style.layout.gap === 'auto' ? 'auto' : sc(o.style.layout.gap)!, padding: o.style.layout.padding.map((p) => sc(p)!) as [number, number, number, number] }
+    for (const key of Object.keys(st) as (keyof typeof st)[]) if (st[key] === undefined) delete st[key]
+    n.style = st
+    if (i === 0) { n.x = x; n.y = y; return }
+    n.x = sc(o.x)!; n.y = sc(o.y)!; n.w = Math.max(1, sc(o.w)!); n.h = Math.max(1, sc(o.h)!)
+  })
 }
 
 /** 캔버스 위 섹션을 옮기면 그 안에 완전히 들어간 화면도 함께 */
@@ -225,7 +264,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       return
     }
     // 이동 도구 → 상자 선택 (피그마와 같아요. 화면 이동은 스페이스 · 손 도구 H · 스크롤)
-    if (tool.value === 'move') { drag = { kind: 'marqueeCanvas', wx: w.x, wy: w.y, moved: false }; marqueeOn.value = true; return }
+    if (tool.value === 'move' || tool.value === 'scale') { drag = { kind: 'marqueeCanvas', wx: w.x, wy: w.y, moved: false }; marqueeOn.value = true; return }
     return
   }
   const w = toWorld(e.clientX, e.clientY)
@@ -248,7 +287,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     drag = { kind: 'drawLayer', sid: screen.id, type: t, parentId, px: p.x, py: p.y, lx, ly, moved: false }
     return
   }
-  if (tool.value !== 'move') return
+  if (tool.value !== 'move' && tool.value !== 'scale') return
   // 레이어 고르기 · 끌기
   const layerEl = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
   const lid = layerEl?.dataset.layer
@@ -299,7 +338,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   }
   store.selectScreen(screen.id)
   const sid0 = screen.id
-  drag = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : realScreens.value.filter((v) => v.id !== sid0).map(rectOf), moved: false, clickLayer: screenGrab ? lid : undefined }
+  drag = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined }
 }
 
 const rectOf = (s: { x: number; y: number; width: number; height: number }): Rect => ({ x: s.x, y: s.y, w: s.width, h: s.height })
@@ -313,8 +352,11 @@ function snapTargets(s: ScreenRow, ids: string[]): Targets {
   if (pid) { const p = layerWorld(s, pid); if (p) parents.push(p) }
   else if (isCanvas(s)) sibs.push(...realScreens.value.map(rectOf))
   else parents.push(rectOf(s))
+  sibs.push(...guideRects())
   return { sibs, parents }
 }
+/** 가이드선도 붙는 대상(폭 0 인 긴 상자) */
+const guideRects = (): Rect[] => [...(props.guides?.x ?? []).map((x) => ({ x, y: -1e6, w: 0, h: 2e6 })), ...(props.guides?.y ?? []).map((y) => ({ x: -1e6, y, w: 2e6, h: 0 }))]
 const snapOff = (e: PointerEvent) => e.metaKey || e.ctrlKey
 const thr = () => 6 / vp.value.zoom
 
@@ -326,14 +368,17 @@ function startResize(e: PointerEvent, handle: Handle) {
   if (!n) return
   try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
   const g = layerGeom(s, id)!
-  drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n), targets: snapTargets(s, [id]), before: store.begin(s.id), moved: false }
+  const d0 = store.doc(s.id)
+  const kids = isContainer(n) && !n.style.layout ? (n.children ?? []).map((c) => d0.nodes[c]!).filter(Boolean) : []
+  drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n) || tool.value === 'scale', targets: snapTargets(s, [id]), before: store.begin(s.id), moved: false, kids0: kids.length ? boxes0(kids) : undefined, sub0: tool.value === 'scale' ? JSON.stringify(descendants(d0, id).map((k) => d0.nodes[k])) : undefined }
 }
 /** 고른 화면(프레임)의 변 · 모서리 */
 function startScreenResize(e: PointerEvent, handle: Handle) {
   const s = selFrame.value
   if (!s) return
   try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
-  drag = { kind: 'resizeScreen', id: s.id, handle, sx: e.clientX, sy: e.clientY, o: rectOf(s), targets: realScreens.value.filter((v) => v.id !== s.id).map(rectOf), moved: false }
+  const kids = isNative(s) ? store.doc(s.id).rootIds.map((c) => store.doc(s.id).nodes[c]!).filter(Boolean) : []
+  drag = { kind: 'resizeScreen', id: s.id, handle, sx: e.clientX, sy: e.clientY, o: rectOf(s), targets: realScreens.value.filter((v) => v.id !== s.id).map(rectOf), moved: false, kids0: kids.length ? boxes0(kids) : undefined, before: kids.length ? store.begin(s.id) : undefined }
 }
 /** 모서리 바로 바깥을 끌어 돌리기 */
 function startRotate(e: PointerEvent) {
@@ -408,7 +453,9 @@ function move(e: PointerEvent) {
     const lock = e.shiftKey ? (Math.abs(dx) > Math.abs(dy) ? 'y' : 'x') : null // Shift: 가로나 세로로만
     if (lock === 'y') dy = 0
     if (lock === 'x') dx = 0
-    if (drag.b0 && !snapOff(e)) {
+    const dl = store.doc(drag.sid)
+    const inFlow = drag.ids.some((id) => { const n = dl.nodes[id]; return !!n && !n.absolute && !!n.parentId && !!dl.nodes[n.parentId]?.style.layout })
+    if (drag.b0 && !snapOff(e) && !inFlow) {
       const r = snapMove({ ...drag.b0, x: drag.b0.x + dx, y: drag.b0.y + dy }, drag.targets.sibs, drag.targets.parents, thr(), { x: lock !== 'x', y: lock !== 'y' })
       dx += r.dx; dy += r.dy; guides.value = r.guides
     } else guides.value = null
@@ -429,7 +476,22 @@ function move(e: PointerEvent) {
     guides.value = r.guide
     const c = apply(drag.pinv, r.cx, r.cy)
     const n = store.node(drag.sid, drag.id)
-    if (n) { Object.assign(n, { x: Math.round(c.x - r.w / 2), y: Math.round(c.y - r.h / 2), w: r.w, h: r.h }); if (n.type === 'text') n.style.autoWidth = false }
+    if (n) {
+      Object.assign(n, { x: Math.round(c.x - r.w / 2), y: Math.round(c.y - r.h / 2), w: r.w, h: r.h })
+      if (drag.sub0) scaleSubtree(drag.sid, drag.sub0, r.w / drag.g.w, n.x, n.y) // 스케일 도구(K): 안쪽까지 같은 비율로
+      else {
+        if (n.type === 'text') n.style.autoWidth = false
+        // 직접 크기를 바꾸면 그 방향은 고정 크기로(피그마와 같아요)
+        if (r.w !== drag.g.w && n.sizeH && n.sizeH !== 'fixed') n.sizeH = 'fixed'
+        if (r.h !== drag.g.h && n.sizeV && n.sizeV !== 'fixed') n.sizeV = 'fixed'
+        // 제약: 안쪽 레이어가 따라와요(⌘ 를 누르면 무시)
+        if (drag.kids0 && !e.metaKey) {
+          const d = store.doc(drag.sid)
+          constrain((n.children ?? []).map((k) => d.nodes[k]!).filter(Boolean), drag.kids0, drag.g.w, drag.g.h, r.w, r.h)
+        }
+      }
+      store.relayout(drag.sid)
+    }
   } else if (drag.kind === 'resizeScreen') {
     const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 1) return
@@ -438,6 +500,7 @@ function move(e: PointerEvent) {
     const r = resizeBox({ cx: o.x + o.w / 2, cy: o.y + o.h / 2, w: o.w, h: o.h, angle: 0 }, drag.handle, dx, dy, e, false, drag.targets)
     guides.value = r.guide
     emit('resize-screen', drag.id, { x: Math.round(r.cx - r.w / 2), y: Math.round(r.cy - r.h / 2), width: r.w, height: r.h }, false)
+    if (drag.kids0 && !e.metaKey) store.constrainRoot(drag.id, o.w, o.h, r.w, r.h, drag.kids0, false)
   } else if (drag.kind === 'rotate') {
     drag.moved = true
     let deg = drag.r0 + (drag.sign * (Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx) - drag.a0) * 180) / Math.PI
@@ -565,6 +628,7 @@ function end(e: PointerEvent) {
   if ((d.kind === 'layers' || d.kind === 'screen') && !d.moved && d.clickLayer) store.selectLayer(d.kind === 'layers' ? d.sid : d.id, d.clickLayer)
   if (d.kind === 'layers' && d.moved) for (const c of d.carry) { const v = props.screens.find((x) => x.id === c.id); if (v) emit('move', c.id, v.x, v.y, true) }
   if (d.kind === 'drawLine' || d.kind === 'pencil') { draftPts.value = null; tool.value = 'move'; finishPoints(d) }
+  if (d.kind === 'resizeScreen' && d.moved && d.before) store.commit(d.id, d.before)
   if (d.kind === 'resizeScreen' && d.moved) {
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('resize-screen', d.id, { x: s.x, y: s.y, width: s.width, height: s.height }, true)
@@ -627,6 +691,16 @@ const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('inpu
  * 피그마와 같은 단축키. 레이어를 골랐으면 레이어에, 화면만 골랐으면 화면에 적용합니다.
  * 이동 V · 프레임 F/A · 사각형 R · 텍스트 T 는 EditorToolbar 가 받습니다.
  */
+const gridsShown = useLayoutGridsShown()
+const rulersShown = useState('iris-rulers', () => false)
+/** 고른 것의 캔버스 좌표 상자(눈금자에 표시) */
+const selWorld = computed(() => {
+  void tick.value
+  const s = selScreen.value
+  if (!s) return null
+  if (store.layerIds.value.length) { const bs = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b); return bs.length ? union(bs) : null }
+  return isCanvas(s) ? null : rectOf(s)
+})
 /** 마지막에 복사한 것: 레이어 · 화면 */
 let lastCopy: 'layers' | 'screen' | null = null
 function onKeyDown(e: KeyboardEvent) {
@@ -668,6 +742,12 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.shiftKey && !mod && e.code === 'Digit1') { fit(); return }
   if (e.shiftKey && !mod && e.code === 'Digit2' && sid) { fitSelection(); return }
   if (e.shiftKey && !mod && e.code === 'Digit0') { zoomAt(1); return }
+  // 눈금자 ⇧R
+  if (e.shiftKey && !mod && !e.altKey && e.code === 'KeyR') { stop(); rulersShown.value = !rulersShown.value; return }
+  // 레이아웃 그리드 보이기 · 숨기기 ⌃G
+  if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? 'Layout grids shown' : 'Layout grids hidden'); return }
+  // 오토 레이아웃 ⇧A · 빼기 ⌥⇧A
+  if (e.shiftKey && !mod && e.code === 'KeyA') { if (layerMode && native) { stop(); if (e.altKey) store.removeAutoLayout(sid!, ids); else store.addAutoLayout(sid!, ids) } return }
   // 속성 복사 · 붙여넣기 ⌥⌘C / ⌥⌘V
   if (mod && e.altKey && e.code === 'KeyC') { if (layerMode && store.copyStyle()) { stop(); emit('hint', 'Copied properties') } return }
   if (mod && e.altKey && e.code === 'KeyV') { if (layerMode) { stop(); store.pasteStyle() } return }
@@ -932,7 +1012,7 @@ function onDrop(e: DragEvent) {
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
 const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color) : {})
 const marqueeOn = ref(false)
-const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
+const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' || tool.value === 'scale' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
 
 <template>
@@ -969,6 +1049,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <img v-if="s.thumbnail_path && s.source === 'figma'" :src="s.thumbnail_path" alt="" draggable="false" class="thumb">
         <template v-else>
           <LayerView v-for="id in store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
+          <GridOverlay v-if="store.doc(s.id).frame?.grids" :grids="store.doc(s.id).frame?.grids" :w="s.width" :h="s.height" />
         </template>
       </div>
       <!-- 캔버스 위(화면 밖) 레이어: 화면들 위에 그려요 -->
@@ -1021,6 +1102,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-if="draft && marqueeOn" class="marq" :style="box(draft)" />
       <svg v-if="draftPts" class="guides draw" width="100%" height="100%"><polyline :points="draftPts.map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ')" /></svg>
     </div>
+    <CanvasRulers :vp="vp" :guides="props.guides ?? { x: [], y: [] }" :sel="selWorld" :rulers="rulersShown" @change="(g) => emit('guides', g)" />
   </main>
 </template>
 

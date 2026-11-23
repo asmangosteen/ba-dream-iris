@@ -2,6 +2,7 @@
 import { isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { useImageSrc } from '~/canvas/images'
+import GridOverlay from '~/components/editor/GridOverlay.vue'
 import { backgroundCss, defaultAlign, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
@@ -161,6 +162,7 @@ function onKey(e: KeyboardEvent) {
     <span v-if="n.type === 'section'" class="sec-name">{{ n.name }}</span>
     <template v-if="isContainer(n)">
       <LayerView v-for="c in n.children ?? []" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
+      <GridOverlay v-if="n.style.grids" :grids="n.style.grids" :w="n.w" :h="n.h" />
     </template>
     <img v-else-if="n.type === 'image'" :src="imageSrc(n.src)" alt="" draggable="false" :style="imgStyle">
     <template v-else-if="n.type === 'text'">

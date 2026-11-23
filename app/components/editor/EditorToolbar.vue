@@ -2,13 +2,14 @@
 import { Icon } from '@ba-dream/design-system'
 
 /** 아래 도구 막대. 피그마처럼 묶음 버튼(프레임 · 섹션 / 도형 / 그리기)을 누르면 마지막 도구, ▾ 로 펼쳐서 고르기 */
-export type Tool = 'move' | 'hand' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
+export type Tool = 'move' | 'hand' | 'scale' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
 const tool = defineModel<Tool>({ default: 'move' })
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
 interface Item { key: Tool; label: string; key2?: string; d?: string; icon?: string; fill?: boolean }
 const ITEMS: Record<Tool, Item> = {
   move: { key: 'move', label: 'Move', key2: 'V', d: 'M3.5 2.2l9.3 4.6-4 1.3-1.4 4z', fill: true },
+  scale: { key: 'scale', label: 'Scale', key2: 'K', d: 'M2.5 9.5v4h4M2.5 13.5l5-5M13.5 6.5v-4h-4M13.5 2.5l-5 5M9.5 13.5h4v-4' },
   hand: { key: 'hand', label: 'Hand tool', key2: 'H', d: 'M5.5 8V4.2a1 1 0 0 1 2 0V7.5M7.5 7V3.2a1 1 0 0 1 2 0V7M9.5 7V4.2a1 1 0 0 1 2 0V9.5c0 2.6-1.7 4.5-4.2 4.5-1.6 0-2.6-.7-3.5-2.1L2.4 9.6a1 1 0 0 1 1.6-1.2l1.5 1.6' },
   frame: { key: 'frame', label: 'Frame', key2: 'F', d: 'M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13' },
   section: { key: 'section', label: 'Section', key2: '⇧S', d: 'M2 5V3.5a1.5 1.5 0 0 1 1.5-1.5H7M10 2h2.5A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5V8' },
@@ -23,7 +24,7 @@ const ITEMS: Record<Tool, Item> = {
   text: { key: 'text', label: 'Text', key2: 'T', d: 'M3 4.5V3h10v1.5M8 3v10M6 13h4' },
 }
 const GROUPS: { id: string; tools: Tool[] }[] = [
-  { id: 'move', tools: ['move', 'hand'] },
+  { id: 'move', tools: ['move', 'hand', 'scale'] },
   { id: 'frame', tools: ['frame', 'section'] },
   { id: 'shape', tools: ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star', 'image'] },
   { id: 'draw', tools: ['pencil'] },
@@ -37,7 +38,7 @@ const tip = (it: Item) => (it.key2 ? `${it.label} (${it.key2})` : it.label)
 function pick(t: Tool) { tool.value = t; open.value = null }
 
 // 단축키: 피그마와 같아요
-const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', f: 'frame', a: 'frame', r: 'rect', l: 'line', o: 'ellipse', t: 'text' }
+const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', k: 'scale', f: 'frame', a: 'frame', r: 'rect', l: 'line', o: 'ellipse', t: 'text' }
 const SHIFT_KEYS: Record<string, Tool> = { s: 'section', l: 'arrow', p: 'pencil' }
 function onKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement

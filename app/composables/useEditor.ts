@@ -1,5 +1,5 @@
 /** 페이지 설정(pages.viewport jsonb): 캔버스 배경색 · 픽셀 격자 */
-export interface PageSettings { background?: string | null; pixelGrid?: boolean }
+export interface PageSettings { background?: string | null; pixelGrid?: boolean; /** 가이드선(캔버스 좌표) */ guides?: { x: number[]; y: number[] } }
 export interface PageRow { id: string; name: string; sort_order: number; layers?: unknown; viewport?: PageSettings | null }
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId

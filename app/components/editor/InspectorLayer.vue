@@ -10,6 +10,10 @@ import ArrangeControls from '~/components/editor/ArrangeControls.vue'
 import InspectorPaints from '~/components/editor/InspectorPaints.vue'
 import InspectorEffects from '~/components/editor/InspectorEffects.vue'
 import StyleCreate from '~/components/editor/StyleCreate.vue'
+import InspectorAutoLayout from '~/components/editor/InspectorAutoLayout.vue'
+import InspectorGrids from '~/components/editor/InspectorGrids.vue'
+import { isPageCanvas } from '~/composables/useEditor'
+import type { Constraints, Sizing } from '~/canvas/schema'
 import { BLEND_MODES, defaultAlign } from '~/canvas/paint'
 import { isContainer, isVector } from '~/canvas/schema'
 
@@ -50,7 +54,8 @@ function setNum(key: 'x' | 'y' | 'w' | 'h', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value)
   if (!input.value.trim() || !Number.isFinite(v)) { input.value = show(same((n) => n[key])); return }
-  store.update(sid.value, ids.value, (n) => (key === 'w' || key === 'h' ? sized(n, key, v) : { [key]: Math.max(-1e6, Math.round(v)) }))
+  if (key === 'w' || key === 'h') store.sizeTo(sid.value, ids.value, (n) => ({ ...sized(n, key, v), ...(key === 'w' ? (n.sizeH && n.sizeH !== 'fixed' ? { sizeH: 'fixed' as const } : {}) : (n.sizeV && n.sizeV !== 'fixed' ? { sizeV: 'fixed' as const } : {})) }))
+  else store.update(sid.value, ids.value, { [key]: Math.max(-1e6, Math.round(v)) })
 }
 const locked = computed(() => same((n) => ratioLocked(n)) === true)
 function toggleRatio() { const on = !locked.value; store.update(sid.value, ids.value, { lockRatio: on }) }
@@ -191,6 +196,31 @@ const weights = computed(() => {
   return [...new Set([...base, ...cur])].sort((a, b) => a - b)
 })
 const weightNow = computed(() => same((n) => n.style.fontWeight ?? 400))
+// --- v6: 크기 방식(Fixed · Hug · Fill) · 제약 · 오토 레이아웃 안 자리 무시 ---
+const parentOf = (n: LayerNode) => (n.parentId ? store.node(sid.value, n.parentId) : undefined)
+const inFlow = computed(() => nodes.value.every((n) => !!parentOf(n)?.style.layout))
+const sizingOpts = (axis: 'w' | 'h') => {
+  const o: { k: Sizing; label: string }[] = [{ k: 'fixed', label: axis === 'w' ? 'Fixed width' : 'Fixed height' }]
+  if (nodes.value.every((n) => !!n.style.layout || n.type === 'text')) o.push({ k: 'hug', label: 'Hug contents' })
+  if (inFlow.value) o.push({ k: 'fill', label: 'Fill container' })
+  return o
+}
+const sizingNow = (axis: 'w' | 'h') => same((n) => (axis === 'w' ? n.sizeH ?? (n.type === 'text' && n.style.autoWidth ? 'hug' : 'fixed') : n.sizeV ?? (n.type === 'text' ? 'hug' : 'fixed')))
+function setSizing(axis: 'w' | 'h', v: Sizing) {
+  store.update(sid.value, ids.value, (n) => {
+    const p: Partial<LayerNode> = axis === 'w' ? { sizeH: v === 'fixed' ? undefined : v } : { sizeV: v === 'fixed' ? undefined : v }
+    if (n.type === 'text' && axis === 'w') n.style.autoWidth = v === 'hug'
+    return p
+  })
+}
+const showConstraints = computed(() => !inFlow.value && !isPageCanvas(sid.value) && nodes.value.every((n) => !parentOf(n) || isContainer(parentOf(n))))
+const consNow = (axis: 'h' | 'v') => same((n) => n.constraints?.[axis] ?? (axis === 'h' ? 'left' : 'top'))
+function setCons(axis: 'h' | 'v', v: string) {
+  store.update(sid.value, ids.value, (n) => { const c: Constraints = { h: n.constraints?.h ?? 'left', v: n.constraints?.v ?? 'top', [axis]: v } as Constraints; return { constraints: c.h === 'left' && c.v === 'top' ? undefined : c } })
+}
+const CONS_H = [['left', 'Left'], ['right', 'Right'], ['leftright', 'Left & right'], ['center', 'Center'], ['scale', 'Scale']] as const
+const CONS_V = [['top', 'Top'], ['bottom', 'Bottom'], ['topbottom', 'Top & bottom'], ['center', 'Center'], ['scale', 'Scale']] as const
+
 // --- v5: 선 위치 · 점선 · 끝 모양 · 화살표, 다각형 · 별, 혼합 모드, 이미지 채우기 방식 · 자르기, 텍스트 고급 ---
 const hasStroke = computed(() => nodes.value.some((n) => n.style.strokeWidth && (n.style.stroke || n.style.strokes?.length)))
 const alignNow = computed(() => same((n) => n.style.strokeAlign ?? defaultAlign(n.type)))
@@ -285,7 +315,32 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </button>
         <label class="sq fld"><span>H</span><input v-if="!vb('h')" :value="show(same((n) => n.h))" :placeholder="same((n) => n.h) === 'Mixed' ? 'Mixed' : ''" inputmode="numeric" aria-label="Height" @change="setNum('h', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, 'h', n.h + d)))"><TokenPicker :kinds="['spacing']" :bound="vb('h')" reveal label="Height" @pick="(t) => pickNum('h', t)" @unbind="unbind('h')" @step="(d) => stepNum('h', d)" /></label>
       </div>
+      <div class="grid2">
+        <select v-for="ax in (['w', 'h'] as const)" :key="ax" class="sq sel" :aria-label="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :title="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :value="sizingNow(ax)" @change="setSizing(ax, ($event.target as HTMLSelectElement).value as Sizing)">
+          <option v-if="sizingNow(ax) === 'Mixed'" value="Mixed" disabled>Mixed</option>
+          <option v-for="o in sizingOpts(ax)" :key="o.k" :value="o.k">{{ o.label }}</option>
+        </select>
+      </div>
+      <button v-if="inFlow" :class="['cb', { on: same((n) => !!n.absolute) === true }]" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><i />Absolute position</button>
       <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i />Clip content</button>
+    </section>
+
+    <InspectorAutoLayout v-if="nodes.every((n) => n.type === 'frame')" :sid="sid" :ids="ids" />
+
+    <section v-if="showConstraints" class="s">
+      <div class="sec-h h24"><span>Constraints</span></div>
+      <div class="cons">
+        <div class="cons-box" aria-hidden="true">
+          <i :class="['ct', 'l', { on: ['left', 'leftright'].includes(String(consNow('h'))) }]" /><i :class="['ct', 'r', { on: ['right', 'leftright'].includes(String(consNow('h'))) }]" />
+          <i :class="['ct', 't', { on: ['top', 'topbottom'].includes(String(consNow('v'))) }]" /><i :class="['ct', 'b', { on: ['bottom', 'topbottom'].includes(String(consNow('v'))) }]" />
+          <i :class="['ct', 'ch', { on: consNow('h') === 'center' || consNow('h') === 'scale' }]" /><i :class="['ct', 'cv', { on: consNow('v') === 'center' || consNow('v') === 'scale' }]" />
+          <b />
+        </div>
+        <div class="cons-sel">
+          <select class="sq sel" aria-label="Horizontal constraint" :value="consNow('h')" @change="setCons('h', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('h') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_H" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+          <select class="sq sel" aria-label="Vertical constraint" :value="consNow('v')" @change="setCons('v', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('v') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_V" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+        </div>
+      </div>
     </section>
 
     <section class="s">
@@ -393,6 +448,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 
     <InspectorEffects :sid="sid" :ids="ids" />
 
+    <InspectorGrids v-if="one?.type === 'frame'" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
+
     <section v-if="one?.type === 'image'" class="s">
       <div class="sec-h h24"><span>Image</span></div>
       <div class="seg4">
@@ -427,6 +484,17 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .tog.on { --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); }
 .tog:hover { color: var(--sys-color-neutral-800); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center; }
+.sel { height: 28px; padding: 0 var(--ref-spacing-04); border: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font: inherit; font-size: 12px; color: var(--sys-color-neutral-800); min-width: 0; }
+.sel:focus-visible { outline: 1px solid var(--sys-color-brand-primary-default); }
+.cons { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--ref-spacing-04); align-items: center; }
+.cons-box { position: relative; width: 72px; height: 72px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
+.cons-box b { position: absolute; left: 24px; top: 24px; width: 24px; height: 24px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400); }
+.ct { position: absolute; background: var(--sys-color-neutral-400); border-radius: 1px; }
+.ct.on { background: var(--iris-select, #0D99FF); }
+.ct.l { left: 8px; top: 35px; width: 10px; height: 2px; } .ct.r { right: 8px; top: 35px; width: 10px; height: 2px; }
+.ct.t { top: 8px; left: 35px; width: 2px; height: 10px; } .ct.b { bottom: 8px; left: 35px; width: 2px; height: 10px; }
+.ct.ch { left: 30px; top: 35px; width: 12px; height: 2px; } .ct.cv { top: 30px; left: 35px; width: 2px; height: 12px; }
+.cons-sel { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .ts-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-02); align-items: center; }
 .tools { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .txt-b { width: auto; min-width: 24px; padding: 0 4px; font-size: 11px; font-weight: 500; }

@@ -5,6 +5,7 @@ import type { LayerStyle } from '~/canvas/schema'
 import { colorLabel, parseColor, type CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
+import InspectorGrids from '~/components/editor/InspectorGrids.vue'
 
 /** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기 · 모양(채우기 · 선 · 모서리 · 투명도 · 내용 자르기). 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
 const props = defineProps<{ screen: ScreenRow }>()
@@ -173,6 +174,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           </div>
         </template>
       </section>
+
+      <InspectorGrids :grids="look.grids ?? []" @change="(g) => fstyle({ grids: g })" />
     </template>
 
     <section class="s">
