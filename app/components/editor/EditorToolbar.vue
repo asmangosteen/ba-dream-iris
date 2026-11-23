@@ -11,7 +11,7 @@ const tools: { key: Tool; label: string; d?: string; icon?: string }[] = [
   { key: 'text', label: '텍스트 (T)', d: 'M3 4.5V3h10v1.5M8 3v10M6 13h4' },
   { key: 'image', label: '이미지', icon: 'image' },
 ]
-const KEYS: Record<string, Tool> = { v: 'move', f: 'frame', r: 'rect', t: 'text' }
+const KEYS: Record<string, Tool> = { v: 'move', f: 'frame', a: 'frame', r: 'rect', t: 'text' }
 function onKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement
   if (e.metaKey || e.ctrlKey || e.altKey || el.closest('input, textarea, [contenteditable]')) return

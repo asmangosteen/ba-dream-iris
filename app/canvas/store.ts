@@ -208,7 +208,7 @@ export function createLayerStore(opts: {
     return true
   }
   /** 붙여넣기: 고른 프레임 레이어가 있으면 그 안, 아니면 원래 부모(없으면 화면) — 10px 비켜서 */
-  function paste(targetSid?: string) {
+  function paste(targetSid?: string, offset = 10) {
     const sid = targetSid ?? screenId.value
     if (!clipboard || !sid) return
     const cb = clipboard
@@ -221,7 +221,7 @@ export function createLayerStore(opts: {
         const id = map.get(n.id)!
         const root = cb.rootIds.includes(n.id)
         const parentId = root ? (into ?? (n.parentId && d.nodes[n.parentId] ? n.parentId : null)) : map.get(n.parentId!)!
-        d.nodes[id] = { ...n, id, parentId, children: n.children?.map((c) => map.get(c)!), x: root ? n.x + 10 : n.x, y: root ? n.y + 10 : n.y }
+        d.nodes[id] = { ...n, id, parentId, children: n.children?.map((c) => map.get(c)!), x: root ? n.x + offset : n.x, y: root ? n.y + offset : n.y }
         if (root) { siblings(d, parentId).push(id); fresh.push(id) }
       }
       layerIds.value = fresh
@@ -229,6 +229,89 @@ export function createLayerStore(opts: {
     })
   }
   function duplicate() { if (copy()) paste() }
+  /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름 */
+  function duplicateInPlace() { const keep = clipboard; if (copy()) paste(undefined, 0); clipboard = keep }
+
+  // --- 고르기 이동 (피그마: ⌘A · Enter · Shift+Enter · Tab) ---
+  function selectAll(sid: string) {
+    const d = doc(sid)
+    const first = layerIds.value[0] ? d.nodes[layerIds.value[0]] : undefined
+    layerIds.value = [...(first ? siblings(d, first.parentId) : d.rootIds)].filter((id) => !d.nodes[id]?.locked && !d.nodes[id]?.hidden)
+    screenId.value = sid
+  }
+  function selectChildren(sid: string) {
+    const d = doc(sid)
+    if (!layerIds.value.length) { layerIds.value = [...d.rootIds]; screenId.value = sid; return }
+    const kids = layerIds.value.flatMap((id) => d.nodes[id]?.children ?? [])
+    if (kids.length) layerIds.value = kids
+  }
+  /** 부모로: 레이어 → 부모 프레임, 맨 위 레이어 → 화면 */
+  function selectParent(sid: string) {
+    const d = doc(sid)
+    const n = layerIds.value[0] ? d.nodes[layerIds.value[0]] : undefined
+    if (!n) return
+    layerIds.value = n.parentId ? [n.parentId] : []
+  }
+  function selectSibling(sid: string, dir: 1 | -1) {
+    const d = doc(sid)
+    const n = layerIds.value[0] ? d.nodes[layerIds.value[0]] : undefined
+    if (!n) { if (d.rootIds.length) layerIds.value = [d.rootIds[dir === 1 ? d.rootIds.length - 1 : 0]!]; return }
+    const sib = siblings(d, n.parentId)
+    // 목록은 위가 앞(그리는 순서의 뒤)이라 Tab 은 그리는 순서로 한 칸 앞
+    const i = sib.indexOf(n.id) - dir
+    layerIds.value = [sib[(i + sib.length) % sib.length]!]
+  }
+
+  // --- 묶기 (⌘G · ⌥⌘G) / 풀기 (⇧⌘G) ---
+  function wrap(sid: string, ids: string[], kind: 'group' | 'frame') {
+    const d0 = doc(sid)
+    const list = ids.filter((id) => d0.nodes[id])
+    if (!list.length) return
+    const parentId = d0.nodes[list[0]!]!.parentId
+    const same = list.filter((id) => d0.nodes[id]!.parentId === parentId)
+    mutate(sid, (d) => {
+      const boxes = same.map((id) => ({ id, ...absPos(d, id), w: d.nodes[id]!.w, h: d.nodes[id]!.h }))
+      const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y))
+      const x1 = Math.max(...boxes.map((b) => b.x + b.w)), y1 = Math.max(...boxes.map((b) => b.y + b.h))
+      const p = parentId ? absPos(d, parentId) : { x: 0, y: 0 }
+      const id = newId()
+      const sib = siblings(d, parentId)
+      const at = Math.max(...same.map((k) => sib.indexOf(k)))
+      d.nodes[id] = { id, type: 'frame', name: nextName(d, 'frame').replace('프레임', kind === 'group' ? '그룹' : '프레임'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : { fill: '#FFFFFF', clip: true } }
+      sib.splice(at + 1, 0, id)
+      for (const b of boxes.sort((a, c) => sib.indexOf(a.id) - sib.indexOf(c.id))) {
+        sib.splice(sib.indexOf(b.id), 1)
+        const n = d.nodes[b.id]!
+        n.parentId = id; n.x = b.x - x0; n.y = b.y - y0
+        d.nodes[id]!.children!.push(b.id)
+      }
+      layerIds.value = [id]
+    })
+  }
+  function unwrap(sid: string, ids: string[]) {
+    const d0 = doc(sid)
+    const frames = ids.filter((id) => d0.nodes[id]?.type === 'frame')
+    if (!frames.length) return
+    mutate(sid, (d) => {
+      const freed: string[] = []
+      for (const fid of frames) {
+        const f = d.nodes[fid]!
+        const sib = siblings(d, f.parentId)
+        const at = sib.indexOf(fid)
+        const kids = [...(f.children ?? [])]
+        for (const k of kids) { const n = d.nodes[k]!; n.parentId = f.parentId; n.x += f.x; n.y += f.y }
+        sib.splice(at, 1, ...kids)
+        delete d.nodes[fid]
+        freed.push(...kids)
+      }
+      layerIds.value = freed
+    })
+  }
+
+  // --- 속성 복사 · 붙여넣기 (⌥⌘C · ⌥⌘V) ---
+  let styleClip: LayerStyle | null = null
+  function copyStyle() { const sid = screenId.value; const n = sid && layerIds.value[0] ? node(sid, layerIds.value[0]) : undefined; if (n) { styleClip = { ...n.style }; return true } return false }
+  function pasteStyle() { const sid = screenId.value; if (sid && styleClip && layerIds.value.length) style(sid, layerIds.value, styleClip) }
 
   /** 색 값 → CSS 색 (토큰 참조는 디자인 시스템 토큰 값으로) */
   function color(v?: string): string | undefined {
@@ -242,7 +325,8 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    selectScreen, selectLayer, add, update, style, remove, arrange, moveTo, copy, paste, duplicate, color,
+    selectScreen, selectLayer, add, update, style, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),
   }
 }

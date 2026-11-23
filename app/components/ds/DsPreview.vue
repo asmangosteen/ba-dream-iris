@@ -31,7 +31,7 @@ export function previewKind(names: (string | null | undefined)[]): PreviewKind |
 </script>
 
 <script setup lang="ts">
-import { Badge, Button, Checkbox, Icon, RadioButton, TextInput, Toast, Toggle } from '@ba-dream/design-system'
+import { Avatar, Badge, Button, Checkbox, Chip, Divider, Icon, IconButton, Label, NumericBadge, PageControl, Pagination, ProgressBar, RadioButton, SearchField, Skeleton, Slider, Spinner, Stepper, TextArea, TextButton, TextInput, Toast, Toggle, Tooltip } from '@ba-dream/design-system'
 
 const props = defineProps<{ names: (string | null | undefined)[]; label: string }>()
 const kind = computed(() => previewKind(props.names))
@@ -88,6 +88,25 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
         <span v-for="(t, i) in ['홈', '내 차고', '커뮤니티', '마이']" :key="t" :class="['bn', { on: i === 0 }]"><i /><span>{{ t }}</span></span>
       </span>
     </template>
+    <!-- 기본 탑재 목록(dsCatalog)의 나머지 컴포넌트: 실제 컴포넌트를 기본 속성으로 -->
+    <template v-else-if="label === 'IconButton'"><IconButton icon-name="search" size="l" type="tertiary" ariaLabel="검색" /><IconButton icon-name="plus" size="l" type="primary" ariaLabel="추가" /></template>
+    <template v-else-if="label === 'TextButton'"><TextButton size="l" color="blue">더 보기</TextButton><TextButton size="l" color="gray">취소</TextButton></template>
+    <template v-else-if="label === 'ButtonGroup'"><Button type="tertiary" size="l">이전</Button><Button type="primary" size="l">다음</Button></template>
+    <template v-else-if="label === 'SearchField'"><span class="pad-x"><SearchField size="m" type="contained" placeholder="차종 · 모델 검색" /></span></template>
+    <template v-else-if="label === 'TextArea'"><span class="pad-x"><TextArea label="메모" placeholder="내용을 적어주세요" /></span></template>
+    <template v-else-if="label === 'Chip'"><Chip :selected="true">전체</Chip><Chip>스쿠터</Chip><Chip>바이크</Chip></template>
+    <template v-else-if="label === 'Slider'"><span class="pad-x"><Slider :default-value="40" aria-label="범위" /></span></template>
+    <template v-else-if="label === 'Stepper'"><Stepper :default-value="2" :min="0" :max="9" /></template>
+    <template v-else-if="label === 'ProgressBar'"><span class="pad-x"><ProgressBar :value="60" aria-label="진행률" /></span></template>
+    <template v-else-if="label === 'NumericBadge'"><NumericBadge :count="3" theme="destructed" /><NumericBadge :count="128" theme="brand" /></template>
+    <template v-else-if="label === 'Avatar'"><Avatar alt="바드림" :size="40" /><Avatar alt="이리스" :size="32" /></template>
+    <template v-else-if="label === 'Divider'"><span class="pad-x"><Divider /></span></template>
+    <template v-else-if="label === 'Spinner' || label === 'Loading'"><Spinner size="l" /></template>
+    <template v-else-if="label === 'Skeleton'"><span class="pad-x col"><Skeleton shape="text" width="70%" /><Skeleton shape="text" width="45%" /></span></template>
+    <template v-else-if="label === 'Label'"><Label essential>이름</Label></template>
+    <template v-else-if="label === 'PageControl'"><PageControl :selection="1" /></template>
+    <template v-else-if="label === 'Pagination'"><Pagination :current="2" :total="5" /></template>
+    <template v-else-if="label === 'Tooltip'"><Tooltip>여기를 눌러 보세요</Tooltip></template>
     <template v-else>
       <span class="ph">{{ initials }}</span>
     </template>
@@ -132,4 +151,5 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
 .bn.on i { background: var(--sys-color-neutral-800); }
 
 .ph { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--ref-radius-06); background: var(--sys-color-neutral-100); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-5); color: var(--sys-color-neutral-500); font-size: 14px; font-weight: 600; }
+.col { display: flex; flex-direction: column; gap: 8px; }
 </style>

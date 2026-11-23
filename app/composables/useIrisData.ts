@@ -249,11 +249,16 @@ export function useProjectScreens(projectId: string) {
 export function useDesignSystem() {
   const supabase = useSupabaseClient()
   const preview = useDevPreview()
+  // 기본 탑재(DS_CATALOG) + DB 에 따로 등록한 것 중 기본 목록에 없는 이름
+  const merge = (extra: ComponentRow[]) => {
+    const names = new Set(DS_CATALOG.map((c) => c.name.toLowerCase()))
+    return [...DS_CATALOG, ...extra.filter((c) => !names.has(c.name.toLowerCase()) && !matchCatalog(c.name))]
+  }
   const components = useAsyncData('ds-components', async () => {
-    if (preview) return previewStore().components.value
+    if (preview) return merge(previewStore().components.value)
     const { data, error } = await supabase.from('components').select('id, name, code_name, category, description, match_aliases, props_schema').order('category').order('name')
     if (error) throw error
-    return (data ?? []) as unknown as ComponentRow[]
+    return merge((data ?? []) as unknown as ComponentRow[])
   }, { deep: true })
   const tokens = useAsyncData('ds-tokens', async () => {
     if (preview) return previewStore().tokens.value
@@ -270,7 +275,9 @@ export function useUsages(key: string, screenIds?: () => string[]) {
   const preview = useDevPreview()
   return useAsyncData(`usages-${key}`, async () => {
     const ids = screenIds?.()
-    if (preview) return PREVIEW_USAGES.filter((x) => !ids || ids.includes(x.screen_id))
+    // 레이어 이름으로 기본 탑재 컴포넌트와 맞춥니다(맞지 않으면 DB 에 등록한 컴포넌트 id 를 그대로)
+    const link = (rows: UsageRow[]) => rows.map((u) => ({ ...u, component_id: matchCatalog(u.detected_name) ?? u.component_id }))
+    if (preview) return link(PREVIEW_USAGES.filter((x) => !ids || ids.includes(x.screen_id)))
     let q = supabase.from('screen_component_usages').select('id, screen_id, component_id, detected_name, count')
     if (ids) {
       if (!ids.length) return [] as UsageRow[]
@@ -278,7 +285,7 @@ export function useUsages(key: string, screenIds?: () => string[]) {
     }
     const { data, error } = await q
     if (error) throw error
-    return (data ?? []) as UsageRow[]
+    return link((data ?? []) as UsageRow[])
   }, screenIds ? { watch: [screenIds], deep: true } : { deep: true })
 }
 

@@ -21,6 +21,8 @@ const emit = defineEmits<{
   move: [id: string, x: number, y: number, done: boolean]
   create: [rect: { x: number; y: number; width: number; height: number }]
   hint: [text: string]
+  /** 화면(프레임) 단위 동작 — 레이어를 고르지 않고 화면만 골랐을 때 */
+  'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx?: number, dy?: number]
 }>()
 const store = useLayerStore()
 
@@ -140,6 +142,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   if (lid && isNative(screen)) {
     if (e.shiftKey) { store.selectLayer(screen.id, lid, true); return }
     if (!(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
+    if (e.altKey) store.duplicateInPlace() // ⌥ 끌기: 복제해서 옮기기
     const d = store.doc(screen.id)
     const ids = store.layerIds.value.filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
     drag = { kind: 'layers', sid: screen.id, ids, sx: e.clientX, sy: e.clientY, orig: Object.fromEntries(ids.map((id) => [id, { x: d.nodes[id]!.x, y: d.nodes[id]!.y }])), before: store.begin(screen.id), moved: false }
@@ -287,44 +290,81 @@ function onDbl(e: MouseEvent, screen: ScreenRow) {
 // 단축키
 // ---------------------------------------------------------------------------
 const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable="true"]')
+/**
+ * 피그마와 같은 단축키. 레이어를 골랐으면 레이어에, 화면만 골랐으면 화면에 적용합니다.
+ * 이동 V · 프레임 F/A · 사각형 R · 텍스트 T 는 EditorToolbar 가 받습니다.
+ */
 function onKeyDown(e: KeyboardEvent) {
   if (typing(e)) return
   const mod = e.metaKey || e.ctrlKey
+  const key = e.key.toLowerCase()
   const sid = store.screenId.value
   const ids = store.layerIds.value
-  if (e.code === 'Space') { space.value = true; e.preventDefault(); return }
-  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); return }
-  if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); store.redo(); return }
-  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomAt(vp.value.zoom * 1.25); return }
-  if (mod && e.key === '-') { e.preventDefault(); zoomAt(vp.value.zoom / 1.25); return }
-  if (mod && e.key === '0') { e.preventDefault(); zoomAt(1); return }
-  if (e.shiftKey && e.code === 'Digit1') { fit(); return }
-  if (e.shiftKey && e.code === 'Digit2' && sid) { fitSelection(); return }
-  if (e.shiftKey && e.code === 'Digit0') { zoomAt(1); return }
-  if (mod && e.key.toLowerCase() === 'c') { if (store.copy()) e.preventDefault(); return }
-  if (mod && e.key.toLowerCase() === 'v') { const s = props.screens.find((v) => v.id === sid); if (s && isNative(s)) { e.preventDefault(); store.paste() } return }
-  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); store.duplicate(); return }
+  const screen = props.screens.find((v) => v.id === sid)
+  const native = !!screen && isNative(screen)
+  const layerMode = !!sid && ids.length > 0
+  const stop = () => e.preventDefault()
+
+  if (e.code === 'Space') { space.value = true; stop(); return }
+  // 실행취소 · 확대
+  if (mod && key === 'z') { stop(); if (e.shiftKey) store.redo(); else store.undo(); return }
+  if (mod && key === 'y') { stop(); store.redo(); return }
+  if (mod && (e.key === '=' || e.key === '+')) { stop(); zoomAt(vp.value.zoom * 1.25); return }
+  if (mod && e.key === '-') { stop(); zoomAt(vp.value.zoom / 1.25); return }
+  if (mod && e.key === '0') { stop(); zoomAt(1); return }
+  if (e.shiftKey && !mod && e.code === 'Digit1') { fit(); return }
+  if (e.shiftKey && !mod && e.code === 'Digit2' && sid) { fitSelection(); return }
+  if (e.shiftKey && !mod && e.code === 'Digit0') { zoomAt(1); return }
+  // 속성 복사 · 붙여넣기 ⌥⌘C / ⌥⌘V
+  if (mod && e.altKey && e.code === 'KeyC') { if (layerMode && store.copyStyle()) { stop(); emit('hint', '속성을 복사했어요') } return }
+  if (mod && e.altKey && e.code === 'KeyV') { if (layerMode) { stop(); store.pasteStyle() } return }
+  // 복사 · 잘라내기 · 붙여넣기 · 복제
+  if (mod && key === 'c') { if (layerMode ? store.copy() : sid ? (emit('screen-action', 'copy'), true) : false) stop(); return }
+  if (mod && key === 'x') { if (layerMode && store.copy()) { stop(); store.remove(sid!, ids) } return }
+  if (mod && key === 'v') {
+    stop()
+    if (native && store.hasClipboard()) store.paste()
+    else emit('screen-action', 'paste')
+    return
+  }
+  if (mod && key === 'd') { stop(); if (layerMode) store.duplicate(); else if (sid) emit('screen-action', 'duplicate'); return }
+  // 모두 고르기 ⌘A
+  if (mod && key === 'a') { if (native) { stop(); store.selectAll(sid!) } return }
+  // 묶기 ⌘G(그룹) · ⌥⌘G(프레임으로 감싸기) · ⇧⌘G(풀기)
+  if (mod && e.code === 'KeyG') { if (!layerMode) return; stop(); if (e.shiftKey) store.unwrap(sid!, ids); else store.wrap(sid!, ids, e.altKey ? 'frame' : 'group'); return }
+  // 숨기기 ⇧⌘H · 잠그기 ⇧⌘L
+  if (mod && e.shiftKey && e.code === 'KeyH') { if (layerMode) { stop(); const hide = !store.node(sid!, ids[0]!)?.hidden; store.update(sid!, ids, { hidden: hide }) } return }
+  if (mod && e.shiftKey && e.code === 'KeyL') { if (layerMode) { stop(); const lock = !store.node(sid!, ids[0]!)?.locked; store.update(sid!, ids, { locked: lock }) } return }
   if (e.key === 'Escape') {
-    if (ids.length && sid) store.selectLayer(sid, null)
+    if (layerMode) store.selectLayer(sid!, null)
     else store.selectScreen(null)
     tool.value = 'move'
     return
   }
-  if (!sid || !ids.length) return
-  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); store.remove(sid, ids); return }
-  if (mod && e.key === ']') { e.preventDefault(); store.arrange(sid, ids, e.altKey ? 'top' : 1); return }
-  if (mod && e.key === '[') { e.preventDefault(); store.arrange(sid, ids, e.altKey ? 'bottom' : -1); return }
-  if (e.key === 'Enter' && ids.length === 1) {
-    const n = store.node(sid, ids[0]!)
-    if (n?.type === 'text') { e.preventDefault(); store.editing.value = n.id }
+  if (!sid) return
+  // 지우기
+  if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) store.remove(sid, ids); else emit('screen-action', 'remove'); return }
+  // 순서
+  if (layerMode && mod && e.key === ']') { stop(); store.arrange(sid, ids, e.altKey ? 'top' : 1); return }
+  if (layerMode && mod && e.key === '[') { stop(); store.arrange(sid, ids, e.altKey ? 'bottom' : -1); return }
+  // 고르기 이동: Enter(안으로 · 텍스트면 고치기) · Shift+Enter(부모로) · Tab(다음 레이어)
+  if (e.key === 'Enter' && native) {
+    stop()
+    if (e.shiftKey) { store.selectParent(sid); return }
+    const n = ids.length === 1 ? store.node(sid, ids[0]!) : undefined
+    if (n?.type === 'text') store.editing.value = n.id
+    else store.selectChildren(sid)
     return
   }
+  if (e.key === 'Tab' && native) { stop(); store.selectSibling(sid, e.shiftKey ? -1 : 1); return }
+  // 화살표로 옮기기(Shift 10px)
   const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
   const a = arrows[e.key]
   if (a) {
-    e.preventDefault()
+    stop()
     const k = e.shiftKey ? 10 : 1
-    store.update(sid, ids, (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k }))
+    if (layerMode) store.update(sid, ids, (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k }))
+    else emit('screen-action', 'nudge', a[0] * k, a[1] * k)
   }
 }
 function onKeyUp(e: KeyboardEvent) { if (e.code === 'Space') space.value = false }

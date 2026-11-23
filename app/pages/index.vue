@@ -24,7 +24,7 @@ function createProject() { newOpen.value = true }
 <template>
   <div class="shell">
     <AppTopBar />
-    <main class="sq float body">
+    <main class="sq float body"><div class="scroller">
       <div class="inner">
         <div class="head">
           <h1 class="tx-title">프로젝트</h1>
@@ -67,7 +67,7 @@ function createProject() { newOpen.value = true }
           </NuxtLink>
         </div>
       </div>
-    </main>
+    </div></main>
     <ProjectModal v-model:open="newOpen" @created="(id: string) => navigateTo(`/p/${id}`)" />
     <ProjectModal v-model:open="settingsOpen" :project-id="settingsId" />
   </div>
@@ -75,7 +75,8 @@ function createProject() { newOpen.value = true }
 
 <style scoped>
 .shell { height: 100vh; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
-.body { flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19); }
+.body { flex: 1; min-width: 0;    overflow: hidden; display: flex; flex-direction: column; }
+.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19); }
 .inner { max-width: 1120px; margin: 0 auto; }
 .head { display: flex; align-items: center; justify-content: space-between; }
 .filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }

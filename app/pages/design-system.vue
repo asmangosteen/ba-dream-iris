@@ -204,7 +204,7 @@ async function onSaved(msg: string) {
     </aside>
 
     <!-- 가운데: 카드 목록 -->
-    <main class="sq float body">
+    <main class="sq float body"><div class="scroller">
       <div class="head">
         <h1 class="tx-title">디자인 시스템</h1>
         <div class="head-act">
@@ -286,10 +286,10 @@ async function onSaved(msg: string) {
           </div>
         </section>
       </template>
-    </main>
+    </div></main>
 
     <!-- 오른쪽: 상세 · 사용 화면 역추적 -->
-    <aside aria-label="상세" class="sq float detail">
+    <aside aria-label="상세" class="sq float detail"><div class="scroller">
       <template v-if="loading">
         <Skeleton shape="text" width="50%" />
         <Skeleton shape="rectangle" height="72px" />
@@ -364,7 +364,7 @@ async function onSaved(msg: string) {
       </template>
 
       <p v-else class="tx-meta">{{ view === 'tokens' ? '토큰을 골라주세요' : '컴포넌트를 골라주세요' }}</p>
-    </aside>
+    </div></aside>
 
     <DsRegisterModal
       :open="modal.open"
@@ -400,13 +400,16 @@ async function onSaved(msg: string) {
 .side-empty p { margin: 0; }
 
 /* 가운데 */
-.body { flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box; }
+.body { flex: 1; min-width: 0;   box-sizing: border-box;  overflow: hidden; display: flex; flex-direction: column; }
+.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .head-act { display: flex; gap: var(--ref-spacing-04); }
 .chips { flex-wrap: wrap; margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-10); }
-.card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
-.thumb { display: block; height: 168px; border-radius: var(--ref-radius-07); overflow: hidden; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: var(--ref-spacing-10) var(--ref-spacing-06); }
+.card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
+.thumb { display: block; height: 92px; position: relative; border-radius: var(--ref-radius-07); overflow: hidden; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+/* 미리보기를 실제 크기의 60% 로 줄여 작은 칸에 담습니다 */
+.thumb :deep(.pv) { position: absolute; left: 0; top: 0; width: 166.67%; height: 166.67%; transform: scale(.6); transform-origin: 0 0; }
 .thumb :deep(.pv) { border-radius: inherit; }
 .card:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }
 .thumb.on, .card:hover .thumb.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
@@ -442,7 +445,8 @@ async function onSaved(msg: string) {
 .desc { color: var(--sys-color-neutral-500); }
 
 /* 오른쪽 */
-.detail { flex: 0 0 320px; min-width: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-11) var(--ref-spacing-16); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-14); }
+.detail { flex: 0 0 320px; min-width: 0;   box-sizing: border-box;     overflow: hidden; display: flex; flex-direction: column; }
+.detail > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12) var(--ref-spacing-11) var(--ref-spacing-16); display: flex; flex-direction: column; gap: var(--ref-spacing-14); }
 .d-sec { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .self-start { align-self: flex-start; }
 .code { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); padding: var(--ref-spacing-07) var(--ref-spacing-04) var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }

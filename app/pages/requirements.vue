@@ -263,7 +263,7 @@ function exportCsv() {
     </aside>
 
     <!-- 가운데: 요구사항 표 -->
-    <main class="sq float body">
+    <main class="sq float body"><div class="scroller">
       <div class="head">
         <div class="title-col">
           <h1 class="tx-title">요구사항</h1>
@@ -366,10 +366,10 @@ function exportCsv() {
           <TextButton size="s" color="blue" @click="clearFilters">거르기 지우기</TextButton>
         </div>
       </template>
-    </main>
+    </div></main>
 
     <!-- 오른쪽: 선택한 요구사항 -->
-    <aside v-if="selected" aria-label="요구사항 상세" class="sq float detail">
+    <aside v-if="selected" aria-label="요구사항 상세" class="sq float detail"><div class="scroller">
       <div class="sec-h d-top">
         <span class="num">{{ selected.req.code }}</span>
         <button type="button" class="ib s" aria-label="닫기" @click="selectedId = null"><Icon name="close" :size="14" /></button>
@@ -430,7 +430,7 @@ function exportCsv() {
           <p v-if="saveError" class="tx-meta err" role="alert">바꾸지 못했어요. 잠시 뒤 다시 해 주세요</p>
         </div>
       </section>
-    </aside>
+    </div></aside>
   </div>
 </template>
 
@@ -444,7 +444,8 @@ function exportCsv() {
 .side-sk { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-08); }
 
 /* 가운데 표 */
-.body { flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box; }
+.body { flex: 1; min-width: 0;   box-sizing: border-box;  overflow: hidden; display: flex; flex-direction: column; }
+.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-10); }
 .title-col { display: flex; align-items: baseline; gap: var(--ref-spacing-06); min-width: 0; }
 .actions { display: flex; gap: var(--ref-spacing-04); }
@@ -479,7 +480,8 @@ function exportCsv() {
 .empty p { margin: 0; }
 
 /* 오른쪽 상세 */
-.detail { flex: 0 0 320px; box-sizing: border-box; overflow: auto; display: flex; flex-direction: column; padding-bottom: var(--ref-spacing-10); }
+.detail { flex: 0 0 320px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+.detail > .scroller { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding-bottom: var(--ref-spacing-10); }
 .d-top { height: 40px; }
 .ib.s { width: 24px; height: 24px; }
 .ib:disabled { opacity: .5; cursor: default; }

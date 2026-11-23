@@ -131,6 +131,59 @@ async function onRemove() {
   try { await removeScreen(current.value.id); store.selectScreen(null); say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요') }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
+
+// ---------------------------------------------------------------------------
+// 화면 단위 단축키 (레이어 없이 화면만 골랐을 때): Delete · ⌘D · ⌘C/⌘V · 화살표
+// ---------------------------------------------------------------------------
+const screenClip = ref<string | null>(null)
+/** 화면 복제: 레이어까지 그대로, 오른쪽(또는 지정한 자리)에 */
+async function cloneScreen(srcId: string, at?: { x: number; y: number }) {
+  const src = list.value.find((v) => v.id === srcId)
+  if (!src) return null
+  if (src.source !== 'native') { say('피그마 화면은 복제할 수 없어요. 피그마에서 다시 가져와주세요'); return null }
+  const rect = { x: at?.x ?? src.x + src.width + 40, y: at?.y ?? src.y, width: src.width, height: src.height }
+  const row = await addScreen(rect, `${src.name} 사본`)
+  if (!row) return null
+  const layers = JSON.parse(JSON.stringify(store.doc(src.id)))
+  await updateScreen(row.id, { layers })
+  delete store.docs[row.id] // 새 레이어로 다시 읽기
+  store.selectScreen(row.id)
+  let cur = row.id
+  store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(src.id) }, async () => { const r = await addScreen(rect, row.name); if (r) { cur = r.id; await updateScreen(r.id, { layers }); delete store.docs[r.id] } })
+  return row
+}
+async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx = 0, dy = 0) {
+  const s = current.value
+  try {
+    if (action === 'copy' && s) { screenClip.value = s.id; say(`'${s.name}' 화면을 복사했어요`); return }
+    if (action === 'paste') { if (screenClip.value) await cloneScreen(screenClip.value, { x: nextX.value, y: 0 }); return }
+    if (!s) return
+    if (action === 'duplicate') { await cloneScreen(s.id); return }
+    if (action === 'nudge') {
+      const from = { x: s.x, y: s.y }, to = { x: s.x + dx, y: s.y + dy }
+      await updateScreen(s.id, to)
+      store.pushAction(s.id, () => updateScreen(s.id, from), () => updateScreen(s.id, to))
+      return
+    }
+    if (action === 'remove') {
+      const linked = (links.data.value ?? []).some((l) => l.screen_id === s.id)
+      if (s.source !== 'native' || linked) {
+        tab.value = 'design'
+        say(linked ? '요구사항이 연결된 화면이에요. 디자인 탭에서 확인하고 지워주세요' : '피그마 화면은 디자인 탭에서 확인하고 지워주세요')
+        return
+      }
+      const snap = { rect: { x: s.x, y: s.y, width: s.width, height: s.height }, name: s.name, status: s.status, layers: JSON.parse(JSON.stringify(store.doc(s.id))) }
+      let cur = s.id
+      await removeScreen(cur)
+      store.selectScreen(null)
+      say(`'${s.name}' 화면을 지웠어요 · ⌘Z 로 되돌려요`)
+      store.pushAction(null, async () => {
+        const r = await addScreen(snap.rect, snap.name)
+        if (r) { cur = r.id; await updateScreen(r.id, { layers: snap.layers, status: snap.status }); delete store.docs[r.id]; store.selectScreen(r.id) }
+      }, async () => { await removeScreen(cur); store.selectScreen(null) })
+    }
+  } catch { say('처리하지 못했어요. 다시 시도해주세요') }
+}
 async function onFigmaCreated() {
   await screens.refresh()
   say('피그마 화면을 가져왔어요')
@@ -296,6 +349,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       @move="onMove"
       @create="onCreate"
       @hint="say"
+      @screen-action="onScreenAction"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="canvas-empty">
       <span class="tx-head">이 페이지는 비어 있어요</span>
