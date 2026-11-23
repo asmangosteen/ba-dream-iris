@@ -56,3 +56,21 @@
 - SemiBold는 섹션 제목 · 선택 대상 이름에만 씁니다. 카드 제목 · 묶음 제목은 Medium 입니다.
 - 카드 안 순서: 제목(Medium) → 보조(`tx-meta`) → 덧붙인 메모(`neutral/100` 상자) → 1px 안쪽 선 아래 출처 · 동작.
 - 요약(진행률 등)은 `neutral/100` 상자 하나에 모읍니다.
+
+## 6. 디자인 시스템 컴포넌트 우선 (2026-11-23)
+
+버튼 · 입력칸 · 검색칸 · 글자 버튼 · 아바타는 `@ba-dream/design-system` 컴포넌트를 씁니다. 위 표의 `act` · `field` 클래스는 컴포넌트로 못 바꾸는 곳(촘촘한 패널 행 등)에만 남깁니다.
+
+| 쓰임 | 컴포넌트 | 크기 |
+|---|---|---|
+| 헤더 · 패널 · 표 위 동작 | `Button` primary · tertiary(+stroke) · destructed | `s` (26) |
+| 모달 맨 아래 확정 줄 | `Button` | `m` (30) |
+| 로그인 확정 | `Button` primary | `l` (38) |
+| 한 줄 입력(모달 · 로그인) | `TextInput` (`show-left-icon` · `show-right-icon` · `show-button` 끄고 필요할 때만 supporting) | 모달 `s`, 로그인 `m` |
+| 검색 | `SearchField` contained | `s` |
+| 링크처럼 쓰는 동작 | `TextButton` blue · gray | `s` |
+| 아바타 | `Avatar` | 24 |
+
+- 컴포넌트 안의 글자 크기는 컴포넌트 기본값을 따릅니다(4장 검사에서 컴포넌트 내부는 빼고 봅니다).
+- 컴포넌트로 못 바꾼 부품은 같은 무드로 맞춥니다: 모서리 8, hover `interaction-light-gray-hover`, 눌림 `interaction-light-gray-pressed`, 키보드 포커스 2px 바드림 파랑 바깥선, 전환 120ms (`main.css` 의 "인터랙션" 묶음).
+- 상단 검색 열기 버튼은 Search Field(contained · S)와 같은 생김새에 `⌘K` 키캡을 붙입니다.

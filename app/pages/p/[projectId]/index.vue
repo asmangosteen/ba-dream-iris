@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon, Skeleton } from '@ba-dream/design-system'
+import { Avatar, Button, Icon, IconButton, Skeleton, TextButton } from '@ba-dream/design-system'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
@@ -88,12 +88,12 @@ watch(() => [pageId.value, screens.status.value] as const, ([pid, st]) => {
 onMounted(() => { if (screens.status.value === 'success' && fitted !== pageId.value) { fitted = pageId.value; canvas.value?.fit() } })
 
 async function onAddPage() {
-  try { await addPage() } catch { say('페이지를 만들지 못했어요. 다시 시도해주세요.') }
+  try { await addPage() } catch { say('페이지를 만들지 못했어요. 다시 시도해주세요') }
 }
 const renaming = ref<string | null>(null)
 async function onRename(id: string, e: Event) {
   renaming.value = null
-  try { await renamePage(id, (e.target as HTMLInputElement).value) } catch { say('이름을 바꾸지 못했어요.') }
+  try { await renamePage(id, (e.target as HTMLInputElement).value) } catch { say('이름을 바꾸지 못했어요') }
 }
 
 const moveFrom = new Map<string, { x: number; y: number }>()
@@ -103,7 +103,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
   if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
   const from = moveFrom.get(id) ?? { x, y }
   moveFrom.delete(id)
-  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요.')
+  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요')
   updateScreen(id, { x, y }).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
 }
@@ -115,20 +115,20 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
       let cur = row.id
       store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
     }
-  } catch { say('화면을 만들지 못했어요. 다시 시도해주세요.') }
+  } catch { say('화면을 만들지 못했어요. 다시 시도해주세요') }
 }
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
   const s = current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
-  const fail = () => say('저장하지 못했어요. 다시 시도해주세요.')
+  const fail = () => say('저장하지 못했어요. 다시 시도해주세요')
   updateScreen(s.id, patch).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); store.selectScreen(null); say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요.') }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요') }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 async function onFigmaCreated() {
@@ -182,7 +182,7 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? `${code}를 만들고 '${current.value.name}'에 연결했어요` : `${code}를 만들었어요`)
-  } catch { say('요구사항을 만들지 못했어요. 다시 시도해주세요.') }
+  } catch { say('요구사항을 만들지 못했어요. 다시 시도해주세요') }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -228,7 +228,7 @@ async function onImageFile(e: Event) {
     const w = Math.round(img.w * k), h = Math.round(img.h * k)
     store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: Math.round((s.width - w) / 2), y: Math.round((s.height - h) / 2), w, h })
     tab.value = 'design'
-  } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요.') }
+  } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요') }
 }
 // 저장이 끝나기 전에 떠나면 알리기
 function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error') { e.preventDefault(); e.returnValue = '' } }
@@ -254,8 +254,33 @@ const zoomOpen = ref(false)
 const projMenu = ref(false)
 const settingsOpen = ref(false)
 const ZOOMS = [0.25, 0.5, 1, 2]
-const me = useSupabaseUser()
-const initial = computed(() => (me.value?.email ?? '나').slice(0, 1).toUpperCase())
+const { data: me } = useMe()
+const myName = computed(() => me.value?.name || me.value?.email || '나')
+
+// 메뉴: 바깥을 누르거나 Esc 로 닫기
+function onDocPointer(e: PointerEvent) {
+  const t = e.target as HTMLElement | null
+  if (projMenu.value && !t?.closest('.home-wrap')) projMenu.value = false
+  if (zoomOpen.value && !t?.closest('.zoom-wrap')) zoomOpen.value = false
+}
+function onDocKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !(projMenu.value || zoomOpen.value)) return
+  projMenu.value = false
+  zoomOpen.value = false
+}
+onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
+
+// 오른쪽 위 '문서': 문서 읽기 패널을 열고 닫는 토글. 열 때는 마지막에 본 문서(없으면 첫 문서)
+const lastDoc = ref<string | null>(null)
+watch(docId, (v) => { if (v) lastDoc.value = v })
+function toggleDocs() {
+  if (docId.value) return closeDoc()
+  left.value = 'docs'
+  const all = docs.data.value ?? []
+  const next = (lastDoc.value && all.some((d) => d.id === lastDoc.value) ? lastDoc.value : null) ?? docGroups.value[0]?.items[0]?.id
+  if (next) showDoc(next)
+}
 const screenName = (id: string) => allScreens.data.value?.find((s) => s.id === id)?.name ?? list.value.find((s) => s.id === id)?.name ?? '화면'
 const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중', review: '검토 요청', approved: '확정' }
 </script>
@@ -275,7 +300,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <div v-if="screens.status.value === 'success' && !list.length" class="canvas-empty">
       <span class="tx-head">이 페이지는 비어 있어요</span>
       <span class="tx-meta">프레임 도구(F)로 화면을 그리거나 피그마 화면을 가져와요</span>
-      <span class="row"><button class="act line" @click="tool = 'frame'">프레임 그리기</button><button class="act line" @click="figmaOpen = true">피그마에서 가져오기</button></span>
+      <span class="row">
+        <Button size="s" type="tertiary" stroke @click="tool = 'frame'">프레임 그리기</Button>
+        <Button size="s" type="tertiary" stroke @click="figmaOpen = true">피그마에서 가져오기</Button>
+      </span>
     </div>
 
     <!-- 왼쪽 위: 파일 알약 -->
@@ -291,7 +319,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       </div>
       <span class="tx-head ellipsis">{{ project.data.value?.name ?? '' }}</span>
       <span v-if="store.saveState.state === 'saving'" class="tx-meta save">저장 중</span>
-      <button v-else-if="store.saveState.state === 'error'" class="tx-meta save err" @click="store.flushAll()">저장 못 함 · 다시</button>
+      <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">저장 못 함 · 다시 시도</TextButton>
     </div>
 
     <!-- 왼쪽 패널 -->
@@ -302,7 +330,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 
       <template v-if="left === 'file'">
         <section class="pages">
-          <div class="sec-h"><span>페이지</span><button class="ib" aria-label="페이지 추가" @click="onAddPage"><Icon name="plus" :size="14" /></button></div>
+          <div class="sec-h"><span>페이지</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="페이지 추가" @click="onAddPage" /></div>
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <template v-for="p in pages.data.value ?? []" :key="p.id">
             <input v-if="renaming === p.id" class="txt-in rename" :value="p.name" aria-label="페이지 이름" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
@@ -312,14 +340,17 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         <section class="layers">
           <span class="nav-label">레이어</span>
           <LayerTree :screens="list" @pick-screen="pickScreen" />
-          <p v-if="screens.status.value === 'success' && !list.length" class="tx-meta empty">화면이 아직 없어요</p>
+          <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
+            <span class="tx-meta">화면이 아직 없어요</span>
+            <TextButton size="s" color="blue" @click="tool = 'frame'">프레임 그리기</TextButton>
+          </div>
         </section>
       </template>
 
       <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" />
 
       <div v-else class="docs">
-        <div class="sec-h"><span>문서</span><button class="ib" aria-label="문서 추가" @click="addDocOpen = true"><Icon name="plus" :size="14" /></button></div>
+        <div class="sec-h"><span>문서</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="문서 추가" @click="addDocOpen = true" /></div>
         <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
           <span class="nav-label">{{ g.label }}</span>
@@ -332,26 +363,28 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         </div>
         <div v-if="docs.status.value === 'success' && !docGroups.length" class="empty-col">
           <span class="tx-meta">아직 문서가 없어요</span>
-          <button class="act line" @click="addDocOpen = true"><Icon name="plus" :size="12" />문서 추가</button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="addDocOpen = true">문서 추가</Button>
         </div>
       </div>
     </aside>
 
     <!-- 오른쪽 위 알약 -->
     <div class="sq float s pill-right">
-      <span class="avatar" :title="me?.email ?? ''">{{ initial }}</span>
-      <button :class="['act', 'gray', 'ml-auto', { on: !!docId }]" :aria-pressed="!!docId" @click="docId ? closeDoc() : (left = 'docs')">문서</button>
-      <button class="act pri" @click="share">공유</button>
+      <Avatar :size="24" :alt="myName" :title="myName" />
+      <span class="pill-acts">
+        <Button size="s" type="tertiary" :text-color="docId ? 'blue' : 'gray'" :class="['doc-toggle', { 'is-on': !!docId }]" :aria-pressed="!!docId" @click="toggleDocs">문서</Button>
+        <Button size="s" type="primary" @click="share">공유</Button>
+      </span>
     </div>
 
     <!-- 오른쪽 패널 -->
     <aside aria-label="오른쪽 패널" class="sq float panel-right">
       <!-- 문서 읽기 -->
       <template v-if="openDoc">
-        <div class="seg tabs line-b">
-          <button class="sq seg-item on">문서</button>
-          <span class="tx-meta ellipsis f1 pl4">{{ current ? `'${current.name}' 화면과 함께 보는 중` : '' }}</span>
-          <button class="ib" aria-label="문서 닫기" @click="closeDoc"><Icon name="close" :size="16" /></button>
+        <div class="panel-h line-b">
+          <span class="tx-head flex-none">문서</span>
+          <span class="tx-meta ellipsis f1">{{ current ? `'${current.name}' 화면과 함께 보는 중` : '' }}</span>
+          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="문서 닫기" @click="closeDoc" />
         </div>
         <div class="scroll reader">
           <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="(id: string) => (docReq = docReq === id ? null : id)" @create-req="onCreateReq" />
@@ -384,21 +417,29 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           </div>
           <div class="scroll">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
-             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
+            <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <InspectorLayer v-else-if="store.layerIds.value.length" :screen="current" @replace-image="pickImage" />
             <InspectorDesign v-else :screen="current" @update="onUpdate" @remove="onRemove" />
           </div>
         </template>
         <div v-else class="none">
-          <p class="tx-meta m0">캔버스에서 화면을 골라주세요</p>
-          <p class="tx-meta m0 keys">이동 · 스페이스+드래그 또는 빈 곳 드래그<br>확대 · ⌘+스크롤 또는 핀치<br>전체 보기 · ⇧1</p>
+          <span class="tx-head">화면을 골라주세요</span>
+          <span class="tx-meta">캔버스나 왼쪽 레이어에서 화면을 누르면 요구사항 · 디자인 · 개발 정보가 여기 나와요</span>
+          <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">첫 화면 고르기</TextButton>
+          <dl class="sq keys">
+            <dt>이동</dt><dd>스페이스 + 드래그 · 빈 곳 드래그</dd>
+            <dt>확대</dt><dd>⌘ + 스크롤 · 핀치</dd>
+            <dt>전체 보기</dt><dd>⇧ 1</dd>
+          </dl>
         </div>
       </template>
     </aside>
 
     <EditorToolbar v-model="tool" @rail="onRail" />
 
-    <Transition name="toast"><div v-if="toast" class="sq toast" role="status">{{ toast }}</div></Transition>
+    <div class="toast-wrap" role="status" aria-live="polite">
+      <Transition name="toast"><div v-if="toast" class="sq toast">{{ toast }}</div></Transition>
+    </div>
 
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
     <AppCommandPalette />
@@ -411,20 +452,21 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 <style scoped>
 .editor { height: 100vh; position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
 .canvas-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-02); pointer-events: none; }
-.canvas-empty .row { display: flex; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); pointer-events: auto; }
+.canvas-empty .row { display: flex; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-06); pointer-events: auto; }
 .save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
-.save.err { color: var(--sys-color-theme-error-default); }
 .pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 4; }
 .home-wrap { position: relative; flex: none; }
 .pmenu { left: 0; right: auto; width: 180px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }
-.pill-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); width: 288px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); z-index: 3; }
+.pill-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); width: 288px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); z-index: 3; }
+.pill-acts { margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.bd-button.doc-toggle.is-on { --bd-btn-bg: var(--sys-color-brand-primary-lightest); }
+.panel-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 42px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
 .panel-right { position: absolute; right: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }
 .tabs { padding: var(--ref-spacing-06); flex: none; }
-.line-b { box-shadow: 0 1px 0 var(--iris-line); gap: var(--ref-spacing-02); }
-.pl4 { padding-left: var(--ref-spacing-04); }
+.line-b { box-shadow: 0 1px 0 var(--iris-line); }
 .pages { display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); flex: none; max-height: 40%; overflow: auto; }
 .pages .sec-h, .docs > .sec-h { padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-08); }
 .rename { margin: 1px 0; height: 28px; }
@@ -433,14 +475,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .docs { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-04) var(--ref-spacing-10); }
 .dgroup { display: flex; flex-direction: column; }
 .dgroup .nav-label { color: var(--sys-color-neutral-500); font-weight: 500; }
-.empty { padding: 0 var(--ref-spacing-08); margin: 0; }
 .empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-08); }
 .flex-none { flex: none; }
 .f1 { flex: 1; }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
-.lead-auto { margin-left: auto; }
-.ml-auto { margin-left: auto; }
-.act.gray.on { --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
 .zoom-wrap { margin-left: auto; position: relative; }
 .zoom { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
 .zmenu { left: auto; right: 0; width: 168px; }
@@ -449,11 +487,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .badge { flex: none; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-weight: 500; }
 .scroll { flex: 1; min-height: 0; overflow: auto; }
 .reader { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-16); }
-.none { padding: var(--ref-spacing-08) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
-.keys { line-height: 20px; }
-.m0 { margin: 0; }
-.avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); display: grid; place-items: center; font-size: 10px; font-weight: 600; flex: none; }
-.toast { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 10; padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); white-space: nowrap; }
-.toast-enter-active, .toast-leave-active { transition: opacity .18s ease, transform .18s ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translate(-50%, 6px); }
+.none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.self-start { align-self: flex-start; }
+.keys { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ref-spacing-02) var(--ref-spacing-08); margin: var(--ref-spacing-06) 0 0; padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); }
+.keys dt { color: var(--sys-color-neutral-500); }
+.keys dd { margin: 0; color: var(--sys-color-neutral-700); }
+.toast-wrap { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 10; pointer-events: none; }
+.toast { padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-weight: 500; white-space: nowrap; filter: drop-shadow(0 8px 16px rgb(3 9 26 / 16%)); }
+.toast-enter-active, .toast-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(4px); }
 </style>

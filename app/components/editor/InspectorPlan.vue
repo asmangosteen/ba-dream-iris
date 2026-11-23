@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, SearchField, TextButton } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 import { LINK_STATUS, NEXT_STATUS, STATUS_ORDER, docIcon, DOC_CATEGORY_LABEL, type LinkStatus, type ReqRow } from '~/composables/useIrisData'
 
@@ -50,7 +50,7 @@ async function cycle(link: { requirement_id: string; status: LinkStatus; note: s
   const before = link.status
   link.status = next
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: next, note: link.note }) }
-  catch { link.status = before; emit('toast', '상태를 바꾸지 못했어요. 다시 시도해주세요.') }
+  catch { link.status = before; emit('toast', '상태를 바꾸지 못했어요. 다시 시도해주세요') }
 }
 
 // 요구사항 연결 고르기
@@ -65,13 +65,13 @@ async function link(r: ReqRow) {
   const row = { screen_id: props.screen.id, requirement_id: r.id, status: 'missing' as const, note: null }
   links.data.value = [...(links.data.value ?? []), row]
   try { await setLink(row) }
-  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', '연결하지 못했어요. 다시 시도해주세요.') }
+  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', '연결하지 못했어요. 다시 시도해주세요') }
 }
 async function unlink(requirement_id: string) {
   const before = links.data.value
   links.data.value = (links.data.value ?? []).filter((x) => !(x.screen_id === props.screen.id && x.requirement_id === requirement_id))
   try { await removeLink(props.screen.id, requirement_id) }
-  catch { links.data.value = before; emit('toast', '연결을 풀지 못했어요.') }
+  catch { links.data.value = before; emit('toast', '연결을 풀지 못했어요') }
 }
 
 // 메모 고치기
@@ -83,7 +83,7 @@ async function saveNote(link: { requirement_id: string; status: LinkStatus; note
   link.note = noteDraft.value.trim() || null
   editing.value = null
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: link.status, note: link.note }) }
-  catch { link.note = before; emit('toast', '메모를 저장하지 못했어요.') }
+  catch { link.note = before; emit('toast', '메모를 저장하지 못했어요') }
 }
 defineExpose({ openPicker: () => (picking.value = true) })
 </script>
@@ -108,12 +108,12 @@ defineExpose({ openPicker: () => (picking.value = true) })
       <div class="sec-h h24"><span>{{ mine.length ? `요구사항 ${mine.length}` : '요구사항' }}</span><button class="ib s24" aria-label="요구사항 연결" :aria-expanded="picking" @click="picking = !picking"><Icon name="plus" :size="14" /></button></div>
 
       <div v-if="picking" class="sq picker">
-        <label class="sq fld"><Icon name="search" :size="14" /><input v-model="q" placeholder="번호나 내용으로 찾기" aria-label="요구사항 찾기" autofocus></label>
+        <SearchField v-model:value="q" type="contained" size="s" placeholder="번호나 내용으로 찾기" :input-props="{ 'aria-label': '요구사항 찾기', autofocus: true }" />
         <div class="plist">
           <button v-for="r in candidates" :key="r.id" class="sq menu-item" @click="link(r)"><span class="num w6">{{ r.code }}</span><span class="ell">{{ r.title }}</span></button>
-          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ (reqs.data.value ?? []).length ? '연결할 요구사항이 없어요' : '문서에서 요구사항을 먼저 만들어주세요' }}</p>
+          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? '찾는 요구사항이 없어요' : (reqs.data.value ?? []).length ? '연결할 요구사항이 없어요' : '문서에서 요구사항을 먼저 만들어주세요' }}</p>
         </div>
-        <div class="pfoot"><button class="act gray" @click="picking = false">닫기</button></div>
+        <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">닫기</Button></div>
       </div>
 
       <div v-for="g in groups" :key="g.k" class="grp-list">
@@ -127,15 +127,15 @@ defineExpose({ openPicker: () => (picking.value = true) })
           </div>
           <div v-if="editing === req.id" class="note-edit">
             <textarea v-model="noteDraft" rows="2" class="sq txt" aria-label="메모" placeholder="무엇이 빠졌는지 적어주세요" @keydown.meta.enter="saveNote(lk)" />
-            <span class="row-end"><button class="act gray" @click="editing = null">취소</button><button class="act line" @click="saveNote(lk)">저장</button></span>
+            <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">취소</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">저장</Button></span>
           </div>
           <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><Icon name="warning" :size="12" class="mt3" /><span>{{ lk.note }}</span></button>
           <div class="foot">
             <span class="src"><Icon name="document" :size="12" /><span class="ell">{{ docById.get(req.document_id)?.title ?? '' }}</span></span>
             <span class="acts">
-              <button v-if="!lk.note && editing !== req.id" class="lnk gray" @click="editNote(lk)">메모</button>
-              <button class="lnk gray" @click="unlink(req.id)">풀기</button>
-              <button class="lnk" @click="emit('open-doc', req.document_id, req.id)">원문<Icon name="chevron_right" :size="12" /></button>
+              <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">메모</TextButton>
+              <TextButton size="s" color="gray" :aria-label="`${req.code} 연결 풀기`" @click="unlink(req.id)">풀기</TextButton>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" @click="emit('open-doc', req.document_id, req.id)">원문</TextButton>
             </span>
           </div>
         </div>
@@ -143,7 +143,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 
       <div v-if="!mine.length && !picking" class="empty-col">
         <span class="tx-meta">연결된 요구사항이 없어요</span>
-        <button class="act line" @click="picking = true"><Icon name="link" :size="12" />요구사항 연결</button>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">요구사항 연결</Button>
       </div>
     </section>
 
@@ -152,7 +152,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
       <button v-for="d in relDocs" :key="d!.id" class="sq hov doc" @click="emit('open-doc', d!.id)">
         <Icon :name="docIcon(d!)" :size="14" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ DOC_CATEGORY_LABEL[d!.category] }}</span>
       </button>
-      <p v-if="!relDocs.length" class="tx-meta m0">요구사항을 연결하면 문서가 여기 모여요</p>
+      <p v-if="!relDocs.length" class="tx-meta m0 pb2">요구사항을 연결하면 문서가 여기 모여요</p>
     </section>
   </div>
 </template>
@@ -188,10 +188,14 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); margin-left: var(--ref-spacing-10); padding-top: var(--ref-spacing-04); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500); }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
-.acts { display: flex; gap: var(--ref-spacing-06); flex: none; }
-.lnk { display: flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-brand-primary-default); font-weight: 500; }
-.lnk.gray { color: var(--sys-color-neutral-500); }
-.lnk.gray:hover { color: var(--sys-color-neutral-800); }
+.acts { display: flex; align-items: center; gap: var(--ref-spacing-06); flex: none; }
+.st { border-radius: var(--ref-radius-02); }
+.st:hover { background: var(--interaction-light-gray-hover); }
+.st:active { background: var(--interaction-light-gray-pressed); }
+.st:focus-visible, .note:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.note { text-align: left; }
+.note:hover { --sq-overlay: var(--interaction-light-gray-hover); }
+.pb2 { padding-bottom: var(--ref-spacing-02); }
 .empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
 .doc { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); }
 .f1 { flex: 1; }
@@ -200,5 +204,6 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .p6 { padding: var(--ref-spacing-04) var(--ref-spacing-06); }
 .picker { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .plist { max-height: 220px; overflow: auto; display: flex; flex-direction: column; }
+.plist > * { flex: none; }
 .pfoot { display: flex; justify-content: flex-end; }
 </style>

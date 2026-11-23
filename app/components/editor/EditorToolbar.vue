@@ -24,19 +24,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div role="toolbar" aria-label="도구" class="sq float s bar">
-    <button v-for="t in tools" :key="t.key" :aria-label="t.label" :aria-pressed="tool === t.key" :class="['rail-btn', { on: tool === t.key }]" @click="tool = t.key">
+    <button v-for="t in tools" :key="t.key" :aria-label="t.label" :title="t.label" :aria-pressed="tool === t.key" :class="['rail-btn', { on: tool === t.key }]" @click="tool = t.key">
       <svg v-if="t.d" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="t.d" :fill="t.key === 'move' ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.33" /></svg>
       <Icon v-else :name="t.icon!" :size="16" />
     </button>
-    <button aria-label="에셋 열기" class="rail-btn" @click="emit('rail', 'assets')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none" /></svg></button>
-    <button aria-label="코멘트" class="rail-btn" @click="emit('rail', 'comment')"><Icon name="comment" :size="16" /></button>
     <span class="div" aria-hidden="true" />
-    <button aria-label="요구사항 연결" class="rail-btn" @click="emit('rail', 'link')"><Icon name="link" :size="16" /></button>
-    <button aria-label="피그마 화면 가져오기" class="rail-btn" @click="emit('rail', 'figma')"><Icon name="arrow_up_right" :size="16" /></button>
+    <button aria-label="에셋 열기" title="에셋 열기" class="rail-btn" @click="emit('rail', 'assets')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l6.2 6.2L8 14.2 1.8 8z" stroke="currentColor" stroke-width="1.33" fill="none" /></svg></button>
+    <button aria-label="요구사항 연결" title="요구사항 연결" class="rail-btn" @click="emit('rail', 'link')"><Icon name="link" :size="16" /></button>
+    <button aria-label="피그마 화면 가져오기" title="피그마 화면 가져오기" class="rail-btn" @click="emit('rail', 'figma')"><Icon name="arrow_up_right" :size="16" /></button>
+    <button aria-label="코멘트 (준비 중)" title="코멘트 (준비 중)" class="rail-btn soon" @click="emit('rail', 'comment')"><Icon name="comment" :size="16" /></button>
   </div>
 </template>
 
 <style scoped>
-.bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 40px; box-sizing: border-box; padding: var(--ref-spacing-02) var(--ref-spacing-04); display: flex; align-items: center; gap: var(--ref-spacing-02); z-index: 3; }
+.bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-04); display: flex; align-items: center; gap: var(--ref-spacing-02); z-index: 3; }
 .div { width: 1px; height: 20px; background: var(--iris-line-strong); margin: 0 var(--ref-spacing-02); }
+.soon { color: var(--sys-color-neutral-400); }
+.rail-btn.on:hover { --sq-overlay: rgb(13 45 87 / 15%); }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 
 /** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기. 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
@@ -41,10 +41,19 @@ const statusOpen = ref(false)
 const presetOpen = ref(false)
 const confirmDelete = ref(false)
 watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.value = false; presetOpen.value = false })
+// 드롭다운: 바깥을 누르거나 Esc 로 닫기
+const root = ref<HTMLElement | null>(null)
+function onDocPointer(e: PointerEvent) {
+  const rel = (e.target as HTMLElement | null)?.closest('.rel')
+  if (!rel || !root.value?.contains(rel)) { statusOpen.value = false; presetOpen.value = false }
+}
+function onDocKey(e: KeyboardEvent) { if (e.key === 'Escape') { statusOpen.value = false; presetOpen.value = false } }
+onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
 </script>
 
 <template>
-  <div class="design">
+  <div ref="root" class="design">
     <section class="s">
       <div class="sec-h h24"><span>화면</span></div>
       <label class="sq fld"><span>이름</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="화면 이름" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
@@ -53,7 +62,7 @@ watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.val
         <button :class="['sq', 'dd', { open: statusOpen }]" :aria-expanded="statusOpen" @click="statusOpen = !statusOpen">
           <span>{{ STATUS.find((s) => s.k === screen.status)?.label }}</span><Icon name="chevron_down" :size="12" class="muted" />
         </button>
-        <div v-if="statusOpen" class="sq menu" role="listbox">
+        <div v-if="statusOpen" class="sq menu" role="listbox" aria-label="상태">
           <button v-for="s in STATUS" :key="s.k" role="option" :aria-selected="screen.status === s.k" :class="['sq', 'menu-item', { on: screen.status === s.k }]" @click="emit('update', { status: s.k }); statusOpen = false">{{ s.label }}</button>
         </div>
       </div>
@@ -73,7 +82,7 @@ watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.val
         <button :class="['sq', 'dd', { open: presetOpen }]" :aria-expanded="presetOpen" @click="presetOpen = !presetOpen">
           <span>{{ PRESETS.find((p) => p.w === screen.width && p.h === screen.height)?.label ?? '직접 입력' }}</span><Icon name="chevron_down" :size="12" class="muted" />
         </button>
-        <div v-if="presetOpen" class="sq menu" role="listbox">
+        <div v-if="presetOpen" class="sq menu" role="listbox" aria-label="크기 프리셋">
           <button v-for="p in PRESETS" :key="p.label" role="option" :aria-selected="p.w === screen.width && p.h === screen.height" :class="['sq', 'menu-item', { on: p.w === screen.width && p.h === screen.height }]" @click="emit('update', { width: p.w, height: p.h }); presetOpen = false">
             <span class="f1">{{ p.label }}</span><span class="tx-meta num">{{ p.w }} × {{ p.h }}</span>
           </button>
@@ -87,14 +96,16 @@ watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.val
 
     <section class="s">
       <div class="sec-h h24"><span>레이어</span></div>
-      <p class="tx-meta m0">캔버스나 왼쪽 레이어 목록에서 레이어를 고르면 여기서 고쳐요. 도구: 사각형 R · 텍스트 T · 프레임 F · 이미지</p>
+      <p class="tx-meta m0">캔버스나 왼쪽 레이어 목록에서 레이어를 고르면 여기서 고쳐요</p>
+      <dl class="sq keys"><dt>사각형</dt><dd>R</dd><dt>텍스트</dt><dd>T</dd><dt>프레임</dt><dd>F</dd></dl>
     </section>
 
     <section class="s">
-      <button v-if="!confirmDelete" class="act line full" @click="confirmDelete = true"><Icon name="trashbin" :size="12" />화면 지우기</button>
-      <div v-else class="confirm">
-        <span class="tx-meta">연결된 요구사항 상태도 함께 지워져요. 되돌릴 수 없어요.</span>
-        <span class="row-end"><button class="act gray" @click="confirmDelete = false">취소</button><button class="act line danger" @click="emit('remove')">지우기</button></span>
+      <Button v-if="!confirmDelete" size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" class="full" @click="confirmDelete = true">화면 지우기</Button>
+      <div v-else class="sq confirm" role="alertdialog" aria-label="화면 지우기 확인">
+        <span class="tx-head">'{{ screen.name }}' 화면을 지울까요?</span>
+        <span class="tx-meta">연결된 요구사항 상태도 함께 지워지고 되돌릴 수 없어요</span>
+        <span class="row-end"><Button size="s" type="tertiary" @click="confirmDelete = false">취소</Button><Button size="s" type="destructed" @click="emit('remove')">지우기</Button></span>
       </div>
     </section>
   </div>
@@ -111,7 +122,10 @@ watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.val
 .f1 { flex: 1; }
 .m0 { margin: 0; }
 .full { width: 100%; }
-.confirm { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); }
-.danger { color: var(--sys-color-theme-error-default); }
+.confirm { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-04); }
+.keys { display: grid; grid-template-columns: repeat(3, auto minmax(0, 1fr)); gap: var(--ref-spacing-04); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
+.keys dt { color: var(--sys-color-neutral-500); }
+.keys dd { margin: 0; font-weight: 600; color: var(--sys-color-neutral-700); }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 </style>

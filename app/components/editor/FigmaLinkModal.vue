@@ -2,7 +2,7 @@
 // 피그마 화면 가져오기 — 시안: design/iris-canvas/FigmaLink.dc.html, 위계: PRD/05_UI_GUIDE.md
 // 프레임 링크 → 서버(/api/figma/frame)가 피그마에서 이름 · 크기 · 썸네일 · 컴포넌트 요약을 받아오고,
 // "화면 추가"를 누르면 screens · screen_component_usages 에 저장합니다. 미리보기 모드에서는 저장하지 않아요.
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, IconButton, TextButton, TextInput } from '@ba-dream/design-system'
 // Nuxt 내장 useDevPreview 와 이름이 겹쳐 자동 import 가 내장 쪽으로 잡히므로 직접 가져옵니다
 import { useDevPreview } from '~/composables/usePreview'
 
@@ -18,7 +18,6 @@ const supabase = useSupabaseClient()
 const preview = useDevPreview()
 
 const url = ref('')
-const focused = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const result = ref<FrameResult | null>(null)
@@ -27,7 +26,7 @@ const catalog = ref<ComponentRef[]>([])
 const thumbFailed = ref(false)
 
 const dialog = ref<HTMLElement | null>(null)
-const input = ref<HTMLInputElement | null>(null)
+const focusInput = () => document.getElementById('figmaUrl')?.focus()
 let lastFocus: HTMLElement | null = null
 
 const total = computed(() => result.value?.components.reduce((n, c) => n + c.count, 0) ?? 0)
@@ -70,8 +69,8 @@ async function load() {
   result.value = null
   thumbFailed.value = false
   if (!/figma\.com\//i.test(raw)) {
-    error.value = { code: 'invalid_url', message: '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요.' }
-    input.value?.focus()
+    error.value = { code: 'invalid_url', message: '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요' }
+    focusInput()
     return
   }
   error.value = null
@@ -86,7 +85,7 @@ async function load() {
     const body = (e as { data?: { message?: string; data?: { code?: string; message?: string } } }).data
     error.value = {
       code: body?.data?.code ?? 'figma_error',
-      message: body?.data?.message ?? '피그마에서 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해주세요.',
+      message: body?.data?.message ?? '피그마에서 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해주세요',
     }
   } finally {
     loading.value = false
@@ -126,7 +125,7 @@ async function add() {
   }).select('id').single()
   if (e1 || !screen) {
     saving.value = false
-    error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요.' }
+    error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요' }
     return
   }
   const screenId = (screen as { id: string }).id
@@ -138,7 +137,7 @@ async function add() {
       // 컴포넌트 기록이 빠진 화면이 남지 않도록 되돌립니다
       await supabase.from('screens').delete().eq('id', screenId)
       saving.value = false
-      error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요.' }
+      error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요' }
       return
     }
   }
@@ -146,6 +145,8 @@ async function add() {
   emit('created', screenId)
   open.value = false
 }
+
+function openFigma(href: string) { window.open(href, '_blank', 'noopener,noreferrer') }
 
 // 대화상자 안에서만 Tab 이 돌도록 하고, Esc 로 닫습니다
 function onKeydown(e: KeyboardEvent) {
@@ -175,7 +176,7 @@ watch(open, async (v) => {
     lastFocus = document.activeElement as HTMLElement | null
     document.addEventListener('keydown', onKeydown)
     await nextTick()
-    input.value?.focus()
+    focusInput()
   } else {
     document.removeEventListener('keydown', onKeydown)
     lastFocus?.focus?.()
@@ -192,36 +193,29 @@ onBeforeUnmount(() => {
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog">
         <header class="head">
           <h2 id="figmaTitle" class="tx-title">피그마 화면 가져오기</h2>
-          <button type="button" class="ib" aria-label="닫기" @click="close"><Icon name="close" :size="20" /></button>
+          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="닫기" @click="close" />
         </header>
 
-        <form class="body" @submit.prevent="load">
-          <label for="figmaUrl" class="tx-head">피그마 링크</label>
+        <div class="body">
           <div class="row">
-            <div :class="['sq', 'field', 'm', 'grow', { focus: focused }]">
-              <Icon name="link" :size="16" class="dim" />
-              <input
-                id="figmaUrl"
-                ref="input"
-                v-model="url"
-                type="text"
-                inputmode="url"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="figma.com/design/…?node-id=…"
-                aria-describedby="figmaHint"
-                :aria-invalid="error?.code === 'invalid_url' || error?.code === 'no_node'"
-                @focus="focused = true"
-                @blur="focused = false"
-              >
-            </div>
-            <button type="submit" class="act m line" :disabled="loading || !url.trim()">
-              <Icon v-if="loading" name="refresh" :size="14" class="spin" />
-              {{ loading ? '불러오는 중' : '불러오기' }}
-            </button>
+            <TextInput
+              v-model:value="url"
+              size="s"
+              label="피그마 링크"
+              :label-props="{ htmlFor: 'figmaUrl' }"
+              placeholder="figma.com/design/…?node-id=…"
+              :show-left-icon="false"
+              :show-right-icon="false"
+              :show-button="false"
+              :show-supporting-text="false"
+              :destructed="error?.code === 'invalid_url' || error?.code === 'no_node'"
+              :input-props="{ id: 'figmaUrl', type: 'text', inputmode: 'url', autocomplete: 'off', 'aria-describedby': 'figmaHint', 'aria-invalid': error?.code === 'invalid_url' || error?.code === 'no_node', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); load() } } }"
+              class="grow"
+            />
+            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">불러오기</Button>
           </div>
-          <p id="figmaHint" class="tx-meta">피그마에서 프레임을 고르고 "링크 복사"한 주소를 붙여주세요.</p>
-        </form>
+          <p id="figmaHint" class="tx-meta">피그마에서 프레임을 고르고 '링크 복사'한 주소를 붙여주세요</p>
+        </div>
 
         <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
           <Icon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
@@ -239,7 +233,7 @@ onBeforeUnmount(() => {
                 <span class="tx-body name">{{ result.name }}</span>
                 <span class="tx-meta num">{{ result.width }} × {{ result.height }}</span>
               </div>
-              <a :href="result.url" target="_blank" rel="noopener noreferrer" class="link">피그마에서 열기 <Icon name="arrow_up_right" :size="12" /></a>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">피그마에서 열기</TextButton>
 
               <div class="divider" />
               <div class="sum-h">
@@ -254,15 +248,15 @@ onBeforeUnmount(() => {
                   <span class="tx-meta num">{{ c.count }}개</span>
                 </li>
               </ul>
-              <p v-else class="tx-meta">이 프레임에는 컴포넌트 인스턴스가 없어요.</p>
+              <p v-else class="tx-meta">이 프레임에는 컴포넌트 인스턴스가 없어요</p>
             </div>
           </div>
-          <p v-if="preview" class="tx-meta">미리보기 모드라 저장하지 않고 닫아요.</p>
+          <p v-if="preview" class="tx-meta">미리보기 모드라 저장하지 않고 닫아요</p>
         </div>
 
         <footer class="foot">
-          <button type="button" class="act m gray" :disabled="saving" @click="close">취소</button>
-          <button type="button" class="act m pri" :disabled="!result || saving" @click="add">{{ saving ? '추가하는 중' : '화면 추가' }}</button>
+          <Button size="m" type="tertiary" :disabled="saving" @click="close">취소</Button>
+          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">화면 추가</Button>
         </footer>
       </section>
     </div>
@@ -272,14 +266,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
-.head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-10); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-11) var(--ref-spacing-10) var(--ref-spacing-08) var(--ref-spacing-12); }
 .body { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); }
-.row { display: flex; gap: var(--ref-spacing-06); }
+.row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }
+.self-start { align-self: flex-start; }
 .grow { flex: 1; min-width: 0; }
 .dim { color: var(--sys-color-neutral-500); flex: none; }
 .tx-meta { margin: 0; }
-.act:disabled { opacity: .5; cursor: default; }
-.act:disabled:hover { --sq-overlay: transparent; }
 
 .note { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); margin: 0 var(--ref-spacing-12) var(--ref-spacing-10); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
 .note.warn { color: var(--sys-color-theme-destructed-default); }
@@ -292,7 +285,6 @@ onBeforeUnmount(() => {
 .info { min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .col { display: flex; flex-direction: column; }
 .name { font-weight: 500; overflow-wrap: anywhere; }
-.link { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .divider { height: 1px; margin: var(--ref-spacing-04) 0; background: var(--iris-line); }
 .sum-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 132px; overflow: auto; }
@@ -303,11 +295,5 @@ onBeforeUnmount(() => {
 .dot::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-400); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.foot { display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); }
-.foot .gray { flex: 1; }
-.foot .pri { flex: 2.25; }
-
-.spin { animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); }
 </style>

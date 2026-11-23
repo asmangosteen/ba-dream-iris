@@ -58,7 +58,7 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
 <template>
   <div class="tree" role="tree" aria-label="레이어">
     <template v-for="s in screens" :key="s.id">
-      <div role="treeitem" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)">
+      <div role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
         <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? '펼치기' : '접기'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
@@ -69,11 +69,15 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
         v-for="r in rowsOf(s)"
         :key="r.n.id"
         role="treeitem"
+        tabindex="0"
         :aria-selected="isSel(r)"
         draggable="true"
         :class="['sq', 'nav-item', 's', 'row', { on: isSel(r), faded: r.n.hidden, 'drop-above': over?.id === r.n.id && !over.into, 'drop-into': over?.id === r.n.id && over.into }]"
         :style="{ paddingLeft: `calc(var(--ref-spacing-08) + ${r.depth * 14}px)` }"
         @click="pick(r, $event)"
+        @keydown.enter.self.prevent="store.selectLayer(r.sid, r.n.id, $event.shiftKey)"
+        @keydown.space.self.prevent="store.selectLayer(r.sid, r.n.id, $event.shiftKey)"
+        @keydown.f2.self.prevent="renaming = r.n.id"
         @dblclick="renaming = r.n.id"
         @dragstart="dragging = { sid: r.sid, id: r.n.id }"
         @dragover="onDragOver($event, r)"
@@ -106,17 +110,23 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
 <style scoped>
 .tree { display: flex; flex-direction: column; }
 .row { cursor: default; user-select: none; gap: var(--ref-spacing-02) !important; }
-.chev { width: 14px; height: 14px; flex: none; display: grid; place-items: center; color: var(--sys-color-neutral-500); }
+.chev { width: 14px; height: 14px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-01); color: var(--sys-color-neutral-500); }
+button.chev:hover { color: var(--sys-color-neutral-800); background: var(--interaction-light-gray-hover); }
+button.chev:active { background: var(--interaction-light-gray-pressed); }
+.chev .rot, .chev :deep(svg) { transition: transform .12s ease; }
 .chev .rot { transform: rotate(-90deg); }
 .ic { flex: none; color: var(--sys-color-neutral-600); margin-right: var(--ref-spacing-02); }
 .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
 .faded { opacity: .5; }
 .ren { height: 22px; flex: 1; min-width: 0; }
-.tools { display: none; gap: var(--ref-spacing-01, 2px); flex: none; }
-.row:hover .tools, .tools.keep { display: flex; }
-.mini { width: 18px; height: 18px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); }
-.mini:hover { background: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); }
+.tools { display: none; gap: var(--ref-spacing-02); flex: none; }
+.row:hover .tools, .row:focus-within .tools, .tools.keep { display: flex; }
+.mini { width: 18px; height: 18px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); transition: background-color .12s ease, color .12s ease; }
+.mini:hover { background: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.mini:active { background: var(--interaction-light-gray-pressed); }
+.mini.act2 { color: var(--sys-color-neutral-800); }
+.chev:focus-visible, .mini:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .drop-above { box-shadow: inset 0 2px 0 var(--sys-color-brand-primary-default); }
 .drop-into { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 </style>

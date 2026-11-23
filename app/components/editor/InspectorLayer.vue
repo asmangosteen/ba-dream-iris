@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 import { TYPE_LABEL, type LayerNode, type LayerStyle } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
@@ -93,10 +93,19 @@ function align(kind: 'l' | 'c' | 'r' | 't' | 'm' | 'b') {
 }
 const WEIGHTS = [[400, 'Regular'], [500, 'Medium'], [600, 'SemiBold'], [700, 'Bold']] as const
 watch(ids, () => (menu.value = null))
+// 메뉴: 바깥을 누르거나 Esc 로 닫기
+const root = ref<HTMLElement | null>(null)
+function onDocPointer(e: PointerEvent) {
+  const rel = (e.target as HTMLElement | null)?.closest('.rel')
+  if (menu.value && (!rel || !root.value?.contains(rel))) menu.value = null
+}
+function onDocKey(e: KeyboardEvent) { if (e.key === 'Escape' && menu.value) menu.value = null }
+onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
 </script>
 
 <template>
-  <div class="li">
+  <div ref="root" class="li">
     <section class="s first">
       <div class="head">
         <span class="tx-head">{{ one ? TYPE_LABEL[one.type] : `${nodes.length}개 고름` }}</span>
@@ -170,7 +179,7 @@ watch(ids, () => (menu.value = null))
       <div class="color-row">
         <label class="sq fld"><input type="color" class="swatch" :value="hex(nodes[0]?.style.color)" aria-label="글자 색" @change="setStyle('color', ($event.target as HTMLInputElement).value.toUpperCase())"><input :value="label(same((n) => n.style.color))" aria-label="글자 색 값" @change="setHex('color', $event)" @keydown="blurOnEnter"></label>
         <div class="rel"><button class="ib s28" aria-label="색 토큰" :aria-expanded="menu === 'color'" @click="menu = menu === 'color' ? null : 'color'"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor" /><circle cx="9.5" cy="4.5" r="1.6" fill="currentColor" /><circle cx="4.5" cy="9.5" r="1.6" fill="currentColor" /><circle cx="9.5" cy="9.5" r="1.6" fill="currentColor" /></svg></button>
-          <div v-if="menu === 'color'" class="sq menu tok"><button v-for="t in colorTokens" :key="t.id" class="sq menu-item" @click="setStyle('color', 'token:' + t.name); menu = null"><span class="sw" :style="{ background: t.value }" />{{ t.name }}</button></div>
+          <div v-if="menu === 'color'" class="sq menu tok"><button v-for="t in colorTokens" :key="t.id" class="sq menu-item" @click="setStyle('color', 'token:' + t.name); menu = null"><span class="sw" :style="{ background: t.value }" />{{ t.name }}</button><span v-if="!colorTokens.length" class="tx-meta p6">색 토큰이 없어요</span></div>
         </div>
       </div>
       <div class="grp">
@@ -184,7 +193,7 @@ watch(ids, () => (menu.value = null))
 
     <section v-if="one?.type === 'image'" class="s">
       <div class="sec-h h24"><span>이미지</span></div>
-      <button class="act line" @click="emit('replace-image', one.id)"><Icon name="image" :size="12" />다른 이미지로 바꾸기</button>
+      <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="image" class="full" @click="emit('replace-image', one.id)">다른 이미지로 바꾸기</Button>
     </section>
   </div>
 </template>
@@ -206,6 +215,12 @@ watch(ids, () => (menu.value = null))
 .swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .rel { position: relative; min-width: 0; }
 .tok { left: auto; right: 0; width: 220px; max-height: 240px; overflow: auto; }
+.tok > * { flex: none; }
 .muted { color: var(--sys-color-neutral-500); }
 .p6 { padding: var(--ref-spacing-04) var(--ref-spacing-06); }
+.full { width: 100%; }
+.cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
+.cb:hover > i { box-shadow: inset 0 0 0 1px var(--sys-color-neutral-600); }
+.cb:focus-visible, .swatch:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 </style>

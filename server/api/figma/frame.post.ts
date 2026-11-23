@@ -83,10 +83,10 @@ function figmaStatus(e: unknown): number {
 
 function failFromFigma(e: unknown): never {
   const status = figmaStatus(e)
-  if (status === 403) fail(403, 'forbidden', '이 파일을 볼 권한이 없어요. 파일 공유 설정이나 피그마 토큰을 확인해주세요.')
-  if (status === 404) fail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요.')
-  if (status === 429) fail(429, 'rate_limited', '피그마 요청이 많아요. 1분 정도 뒤에 다시 시도해주세요.')
-  fail(502, 'figma_error', '피그마에서 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해주세요.')
+  if (status === 403) fail(403, 'forbidden', '이 파일을 볼 권한이 없어요. 파일 공유 설정이나 피그마 토큰을 확인해주세요')
+  if (status === 404) fail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요')
+  if (status === 429) fail(429, 'rate_limited', '피그마 요청이 많아요. 1분 정도 뒤에 다시 시도해주세요')
+  fail(502, 'figma_error', '피그마에서 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해주세요')
 }
 
 export default defineEventHandler(async (event): Promise<FigmaFrameResult> => {
@@ -95,18 +95,18 @@ export default defineEventHandler(async (event): Promise<FigmaFrameResult> => {
   // 로그인한 사람만 (개발용 미리보기에서는 건너뜁니다)
   if (!(import.meta.dev && config.public.devPreview)) {
     const user = await serverSupabaseUser(event).catch(() => null)
-    if (!user) fail(401, 'unauthorized', '로그인이 필요해요. 다시 로그인해주세요.')
+    if (!user) fail(401, 'unauthorized', '로그인이 필요해요. 다시 로그인해주세요')
   }
 
   const body = await readBody<{ url?: unknown }>(event).catch(() => null)
   const url = typeof body?.url === 'string' ? body.url.trim() : ''
   const parsed = url ? parseFigmaUrl(url) : null
-  if (!parsed) fail(400, 'invalid_url', '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요.')
-  if (!parsed.nodeId) fail(400, 'no_node', '프레임 링크가 아니에요. 피그마에서 프레임을 고르고 "링크 복사"한 주소를 붙여주세요.')
+  if (!parsed) fail(400, 'invalid_url', '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요')
+  if (!parsed.nodeId) fail(400, 'no_node', '프레임 링크가 아니에요. 피그마에서 프레임을 고르고 "링크 복사"한 주소를 붙여주세요')
   const { fileKey, nodeId } = parsed
 
   const token = String(config.figmaAccessToken || config.figmaToken || '')
-  if (!token) fail(503, 'no_token', '피그마 토큰이 아직 설정되지 않았어요. 관리자에게 알려주세요.')
+  if (!token) fail(503, 'no_token', '피그마 토큰이 아직 설정되지 않았어요. 관리자에게 알려주세요')
 
   const headers = { 'X-Figma-Token': token }
   const ids = encodeURIComponent(nodeId)
@@ -117,9 +117,9 @@ export default defineEventHandler(async (event): Promise<FigmaFrameResult> => {
   if (nodesRes.status === 'rejected') failFromFigma(nodesRes.reason)
 
   const entry = nodesRes.value.nodes?.[nodeId]
-  if (!entry?.document) fail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요.')
+  if (!entry?.document) fail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요')
   const doc = entry.document
-  if (doc.type === 'CANVAS' || doc.type === 'DOCUMENT') fail(400, 'no_node', '페이지 전체가 아니라 프레임 하나의 링크를 붙여주세요.')
+  if (doc.type === 'CANVAS' || doc.type === 'DOCUMENT') fail(400, 'no_node', '페이지 전체가 아니라 프레임 하나의 링크를 붙여주세요')
 
   const box = doc.absoluteBoundingBox
   // 썸네일은 실패해도 화면은 가져옵니다 (피그마 이미지 주소는 일정 기간 뒤 만료돼요)
