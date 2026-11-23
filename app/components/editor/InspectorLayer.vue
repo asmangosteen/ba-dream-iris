@@ -325,7 +325,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i />Clip content</button>
     </section>
 
-    <InspectorAutoLayout v-if="nodes.every((n) => n.type === 'frame')" :sid="sid" :ids="ids" />
+    <InspectorAutoLayout :sid="sid" :ids="ids" />
 
     <section v-if="showConstraints" class="s">
       <div class="sec-h h24"><span>Constraints</span></div>

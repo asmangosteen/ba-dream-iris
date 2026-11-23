@@ -107,6 +107,7 @@ type Drag =
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
+  | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number } }[]; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
@@ -299,7 +300,10 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     const d0 = store.doc(screen.id)
     // 고른 프레임 안의 레이어를 끌면 프레임째(누르고 떼기만 하면 안쪽 레이어를 골라요)
     const anc = store.screenId.value === screen.id ? store.layerIds.value.find((id) => id !== lid && descendants(d0, id).includes(lid)) : undefined
-    if (!anc && !(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
+    const wasSel = store.screenId.value === screen.id && store.layerIds.value.includes(lid)
+    // 여러 개 중 하나를 누르면: 끌면 함께 옮기고, 그냥 떼면 그 하나만 골라요(피그마와 같아요)
+    const pickOne = wasSel && store.layerIds.value.length > 1 ? lid : undefined
+    if (!anc && !wasSel) store.selectLayer(screen.id, lid)
     if (e.altKey) store.duplicateInPlace() // ⌥ 끌기: 복제해서 옮기기
     const d = store.doc(screen.id)
     const ids = store.layerIds.value.filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
@@ -312,7 +316,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       targets: snapTargets(sc, ids),
       before: store.begin(sc.id), moved: false,
       carry: sectionCarry(sc, ids),
-      clickLayer: anc ? lid : undefined,
+      clickLayer: anc ? lid : pickOne,
     }
     return
   }
@@ -372,6 +376,21 @@ function startResize(e: PointerEvent, handle: Handle) {
   const d0 = store.doc(s.id)
   const kids = isContainer(n) && !n.style.layout ? (n.children ?? []).map((c) => d0.nodes[c]!).filter(Boolean) : []
   drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n) || tool.value === 'scale', targets: snapTargets(s, [id]), before: store.begin(s.id), moved: false, kids0: kids.length ? boxes0(kids) : undefined, sub0: tool.value === 'scale' ? JSON.stringify(descendants(d0, id).map((k) => d0.nodes[k])) : undefined }
+}
+/** 여러 개 고른 상자의 변 · 모서리: 모두 같은 비율로(피그마와 같아요) */
+function startResizeMany(e: PointerEvent, handle: Handle) {
+  const s = selScreen.value
+  if (!s || store.layerIds.value.length < 2) return
+  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
+  const d = store.doc(s.id)
+  const ids = store.layerIds.value.filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
+  const items = ids.map((id) => {
+    const n = d.nodes[id]!
+    const pw = n.parentId ? layerWorld(s, n.parentId) : null
+    return { id, b: layerWorld(s, id)!, p: pw ? { x: pw.x, y: pw.y } : { x: s.x, y: s.y } }
+  }).filter((x) => x.b)
+  if (!items.length) return
+  drag = { kind: 'resizeMany', sid: s.id, handle, sx: e.clientX, sy: e.clientY, u0: union(items.map((x) => x.b)), items, before: store.begin(s.id), moved: false }
 }
 /** 고른 화면(프레임)의 변 · 모서리 */
 function startScreenResize(e: PointerEvent, handle: Handle) {
@@ -493,6 +512,23 @@ function move(e: PointerEvent) {
       }
       store.relayout(drag.sid)
     }
+  } else if (drag.kind === 'resizeMany') {
+    const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
+    if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 1) return
+    drag.moved = true
+    const u = drag.u0
+    const r = resizeBox({ cx: u.x + u.w / 2, cy: u.y + u.h / 2, w: u.w, h: u.h, angle: 0 }, drag.handle, dx, dy, e, e.shiftKey, [])
+    const x1 = r.cx - r.w / 2, y1 = r.cy - r.h / 2, kx = r.w / (u.w || 1), ky = r.h / (u.h || 1)
+    const d = store.doc(drag.sid)
+    for (const it of drag.items) {
+      const n = d.nodes[it.id]
+      if (!n) continue
+      n.x = Math.round(x1 + (it.b.x - u.x) * kx - it.p.x)
+      n.y = Math.round(y1 + (it.b.y - u.y) * ky - it.p.y)
+      n.w = Math.max(1, Math.round(it.b.w * kx)); n.h = Math.max(1, Math.round(it.b.h * ky))
+      if (n.type === 'text') n.style.autoWidth = false
+    }
+    store.relayout(drag.sid)
   } else if (drag.kind === 'resizeScreen') {
     const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 1) return
@@ -612,7 +648,7 @@ function end(e: PointerEvent) {
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('move', d.id, s.x, s.y, true)
   }
-  if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate') && d.moved) store.commit(d.sid, d.before)
+  if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany') && d.moved) store.commit(d.sid, d.before)
   dragOut.value = null
   // 화면 밖으로 끌어 놓기: 다른 화면 안으로, 아니면 캔버스 위로
   if (d.kind === 'layers' && d.moved && d.out) {
@@ -1106,13 +1142,13 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :key="'l' + s.id"
         class="label"
         :data-screen="s.id"
-        :class="{ on: store.screenId.value === s.id }"
+        :class="{ on: store.screenId.value === s.id && !store.layerIds.value.length }"
         :style="{ left: box(s).left, top: `calc(${box(s).top} - 20px)`, maxWidth: box(s).width }"
         @pointerdown.stop="tool = 'move'; start($event, s)"
       >{{ s.name }}</span>
       <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
       <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="box(m)" />
-      <div v-if="selFrame && !multi.length" class="sel" :class="{ dim: selBoxes.length }" :style="box(selFrame)">
+      <div v-if="selFrame && !multi.length && !selBoxes.length" class="sel" :style="box(selFrame)">
         <template v-if="!selBoxes.length">
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
           <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
@@ -1120,6 +1156,12 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :style="rbox(b)" />
+      <!-- 여러 개 고름: 전체를 감싸는 상자(손잡이로 함께 크기 바꾸기) + 크기 -->
+      <div v-if="selBoxes.length > 1 && selWorld && !multi.length" class="sel group" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
+        <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startResizeMany($event, h)" />
+        <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, 0) }" @pointerdown.stop.prevent="startResizeMany($event, c)" />
+        <span class="size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
+      </div>
       <template v-if="single">
         <div class="sel none" :style="rbox(single)">
           <template v-if="!single.locked">

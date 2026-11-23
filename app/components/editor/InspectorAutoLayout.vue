@@ -7,7 +7,8 @@ import { useLayerStore } from '~/canvas/store'
 const props = defineProps<{ sid: string; ids: string[] }>()
 const store = useLayerStore()
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
-const l = computed(() => nodes.value[0]?.style.layout)
+/** 고른 것이 모두 오토 레이아웃일 때만 조절 칸, 아니면 + (여러 개 · 프레임 아닌 것은 새 프레임으로 감싸서 걸어요) */
+const l = computed(() => (nodes.value.length && nodes.value.every((n) => n.style.layout) ? nodes.value[0]!.style.layout : undefined))
 const sepPad = ref(false)
 watch(() => props.ids.join(), () => { const p = l.value?.padding; sepPad.value = !!p && !(p[0] === p[2] && p[1] === p[3]) }, { immediate: true })
 
