@@ -746,6 +746,14 @@ const gridStyle = computed(() => {
   } else style.backgroundImage = 'none'
   return style
 })
+/** 확대 · 이동 중인지: 멈춘 뒤 160ms 가 지나면 false → 브라우저가 지금 배율로 다시 그려 흐림이 없어요 */
+const moving = ref(false)
+let movingTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => [vp.value.x, vp.value.y, vp.value.zoom], () => {
+  moving.value = true
+  clearTimeout(movingTimer)
+  movingTimer = setTimeout(() => (moving.value = false), 160)
+})
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -761,7 +769,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @pointerup="end"
     @pointercancel="end"
   >
-    <div class="world" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
+    <div class="world" :class="{ moving }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
       <div
         v-for="s in realScreens"
         :key="s.id"
@@ -830,7 +838,9 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 
 <style scoped>
 .canvas { --grid-pixel: rgb(128 128 128 / 14%); position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
-.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+/* 움직이는 동안만 GPU 층으로(부드럽게), 멈추면 풀어서 확대 비율대로 다시 그려요 — 글자 · 도형이 늘 선명한 벡터 */
+.world.moving { will-change: transform; }
 .free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }
 .frame { position: absolute; pointer-events: auto; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
