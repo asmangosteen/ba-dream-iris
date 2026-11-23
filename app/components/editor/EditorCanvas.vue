@@ -7,7 +7,8 @@ import { simplify } from '~/canvas/paint'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
-import { layerMenuItems, useLastCopy } from '~/composables/useLayerMenu'
+import { layerMenuItems, svgOf, useLastCopy } from '~/composables/useLayerMenu'
+import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize } from '~/canvas/vector'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
@@ -40,9 +41,11 @@ const emit = defineEmits<{
   /** 캔버스에 파일을 끌어 놓았을 때(캔버스 좌표) */
   /** place: 놓은 자리의 화면(또는 캔버스) · 가장 안쪽 프레임 */
   'drop-files': [files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }]
-  'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx?: number, dy?: number]
+  'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge' | 'front' | 'back' | 'forward' | 'backward', dx?: number, dy?: number]
   /** 가이드선 바뀜 */
   guides: [g: { x: number[]; y: number[] }]
+  /** ⌥ 끌어서 화면 복제(놓은 자리) */
+  'clone-screen': [id: string, x: number, y: number]
 }>()
 const store = useLayerStore()
 
@@ -106,7 +109,7 @@ const EDGES = ['n', 's', 'e', 'w'] as const
 type Targets = { sibs: Rect[]; parents: Rect[] }
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean }
-  | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string }
+  | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string; dup?: boolean }
   | { kind: 'draw'; wx: number; wy: number; moved: boolean }
   | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
@@ -422,9 +425,10 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   const layerEl = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
   const lid = layerEl?.dataset.layer
   // 피그마처럼: 고른 화면 안을 끌면 화면째 옮기기(누르고 떼기만 하면 그 레이어를 골라요)
-  const screenGrab = !!lid && !isCanvas(screen) && store.screenId.value === screen.id && !store.layerIds.value.length && !multi.value.length && !e.shiftKey && !e.altKey
+  const screenGrab = !!lid && !isCanvas(screen) && store.screenId.value === screen.id && !store.layerIds.value.length && !multi.value.length && !(e.shiftKey && !e.altKey)
   if (lid && isNative(screen) && !screenGrab) {
-    if (e.shiftKey) { store.selectLayer(screen.id, lid, true); return }
+    // Shift+클릭은 여러 개 고르기. ⌥⇧ 는 복제해서 끌기(가로 · 세로로만)
+    if (e.shiftKey && !e.altKey) { store.selectLayer(screen.id, lid, true); return }
     const d0 = store.doc(screen.id)
     // 고른 프레임 안의 레이어를 끌면 프레임째(누르고 떼기만 하면 안쪽 레이어를 골라요)
     const anc = store.screenId.value === screen.id ? store.layerIds.value.find((id) => id !== lid && descendants(d0, id).includes(lid)) : undefined
@@ -449,7 +453,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     return
   }
   // Shift + 화면 빈 곳 끌기: 상자 안의 레이어 고르기
-  if (e.shiftKey && isNative(screen)) {
+  if (e.shiftKey && !e.altKey && isNative(screen)) {
     const base = store.screenId.value === screen.id ? [...store.layerIds.value] : []
     // 화면 고르기는 실제로 끌 때 — 그냥 Shift+클릭이면 여러 화면 고르기(toggleMulti)라 지금 고른 화면을 지키려고
     drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base, moved: false }
@@ -457,7 +461,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     return
   }
   // Shift+클릭: 화면 여러 개 고르기 · 고른 화면들 함께 옮기기
-  if (e.shiftKey && !isCanvas(screen)) {
+  if (e.shiftKey && !e.altKey && !isCanvas(screen)) {
     const cur = multi.value.length ? multi.value : store.screenId.value && !isCanvas({ id: store.screenId.value }) ? [store.screenId.value] : []
     const next = cur.includes(screen.id) ? cur.filter((x) => x !== screen.id) : [...cur, screen.id]
     if (next.length) { store.selectScreen(next[0]!); multi.value = next.length > 1 ? next : [] } else store.selectScreen(null)
@@ -471,7 +475,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   }
   store.selectScreen(screen.id)
   const sid0 = screen.id
-  drag = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined }
+  drag = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined, dup: e.altKey && isNative(screen) && !isCanvas(screen) }
 }
 
 const rectOf = (s: { x: number; y: number; width: number; height: number }): Rect => ({ x: s.x, y: s.y, w: s.width, h: s.height })
@@ -626,11 +630,15 @@ function move(e: PointerEvent) {
     const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return
     drag.moved = true
-    let nx = drag.ox + dx / z, ny = drag.oy + dy / z
+    // Shift: 가로나 세로로만
+    const lockS = e.shiftKey ? (Math.abs(dx) > Math.abs(dy) ? 'y' : 'x') : null
+    let nx = drag.ox + (lockS === 'x' ? 0 : dx / z), ny = drag.oy + (lockS === 'y' ? 0 : dy / z)
     if (!snapOff(e) && drag.targets.length) {
-      const r = snapMove({ x: nx, y: ny, w: drag.w, h: drag.h }, drag.targets, [], thr())
+      const r = snapMove({ x: nx, y: ny, w: drag.w, h: drag.h }, drag.targets, [], thr(), { x: lockS !== 'x', y: lockS !== 'y' })
       nx += r.dx; ny += r.dy; guides.value = r.guides
     } else guides.value = null
+    // ⌥ 끌기: 원래 화면은 그대로 두고 복제될 자리를 보여 줘요(놓으면 복제)
+    if (drag.dup) { draft.value = { x: Math.round(nx), y: Math.round(ny), width: drag.w, height: drag.h }; return }
     emit('move', drag.id, Math.round(nx), Math.round(ny), false)
   } else if (drag.kind === 'layers') {
     let dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
@@ -810,7 +818,8 @@ function end(e: PointerEvent) {
   guides.value = null
   rotating.value = false
   if (d.kind === 'pan' && !d.moved && e.target === el.value) store.selectScreen(null)
-  if (d.kind === 'screen' && d.moved) {
+  if (d.kind === 'screen' && d.moved && d.dup) { const r = draft.value; draft.value = null; if (r) emit('clone-screen', d.id, r.x, r.y) }
+  else if (d.kind === 'screen' && d.moved) {
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('move', d.id, s.x, s.y, true)
   }
@@ -926,6 +935,47 @@ function doPaste() {
   if (lastCopy.value !== 'screen' && store.hasClipboard()) store.paste(native || (sid && isPageCanvas(sid)) ? undefined : canvasDoc.value?.id)
   else emit('screen-action', 'paste')
 }
+/** 붙여넣고 누른 자리(캔버스 좌표)로 옮기기 */
+function pasteAt(w: { x: number; y: number }) {
+  doPaste()
+  const sid = store.screenId.value
+  const s = props.screens.find((v) => v.id === sid)
+  if (!s || !store.layerIds.value.length) return
+  const bs = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b)
+  if (!bs.length) return
+  const u = union(bs)
+  const dx = Math.round(w.x - u.x), dy = Math.round(w.y - u.y)
+  store.update(s.id, [...store.layerIds.value], (n) => ({ x: n.x + dx, y: n.y + dy }))
+}
+/** 이름 바꾸기: 오른쪽 패널의 이름 칸으로 */
+function focusName() {
+  nextTick(() => { const i = document.querySelector<HTMLInputElement>('input[aria-label="Layer name"], input[aria-label="Frame name"]'); i?.focus(); i?.select() })
+}
+/** 화면(프레임) 우클릭 메뉴 */
+function screenMenuItems(screen: ScreenRow, at: { x: number; y: number }): MenuItem[] {
+  const native = isNative(screen)
+  return [
+    { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    ...(native ? [{ label: 'Paste here', action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
+    { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+    'sep',
+    { label: 'Bring to front', shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: 'Bring forward', shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
+    { label: 'Send backward', shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
+    { label: 'Send to back', shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
+    'sep',
+    ...(native ? [
+      { label: 'Select all layers', shortcut: '⌘A', action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
+      { label: (store.doc(screen.id).frame?.grids?.length ? 'Remove' : 'Add') + ' layout grid', action: () => store.frameStyle(screen.id, { grids: store.doc(screen.id).frame?.grids?.length ? undefined : [{ type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }] }) },
+      { label: 'Copy as SVG', action: () => { const d = store.doc(screen.id); const svg = svgOf(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color); if (svg) navigator.clipboard.writeText(svg).then(() => emit('hint', 'Copied to clipboard'), () => emit('hint', 'Couldn\'t copy to the clipboard')); else emit('hint', 'Nothing to copy as SVG') } },
+    ] : []),
+    { label: 'Rename', action: focusName },
+    { label: 'Zoom to selection', shortcut: '⇧2', action: fitSelection },
+    'sep',
+    { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
+  ]
+}
 /** 우클릭 메뉴(피그마와 같아요): 레이어 · 화면 · 빈 캔버스 */
 function onContext(e: MouseEvent) {
   const t = e.target as HTMLElement
@@ -933,28 +983,31 @@ function onContext(e: MouseEvent) {
   const scrEl = t.closest('[data-screen]') as HTMLElement | null
   const screen = scrEl ? props.screens.find((v) => v.id === scrEl.dataset.screen) : undefined
   const lid = (t.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
+  const at = toWorld(e.clientX, e.clientY)
   if (screen && lid && isNative(screen)) {
     if (!(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
-    ctx.open(e, layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, fit: fitSelection }))
+    const n0 = store.node(screen.id, lid)
+    const items = layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (t) => emit('hint', t) })
+    // 이름 바꾸기 · 점 편집은 Delete 위에(Delete 가 늘 맨 끝)
+    const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 ? [{ label: 'Rename', action: focusName }, ...(EDITABLE.has(n0.type) ? [{ label: 'Edit vector', shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : [])] : []
+    items.splice(Math.max(0, items.length - 2), 0, ...extra)
+    ctx.open(e, items)
     return
   }
   if (screen && !isCanvas(screen)) {
     if (!multi.value.includes(screen.id)) store.selectScreen(screen.id)
-    ctx.open(e, [
-      { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
-      { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
-      { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
-      'sep',
-      { label: 'Zoom to selection', shortcut: '⇧2', action: fitSelection },
-      'sep',
-      { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
-    ])
+    ctx.open(e, screenMenuItems(screen, at))
     return
   }
   ctx.open(e, [
     { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    { label: 'Paste here', action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' },
     'sep',
+    { label: 'Zoom in', shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 1.25) },
+    { label: 'Zoom out', shortcut: '⌘−', action: () => zoomAt(vp.value.zoom / 1.25) },
+    { label: 'Zoom to 100%', shortcut: '⇧0', action: () => zoomAt(1) },
     { label: 'Zoom to fit', shortcut: '⇧1', action: () => fit() },
+    'sep',
     { label: rulersShown.value ? 'Hide rulers' : 'Show rulers', shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
     { label: gridsShown.value ? 'Hide layout grids' : 'Show layout grids', shortcut: '⌃G', action: () => (gridsShown.value = !gridsShown.value) },
   ])
@@ -1058,8 +1111,14 @@ function onKeyDown(e: KeyboardEvent) {
   // 지우기
   if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) store.remove(sid, ids); else emit('screen-action', 'remove'); return }
   // 순서
-  if (layerMode && mod && e.key === ']') { stop(); store.arrange(sid, ids, e.altKey ? 'top' : 1); return }
-  if (layerMode && mod && e.key === '[') { stop(); store.arrange(sid, ids, e.altKey ? 'bottom' : -1); return }
+  // ⌥ 가 e.key 를 바꾸는 맥에서도 되게 e.code 로. 화면만 골랐으면 화면 순서
+  if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+    stop()
+    const up = e.code === 'BracketRight'
+    if (layerMode) store.arrange(sid, ids, up ? (e.altKey ? 'top' : 1) : (e.altKey ? 'bottom' : -1))
+    else if (!isPageCanvas(sid)) emit('screen-action', up ? (e.altKey ? 'front' : 'forward') : (e.altKey ? 'back' : 'backward'))
+    return
+  }
   // 고르기 이동: Enter(안으로 · 텍스트면 고치기) · Shift+Enter(부모로) · Tab(다음 레이어)
   if (e.key === 'Enter' && native) {
     stop()

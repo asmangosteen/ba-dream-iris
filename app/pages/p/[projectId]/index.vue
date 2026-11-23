@@ -26,7 +26,7 @@ import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/use
 const route = useRoute()
 const router = useRouter()
 const projectId = route.params.projectId as string
-const { project, pages, pageId, screens, addPage, renamePage, removePage, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+const { project, pages, pageId, screens, addPage, renamePage, removePage, reorderScreen, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
 // 좌우 사이드바 접기(위로 접혀서 탭 줄만 남아요). 이 브라우저에 기억
 const collapsed = ref<{ left: boolean; right: boolean }>({ left: false, right: false })
 onMounted(() => { try { const v = JSON.parse(localStorage.getItem('iris-panels') ?? '{}'); collapsed.value = { left: !!v.left, right: !!v.right } } catch { /* 저장소를 못 쓰면 펼친 채로 */ } })
@@ -235,9 +235,18 @@ function spotRightOf(id: string): { x: number; y: number } {
   const hit = list.value.some((v) => v.x < r.x + r.w && v.x + v.width > r.x && v.y < r.y + r.h && v.y + v.height > r.y)
   return hit ? { x: nextX.value, y: src.y } : { x: r.x, y: r.y }
 }
-async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx = 0, dy = 0) {
+async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge' | 'front' | 'back' | 'forward' | 'backward', dx = 0, dy = 0) {
   const s = current.value
   try {
+    if (s && (action === 'front' || action === 'back' || action === 'forward' || action === 'backward')) {
+      const before = list.value.map((v) => v.id)
+      await reorderScreen(s.id, action)
+      const after = list.value.map((v) => v.id)
+      // 실행취소: 원래 순서로 되돌리기
+      const restore = async (ids: string[]) => { for (const [k, id] of ids.entries()) { const cur = list.value.findIndex((v) => v.id === id); if (cur !== k) { const arr = [...list.value]; const [m] = arr.splice(cur, 1); arr.splice(k, 0, m!); screens.data.value = arr } } await reorderScreen(ids[ids.length - 1]!, 'front') }
+      store.pushAction(s.id, () => restore(before), () => restore(after))
+      return
+    }
     if (action === 'copy' && s) { screenClip.value = s.id; say(`Copied ${s.name}`); return }
     if (action === 'paste') { if (screenClip.value) await cloneScreen(screenClip.value, spotRightOf(screenClip.value)); return }
     if (!s) return
@@ -493,6 +502,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       :highlight="highlight"
       :guides="currentPage?.viewport?.guides ?? { x: [], y: [] }"
       @guides="(g) => onPageSettings({ guides: g })"
+      @clone-screen="(id: string, x: number, y: number) => cloneScreen(id, { x, y })"
       @move="onMove"
       @resize-screen="onResizeScreen"
       @arrange-screens="onArrangeScreens"

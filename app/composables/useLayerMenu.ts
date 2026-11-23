@@ -1,4 +1,6 @@
-import { isContainer } from '~/canvas/schema'
+import { isContainer, type LayerDoc, type LayerNode } from '~/canvas/schema'
+import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
+import { nodePathIn } from '~/canvas/vector'
 import type { LayerStore } from '~/canvas/store'
 import type { MenuItem } from './useContextMenu'
 
@@ -6,7 +8,42 @@ import type { MenuItem } from './useContextMenu'
 export const useLastCopy = () => useState<'layers' | 'screen' | null>('iris-last-copy', () => null)
 
 /** 레이어 우클릭 메뉴 항목(피그마 순서). 캔버스 · 레이어 목록 공용 */
-export function layerMenuItems(store: LayerStore, sid: string, ids: string[], opts: { lastCopy: Ref<'layers' | 'screen' | null>; paste: () => void; fit?: () => void }): MenuItem[] {
+/** 레이어 → CSS(피그마 'Copy as CSS') */
+export function cssOf(n: LayerNode, color: (v?: string) => string | undefined): string {
+  const s = n.style
+  const css: Record<string, string> = { width: `${Math.round(n.w)}px`, height: `${Math.round(n.h)}px` }
+  if (n.type !== 'text') Object.assign(css, Object.fromEntries(Object.entries(backgroundCss(s, color, () => undefined)).map(([k, v]) => [k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()), v])))
+  const r = s.radii ? s.radii.map((v) => v + 'px').join(' ') : s.radius ? s.radius + 'px' : n.type === 'ellipse' ? '50%' : ''
+  if (r) css['border-radius'] = r
+  const st = strokeShadows(s, n.type, color), fx = effectCss(s.effects, color, true)
+  const sh = [...st.outer, ...st.inner, ...fx.outer, ...fx.inner]
+  if (sh.length) css['box-shadow'] = sh.join(', ')
+  if (fx.filter.length) css.filter = fx.filter.join(' ')
+  if (s.opacity !== undefined && s.opacity < 1) css.opacity = String(s.opacity)
+  if (s.blend && s.blend !== 'normal') css['mix-blend-mode'] = s.blend
+  if (n.type === 'text') Object.assign(css, { color: color(s.color) ?? '', 'font-family': 'Pretendard', 'font-size': `${s.fontSize ?? 16}px`, 'font-weight': String(s.fontWeight ?? 400), 'line-height': s.lineHeight ? `${s.lineHeight}px` : 'normal', ...(s.letterSpacing ? { 'letter-spacing': `${s.letterSpacing}px` } : {}), 'text-align': s.align ?? 'left' })
+  return `/* ${n.name} */\n` + Object.entries(css).filter(([, v]) => v).map(([k, v]) => `${k}: ${v};`).join('\n')
+}
+/** 레이어들 → SVG(피그마 'Copy as SVG'). 텍스트 · 이미지 · 인스턴스는 빼요 */
+export function svgOf(doc: LayerDoc, ns: LayerNode[], color: (v?: string) => string | undefined): string | null {
+  const shapes = ns.filter((n) => n.type !== 'text' && n.type !== 'image' && n.type !== 'instance')
+  if (!shapes.length) return null
+  const x0 = Math.min(...shapes.map((n) => n.x)), y0 = Math.min(...shapes.map((n) => n.y))
+  const W = Math.max(...shapes.map((n) => n.x + n.w)) - x0, H = Math.max(...shapes.map((n) => n.y + n.h)) - y0
+  const r = (v: number) => Math.round(v * 100) / 100
+  const body = shapes.map((n) => {
+    const d = nodePathIn(doc, n, -x0, -y0)
+    const fill = n.type === 'line' || (n.type === 'path' && !n.closed) ? 'none' : color(n.style.fill) ?? 'none'
+    const stroke = n.style.stroke && n.style.strokeWidth ? ` stroke="${color(n.style.stroke)}" stroke-width="${n.style.strokeWidth}"` : ''
+    return `  <path d="${d}" fill="${fill}"${n.evenodd ? ' fill-rule="evenodd"' : ''}${stroke}${n.style.opacity !== undefined && n.style.opacity < 1 ? ` opacity="${n.style.opacity}"` : ''}/>`
+  }).join('\n')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${r(W)}" height="${r(H)}" viewBox="0 0 ${r(W)} ${r(H)}" fill="none">\n${body}\n</svg>`
+}
+async function copyText(text: string, hint?: (t: string) => void) {
+  try { await navigator.clipboard.writeText(text); hint?.('Copied to clipboard') } catch { hint?.('Couldn\'t copy to the clipboard') }
+}
+
+export function layerMenuItems(store: LayerStore, sid: string, ids: string[], opts: { lastCopy: Ref<'layers' | 'screen' | null>; paste: () => void; pasteHere?: () => void; fit?: () => void; hint?: (t: string) => void }): MenuItem[] {
   const d = store.doc(sid)
   const nodes = ids.map((id) => d.nodes[id]).filter((n): n is NonNullable<typeof n> => !!n)
   if (!nodes.length) return []
@@ -16,7 +53,14 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
   return [
     { label: 'Copy', shortcut: '⌘C', action: () => { if (store.copy()) opts.lastCopy.value = 'layers' } },
     { label: 'Paste', shortcut: '⌘V', action: opts.paste, disabled: !store.hasClipboard() && opts.lastCopy.value !== 'screen' },
+    ...(opts.pasteHere ? [{ label: 'Paste here', action: opts.pasteHere, disabled: !store.hasClipboard() || opts.lastCopy.value === 'screen' }] : []),
     { label: 'Duplicate', shortcut: '⌘D', action: () => store.duplicate() },
+    { label: 'Copy as CSS', action: () => copyText(nodes.map((n) => cssOf(n, store.color)).join('\n\n'), opts.hint) },
+    ...(svgOf(d, nodes, store.color) ? [{ label: 'Copy as SVG', action: () => copyText(svgOf(d, nodes, store.color)!, opts.hint) }] : []),
+    'sep',
+    { label: 'Select parent', shortcut: '⇧↵', action: () => store.selectParent(sid), disabled: nodes.every((n) => !n.parentId) },
+    ...(nodes.some((n) => isContainer(n) && n.children?.length) ? [{ label: 'Select children', shortcut: '↵', action: () => store.selectChildren(sid) }] : []),
+    { label: 'Select all', shortcut: '⌘A', action: () => store.selectAll(sid) },
     'sep',
     { label: 'Bring to front', shortcut: '⌥⌘]', action: () => store.arrange(sid, ids, 'top') },
     { label: 'Bring forward', shortcut: '⌘]', action: () => store.arrange(sid, ids, 1) },

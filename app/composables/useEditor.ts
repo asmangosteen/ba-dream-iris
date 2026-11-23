@@ -89,6 +89,21 @@ export function useEditor(projectId: string) {
     if (pageId.value === id) pageId.value = next[0]?.id ?? null
   }
 
+  /** 화면(프레임) 앞뒤 순서: 뒤에 있을수록 위에 그려져요. sort_order 를 다시 매겨 저장 */
+  async function reorderScreen(id: string, to: 'front' | 'back' | 'forward' | 'backward') {
+    const list = [...(screens.data.value ?? [])]
+    const i = list.findIndex((x) => x.id === id)
+    if (i < 0) return
+    const [s] = list.splice(i, 1)
+    const j = to === 'front' ? list.length : to === 'back' ? 0 : Math.max(0, Math.min(list.length, i + (to === 'forward' ? 1 : -1)))
+    list.splice(j, 0, s!)
+    screens.data.value = list
+    if (preview) { if (pageId.value) PREVIEW_SCREENS[pageId.value] = list as never; return }
+    const results = await Promise.all(list.map((x, k) => supabase.from('screens').update({ sort_order: k }).eq('id', x.id)))
+    const err = results.find((r) => r.error)?.error
+    if (err) throw err
+  }
+
   /** 빈 화면(프레임) 추가 */
   async function addScreen(rect: { x: number; y: number; width: number; height: number }, name?: string): Promise<ScreenRow | null> {
     if (!pageId.value) return null
@@ -143,5 +158,5 @@ export function useEditor(projectId: string) {
     screens.data.value = list.filter((x) => x.id !== id)
   }
 
-  return { project, pages, pageId, screens, addPage, renamePage, removePage, updatePageSettings, addScreen, updateScreen, removeScreen }
+  return { project, pages, pageId, screens, addPage, renamePage, removePage, reorderScreen, updatePageSettings, addScreen, updateScreen, removeScreen }
 }

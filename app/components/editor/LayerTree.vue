@@ -8,7 +8,7 @@ import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
 const props = defineProps<{ screens: ScreenRow[] }>()
-const emit = defineEmits<{ 'pick-screen': [id: string]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste'] }>()
+const emit = defineEmits<{ 'pick-screen': [id: string]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'front' | 'back' | 'forward' | 'backward'] }>()
 const store = useLayerStore()
 
 const closed = ref<Set<string>>(new Set()) // 접은 화면 · 프레임
@@ -70,6 +70,11 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
     { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
     { label: 'Paste', shortcut: '⌘V', action: paste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
     { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+    'sep',
+    { label: 'Bring to front', shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: 'Bring forward', shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
+    { label: 'Send backward', shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
+    { label: 'Send to back', shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
     'sep',
     { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ])
