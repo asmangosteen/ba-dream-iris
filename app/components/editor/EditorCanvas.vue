@@ -28,6 +28,8 @@ const emit = defineEmits<{
   create: [rect: { x: number; y: number; width: number; height: number }]
   hint: [text: string]
   /** 화면(프레임) 단위 동작 — 레이어를 고르지 않고 화면만 골랐을 때 */
+  /** 캔버스에 파일을 끌어 놓았을 때(캔버스 좌표) */
+  'drop-files': [files: File[], at: { x: number; y: number }]
   'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx?: number, dy?: number]
 }>()
 const store = useLayerStore()
@@ -768,6 +770,12 @@ const singleHug = computed(() => {
   const n = sid && id ? store.node(sid, id) : null
   return !!n && n.type === 'text' && !!n.style.autoWidth
 })
+// 파일 끌어 놓기(이미지 · SVG)
+function onDragOver(e: DragEvent) { if (e.dataTransfer) e.dataTransfer.dropEffect = [...e.dataTransfer.types].includes('Files') ? 'copy' : 'none' }
+function onDrop(e: DragEvent) {
+  const files = [...(e.dataTransfer?.files ?? [])]
+  if (files.length) emit('drop-files', files, toWorld(e.clientX, e.clientY))
+}
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -782,6 +790,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @pointermove="move"
     @pointerup="end"
     @pointercancel="end"
+    @dragover.prevent="onDragOver"
+    @drop.prevent="onDrop"
   >
     <div class="world" :class="{ moving }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
       <div

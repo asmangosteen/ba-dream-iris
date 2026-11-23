@@ -318,24 +318,55 @@ async function onImageFile(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  // 고른 화면이 없으면 지금 보이는 캔버스 가운데에 놓아요
-  const s = current.value ?? canvasScreen.value
-  if (!file || !s) return
+  if (file) await insertImage(file)
+}
+/**
+ * 이미지 넣기(도구 · 끌어 놓기 · 붙여넣기 공용). at 이 있으면 그 캔버스 좌표에, 없으면 고른 화면 가운데(없으면 보이는 캔버스 가운데)에.
+ * at 이 Iris 화면 위면 그 화면 안으로, 아니면 캔버스 위로 들어가요.
+ */
+async function insertImage(file: File, at?: { x: number; y: number }) {
   if (!file.type.startsWith('image/')) return say('이미지 파일만 넣을 수 있어요')
   if (file.size > 10 * 1024 * 1024) return say('10MB 보다 작은 이미지만 넣을 수 있어요')
+  const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
+  const s = (at ? hitScreen : current.value) ?? canvasScreen.value
+  if (!s) return
   try {
     const img = await uploadImage(file, s.id.replace(':', '-'), { supabase, preview })
-    const target = replaceId && store.screenId.value ? store.screenId.value : s.id
-    if (replaceId) { store.update(target, [replaceId], { src: img.src }); return }
+    if (replaceId && !at) { const target = store.screenId.value ?? s.id; const id = replaceId; replaceId = null; store.update(target, [id], { src: img.src }); return }
     const onCanvas = isPageCanvas(s.id)
     const k = onCanvas ? Math.min(1, 480 / img.w, 480 / img.h) : Math.min(1, (s.width * 0.7) / img.w, (s.height * 0.5) / img.h)
     const w = Math.round(img.w * k), h = Math.round(img.h * k)
-    const cx = onCanvas ? Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom) : Math.round(s.width / 2)
-    const cy = onCanvas ? Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) : Math.round(s.height / 2)
-    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: cx - Math.round(w / 2), y: cy - Math.round(h / 2), w, h })
+    let cx: number, cy: number
+    if (at) { cx = Math.round(at.x - s.x); cy = Math.round(at.y - s.y) }
+    else if (onCanvas) { cx = Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom); cy = Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
+    else { cx = Math.round(s.width / 2); cy = Math.round(s.height / 2) }
+    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: cx - Math.round(w / 2), y: cy - Math.round(h / 2), w, h, lockRatio: true })
     tab.value = 'design'
   } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요') }
 }
+/** 캔버스에 파일 끌어 놓기 */
+async function onDropFiles(files: File[], at: { x: number; y: number }) {
+  const imgs = files.filter((f) => f.type.startsWith('image/'))
+  if (!imgs.length) return say('이미지 파일(PNG · JPG · SVG 등)만 넣을 수 있어요')
+  for (const [i, f] of imgs.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 })
+}
+/** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
+function onPaste(e: ClipboardEvent) {
+  const t = e.target as HTMLElement | null
+  if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
+  const cd = e.clipboardData
+  if (!cd) return
+  const files = [...cd.files].filter((f) => f.type.startsWith('image/'))
+  const text = cd.getData('text/plain').trim()
+  const center = { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
+  if (files.length) { e.preventDefault(); onDropFiles(files, current.value ? { x: current.value.x + current.value.width / 2, y: current.value.y + current.value.height / 2 } : center); return }
+  if (/^<svg[\s>]/i.test(text) || (/^<\?xml/i.test(text) && text.includes('<svg'))) {
+    e.preventDefault()
+    insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
+  }
+}
+onMounted(() => window.addEventListener('paste', onPaste))
+onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
 // 저장이 끝나기 전에 떠나면 알리기
 function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error') { e.preventDefault(); e.returnValue = '' } }
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
@@ -408,6 +439,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       @create="onCreate"
       @hint="say"
       @screen-action="onScreenAction"
+      @drop-files="onDropFiles"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="canvas-empty">
       <span class="tx-head">이 페이지는 비어 있어요</span>
