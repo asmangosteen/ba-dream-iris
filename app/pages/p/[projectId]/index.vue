@@ -281,7 +281,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <!-- 왼쪽 위: 파일 알약 -->
     <div class="sq float s pill-left">
       <div class="home-wrap">
-        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><img src="/bd-symbol.svg" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></button>
+        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><img :src="BD_SYMBOL" alt="" height="12" onerror="this.remove()"><Icon name="chevron_down" :size="12" /></button>
         <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
           <NuxtLink to="/" class="sq menu-item" role="menuitem">프로젝트 홈으로</NuxtLink>
           <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">프로젝트 설정</button>

@@ -77,7 +77,7 @@ async function signOut() {
 <template>
   <div class="sq float s bar left">
     <NuxtLink to="/" class="brand" aria-label="Iris 홈">
-      <img src="/bd-symbol.svg" alt="" height="13" onerror="this.remove()">
+      <img :src="BD_SYMBOL" alt="" height="13" onerror="this.remove()">
       <span>Iris</span>
     </NuxtLink>
     <nav aria-label="주 메뉴" class="seg">

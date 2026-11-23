@@ -45,7 +45,7 @@ async function verify() {
 
 <template>
   <div class="page">
-    <header class="logo"><img src="/bd-symbol.svg" alt="" height="16" onerror="this.remove()"><span>Iris</span></header>
+    <header class="logo"><img :src="BD_SYMBOL" alt="" height="16" onerror="this.remove()"><span>Iris</span></header>
     <main class="wrap">
       <h1 class="tx-title">로그인</h1>
       <form class="sq float card" @submit.prevent="step === 'email' ? sendCode() : verify()">
