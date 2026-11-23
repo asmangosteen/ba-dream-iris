@@ -12,7 +12,12 @@ export default defineNuxtConfig({
     },
   },
   // 로그인 · 도메인 확인은 app/middleware/auth.global.ts 한 곳에서 합니다
-  supabase: { redirect: false, types: '~~/shared/types/database.ts' },
+  supabase: {
+    redirect: false,
+    types: '~~/shared/types/database.ts',
+    // 로그인 유지 규칙(PRD/06_AUTH_SESSION.md): 마지막으로 쓴 날부터 30일. 쓰는 동안 토큰이 갱신될 때마다 쿠키 기한도 다시 30일로 늘어납니다
+    cookieOptions: { maxAge: 60 * 60 * 24 * 30, sameSite: 'lax', secure: true },
+  },
   runtimeConfig: {
     // 서버 전용 (브라우저에 노출되지 않음)
     figmaAccessToken: '',

@@ -61,11 +61,12 @@ function openProfile() {
 
 const supabase = useSupabaseClient()
 const signingOut = ref(false)
-async function signOut() {
+/** scope 'local' = 이 기기만, 'global' = 내 계정이 로그인된 모든 기기 */
+async function signOut(scope: 'local' | 'global' = 'local') {
   if (signingOut.value) return
   signingOut.value = true
   try {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope })
   } finally {
     signingOut.value = false
     menuOpen.value = false
@@ -111,8 +112,11 @@ async function signOut() {
         <button type="button" role="menuitem" class="menu-item" tabindex="-1" @click="openProfile">
           <Icon name="pencil" :size="14" color="var(--sys-color-neutral-600)" />프로필 고치기
         </button>
-        <button type="button" role="menuitem" class="menu-item" tabindex="-1" :disabled="signingOut" @click="signOut">
+        <button type="button" role="menuitem" class="menu-item" tabindex="-1" :disabled="signingOut" @click="signOut('local')">
           <Icon name="logout_right" :size="14" color="var(--sys-color-neutral-600)" />{{ signingOut ? '로그아웃하는 중' : '로그아웃' }}
+        </button>
+        <button type="button" role="menuitem" class="menu-item" tabindex="-1" :disabled="signingOut" @click="signOut('global')">
+          <Icon name="logout_right" :size="14" color="var(--sys-color-neutral-600)" />모든 기기에서 로그아웃
         </button>
       </div>
     </div>
