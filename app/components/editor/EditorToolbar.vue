@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { Icon } from '@ba-dream/design-system'
 
-export type Tool = 'move' | 'frame' | 'rect' | 'text' | 'image'
+export type Tool = 'move' | 'hand' | 'frame' | 'rect' | 'text' | 'image'
 const tool = defineModel<Tool>({ default: 'move' })
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 const tools: { key: Tool; label: string; d?: string; icon?: string }[] = [
   { key: 'move', label: '이동 (V)', d: 'M3.5 2.2l9.3 4.6-4 1.3-1.4 4z' },
+  { key: 'hand', label: '손 (H) · 끌어서 캔버스 이동', d: 'M5.5 8V4.2a1 1 0 0 1 2 0V7.5M7.5 7V3.2a1 1 0 0 1 2 0V7M9.5 7V4.2a1 1 0 0 1 2 0V9.5c0 2.6-1.7 4.5-4.2 4.5-1.6 0-2.6-.7-3.5-2.1L2.4 9.6a1 1 0 0 1 1.6-1.2l1.5 1.6' },
   { key: 'frame', label: '프레임 (F)', d: 'M5 1.5v13M11 1.5v13M1.5 5h13M1.5 11h13' },
   { key: 'rect', label: '사각형 (R)', d: 'M4.5 2.5h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z' },
   { key: 'text', label: '텍스트 (T)', d: 'M3 4.5V3h10v1.5M8 3v10M6 13h4' },
   { key: 'image', label: '이미지', icon: 'image' },
 ]
-const KEYS: Record<string, Tool> = { v: 'move', f: 'frame', a: 'frame', r: 'rect', t: 'text' }
+const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', f: 'frame', a: 'frame', r: 'rect', t: 'text' }
 function onKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement
   if (e.metaKey || e.ctrlKey || e.altKey || el.closest('input, textarea, [contenteditable]')) return

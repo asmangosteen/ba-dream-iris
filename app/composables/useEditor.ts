@@ -1,4 +1,7 @@
-export interface PageRow { id: string; name: string; sort_order: number }
+export interface PageRow { id: string; name: string; sort_order: number; layers?: unknown }
+/** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
+export const pageCanvasId = (pageId: string) => 'page:' + pageId
+export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
 export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown }
 
 /** 에디터 데이터: 프로젝트 · 페이지 · 선택한 페이지의 화면 */
@@ -13,7 +16,7 @@ export function useEditor(projectId: string) {
   }, { deep: true })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
     if (preview) return PREVIEW_PAGES
-    const { data, error } = await supabase.from('pages').select('id, name, sort_order').eq('project_id', projectId).order('sort_order')
+    const { data, error } = await supabase.from('pages').select('id, name, sort_order, layers').eq('project_id', projectId).order('sort_order')
     if (error) throw error
     return (data ?? []) as PageRow[]
   }, { deep: true })
@@ -80,6 +83,16 @@ export function useEditor(projectId: string) {
 
   /** 화면 속성 저장 (위치 · 크기 · 이름 · 상태). 화면에는 먼저 반영하고, 저장이 실패하면 되돌립니다 */
   async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status' | 'layers'>>) {
+    // 캔버스 위 레이어 → pages.layers
+    if (isPageCanvas(id)) {
+      const pid = id.slice(5)
+      const p = pages.data.value?.find((x) => x.id === pid)
+      if (p && 'layers' in patch) p.layers = patch.layers
+      if (preview || !('layers' in patch)) return
+      const { error } = await supabase.from('pages').update({ layers: patch.layers }).eq('id', pid)
+      if (error) throw error
+      return
+    }
     const s = screens.data.value?.find((x) => x.id === id)
     if (!s) {
       // 다른 페이지로 옮긴 뒤 늦게 도착한 저장(레이어 자동저장 등)

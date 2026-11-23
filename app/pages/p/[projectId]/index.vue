@@ -43,12 +43,18 @@ const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void;
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
+/** 캔버스 위(화면 밖)에 그린 레이어: 페이지에 저장되는 가상 화면 하나로 다룹니다(좌표 = 캔버스 좌표) */
+const canvasScreen = computed<ScreenRow | null>(() => {
+  const p = pages.data.value?.find((x) => x.id === pageId.value)
+  return p ? { id: pageCanvasId(p.id), name: '캔버스', source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
+})
+const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
 // 화면 안 레이어: 고르기 · 실행취소 · 자동저장
 const store = createLayerStore({
-  screens: list,
+  screens: canvasList,
   save: (sid, doc) => updateScreen(sid, { layers: doc }),
   tokens: computed(() => (tokens.data.value ?? []).map((t) => ({ name: t.name, value: t.value }))),
 })
@@ -262,7 +268,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 let replaceId: string | null = null
 function pickImage(replace?: string) {
   const s = current.value
-  if (!s || s.source !== 'native') return say('이미지를 넣을 Iris 캔버스 화면을 먼저 골라주세요')
+  if (s && s.source !== 'native') return say('피그마 화면에는 이미지를 넣을 수 없어요')
   replaceId = typeof replace === 'string' ? replace : null
   fileInput.value?.click()
 }
@@ -270,16 +276,21 @@ async function onImageFile(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  const s = current.value
+  // 고른 화면이 없으면 지금 보이는 캔버스 가운데에 놓아요
+  const s = current.value ?? canvasScreen.value
   if (!file || !s) return
   if (!file.type.startsWith('image/')) return say('이미지 파일만 넣을 수 있어요')
   if (file.size > 10 * 1024 * 1024) return say('10MB 보다 작은 이미지만 넣을 수 있어요')
   try {
-    const img = await uploadImage(file, s.id, { supabase, preview })
-    if (replaceId) { store.update(s.id, [replaceId], { src: img.src }); return }
-    const k = Math.min(1, (s.width * 0.7) / img.w, (s.height * 0.5) / img.h)
+    const img = await uploadImage(file, s.id.replace(':', '-'), { supabase, preview })
+    const target = replaceId && store.screenId.value ? store.screenId.value : s.id
+    if (replaceId) { store.update(target, [replaceId], { src: img.src }); return }
+    const onCanvas = isPageCanvas(s.id)
+    const k = onCanvas ? Math.min(1, 480 / img.w, 480 / img.h) : Math.min(1, (s.width * 0.7) / img.w, (s.height * 0.5) / img.h)
     const w = Math.round(img.w * k), h = Math.round(img.h * k)
-    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: Math.round((s.width - w) / 2), y: Math.round((s.height - h) / 2), w, h })
+    const cx = onCanvas ? Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom) : Math.round(s.width / 2)
+    const cy = onCanvas ? Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) : Math.round(s.height / 2)
+    store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: cx - Math.round(w / 2), y: cy - Math.round(h / 2), w, h })
     tab.value = 'design'
   } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요') }
 }
@@ -344,7 +355,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       ref="canvas"
       v-model:tool="tool"
       v-model:viewport="vp"
-      :screens="list"
+      :screens="canvasList"
       :highlight="highlight"
       @move="onMove"
       @create="onCreate"
@@ -395,7 +406,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         </section>
         <section class="layers">
           <span class="nav-label">레이어</span>
-          <LayerTree :screens="list" @pick-screen="pickScreen" />
+          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" @pick-screen="pickScreen" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
             <span class="tx-meta">화면이 아직 없어요</span>
             <TextButton size="s" color="blue" @click="tool = 'frame'">프레임 그리기</TextButton>
@@ -478,6 +489,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
             <InspectorDesign v-else :screen="current" @update="onUpdate" @remove="onRemove" />
           </div>
         </template>
+        <!-- 캔버스 위 레이어를 골랐을 때: 디자인 속성만 -->
+        <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll">
+          <InspectorLayer :screen="canvasScreen" @replace-image="pickImage" />
+        </div>
         <div v-else class="none">
           <span class="tx-head">화면을 골라주세요</span>
           <span class="tx-meta">캔버스나 왼쪽 레이어에서 화면을 누르면 요구사항 · 디자인 · 개발 정보가 여기 나와요</span>

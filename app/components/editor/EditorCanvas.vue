@@ -88,9 +88,22 @@ type Drag =
   | { kind: 'resize'; sid: string; id: string; corner: Corner; sx: number; sy: number; o: { x: number; y: number; w: number; h: number }; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
   | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean }
+  | { kind: 'marqueeCanvas'; wx: number; wy: number; moved: boolean }
+  | { kind: 'screens'; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; moved: boolean }
 let drag: Drag | null = null
 
 const isNative = (s: ScreenRow) => s.source === 'native'
+const isCanvas = (s: { id: string }) => isPageCanvas(s.id)
+const realScreens = computed(() => props.screens.filter((s) => !isCanvas(s)))
+const canvasDoc = computed(() => props.screens.find(isCanvas) ?? null)
+function toggleMulti(id: string) {
+  const cur = multi.value.length ? multi.value : store.screenId.value && !isPageCanvas(store.screenId.value) && store.screenId.value !== id ? [store.screenId.value] : []
+  const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+  if (next.length) { store.selectScreen(next[0]!); multi.value = next.length > 1 ? next : [] } else store.selectScreen(null)
+}
+/** 상자 선택 · Shift 클릭으로 함께 고른 화면들(첫 번째가 store.screenId) */
+const multi = ref<string[]>([])
+watch(() => store.screenId.value, (id) => { if (!id || !multi.value.includes(id)) multi.value = [] })
 const drawType = (t: Tool): LayerType | null => (t === 'rect' ? 'rect' : t === 'text' ? 'text' : t === 'frame' ? 'frame' : null)
 
 /** 화면 안 좌표에서, 그 위치를 품는 가장 안쪽 프레임 레이어 */
@@ -113,7 +126,9 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   if (e.button !== 0 && e.button !== 1) return
   if (store.editing.value) (document.activeElement as HTMLElement | null)?.blur?.()
   try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
-  if (e.button === 1 || space.value || (!screen && tool.value === 'move')) {
+  // 캔버스 위 레이어 층에서 레이어가 아닌 곳을 누르면 빈 캔버스와 같아요
+  if (screen && isCanvas(screen) && !(e.target as HTMLElement).closest('[data-layer]')) screen = undefined
+  if (e.button === 1 || space.value || tool.value === 'hand') {
     drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: vp.value.x, vy: vp.value.y, moved: false }
     panning.value = true
     return
@@ -121,8 +136,19 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   const t = drawType(tool.value)
   // 빈 캔버스에 프레임 도구 → 새 화면
   if (!screen) {
-    if (tool.value === 'frame') { const w = toWorld(e.clientX, e.clientY); drag = { kind: 'draw', wx: w.x, wy: w.y, moved: false }; return }
-    emit('hint', '사각형 · 텍스트는 화면 안에 그려요')
+    const w = toWorld(e.clientX, e.clientY)
+    // 프레임 도구 → 새 화면
+    if (tool.value === 'frame') { drag = { kind: 'draw', wx: w.x, wy: w.y, moved: false }; return }
+    // 사각형 · 텍스트 등 → 캔버스 위에 바로(페이지 레이어)
+    if (t && canvasDoc.value) {
+      const cid = canvasDoc.value.id
+      const parentId = frameAt(cid, w.x, w.y)
+      const p = parentId ? store.absPos(cid, parentId) : { x: 0, y: 0 }
+      drag = { kind: 'drawLayer', sid: cid, type: t, parentId, px: p.x, py: p.y, lx: w.x, ly: w.y, moved: false }
+      return
+    }
+    // 이동 도구 → 상자 선택 (피그마와 같아요. 화면 이동은 스페이스 · 손 도구 H · 스크롤)
+    if (tool.value === 'move') { drag = { kind: 'marqueeCanvas', wx: w.x, wy: w.y, moved: false }; marqueeOn.value = true; return }
     return
   }
   const w = toWorld(e.clientX, e.clientY)
@@ -154,6 +180,18 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     if (store.screenId.value !== screen.id) store.selectScreen(screen.id)
     drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base, moved: false }
     marqueeOn.value = true
+    return
+  }
+  // Shift+클릭: 화면 여러 개 고르기 · 고른 화면들 함께 옮기기
+  if (e.shiftKey && !isCanvas(screen)) {
+    const cur = multi.value.length ? multi.value : store.screenId.value && !isCanvas({ id: store.screenId.value }) ? [store.screenId.value] : []
+    const next = cur.includes(screen.id) ? cur.filter((x) => x !== screen.id) : [...cur, screen.id]
+    if (next.length) { store.selectScreen(next[0]!); multi.value = next.length > 1 ? next : [] } else store.selectScreen(null)
+    return
+  }
+  if (multi.value.length > 1 && multi.value.includes(screen.id)) {
+    const orig = Object.fromEntries(multi.value.map((id) => { const v = props.screens.find((x) => x.id === id)!; return [id, { x: v.x, y: v.y }] }))
+    drag = { kind: 'screens', ids: [...multi.value], sx: e.clientX, sy: e.clientY, orig, moved: false }
     return
   }
   store.selectScreen(screen.id)
@@ -208,6 +246,30 @@ function move(e: PointerEvent) {
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
     draft.value = { x: Math.round(Math.min(w.x, drag.wx)), y: Math.round(Math.min(w.y, drag.wy)), width: Math.round(Math.abs(w.x - drag.wx)), height: Math.round(Math.abs(w.y - drag.wy)) }
+  } else if (drag.kind === 'screens') {
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return
+    drag.moved = true
+    for (const id of drag.ids) emit('move', id, Math.round(drag.orig[id]!.x + dx / z), Math.round(drag.orig[id]!.y + dy / z), false)
+  } else if (drag.kind === 'marqueeCanvas') {
+    const w = toWorld(e.clientX, e.clientY)
+    if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
+    drag.moved = true
+    const r = { x: Math.min(w.x, drag.wx), y: Math.min(w.y, drag.wy), width: Math.abs(w.x - drag.wx), height: Math.abs(w.y - drag.wy) }
+    draft.value = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
+    const hitBox = (b: { x: number; y: number; w: number; h: number }) => b.x < r.x + r.width && b.x + b.w > r.x && b.y < r.y + r.height && b.y + b.h > r.y
+    // 화면이 걸리면 화면들, 아니면 캔버스 위 레이어들
+    const scr = realScreens.value.filter((v) => hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })).map((v) => v.id)
+    if (scr.length) {
+      store.selectScreen(scr[0]!)
+      multi.value = scr.length > 1 ? scr : []
+    } else if (canvasDoc.value) {
+      const c = canvasDoc.value
+      const d = store.doc(c.id)
+      const ids = d.rootIds.filter((id) => { const n = d.nodes[id]; if (!n || n.hidden || n.locked) return false; return hitBox(layerWorld(c, id)!) })
+      multi.value = []
+      if (ids.length) { store.selectLayer(c.id, ids[0]!); store.layerIds.value = ids } else store.selectScreen(null)
+    }
   } else if (drag.kind === 'marquee') {
     const w = toWorld(e.clientX, e.clientY)
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
@@ -253,7 +315,9 @@ function end(e: PointerEvent) {
     if (s) emit('move', d.id, s.x, s.y, true)
   }
   if ((d.kind === 'layers' || d.kind === 'resize') && d.moved) store.commit(d.sid, d.before)
-  if (d.kind === 'marquee') { draft.value = null; marqueeOn.value = false }
+  if (d.kind === 'marquee') { draft.value = null; marqueeOn.value = false; if (!d.moved) toggleMulti(d.sid) }
+  if (d.kind === 'marqueeCanvas') { draft.value = null; marqueeOn.value = false; if (!d.moved) { store.selectScreen(null); multi.value = [] } }
+  if (d.kind === 'screens' && d.moved) for (const id of d.ids) { const v = props.screens.find((x) => x.id === id); if (v) emit('move', id, v.x, v.y, true) }
   if (d.kind === 'draw') {
     const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 375, height: 812 }
     draft.value = null
@@ -423,6 +487,8 @@ function layerWorld(s: ScreenRow, id: string) {
 const tick = ref(0) // 텍스트 크기 다시 재기
 watch(() => [store.docs, store.editing.value], () => nextTick(() => tick.value++), { deep: true })
 const selScreen = computed(() => props.screens.find((s) => s.id === store.screenId.value) ?? null)
+const selFrame = computed(() => (selScreen.value && !isCanvas(selScreen.value) ? selScreen.value : null))
+const multiBoxes = computed(() => multi.value.map((id) => props.screens.find((s) => s.id === id)).filter((s): s is ScreenRow => !!s))
 const selBoxes = computed(() => {
   void tick.value
   const s = selScreen.value
@@ -435,7 +501,7 @@ const single = computed(() => {
   return { ...b, locked: !!store.node(selScreen.value!.id, b.id)?.locked }
 })
 const marqueeOn = ref(false)
-const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
+const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
 
 <template>
@@ -451,7 +517,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
   >
     <div class="world" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
       <div
-        v-for="s in screens"
+        v-for="s in realScreens"
         :key="s.id"
         class="frame"
         role="button"
@@ -467,12 +533,16 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
           <LayerView v-for="id in store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
         </template>
       </div>
+      <!-- 캔버스 위(화면 밖) 레이어: 화면들 위에 그려요 -->
+      <div v-if="canvasDoc" class="free" :data-screen="canvasDoc.id" @pointerdown.stop="start($event, canvasDoc)" @dblclick="onDbl($event, canvasDoc)">
+        <LayerView v-for="id in store.doc(canvasDoc.id).rootIds" :key="id" :doc="store.doc(canvasDoc.id)" :id="id" :screen-id="canvasDoc.id" />
+      </div>
  <div v-if="draft && !marqueeOn" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
     </div>
 
     <div class="overlay" aria-hidden="true">
       <span
-        v-for="s in screens"
+        v-for="s in realScreens"
         :key="'l' + s.id"
         class="label"
         :class="{ on: store.screenId.value === s.id }"
@@ -480,11 +550,12 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
         @pointerdown.stop="tool = 'move'; start($event, s)"
       >{{ s.name }}</span>
       <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
-      <div v-if="selScreen" class="sel" :class="{ dim: selBoxes.length }" :style="box(selScreen)">
+      <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="box(m)" />
+      <div v-if="selFrame && !multi.length" class="sel" :class="{ dim: selBoxes.length }" :style="box(selFrame)">
         <template v-if="!selBoxes.length">
           <span class="handle" style="left: -4px; top: -4px" /><span class="handle" style="right: -4px; top: -4px" />
           <span class="handle" style="left: -4px; bottom: -4px" /><span class="handle" style="right: -4px; bottom: -4px" />
-          <span class="size num">{{ Math.round(selScreen.width) }} × {{ Math.round(selScreen.height) }}</span>
+          <span class="size num">{{ Math.round(selFrame.width) }} × {{ Math.round(selFrame.height) }}</span>
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :style="box({ x: b.x, y: b.y, width: b.w, height: b.h })" />
@@ -503,6 +574,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value ? 'grab'
 <style scoped>
 .canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+.free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
+.free :deep(.ly:not(.lk)) { pointer-events: auto; }
 .frame { position: absolute; pointer-events: auto; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
