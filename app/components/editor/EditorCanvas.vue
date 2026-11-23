@@ -754,6 +754,15 @@ watch(() => [vp.value.x, vp.value.y, vp.value.zoom], () => {
   clearTimeout(movingTimer)
   movingTimer = setTimeout(() => (moving.value = false), 160)
 })
+/** 크기 숫자: 정수면 그대로, 아니면 소수 한 자리(피그마와 같아요) */
+const fmt = (v: number) => (Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toFixed(1))
+/** 고른 텍스트가 글자 길이에 맞춰 늘어나는(Hug) 상태인지 */
+const singleHug = computed(() => {
+  const sid = store.screenId.value
+  const id = store.layerIds.value.length === 1 ? store.layerIds.value[0] : null
+  const n = sid && id ? store.node(sid, id) : null
+  return !!n && n.type === 'text' && !!n.style.autoWidth
+})
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -809,7 +818,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <template v-if="!selBoxes.length">
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
           <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
-          <span class="size num">{{ Math.round(selFrame.width) }} × {{ Math.round(selFrame.height) }}</span>
+          <span class="size num">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :style="rbox(b)" />
@@ -821,7 +830,10 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
             <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
           </template>
         </div>
-        <span class="size num below" :style="belowBox(single)">{{ rotating ? `${Math.round(single.rotation * 10) / 10}°` : `${Math.round(single.w)} × ${Math.round(single.h)}` }}</span>
+        <span class="size num below" :style="belowBox(single)">
+          <template v-if="rotating">{{ fmt(single.rotation) }}°</template>
+          <template v-else>{{ fmt(single.w) }}<span v-if="singleHug" class="mode">Hug</span> × {{ fmt(single.h) }}<span v-if="singleHug" class="mode">Hug</span></template>
+        </span>
       </template>
       <svg v-if="shown" class="guides" width="100%" height="100%">
         <template v-for="(l, i) in shown.lines" :key="i">
@@ -830,14 +842,14 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </template>
       </svg>
       <template v-if="shown"><span v-for="(lb, i) in shown.labels" :key="'g' + i" class="glabel num" :style="{ left: sx(lb.x) + 'px', top: sy(lb.y) + 'px' }">{{ lb.text }}</span></template>
-      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size num">{{ draft.width }} × {{ draft.height }}</span></div>
+      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size num">{{ fmt(draft.width) }} × {{ fmt(draft.height) }}</span></div>
       <div v-if="draft && marqueeOn" class="marq" :style="box(draft)" />
     </div>
   </main>
 </template>
 
 <style scoped>
-.canvas { --grid-pixel: rgb(128 128 128 / 14%); position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
+.canvas { --grid-pixel: rgb(128 128 128 / 14%); --iris-measure: #F24822; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
 /* 움직이는 동안만 GPU 층으로(부드럽게), 멈추면 풀어서 확대 비율대로 다시 그려요 — 글자 · 도형이 늘 선명한 벡터 */
 .world.moving { will-change: transform; }
@@ -871,8 +883,11 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .rot.se { right: -18px; bottom: -18px; }
 .size.below { top: auto; }
 .guides { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
-.guides line { stroke: var(--sys-color-brand-primary-default); stroke-width: 1; shape-rendering: crispEdges; }
-.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
-.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: var(--ref-spacing-04); padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
+/* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 1px 5px; border-radius: 4px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+/* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 2px 6px; border-radius: 4px; background: #2C7BE2; color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.size .mode { font-weight: 500; opacity: .8; margin-left: 2px; }
 .marq { position: absolute; box-shadow: 0 0 0 1px var(--sys-color-brand-primary-default); background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
 </style>
