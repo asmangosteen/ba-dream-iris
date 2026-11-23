@@ -3,11 +3,12 @@ import { Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 import { isContainer, type LayerNode } from '~/canvas/schema'
 import { LAYER_ICON } from '~/canvas/icons'
+import { layerMenuItems, useLastCopy } from '~/composables/useLayerMenu'
 import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
 const props = defineProps<{ screens: ScreenRow[] }>()
-const emit = defineEmits<{ 'pick-screen': [id: string] }>()
+const emit = defineEmits<{ 'pick-screen': [id: string]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste'] }>()
 const store = useLayerStore()
 
 const closed = ref<Set<string>>(new Set()) // 접은 화면 · 프레임
@@ -54,12 +55,31 @@ function onDrop(r: Row) {
 }
 const isSel = (r: Row) => store.screenId.value === r.sid && store.layerIds.value.includes(r.n.id)
 function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftKey) }
+// 우클릭 메뉴(캔버스와 같은 항목 + 이름 바꾸기)
+const ctx = useContextMenu()
+const lastCopy = useLastCopy()
+const paste = () => { if (lastCopy.value !== 'screen' && store.hasClipboard()) store.paste(); else emit('screen-action', 'paste') }
+function rowMenu(r: Row, e: MouseEvent) {
+  if (!isSel(r)) store.selectLayer(r.sid, r.n.id)
+  ctx.open(e, [{ label: 'Rename', shortcut: 'F2', action: () => (renaming.value = r.n.id) }, 'sep', ...layerMenuItems(store, r.sid, [...store.layerIds.value], { lastCopy, paste })])
+}
+function screenMenu(s: ScreenRow, e: MouseEvent) {
+  if (s.id.startsWith('page:')) return
+  emit('pick-screen', s.id)
+  ctx.open(e, [
+    { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: 'Paste', shortcut: '⌘V', action: paste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+    'sep',
+    { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
+  ])
+}
 </script>
 
 <template>
   <div class="tree" role="tree" aria-label="Layers">
     <template v-for="s in screens" :key="s.id">
-      <div role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
+      <div role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
         <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
@@ -76,6 +96,7 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
         :class="['sq', 'nav-item', 's', 'row', { on: isSel(r), faded: r.n.hidden, 'drop-above': over?.id === r.n.id && !over.into, 'drop-into': over?.id === r.n.id && over.into }]"
         :style="{ paddingLeft: `calc(var(--ref-spacing-08) + ${r.depth * 14}px)` }"
         @click="pick(r, $event)"
+        @contextmenu="rowMenu(r, $event)"
         @keydown.enter.self.prevent="store.selectLayer(r.sid, r.n.id, $event.shiftKey)"
         @keydown.space.self.prevent="store.selectLayer(r.sid, r.n.id, $event.shiftKey)"
         @keydown.f2.self.prevent="renaming = r.n.id"

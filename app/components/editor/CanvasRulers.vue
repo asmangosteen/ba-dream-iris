@@ -46,7 +46,22 @@ const yt = computed(() => ticks(size.value.h, props.vp.y))
 const fmt = (v: number) => String(Math.round(v))
 
 // 끌기: 새 가이드 · 옮기기
-const drag = ref<{ axis: 'x' | 'y'; i: number | null; v: number; out: boolean } | null>(null)
+const drag = ref<{ axis: 'x' | 'y'; i: number | null; v: number; out: boolean; moved: boolean; v0: number } | null>(null)
+/** 고른 가이드선: Backspace · Delete 로 지워요 */
+const picked = ref<{ axis: 'x' | 'y'; i: number } | null>(null)
+watch(() => props.guides, () => { if (picked.value && props.guides[picked.value.axis][picked.value.i] === undefined) picked.value = null })
+function onKey(e: KeyboardEvent) {
+  if (!picked.value || (e.target as HTMLElement).closest?.('input, textarea, [contenteditable="true"]')) return
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault(); e.stopImmediatePropagation()
+    const { axis, i } = picked.value
+    picked.value = null
+    emit('change', { ...props.guides, [axis]: props.guides[axis].filter((_, k) => k !== i) })
+  } else if (e.key === 'Escape') picked.value = null
+}
+function onDocDown(e: PointerEvent) { if (!(e.target as HTMLElement).closest?.('.guide')) picked.value = null }
+onMounted(() => { window.addEventListener('keydown', onKey, true); window.addEventListener('pointerdown', onDocDown, true) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDocDown, true) })
 function toWorld(axis: 'x' | 'y', e: PointerEvent) {
   const r = root.value!.getBoundingClientRect()
   return axis === 'x' ? Math.round((e.clientX - r.left - props.vp.x) / props.vp.zoom) : Math.round((e.clientY - r.top - props.vp.y) / props.vp.zoom)
@@ -57,7 +72,8 @@ function inRuler(axis: 'x' | 'y', e: PointerEvent) {
 }
 function start(axis: 'x' | 'y', i: number | null, e: PointerEvent) {
   e.preventDefault(); e.stopPropagation()
-  drag.value = { axis, i, v: i === null ? toWorld(axis, e) : props.guides[axis][i]!, out: i === null }
+  const v = i === null ? toWorld(axis, e) : props.guides[axis][i]!
+  drag.value = { axis, i, v, v0: v, out: i === null, moved: false }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', end, { once: true })
 }
@@ -65,6 +81,7 @@ function move(e: PointerEvent) {
   const d = drag.value
   if (!d) return
   d.v = toWorld(d.axis, e)
+  if (d.v !== d.v0) d.moved = true
   d.out = props.rulers && inRuler(d.axis, e)
 }
 function end() {
@@ -72,6 +89,9 @@ function end() {
   const d = drag.value
   drag.value = null
   if (!d) return
+  // 끌지 않고 누르기만 하면 고르기
+  if (d.i !== null && !d.moved) { picked.value = { axis: d.axis, i: d.i }; return }
+  if (d.i === null && !d.moved) return
   const list = [...props.guides[d.axis]]
   if (d.i !== null) list.splice(d.i, 1)
   if (!d.out) list.push(d.v)
@@ -85,10 +105,10 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
   <div ref="root" class="rul" aria-hidden="true">
     <!-- 가이드선 -->
     <template v-for="g in shownX" :key="'gx' + g.i">
-      <div class="guide gx" :style="{ left: sx(g.v) + 'px' }" @pointerdown="start('x', g.i, $event)" />
+      <div :class="['guide', 'gx', { on: picked?.axis === 'x' && picked.i === g.i }]" :style="{ left: sx(g.v) + 'px' }" @pointerdown="start('x', g.i, $event)"><span v-if="picked?.axis === 'x' && picked.i === g.i" class="gv">{{ fmt(g.v) }}</span></div>
     </template>
     <template v-for="g in shownY" :key="'gy' + g.i">
-      <div class="guide gy" :style="{ top: sy(g.v) + 'px' }" @pointerdown="start('y', g.i, $event)" />
+      <div :class="['guide', 'gy', { on: picked?.axis === 'y' && picked.i === g.i }]" :style="{ top: sy(g.v) + 'px' }" @pointerdown="start('y', g.i, $event)"><span v-if="picked?.axis === 'y' && picked.i === g.i" class="gv">{{ fmt(g.v) }}</span></div>
     </template>
     <div v-if="drag && !drag.out" :class="['guide', 'live', drag.axis === 'x' ? 'gx' : 'gy']" :style="drag.axis === 'x' ? { left: sx(drag.v) + 'px' } : { top: sy(drag.v) + 'px' }"><span class="gv">{{ fmt(drag.v) }}</span></div>
 
@@ -118,6 +138,9 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
 .gy { left: 0; right: 0; height: 7px; margin-top: -3px; cursor: ns-resize; }
 .gy::after { top: 3px; left: 0; right: 0; height: 1px; }
 .live { pointer-events: none; }
+.guide.on::after { background: var(--iris-select, #0D99FF); }
+.guide.on .gv { background: var(--iris-select, #0D99FF); }
+.guide:hover::after { box-shadow: 0 0 0 0.5px #F24822; }
 .gv { position: absolute; left: 8px; top: 24px; padding: 0 4px; border-radius: 3px; background: #F24822; color: #FFF; font-size: 11px; line-height: 16px; font-family: var(--font-family-base); }
 .gy .gv { top: 8px; left: 24px; }
 .bar { position: absolute; background: var(--sys-color-common-white-default); pointer-events: auto; font-family: var(--font-family-base); color: var(--sys-color-neutral-500); overflow: hidden; }

@@ -4,6 +4,7 @@ import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
+import ContextMenu from '~/components/editor/ContextMenu.vue'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
 import InspectorPage from '~/components/editor/InspectorPage.vue'
 import InspectorScreens from '~/components/editor/InspectorScreens.vue'
@@ -24,7 +25,30 @@ import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/use
 const route = useRoute()
 const router = useRouter()
 const projectId = route.params.projectId as string
-const { project, pages, pageId, screens, addPage, renamePage, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+const { project, pages, pageId, screens, addPage, renamePage, removePage, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+// 좌우 사이드바 접기(위로 접혀서 탭 줄만 남아요). 이 브라우저에 기억
+const collapsed = ref<{ left: boolean; right: boolean }>({ left: false, right: false })
+onMounted(() => { try { const v = JSON.parse(localStorage.getItem('iris-panels') ?? '{}'); collapsed.value = { left: !!v.left, right: !!v.right } } catch { /* 저장소를 못 쓰면 펼친 채로 */ } })
+function togglePanel(k: 'left' | 'right') {
+  collapsed.value = { ...collapsed.value, [k]: !collapsed.value[k] }
+  try { localStorage.setItem('iris-panels', JSON.stringify(collapsed.value)) } catch { /* 기억만 못 해요 */ }
+}
+// 페이지 우클릭 메뉴 · 지우기 확인
+const pageCtx = useContextMenu()
+const confirmPage = ref<{ id: string; name: string; count: number } | null>(null)
+function pageMenu(p: { id: string; name: string }, e: MouseEvent) {
+  pageCtx.open(e, [
+    { label: 'Rename', action: () => (renaming.value = p.id) },
+    'sep',
+    { label: 'Delete page', danger: true, disabled: (pages.data.value?.length ?? 0) <= 1, action: () => (confirmPage.value = { id: p.id, name: p.name, count: p.id === pageId.value ? list.value.length : -1 }) },
+  ])
+}
+async function doRemovePage() {
+  const c = confirmPage.value
+  confirmPage.value = null
+  if (!c) return
+  try { await removePage(c.id); say(`Deleted ${c.name}`) } catch { say('Couldn\'t delete the page. Try again') }
+}
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const allScreens = useProjectScreens(projectId)
@@ -481,9 +505,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     </div>
 
     <!-- 왼쪽 패널 -->
-    <aside aria-label="Left sidebar" class="sq float panel-left">
+    <aside aria-label="Left sidebar" :class="['sq', 'float', 'panel-left', { collapsed: collapsed.left }]">
       <div role="tablist" aria-label="Left sidebar" class="seg tabs">
-        <button v-for="t in [['file', 'File'], ['assets', 'Assets'], ['docs', 'Docs']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]">{{ t[1] }}</button>
+        <button v-for="t in [['file', 'File'], ['assets', 'Assets'], ['docs', 'Docs']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]; collapsed.left && togglePanel('left')">{{ t[1] }}</button>
+        <button class="sq hov fold" :aria-label="collapsed.left ? 'Expand sidebar' : 'Collapse sidebar'" :title="collapsed.left ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!collapsed.left" @click="togglePanel('left')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M1.5 5h11" stroke="currentColor" stroke-width="1.2" /><path :d="collapsed.left ? 'M5 7.5l2 2 2-2' : 'M5 9.5l2-2 2 2'" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
       </div>
 
       <template v-if="left === 'file'">
@@ -492,12 +517,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <template v-for="p in pages.data.value ?? []" :key="p.id">
             <input v-if="renaming === p.id" class="txt-in rename" :value="p.name" aria-label="Page name" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
-            <button v-else :class="['sq', 'nav-item', 's', { on: pageId === p.id }]" :title="'Double-click to rename'" @click="pageId = p.id" @dblclick="renaming = p.id">{{ p.name }}</button>
+            <button v-else :class="['sq', 'nav-item', 's', { on: pageId === p.id }]" :title="'Double-click to rename'" @click="pageId = p.id" @dblclick="renaming = p.id" @contextmenu="pageMenu(p, $event)">{{ p.name }}</button>
           </template>
         </section>
         <section class="layers">
           <span class="nav-label">Layers</span>
-          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" @pick-screen="pickScreen" />
+          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" @pick-screen="pickScreen" @screen-action="onScreenAction" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
             <span class="tx-meta">No frames yet</span>
             <TextButton size="s" color="blue" @click="tool = 'frame'">Draw frame</TextButton>
@@ -536,7 +561,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     </div>
 
     <!-- 오른쪽 패널 -->
-    <aside aria-label="Right sidebar" class="sq float panel-right">
+    <aside aria-label="Right sidebar" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !docId }]">
       <!-- 문서 읽기 -->
       <template v-if="openDoc">
         <div class="panel-h line-b">
@@ -552,7 +577,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       <!-- 인스펙터 -->
       <template v-else>
         <div role="tablist" aria-label="Properties tabs" class="seg tabs">
-          <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]">{{ t[1] }}</button>
+          <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; collapsed.right && togglePanel('right')">{{ t[1] }}</button>
           <div class="zoom-wrap">
             <button class="sq hov zoom" aria-label="Zoom" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><Icon name="chevron_down" :size="12" class="muted" /></button>
             <div v-if="zoomOpen" class="sq menu zmenu" role="menu" @click="zoomOpen = false">
@@ -563,6 +588,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
               <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">{{ z * 100 }}%</button>
             </div>
           </div>
+          <button class="sq hov fold" :aria-label="collapsed.right ? 'Expand sidebar' : 'Collapse sidebar'" :title="collapsed.right ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!collapsed.right" @click="togglePanel('right')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M1.5 5h11" stroke="currentColor" stroke-width="1.2" /><path :d="collapsed.right ? 'M5 7.5l2 2 2-2' : 'M5 9.5l2-2 2 2'" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
         </div>
 
         <template v-if="current">
@@ -613,6 +639,14 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
+    <ContextMenu />
+    <div v-if="confirmPage" class="pg-dim" @click.self="confirmPage = null" @keydown.esc="confirmPage = null">
+      <div class="sq float pg-confirm" role="alertdialog" aria-labelledby="pg-del-t">
+        <span id="pg-del-t" class="tx-head">Delete "{{ confirmPage.name }}"?</span>
+        <span class="tx-meta">All frames and layers on this page will be deleted{{ confirmPage.count >= 0 ? ` (${confirmPage.count} frames)` : '' }}. This can't be undone.</span>
+        <span class="pg-row"><Button size="s" type="tertiary" @click="confirmPage = null">Cancel</Button><Button size="s" type="destructed" @click="doRemovePage">Delete page</Button></span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -627,12 +661,16 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .pmenu { left: 0; right: auto; width: 232px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }
+.panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
+/* 접기: 아래 변이 위로 올라가서 탭 줄(42px)만 남아요 */
+.panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - 56px - 42px); }
+.fold { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
+.fold:hover { color: var(--sys-color-neutral-800); }
 .pill-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); width: 288px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); z-index: 3; }
 .pill-acts { margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .bd-button.doc-toggle.is-on { --bd-btn-bg: var(--sys-color-brand-primary-lightest); }
 .panel-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 42px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
-.panel-right { position: absolute; right: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; }
+.panel-right { position: absolute; right: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
 .tabs { padding: var(--ref-spacing-06); flex: none; }
 .line-b { box-shadow: 0 1px 0 var(--iris-line); }
 .pages { display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); flex: none; max-height: 40%; overflow: auto; }
@@ -664,4 +702,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 .toast { padding: var(--ref-spacing-05) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-weight: 500; white-space: nowrap; filter: drop-shadow(0 8px 16px rgb(3 9 26 / 16%)); }
 .toast-enter-active, .toast-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(4px); }
+.pg-dim { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: var(--dimmed-bg, rgb(0 0 0 / 40%)); }
+.pg-confirm { width: 320px; padding: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); }
+.pg-row { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); }
 </style>

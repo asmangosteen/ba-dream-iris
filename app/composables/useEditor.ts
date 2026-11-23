@@ -43,7 +43,7 @@ export function useEditor(projectId: string) {
   /** 페이지 추가 → 새 페이지로 이동 */
   async function addPage() {
     const list = pages.data.value ?? []
-    const name = `페이지 ${list.length + 1}`
+    const name = `Page ${list.length + 1}`
     const sort_order = list.length ? Math.max(...list.map((p) => p.sort_order)) + 1 : 0
     let row: PageRow = { id: tmpId(), name, sort_order }
     if (!preview) {
@@ -74,6 +74,19 @@ export function useEditor(projectId: string) {
     if (preview) return
     const { error } = await supabase.from('pages').update({ name: p.name }).eq('id', id)
     if (error) { p.name = before; throw error }
+  }
+
+  /** 페이지 지우기(안의 화면 · 캔버스 레이어도 함께, DB cascade). 마지막 한 장은 지울 수 없어요 */
+  async function removePage(id: string) {
+    const list = pages.data.value ?? []
+    if (list.length <= 1) return
+    if (!preview) {
+      const { error } = await supabase.from('pages').delete().eq('id', id)
+      if (error) throw error
+    } else delete PREVIEW_SCREENS[id]
+    const next = list.filter((p) => p.id !== id)
+    pages.data.value = next
+    if (pageId.value === id) pageId.value = next[0]?.id ?? null
   }
 
   /** 빈 화면(프레임) 추가 */
@@ -130,5 +143,5 @@ export function useEditor(projectId: string) {
     screens.data.value = list.filter((x) => x.id !== id)
   }
 
-  return { project, pages, pageId, screens, addPage, renamePage, updatePageSettings, addScreen, updateScreen, removeScreen }
+  return { project, pages, pageId, screens, addPage, renamePage, removePage, updatePageSettings, addScreen, updateScreen, removeScreen }
 }

@@ -7,6 +7,7 @@ import { simplify } from '~/canvas/paint'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
+import { layerMenuItems, useLastCopy } from '~/composables/useLayerMenu'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
 
@@ -701,8 +702,49 @@ const selWorld = computed(() => {
   if (store.layerIds.value.length) { const bs = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b); return bs.length ? union(bs) : null }
   return isCanvas(s) ? null : rectOf(s)
 })
-/** 마지막에 복사한 것: 레이어 · 화면 */
-let lastCopy: 'layers' | 'screen' | null = null
+const lastCopy = useLastCopy()
+const ctx = useContextMenu()
+/** 붙여넣기: 마지막에 복사한 것(화면이면 화면, 레이어면 레이어) */
+function doPaste() {
+  const sid = store.screenId.value
+  const screen = props.screens.find((v) => v.id === sid)
+  const native = !!screen && isNative(screen)
+  if (lastCopy.value !== 'screen' && store.hasClipboard()) store.paste(native || (sid && isPageCanvas(sid)) ? undefined : canvasDoc.value?.id)
+  else emit('screen-action', 'paste')
+}
+/** 우클릭 메뉴(피그마와 같아요): 레이어 · 화면 · 빈 캔버스 */
+function onContext(e: MouseEvent) {
+  const t = e.target as HTMLElement
+  if (t.closest('input, textarea, [contenteditable="true"]')) return
+  const scrEl = t.closest('[data-screen]') as HTMLElement | null
+  const screen = scrEl ? props.screens.find((v) => v.id === scrEl.dataset.screen) : undefined
+  const lid = (t.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
+  if (screen && lid && isNative(screen)) {
+    if (!(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
+    ctx.open(e, layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, fit: fitSelection }))
+    return
+  }
+  if (screen && !isCanvas(screen)) {
+    if (!multi.value.includes(screen.id)) store.selectScreen(screen.id)
+    ctx.open(e, [
+      { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+      { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+      { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+      'sep',
+      { label: 'Zoom to selection', shortcut: '⇧2', action: fitSelection },
+      'sep',
+      { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
+    ])
+    return
+  }
+  ctx.open(e, [
+    { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    'sep',
+    { label: 'Zoom to fit', shortcut: '⇧1', action: () => fit() },
+    { label: rulersShown.value ? 'Hide rulers' : 'Show rulers', shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
+    { label: gridsShown.value ? 'Hide layout grids' : 'Show layout grids', shortcut: '⌃G', action: () => (gridsShown.value = !gridsShown.value) },
+  ])
+}
 function onKeyDown(e: KeyboardEvent) {
   if (typing(e)) return
   const mod = e.metaKey || e.ctrlKey
@@ -753,16 +795,14 @@ function onKeyDown(e: KeyboardEvent) {
   if (mod && e.altKey && e.code === 'KeyV') { if (layerMode) { stop(); store.pasteStyle() } return }
   // 복사 · 잘라내기 · 붙여넣기 · 복제
   if (mod && key === 'c') {
-    if (layerMode && store.copy()) { lastCopy = 'layers'; stop() }
-    else if (sid && !layerMode && !isPageCanvas(sid)) { lastCopy = 'screen'; emit('screen-action', 'copy'); stop() }
+    if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop() }
+    else if (sid && !layerMode && !isPageCanvas(sid)) { lastCopy.value = 'screen'; emit('screen-action', 'copy'); stop() }
     return
   }
-  if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy = 'layers'; stop(); store.remove(sid!, ids) } return }
+  if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); store.remove(sid!, ids) } return }
   if (mod && key === 'v') {
     stop()
-    // 마지막에 복사한 것을 붙여요(화면을 복사했으면 화면, 레이어면 레이어)
-    if (lastCopy !== 'screen' && store.hasClipboard()) store.paste(native || (sid && isPageCanvas(sid)) ? undefined : canvasDoc.value?.id)
-    else emit('screen-action', 'paste')
+    doPaste()
     return
   }
   if (mod && key === 'd') { stop(); if (layerMode) store.duplicate(); else if (sid) emit('screen-action', 'duplicate'); return }
@@ -1018,7 +1058,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 <template>
   <main
     ref="el"
-    aria-label="캔버스"
+    aria-label="Canvas"
     class="canvas canvas-dots"
     :style="{ cursor, ...gridStyle }"
     @pointerdown.self="start($event)"
@@ -1027,6 +1067,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @pointercancel="end"
     @dragover.prevent="onDragOver"
     @drop.prevent="onDrop"
+    @contextmenu="onContext"
   >
     <div class="world" :class="{ moving }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
       <!-- 캔버스 위 섹션: 화면들 아래에 깔아요(피그마처럼 화면을 묶는 바탕) -->
@@ -1064,6 +1105,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         v-for="s in realScreens"
         :key="'l' + s.id"
         class="label"
+        :data-screen="s.id"
         :class="{ on: store.screenId.value === s.id }"
         :style="{ left: box(s).left, top: `calc(${box(s).top} - 20px)`, maxWidth: box(s).width }"
         @pointerdown.stop="tool = 'move'; start($event, s)"
