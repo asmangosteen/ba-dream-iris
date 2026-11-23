@@ -13,6 +13,7 @@ import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
+import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/EditorCanvas.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
@@ -400,6 +401,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <Transition name="toast"><div v-if="toast" class="sq toast" role="status">{{ toast }}</div></Transition>
 
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
+    <AppCommandPalette />
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />

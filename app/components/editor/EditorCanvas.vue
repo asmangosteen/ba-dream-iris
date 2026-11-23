@@ -110,7 +110,7 @@ function frameAt(sid: string, lx: number, ly: number): string | null {
 function start(e: PointerEvent, screen?: ScreenRow) {
   if (e.button !== 0 && e.button !== 1) return
   if (store.editing.value) (document.activeElement as HTMLElement | null)?.blur?.()
-  el.value?.setPointerCapture?.(e.pointerId)
+  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
   if (e.button === 1 || space.value || (!screen && tool.value === 'move')) {
     drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: vp.value.x, vy: vp.value.y, moved: false }
     panning.value = true
@@ -163,7 +163,7 @@ function startResize(e: PointerEvent, corner: Corner) {
   if (!sid || !id) return
   const n = store.node(sid, id)
   if (!n) return
-  el.value?.setPointerCapture?.(e.pointerId)
+  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
   drag = { kind: 'resize', sid, id, corner, sx: e.clientX, sy: e.clientY, o: { x: n.x, y: n.y, w: n.w, h: n.h }, before: store.begin(sid), moved: false }
 }
 

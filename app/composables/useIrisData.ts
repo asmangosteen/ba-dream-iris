@@ -211,7 +211,7 @@ export function useDocuments(projectId: string) {
     const { data, error } = await supabase.from('documents').select(DOC_COLS).eq('project_id', projectId).order('updated_at', { ascending: false })
     if (error) throw error
     return (data ?? []) as unknown as DocRow[]
-  })
+  }, { deep: true })
 }
 
 /** 프로젝트의 요구사항 + 화면 연결 전체 (작은 팀 규모라 한 번에 읽습니다) */
@@ -223,13 +223,13 @@ export function useRequirements(projectId: string) {
     const { data, error } = await supabase.from('requirements').select('id, project_id, document_id, code, title, body, anchor, priority, origin').eq('project_id', projectId).order('code')
     if (error) throw error
     return (data ?? []) as unknown as ReqRow[]
-  })
+  }, { deep: true })
   const links = useAsyncData(`links-${projectId}`, async () => {
     if (preview) return previewStore().links.value
     const { data, error } = await supabase.from('screen_requirements').select('screen_id, requirement_id, status, note, requirements!inner(project_id)').eq('requirements.project_id', projectId)
     if (error) throw error
     return ((data ?? []) as unknown as LinkRow[]).map(({ screen_id, requirement_id, status, note }) => ({ screen_id, requirement_id, status, note }))
-  })
+  }, { deep: true })
   return { reqs, links }
 }
 
@@ -242,7 +242,7 @@ export function useProjectScreens(projectId: string) {
     const { data, error } = await supabase.from('screens').select('id, name, page_id, pages!inner(name, project_id)').eq('pages.project_id', projectId).order('sort_order')
     if (error) throw error
     return ((data ?? []) as unknown as { id: string; name: string; page_id: string; pages: { name: string } }[]).map((s) => ({ id: s.id, name: s.name, page_id: s.page_id, page: s.pages.name }))
-  })
+  }, { deep: true })
 }
 
 /** 디자인 시스템: 컴포넌트 · 토큰 (워크스페이스 공용) */
@@ -254,13 +254,13 @@ export function useDesignSystem() {
     const { data, error } = await supabase.from('components').select('id, name, code_name, category, description, match_aliases, props_schema').order('category').order('name')
     if (error) throw error
     return (data ?? []) as unknown as ComponentRow[]
-  })
+  }, { deep: true })
   const tokens = useAsyncData('ds-tokens', async () => {
     if (preview) return previewStore().tokens.value
     const { data, error } = await supabase.from('tokens').select('id, type, name, value, description').order('type').order('name')
     if (error) throw error
     return ((data ?? []) as unknown as (Omit<TokenRow, 'value'> & { value: unknown })[]).map((x) => ({ ...x, value: typeof x.value === 'string' ? x.value : JSON.stringify(x.value) }))
-  })
+  }, { deep: true })
   return { components, tokens }
 }
 
@@ -279,7 +279,7 @@ export function useUsages(key: string, screenIds?: () => string[]) {
     const { data, error } = await q
     if (error) throw error
     return (data ?? []) as UsageRow[]
-  }, screenIds ? { watch: [screenIds] } : undefined)
+  }, screenIds ? { watch: [screenIds], deep: true } : { deep: true })
 }
 
 // ---------------------------------------------------------------------------
@@ -385,5 +385,5 @@ export function useProjectProgress() {
     if (error) throw error
     for (const row of (data ?? []) as unknown as { status: LinkStatus; requirements: { project_id: string } }[]) add(row.requirements.project_id, row.status)
     return out
-  })
+  }, { deep: true })
 }

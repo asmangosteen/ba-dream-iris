@@ -10,13 +10,13 @@ export function useEditor(projectId: string) {
     const { data, error } = await supabase.from('projects').select('id, name').eq('id', projectId).single()
     if (error) throw error
     return data as { id: string; name: string }
-  })
+  }, { deep: true })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
     if (preview) return PREVIEW_PAGES
     const { data, error } = await supabase.from('pages').select('id, name, sort_order').eq('project_id', projectId).order('sort_order')
     if (error) throw error
     return (data ?? []) as PageRow[]
-  })
+  }, { deep: true })
   // 서버에서 고른 페이지가 브라우저로 그대로 넘어가도록 useState 로 둡니다
   const pageId = useState<string | null>(`page-${projectId}`, () => null)
   const screens = useAsyncData(`screens-${projectId}`, async () => {
@@ -29,7 +29,7 @@ export function useEditor(projectId: string) {
     const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers').eq('page_id', pageId.value).order('sort_order')
     if (error) throw error
     return (data ?? []) as ScreenRow[]
-  }, { watch: [pageId] })
+  }, { watch: [pageId], deep: true })
 
   const user = useSupabaseUser()
   const me = () => (user.value?.sub ?? user.value?.id) as string | undefined
