@@ -2,11 +2,12 @@
 import { Button, TextButton, TextInput } from '@ba-dream/design-system'
 
 /**
- * 로그인: 회사 메일 → 6자리 코드(또는 메일 링크).
- * 왼쪽은 입력, 오른쪽은 Iris 가 하는 일(화면 ↔ 요구사항 반영)을 보여 주는 작은 캔버스 장면입니다.
+ * 로그인: 회사 메일 → 6자리 코드(또는 메일 링크). 로고와 입력을 화면 가운데에.
+ * 이 화면은 기기 · 앱 설정과 상관없이 늘 라이트 모드예요(떠나면 원래 모드로 돌아가요).
  */
 // 랜딩(/welcome) ↔ 로그인은 스르륵 바뀜 (main.css 의 iris-fade)
 definePageMeta({ pageTransition: { name: 'iris-fade', mode: 'out-in' } })
+useHead({ htmlAttrs: { 'data-theme': 'light' }, meta: [{ name: 'color-scheme', content: 'light' }] })
 
 const supabase = useSupabaseClient()
 const route = useRoute()
@@ -130,82 +131,24 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 
       <p class="foot tx-meta">한 번 로그인하면 30일 동안 다시 묻지 않아요</p>
     </section>
-
-    <!-- 오른쪽: Iris 의 한 장면 — 화면을 고르면 그 화면의 요구사항 반영 상태가 보여요 -->
-    <section class="scene canvas-dots" aria-hidden="true">
-      <div class="frames">
-        <div v-for="(f, i) in [['홈', 'on'], ['내 차고', ''], ['차량 상세', '']]" :key="i" class="fr" :class="f[1]">
-          <span class="fl">{{ f[0] }}</span>
-          <div class="sheet">
-            <span class="b w60 dark" /><span class="b w40" />
-            <span class="card" :class="{ blue: i === 0 }"><span class="b w50 light" /><span class="b w70 light" /></span>
-            <span class="b w80" /><span class="b w70" /><span class="b w50" />
-            <span class="tab" />
-          </div>
-        </div>
-      </div>
-      <div class="insp">
-        <div class="ih"><span>홈</span><span class="badge">확정</span></div>
-        <div class="sum">
-          <div class="srow"><span>요구사항 반영</span><span class="num"><b>1</b>/3</span></div>
-          <div class="bars"><span class="r" /><span class="p" /><span class="m" /></div>
-        </div>
-        <div class="rq"><StatusIcon status="missing" /><span>공지 배너 최대 3개 좌우 넘김</span></div>
-        <div class="rq"><StatusIcon status="partial" /><span>다음 결제일 · 금액 표시</span></div>
-        <div class="rq"><StatusIcon status="reflected" /><span>구독 차량 카드, 없으면 신차 배너</span></div>
-      </div>
-    </section>
   </div>
 </template>
 
 <style scoped>
-.page { position: relative; min-height: 100vh; display: grid; grid-template-columns: minmax(400px, 520px) 1fr; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
+.page { position: relative; min-height: 100vh; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
 .side { display: flex; flex-direction: column; padding: var(--ref-spacing-14) var(--ref-spacing-20); box-sizing: border-box; min-height: 100vh; }
-.brand { display: inline-flex; align-self: flex-start; margin-bottom: var(--ref-spacing-12); border-radius: var(--ref-radius-02); }
+.brand { display: inline-flex; align-self: center; margin-bottom: var(--ref-spacing-12); border-radius: var(--ref-radius-02); }
 .brand:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 4px; }
 /* 랜딩 위 막대(높이 72)의 Sign in 과 같은 자리: 세로 가운데 · 가장자리에서 40 */
 .out { position: absolute; z-index: 2; top: 17px; left: 40px; }
 @media (max-width: 760px) { .out { top: 11px; left: 16px; } }
 .form { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--ref-spacing-10); width: 100%; max-width: 360px; margin: 0 auto; }
-.head { display: flex; flex-direction: column; gap: var(--ref-spacing-02); margin-bottom: var(--ref-spacing-04); }
+.head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--ref-spacing-02); margin-bottom: var(--ref-spacing-04); }
 .who { font-weight: 500; color: var(--sys-color-neutral-700); }
 .m0 { margin: 0; }
 .full { width: 100%; }
 .links { display: flex; justify-content: space-between; align-items: center; margin-top: calc(-1 * var(--ref-spacing-04)); }
 .form :deep(input[name='code']) { font-variant-numeric: tabular-nums; letter-spacing: 0.2em; }
 .foot { margin: 0; text-align: center; }
-
-/* 오른쪽 장면: 회색 작업대 위 흰 화면 셋 + 인스펙터 카드 */
-.scene { position: relative; overflow: hidden; background-color: var(--iris-canvas); background-image: linear-gradient(to right, var(--ref-color-gray-900-10) 1px, transparent 1px), linear-gradient(to bottom, var(--ref-color-gray-900-10) 1px, transparent 1px), linear-gradient(to right, var(--ref-color-gray-900-5) 1px, transparent 1px), linear-gradient(to bottom, var(--ref-color-gray-900-5) 1px, transparent 1px); background-size: 128px 128px, 128px 128px, 16px 16px, 16px 16px; display: flex; align-items: center; justify-content: center; }
-.frames { display: flex; gap: 40px; transform: translateX(-80px); }
-.fr { display: flex; flex-direction: column; gap: 6px; }
-.fl { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
-.fr.on .fl { color: var(--sys-color-brand-primary-default); font-weight: 500; }
-.sheet { width: 188px; height: 408px; box-sizing: border-box; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); padding: 36px 14px 0; display: flex; flex-direction: column; gap: 8px; position: relative; }
-.fr.on .sheet { box-shadow: 0 0 0 1.5px var(--sys-color-brand-primary-default), 0 1px 3px rgb(3 9 26 / 6%); }
-.b { display: block; height: 8px; border-radius: 4px; background: #F1F2F3; } /* 종이(화면) 안은 다크모드에서도 밝은 그대로 */
-.b.dark { height: 12px; background: #454C58; }
-.b.light { background: rgb(255 255 255 / 70%); }
-.w40 { width: 40%; } .w50 { width: 50%; } .w60 { width: 60%; } .w70 { width: 70%; } .w80 { width: 80%; }
-.card { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; height: 84px; margin: 6px 0; padding: 12px; box-sizing: border-box; border-radius: 10px; background: #F6F7F7; }
-.card.blue { background: #2C7BE2; }
-.tab { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; box-shadow: inset 0 1px 0 var(--iris-paper-line); }
-.insp { position: absolute; right: 48px; top: 50%; transform: translateY(-50%); width: 248px; padding: var(--ref-spacing-08); box-sizing: border-box; border-radius: var(--ref-radius-07); background: var(--sys-color-common-white-emphasis); box-shadow: 0 0 0 1px var(--ref-color-gray-900-10), 0 6px 16px rgb(3 9 26 / 6%); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
-.ih { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
-.badge { padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); background: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-weight: 500; }
-.sum { padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.srow { display: flex; justify-content: space-between; font-weight: 600; }
-.srow b { color: var(--sys-color-brand-primary-default); font-weight: 600; }
-.bars { display: flex; gap: 2px; height: 4px; }
-.bars span { flex: 1; border-radius: 2px; }
-.bars .r { background: var(--sys-color-brand-primary-default); }
-.bars .p { background: var(--sys-color-neutral-800); }
-.bars .m { background: var(--ref-color-gray-900-10); }
-.rq { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); color: var(--sys-color-neutral-800); white-space: nowrap; overflow: hidden; }
-
-@media (max-width: 900px) {
-  .page { grid-template-columns: 1fr; }
-  .scene { display: none; }
-  .side { padding: var(--ref-spacing-12) var(--ref-spacing-08); }
-}
+@media (max-width: 760px) { .side { padding: var(--ref-spacing-12) var(--ref-spacing-08); } }
 </style>
