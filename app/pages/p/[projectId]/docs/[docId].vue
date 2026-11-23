@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon, Skeleton } from '@ba-dream/design-system'
+import { Button, Icon, IconButton, Skeleton } from '@ba-dream/design-system'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import DocEditor from '~/components/docs/DocEditor.vue'
@@ -96,7 +96,7 @@ async function createReq({ text, block }: { text: string; block: string | null }
     activeReq.value = id
     say(`${code} 요구사항을 만들었어요`)
   } catch {
-    say('요구사항을 만들지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    say('요구사항을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요')
   }
 }
 
@@ -205,7 +205,7 @@ async function removeDoc() {
     }
   } catch {
     deleting.value = false
-    say('문서를 지우지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    say('문서를 지우지 못했어요. 잠시 뒤 다시 시도해 주세요')
     return
   }
   stopEdit()
@@ -217,7 +217,8 @@ async function removeDoc() {
 </script>
 
 <template>
-  <div class="split">
+  <!-- 문서 추가 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
+  <div class="split" :aria-hidden="addOpen ? 'true' : undefined">
     <!-- 왼쪽 위: 돌아가기 알약 -->
     <div class="sq float s pill">
       <NuxtLink :to="`/p/${projectId}`" class="ib" aria-label="에디터로 돌아가기"><Icon name="chevron_left" :size="16" /></NuxtLink>
@@ -272,13 +273,14 @@ async function removeDoc() {
             replace
             :aria-current="d.id === docId ? 'page' : undefined"
             :class="['sq', 'seg-item', 'tab', { on: d.id === docId }]"
+            :title="d.title"
           >
             <Icon :name="docIcon(d)" :size="12" />
             <span class="ellipsis">{{ d.title }}</span>
           </NuxtLink>
         </nav>
-        <button type="button" class="ib" aria-label="문서 추가" @click="addOpen = true"><Icon name="plus" :size="16" /></button>
-        <NuxtLink :to="`/p/${projectId}`" class="ib" aria-label="문서 닫기"><Icon name="close" :size="16" /></NuxtLink>
+        <IconButton icon-name="plus" size="s" type="ghost" ariaLabel="문서 추가" title="문서 추가" @click="addOpen = true" />
+        <IconButton icon-name="close" size="s" type="ghost" ariaLabel="문서 닫기" title="문서 닫기" @click="navigateTo(`/p/${projectId}`)" />
       </div>
 
       <div class="doc-body">
@@ -289,8 +291,8 @@ async function removeDoc() {
         </div>
         <div v-else-if="!doc" class="missing">
           <h1 class="tx-title">문서를 찾지 못했어요</h1>
-          <p class="tx-meta">지워졌거나 주소가 바뀌었을 수 있어요.</p>
-          <NuxtLink :to="`/p/${projectId}`" class="act line">에디터로 돌아가기</NuxtLink>
+          <p class="tx-meta">지워졌거나 주소가 바뀌었을 수 있어요</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="chevron_left" @click="navigateTo(`/p/${projectId}`)">에디터로 돌아가기</Button>
         </div>
         <DocEditor
           v-else-if="editing"
@@ -308,7 +310,7 @@ async function removeDoc() {
                 문서에서 사라진 요구사항:
                 <button v-for="r in goneReqs" :key="r.id" type="button" class="code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
-              <span class="tx-meta">요구사항과 화면 연결은 그대로 남겨 뒀어요. 필요 없으면 <NuxtLink to="/requirements" class="lnk">요구사항</NuxtLink>에서 정리해주세요.</span>
+              <span class="tx-meta">요구사항과 화면 연결은 그대로 남겨 뒀어요. 필요 없으면 <NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">요구사항</NuxtLink>에서 정리해 주세요</span>
             </span>
             <button type="button" class="ib s" aria-label="알림 닫기" @click="gone = []"><Icon name="close" :size="14" /></button>
           </div>
@@ -319,21 +321,23 @@ async function removeDoc() {
             :highlight="activeReq"
             @pick-req="pickReq"
             @create-req="createReq"
+            @edit="startEdit"
           >
             <template #actions>
-              <button type="button" class="act line" @click="startEdit"><Icon name="pencil" :size="14" />고치기</button>
+              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">고치기</Button>
               <div ref="moreEl" class="more">
-                <button
-                  type="button"
-                  class="ib"
-                  aria-label="문서 메뉴"
+                <IconButton
+                  icon-name="menu_kebab"
+                  size="s"
+                  type="ghost"
+                  ariaLabel="문서 메뉴"
                   aria-haspopup="menu"
                   :aria-expanded="menuOpen"
                   @click="menuOpen = !menuOpen"
                   @keydown.esc="menuOpen = false"
-                ><Icon name="menu_kebab" :size="16" /></button>
-                <div v-if="menuOpen" class="menu" role="menu" @keydown.esc="menuOpen = false">
-                  <button type="button" role="menuitem" class="menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />문서 지우기</button>
+                />
+                <div v-if="menuOpen" class="sq menu" role="menu" @keydown.esc="menuOpen = false">
+                  <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />문서 지우기</button>
                 </div>
               </div>
             </template>
@@ -344,16 +348,16 @@ async function removeDoc() {
       <!-- 확인 줄 -->
       <div v-if="bar === 'leave'" class="confirm" role="alertdialog" aria-labelledby="leaveMsg">
         <span id="leaveMsg" class="tx-body confirm-t">저장하지 않은 내용이 있어요. 버리고 나갈까요?</span>
-        <button type="button" class="act gray" @click="closeBars">계속 고치기</button>
-        <button type="button" class="act line" @click="discard">버리기</button>
+        <Button size="s" type="tertiary" @click="closeBars">계속 고치기</Button>
+        <Button size="s" type="destructed" stroke @click="discard">버리기</Button>
       </div>
       <div v-else-if="bar === 'delete' && doc" class="confirm" role="alertdialog" aria-labelledby="delMsg" aria-describedby="delSub">
         <span class="confirm-col">
           <span id="delMsg" class="tx-head">‘{{ doc.title }}’ 문서를 지울까요?</span>
-          <span id="delSub" class="tx-meta">요구사항과 화면 연결도 함께 지워져요. 되돌릴 수 없어요.</span>
+          <span id="delSub" class="tx-meta">요구사항과 화면 연결도 함께 지워져요. 되돌릴 수 없어요</span>
         </span>
-        <button type="button" class="act gray" :disabled="deleting" @click="closeBars">취소</button>
-        <button type="button" class="act line danger" :disabled="deleting" @click="removeDoc"><Icon name="trashbin" :size="14" />{{ deleting ? '지우는 중' : '지우기' }}</button>
+        <Button size="s" type="tertiary" :disabled="deleting" @click="closeBars">취소</Button>
+        <Button size="s" type="destructed" :loading="deleting" @click="removeDoc">지우기</Button>
       </div>
 
       <p class="sr" role="status" aria-live="polite">{{ notice }}</p>
@@ -371,7 +375,9 @@ async function removeDoc() {
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .pill { position: absolute; left: var(--iris-gap); top: var(--iris-gap); z-index: 3; height: 40px; max-width: calc(100% - 640px); box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-04); }
+.crumb { border-radius: var(--ref-radius-02); transition: color .12s ease; }
 .crumb:hover { color: var(--sys-color-neutral-800); }
+.crumb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .pill .tx-head { white-space: nowrap; }
 
 .canvas { position: absolute; inset: 0; overflow: auto; padding: 64px 632px 48px 48px; box-sizing: border-box; }
@@ -408,15 +414,18 @@ async function removeDoc() {
 .more { position: relative; }
 .more .menu { left: auto; right: 0; width: max-content; min-width: 120px; }
 .danger { color: var(--sys-color-theme-error-default); }
-.act:disabled { opacity: .5; cursor: default; }
-.lnk { color: var(--sys-color-brand-primary-default); font-weight: 500; }
+.lnk { color: var(--sys-color-brand-primary-default); font-weight: 600; border-radius: var(--ref-radius-02); }
+.lnk:hover { text-decoration: underline; }
+.lnk:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 
 .gone { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); margin-bottom: var(--ref-spacing-10); padding: var(--ref-spacing-07) var(--ref-spacing-06) var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); }
 .gone-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .gone-t { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-04); font-weight: 500; }
 .ib.s { width: 24px; height: 24px; }
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); }
+.code { transition: background-color .12s ease; }
 .code:hover, .code[aria-pressed='true'] { background: var(--sys-color-brand-primary-lighter); }
+.code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 .confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }
 .confirm-t, .confirm-col { flex: 1; min-width: 0; }

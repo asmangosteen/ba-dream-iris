@@ -199,8 +199,8 @@ export function parseBulk(text: string): BulkResult {
 export function registerErrorMessage(e: unknown): string {
   const o = (e ?? {}) as { code?: string; message?: string; status?: number }
   if (o.code === '42501' || o.status === 401 || o.status === 403 || /row-level security|permission denied|not authorized|unauthorized/i.test(o.message ?? '')) return '관리자만 등록할 수 있어요'
-  if (o.code === '23505') return '같은 이름이 이미 있어요. 이름을 바꿔주세요.'
-  return '등록하지 못했어요. 잠시 뒤 다시 시도해주세요.'
+  if (o.code === '23505') return '같은 이름이 이미 있어요. 이름을 바꿔 주세요'
+  return '등록하지 못했어요. 잠시 뒤 다시 시도해 주세요'
 }
 
 const SAMPLE = `{
@@ -215,7 +215,7 @@ const SAMPLE = `{
 </script>
 
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, IconButton, TextButton, TextInput } from '@ba-dream/design-system'
 import { TOKEN_TYPE_LABEL } from '~/composables/useIrisData'
 
 const props = defineProps<{ open: boolean; tab: RegisterTab; prefill?: string; existingNames: string[]; categories: string[] }>()
@@ -280,10 +280,15 @@ watch(() => props.open, async (open) => {
   await focusFirst()
 })
 
+/** 첫 칸에 포커스 — data-first 가 컴포넌트 바깥 요소에 붙어 있으면 그 안의 입력칸으로 */
 async function focusFirst() {
   await nextTick()
-  dialog.value?.querySelector<HTMLElement>('[data-first]')?.focus()
+  const el = dialog.value?.querySelector<HTMLElement>('[data-first]')
+  const target = el && !el.matches('input, textarea, button') ? el.querySelector<HTMLElement>('input, textarea') : el
+  target?.focus()
 }
+/** TextInput 공통 — 왼쪽 · 오른쪽 아이콘, 버튼, 아래 문구는 끕니다 */
+const TI = { size: 's', showLeftIcon: false, showRightIcon: false, showButton: false, showSupportingText: false } as const
 watch(cur, () => { error.value = ''; if (props.open) focusFirst() })
 
 function onKey(e: KeyboardEvent) {
@@ -294,6 +299,14 @@ function onKey(e: KeyboardEvent) {
   const first = els[0]!, last = els[els.length - 1]!
   if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+}
+
+/** 한 줄 칸에서 Enter 로 등록(예전 submit 버튼과 같은 동작) */
+function onEnter(e: KeyboardEvent) {
+  const t = e.target as HTMLElement
+  if (e.isComposing || t.tagName !== 'INPUT') return
+  e.preventDefault()
+  save()
 }
 
 async function onFile(e: Event) {
@@ -342,43 +355,48 @@ async function save() {
       <div ref="dialog" class="sq float dialog" role="dialog" aria-modal="true" aria-labelledby="ds-reg-title" @keydown="onKey">
         <div class="top">
           <h2 id="ds-reg-title" class="tx-title">디자인 시스템에 등록</h2>
-          <button class="ib" type="button" aria-label="닫기" @click="emit('close')"><Icon name="close" :size="16" /></button>
+          <IconButton icon-name="close" size="s" type="ghost" ariaLabel="닫기" @click="emit('close')" />
         </div>
         <div class="seg tabs" role="tablist" aria-label="등록 방법">
           <button v-for="t in tabs" :key="t.key" type="button" role="tab" :aria-selected="cur === t.key" :class="['sq', 'seg-item', { on: cur === t.key }]" @click="cur = t.key">{{ t.label }}</button>
         </div>
 
-        <form class="body" @submit.prevent="save">
+        <form class="body" @submit.prevent="save" @keydown.enter="onEnter">
           <template v-if="cur === 'component'">
-            <label class="row">
-              <span class="tx-head">이름 <span class="req" aria-hidden="true">*</span></span>
-              <span class="field m"><input v-model="comp.name" data-first required placeholder="예: Button" :aria-invalid="compDup"></span>
-              <span v-if="compDup" class="tx-meta warn">이미 있는 이름이에요</span>
-            </label>
+            <TextInput
+              v-model:value="comp.name"
+              v-bind="TI"
+              data-first
+              label="이름"
+              essential
+              placeholder="예: Button"
+              :destructed="compDup"
+              :show-supporting-text="compDup"
+              supporting-text="이미 있는 이름이에요"
+              supporting-theme="destructed"
+              :input-props="{ id: 'ds-c-name', required: true, 'aria-invalid': compDup }"
+              :label-props="{ htmlFor: 'ds-c-name' }"
+            />
             <div class="two">
-              <label class="row">
-                <span class="tx-head">코드 이름</span>
-                <span class="field m"><input v-model="comp.code_name" placeholder="예: Button"></span>
-              </label>
-              <label class="row">
-                <span class="tx-head">분류</span>
-                <span class="field m"><input v-model="comp.category" list="ds-cat-list" placeholder="예: 입력"></span>
-                <datalist id="ds-cat-list"><option v-for="c in categories" :key="c" :value="c" /></datalist>
-              </label>
+              <TextInput v-model:value="comp.code_name" v-bind="TI" label="코드 이름" placeholder="예: Button" :input-props="{ id: 'ds-c-code' }" :label-props="{ htmlFor: 'ds-c-code' }" />
+              <TextInput v-model:value="comp.category" v-bind="TI" label="분류" placeholder="예: 입력" :input-props="{ id: 'ds-c-cat', list: 'ds-cat-list' }" :label-props="{ htmlFor: 'ds-c-cat' }" />
+              <datalist id="ds-cat-list"><option v-for="c in categories" :key="c" :value="c" /></datalist>
             </div>
-            <label class="row">
-              <span class="tx-head">설명</span>
-              <span class="field m"><input v-model="comp.description" placeholder="언제 쓰는지 한 줄로 적어주세요"></span>
-            </label>
-            <label class="row">
-              <span class="tx-head">매칭 별칭</span>
-              <span class="field m"><input v-model="comp.aliases" placeholder="예: btn, 버튼 (쉼표로 나눠요)"></span>
-              <span class="tx-meta">피그마 레이어 이름이 별칭과 같으면 이 컴포넌트로 셉니다</span>
-            </label>
-            <label class="row">
-              <span class="tx-head">속성</span>
-              <span class="field m area"><textarea v-model="comp.props" rows="3" class="tx-code" placeholder="type: primary, secondary&#10;label: text&#10;disabled: boolean" /></span>
-            </label>
+            <TextInput v-model:value="comp.description" v-bind="TI" label="설명" placeholder="언제 쓰는지 한 줄로 적어 주세요" :input-props="{ id: 'ds-c-desc' }" :label-props="{ htmlFor: 'ds-c-desc' }" />
+            <TextInput
+              v-model:value="comp.aliases"
+              v-bind="TI"
+              label="매칭 별칭"
+              placeholder="예: btn, 버튼 (쉼표로 나눠요)"
+              show-supporting-text
+              supporting-text="피그마 레이어 이름이 별칭과 같으면 이 컴포넌트로 셉니다"
+              :input-props="{ id: 'ds-c-alias' }"
+              :label-props="{ htmlFor: 'ds-c-alias' }"
+            />
+            <div class="row">
+              <label for="ds-c-props" class="tx-head">속성</label>
+              <textarea id="ds-c-props" v-model="comp.props" rows="3" class="area tx-code" placeholder="type: primary, secondary&#10;label: text&#10;disabled: boolean" />
+            </div>
           </template>
 
           <template v-else-if="cur === 'token'">
@@ -388,21 +406,20 @@ async function save() {
                 <button v-for="t in Object.keys(TOKEN_TYPE_LABEL) as TokenType[]" :key="t" type="button" role="radio" :aria-checked="tok.type === t" :class="['sq', 'seg-item', { on: tok.type === t }]" @click="tok.type = t">{{ TOKEN_TYPE_LABEL[t] }}</button>
               </div>
             </div>
-            <label class="row">
-              <span class="tx-head">이름 <span class="req" aria-hidden="true">*</span></span>
-              <span class="field m"><input v-model="tok.name" data-first required placeholder="예: brand/primary-default"></span>
-            </label>
-            <label class="row">
-              <span class="tx-head">값 <span class="req" aria-hidden="true">*</span></span>
-              <span class="field m">
-                <span v-if="tok.type === 'color' && tok.value" class="sw" :style="{ background: tok.value }" aria-hidden="true" />
-                <input v-model="tok.value" required :placeholder="{ color: '#2C7BE2', typography: '16 / 24 · 500', spacing: '16px', radius: '12px', shadow: '0 1px 2px rgb(3 9 26 / 8%)' }[tok.type]">
-              </span>
-            </label>
-            <label class="row">
-              <span class="tx-head">설명</span>
-              <span class="field m"><input v-model="tok.description" placeholder="어디에 쓰는지 적어주세요"></span>
-            </label>
+            <TextInput v-model:value="tok.name" v-bind="TI" data-first label="이름" essential placeholder="예: brand/primary-default" :input-props="{ id: 'ds-t-name', required: true }" :label-props="{ htmlFor: 'ds-t-name' }" />
+            <div class="val">
+              <TextInput
+                v-model:value="tok.value"
+                v-bind="TI"
+                label="값"
+                essential
+                :placeholder="{ color: '#2C7BE2', typography: '16 / 24 · 500', spacing: '16px', radius: '12px', shadow: '0 1px 2px rgb(3 9 26 / 8%)' }[tok.type]"
+                :input-props="{ id: 'ds-t-value', required: true }"
+                :label-props="{ htmlFor: 'ds-t-value' }"
+              />
+              <span v-if="tok.type === 'color' && tok.value" class="sw val-sw" :style="{ background: tok.value }" aria-hidden="true" />
+            </div>
+            <TextInput v-model:value="tok.description" v-bind="TI" label="설명" placeholder="어디에 쓰는지 적어 주세요" :input-props="{ id: 'ds-t-desc' }" :label-props="{ htmlFor: 'ds-t-desc' }" />
           </template>
 
           <template v-else>
@@ -410,12 +427,12 @@ async function save() {
               <div class="bulk-h">
                 <label for="ds-bulk" class="tx-head">CSV 또는 JSON 붙여넣기</label>
                 <span class="bulk-act">
-                  <button type="button" class="act line" @click="bulk = SAMPLE">예시 넣기</button>
-                  <button type="button" class="act line" @click="fileInput?.click()"><Icon name="upload" :size="14" />파일 고르기</button>
+                  <TextButton size="s" color="gray" @click="bulk = SAMPLE">예시 넣기</TextButton>
+                  <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="fileInput?.click()">파일 고르기</Button>
                   <input ref="fileInput" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
                 </span>
               </div>
-              <span class="field m area"><textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="tx-code" spellcheck="false" placeholder="name,code_name,category,description,aliases&#10;Button,Button,입력,주요 동작 버튼,btn|버튼" /></span>
+              <textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="area tx-code" spellcheck="false" placeholder="name,code_name,category,description,aliases&#10;Button,Button,입력,주요 동작 버튼,btn|버튼" />
               <details class="help">
                 <summary class="tx-meta">받는 형식 보기</summary>
                 <ul class="tx-meta">
@@ -431,8 +448,8 @@ async function save() {
                 <li v-for="p in preview.slice(0, 8)" :key="p.key" class="prow">
                   <span class="tx-meta kind">{{ p.kind }}</span>
                   <span v-if="p.swatch" class="sw" :style="{ background: p.swatch }" aria-hidden="true" />
-                  <span class="tx-body pname">{{ p.name }}</span>
-                  <span class="tx-meta pmeta num">{{ p.meta }}</span>
+                  <span class="tx-body pname" :title="p.name">{{ p.name }}</span>
+                  <span class="tx-meta pmeta num" :title="p.meta">{{ p.meta }}</span>
                 </li>
                 <li v-if="preview.length > 8" class="tx-meta">외 {{ preview.length - 8 }}개</li>
               </ul>
@@ -446,8 +463,8 @@ async function save() {
 
           <p v-if="error" class="tx-body warn err" role="alert"><Icon name="warning" :size="14" /> {{ error }}</p>
           <div class="foot">
-            <button type="button" class="act m gray" @click="emit('close')">취소</button>
-            <button type="submit" class="act m pri" :disabled="!canSave || saving">{{ saving ? '등록하는 중…' : saveLabel }}</button>
+            <Button size="m" type="tertiary" class="grow1" @click="emit('close')">취소</Button>
+            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave" @click="save">{{ saveLabel }}</Button>
           </div>
         </form>
       </div>
@@ -461,19 +478,25 @@ async function save() {
 .top { display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-10) var(--ref-spacing-08) 0 var(--ref-spacing-12); }
 .tabs { padding: var(--ref-spacing-06) var(--ref-spacing-12) 0 var(--ref-spacing-10); }
 .body { display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); overflow: auto; min-height: 0; }
-.row { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.row { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
+/* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
+.row > .tx-head:first-child, .bulk-h > .tx-head { color: var(--sys-color-neutral-700); }
+.row > .help { margin-top: var(--ref-spacing-02); }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ref-spacing-06); }
-.req { color: var(--sys-color-brand-primary-default); }
-.field:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.field input:disabled { opacity: .5; }
-.area { height: auto; align-items: stretch; padding: var(--ref-spacing-05) var(--ref-spacing-08); }
-.area textarea { width: 100%; min-height: 54px; border: 0; outline: 0; background: transparent; resize: vertical; padding: 0; }
-.area textarea::placeholder { color: var(--sys-color-neutral-500); }
+.area { display: block; width: 100%; box-sizing: border-box; min-height: 66px; resize: vertical; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); color: var(--sys-color-neutral-800); transition: box-shadow .12s ease; }
+.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
+.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.area::placeholder { color: var(--sys-color-neutral-500); }
+.val { position: relative; }
+.val-sw { position: absolute; right: var(--ref-spacing-08); bottom: 9px; width: 12px; height: 12px; }
+.val :deep(input) { padding-right: var(--ref-spacing-10); }
 .types { flex-wrap: wrap; margin-left: calc(-1 * var(--ref-spacing-06)); }
 .sw { width: 14px; height: 14px; border-radius: var(--ref-radius-02); box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
 .bulk-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
-.bulk-act { display: flex; gap: var(--ref-spacing-04); }
-.help summary { cursor: pointer; width: max-content; }
+.bulk-act { display: flex; align-items: center; gap: var(--ref-spacing-08); }
+.help summary { cursor: pointer; width: max-content; border-radius: var(--ref-radius-02); transition: color .12s ease; }
+.help summary:hover { color: var(--sys-color-neutral-800); }
+.help summary:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .help ul { margin: var(--ref-spacing-04) 0 0; padding-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .help code { padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-neutral-100); }
 .result { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); }
@@ -485,6 +508,7 @@ async function save() {
 .result p { margin: 0; }
 .warn { color: var(--sys-color-theme-destructed-default); display: flex; align-items: center; gap: var(--ref-spacing-02); }
 .err { margin: 0; }
-.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-04); }
-.act:disabled { opacity: .4; cursor: default; }
+.foot { display: flex; gap: var(--ref-spacing-06); padding-top: var(--ref-spacing-04); }
+.grow1 { flex: 1; }
+.grow2 { flex: 2.25; }
 </style>

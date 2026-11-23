@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon, Skeleton } from '@ba-dream/design-system'
+import { Button, Icon, SearchField, Skeleton, TextButton } from '@ba-dream/design-system'
 import DsPreview from '~/components/ds/DsPreview.vue'
 import DsRegisterModal, { type RegisterTab } from '~/components/ds/DsRegisterModal.vue'
 import { TOKEN_TYPE_LABEL, type ComponentRow, type TokenRow, type TokenType, type UsageRow } from '~/composables/useIrisData'
@@ -106,6 +106,7 @@ const curTotal = computed(() => curUses.value.reduce((s, u) => s + u.n, 0))
 
 function pickComponent(c: ComponentRow) { picked.value = { kind: 'component', id: c.id }; view.value = 'components' }
 function pickCategory(key: string) { category.value = key; view.value = 'components' }
+function clearFilters() { category.value = ''; query.value = '' }
 function pickToken(t: TokenRow) { picked.value = { kind: 'token', id: t.id } }
 async function showTokens(type?: TokenType) {
   view.value = 'tokens'
@@ -161,16 +162,14 @@ async function onSaved(msg: string) {
 </script>
 
 <template>
-  <div class="shell">
+  <!-- 등록 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
+  <div class="shell" :aria-hidden="modal.open ? 'true' : undefined">
     <AppTopBar />
 
     <!-- 왼쪽: 컴포넌트 · 토큰 목록 (에디터 왼쪽 패널과 같은 모양) -->
     <aside aria-label="디자인 시스템 목록" class="sq float side">
       <div class="search-row">
-        <label class="fld search">
-          <Icon name="search" :size="14" />
-          <input v-model="query" type="search" placeholder="이름 · 별칭 찾기" aria-label="컴포넌트 · 토큰 찾기">
-        </label>
+        <SearchField v-model:value="query" type="contained" size="s" placeholder="이름 · 별칭 찾기" :input-props="{ 'aria-label': '컴포넌트 · 토큰 찾기' }" />
       </div>
       <div class="side-scroll">
         <template v-if="loading">
@@ -179,7 +178,7 @@ async function onSaved(msg: string) {
         <template v-else-if="!loadError">
           <section v-for="g in navGroups" :key="g.cat" class="sec">
             <div class="sec-h"><span>{{ g.cat }}</span></div>
-            <button v-for="c in g.items" :key="c.id" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'component' && sel.id === c.id }]" @click="pickComponent(c)">
+            <button v-for="c in g.items" :key="c.id" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'component' && sel.id === c.id }]" :aria-current="sel?.kind === 'component' && sel.id === c.id ? 'true' : undefined" :title="c.name" @click="pickComponent(c)">
               <span class="ell">{{ c.name }}</span><span class="cnt num">{{ screenCount(c.id) || '' }}</span>
             </button>
           </section>
@@ -191,12 +190,15 @@ async function onSaved(msg: string) {
           </section>
           <section v-if="unmatchedShown.length" class="sec">
             <div class="sec-h"><span>디자인 시스템에 없는 이름</span></div>
-            <button v-for="u in unmatchedShown" :key="u.name" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'unmatched' && sel.name === u.name }]" @click="picked = { kind: 'unmatched', name: u.name }">
+            <button v-for="u in unmatchedShown" :key="u.name" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'unmatched' && sel.name === u.name }]" :aria-current="sel?.kind === 'unmatched' && sel.name === u.name ? 'true' : undefined" :title="u.name" @click="picked = { kind: 'unmatched', name: u.name }">
               <Icon name="warning" :size="12" class="warn-ic" />
               <span class="ell">{{ u.name }}</span><span class="cnt num">{{ u.uses.length }}</span>
             </button>
           </section>
-          <p v-if="query && !navGroups.length && !unmatchedShown.length" class="tx-meta side-empty">'{{ query }}'에 맞는 이름이 없어요</p>
+          <div v-if="query && !navGroups.length && !unmatchedShown.length" class="side-empty">
+            <p class="tx-meta">'{{ query }}'에 맞는 이름이 없어요</p>
+            <TextButton size="s" color="blue" @click="query = ''">찾는 말 지우기</TextButton>
+          </div>
         </template>
       </div>
     </aside>
@@ -206,8 +208,8 @@ async function onSaved(msg: string) {
       <div class="head">
         <h1 class="tx-title">디자인 시스템</h1>
         <div class="head-act">
-          <button type="button" class="act line" @click="openRegister('bulk')"><Icon name="upload" :size="14" />한꺼번에 가져오기</button>
-          <button type="button" class="act pri" @click="openRegister(view === 'tokens' ? 'token' : 'component')"><Icon name="plus" :size="14" />등록</button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
+          <Button size="s" type="primary" contents="icon-text" icon-name="plus" @click="openRegister(view === 'tokens' ? 'token' : 'component')">등록</Button>
         </div>
       </div>
       <div class="seg chips" role="tablist" aria-label="분류">
@@ -224,20 +226,21 @@ async function onSaved(msg: string) {
       </div>
       <div v-else-if="loadError" class="state" role="alert">
         <span class="tx-head">디자인 시스템을 불러오지 못했어요</span>
-        <span class="tx-meta">잠시 뒤 다시 시도해주세요.</span>
-        <button type="button" class="act line" @click="reload"><Icon name="refresh" :size="14" />다시 불러오기</button>
+        <span class="tx-meta">잠시 뒤 다시 시도해 주세요</span>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload">다시 불러오기</Button>
       </div>
 
       <!-- 컴포넌트 -->
       <template v-else-if="view === 'components'">
         <div v-if="!compList.length" class="state">
           <span class="tx-head">아직 등록한 컴포넌트가 없어요</span>
-          <span class="tx-meta">하나씩 등록하거나 CSV · JSON 으로 한꺼번에 가져와 주세요.</span>
-          <button type="button" class="act line" @click="openRegister('bulk')"><Icon name="upload" :size="14" />한꺼번에 가져오기</button>
+          <span class="tx-meta">하나씩 등록하거나 CSV · JSON 으로 한꺼번에 가져와 주세요</span>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
         </div>
         <div v-else-if="!cards.length" class="state">
           <span class="tx-head">맞는 컴포넌트가 없어요</span>
-          <span class="tx-meta">찾는 말이나 분류를 바꿔 보세요.</span>
+          <span class="tx-meta">찾는 말이나 분류를 바꿔 보세요</span>
+          <Button size="s" type="tertiary" stroke @click="clearFilters">거르기 지우기</Button>
         </div>
         <div v-else class="grid">
           <div v-for="c in cards" :key="c.id" class="card">
@@ -245,7 +248,7 @@ async function onSaved(msg: string) {
               <DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" />
             </span>
             <button type="button" class="card-btn" :aria-pressed="curComp?.id === c.id" @click="pickComponent(c)">
-              <span class="tx-body name">{{ c.name }}</span>
+              <span class="tx-body name ell" :title="c.name">{{ c.name }}</span>
               <span class="tx-meta num">화면 {{ screenCount(c.id) }}</span>
             </button>
           </div>
@@ -256,15 +259,16 @@ async function onSaved(msg: string) {
       <template v-else>
         <div v-if="!tokenGroups.length" class="state">
           <span class="tx-head">{{ tokenList.length ? '맞는 토큰이 없어요' : '아직 등록한 토큰이 없어요' }}</span>
-          <span v-if="!tokenList.length" class="tx-meta">색 · 글자 · 간격 · 모서리 · 그림자 값을 등록해 주세요.</span>
-          <button v-if="!tokenList.length" type="button" class="act line" @click="openRegister('bulk')"><Icon name="upload" :size="14" />한꺼번에 가져오기</button>
+          <span class="tx-meta">{{ tokenList.length ? '찾는 말을 바꿔 보세요' : '색 · 글자 · 간격 · 모서리 · 그림자 값을 등록해 주세요' }}</span>
+          <Button v-if="!tokenList.length" size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
+          <Button v-else size="s" type="tertiary" stroke @click="query = ''">찾는 말 지우기</Button>
         </div>
         <section v-for="g in tokenGroups" :id="`ds-tok-${g.type}`" :key="g.type" class="tok-sec">
           <h2 class="tx-head">{{ TOKEN_TYPE_LABEL[g.type] }} <span class="tx-meta num">{{ g.items.length }}</span></h2>
           <div v-if="g.type === 'color'" class="swatches">
             <button v-for="t in g.items" :key="t.id" type="button" :class="['sq', 'tok-card', { on: curToken?.id === t.id }]" :aria-pressed="curToken?.id === t.id" @click="pickToken(t)">
               <span class="swatch" :style="{ background: t.value }" aria-hidden="true" />
-              <span class="tok-txt"><span class="tx-body name ell">{{ t.name }}</span><span class="tx-meta num ell">{{ t.value }}</span></span>
+              <span class="tok-txt"><span class="tx-body name ell" :title="t.name">{{ t.name }}</span><span class="tx-meta num ell" :title="t.value">{{ t.value }}</span></span>
             </button>
           </div>
           <div v-else class="tok-rows">
@@ -275,9 +279,9 @@ async function onSaved(msg: string) {
                 <span v-else-if="g.type === 'radius'" class="pv-radius" :style="{ borderRadius: t.value }" />
                 <span v-else class="pv-shadow" :style="{ boxShadow: t.value }" />
               </span>
-              <span class="tx-body name ell">{{ t.name }}</span>
-              <span class="tx-meta num ell">{{ t.value }}</span>
-              <span class="tx-meta ell desc">{{ t.description ?? '' }}</span>
+              <span class="tx-body name ell" :title="t.name">{{ t.name }}</span>
+              <span class="tx-meta num ell" :title="t.value">{{ t.value }}</span>
+              <span class="tx-meta ell desc" :title="t.description ?? undefined">{{ t.description ?? '' }}</span>
             </button>
           </div>
         </section>
@@ -299,13 +303,13 @@ async function onSaved(msg: string) {
             <span class="tx-meta">{{ curComp.category }}<template v-if="curComp.description"> · {{ curComp.description }}</template></span>
             <div class="sq code">
               <pre class="tx-code">{{ curCode }}</pre>
-              <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '코드 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
+              <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '코드 복사'" :title="copied ? '복사했어요' : '코드 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
             </div>
             <span v-if="curComp.match_aliases?.length" class="tx-meta">매칭 별칭 · {{ curComp.match_aliases.join(', ') }}</span>
           </template>
           <template v-else>
-            <span class="tx-meta">화면에서 찾은 레이어 이름인데, 디자인 시스템에 같은 이름이 없어요. 새 컴포넌트로 등록하거나 기존 컴포넌트의 별칭으로 넣어 주세요.</span>
-            <button type="button" class="act line self-start" @click="openRegister('component', curUnmatched?.name)"><Icon name="plus" :size="14" />컴포넌트로 등록</button>
+            <span class="tx-meta">화면에서 찾은 레이어 이름인데, 디자인 시스템에 같은 이름이 없어요. 새 컴포넌트로 등록하거나 기존 컴포넌트의 별칭으로 넣어 주세요</span>
+            <Button class="self-start" size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="openRegister('component', curUnmatched?.name)">컴포넌트로 등록</Button>
           </template>
         </section>
 
@@ -314,27 +318,27 @@ async function onSaved(msg: string) {
             <h3 class="tx-head">쓰는 화면</h3>
             <span v-if="curUses.length" class="tx-meta num">{{ curUses.length }}곳 · {{ curTotal }}번</span>
           </div>
-          <div class="tbl-h tx-meta"><span>화면</span><span>개수</span></div>
+          <div class="tbl-h tx-meta"><span>화면</span><span class="r">개수</span></div>
           <template v-if="screens.status.value === 'pending'">
             <div v-for="i in 3" :key="i" class="sk-use"><Skeleton shape="text" /></div>
           </template>
-          <p v-else-if="usages.error.value" class="tx-meta empty">사용 화면을 불러오지 못했어요 <button type="button" class="link" @click="usages.refresh()">다시 불러오기</button></p>
+          <p v-else-if="usages.error.value" class="tx-meta empty">사용 화면을 불러오지 못했어요 <TextButton size="s" color="blue" @click="usages.refresh()">다시 불러오기</TextButton></p>
           <p v-else-if="!curUses.length" class="tx-meta empty">아직 이 컴포넌트를 쓰는 화면이 없어요</p>
           <template v-else>
             <template v-for="u in curUses" :key="u.screenId">
               <NuxtLink v-if="screenOf(u.screenId).projectId" :to="`/p/${screenOf(u.screenId).projectId}?screen=${u.screenId}`" class="use">
                 <span class="use-col">
-                  <span class="tx-body name ell">{{ screenOf(u.screenId).name }}</span>
+                  <span class="tx-body name ell" :title="screenOf(u.screenId).name">{{ screenOf(u.screenId).name }}</span>
                   <span class="tx-meta ell">{{ [screenOf(u.screenId).project, screenOf(u.screenId).page].filter(Boolean).join(' · ') }}</span>
                 </span>
-                <span class="tx-body num">{{ u.n }}</span>
+                <span class="tx-body num r">{{ u.n }}</span>
               </NuxtLink>
               <div v-else class="use">
                 <span class="use-col">
-                  <span class="tx-body name ell">{{ screenOf(u.screenId).name }}</span>
+                  <span class="tx-body name ell" :title="screenOf(u.screenId).name">{{ screenOf(u.screenId).name }}</span>
                   <span class="tx-meta ell">{{ [screenOf(u.screenId).project, screenOf(u.screenId).page].filter(Boolean).join(' · ') }}</span>
                 </span>
-                <span class="tx-body num">{{ u.n }}</span>
+                <span class="tx-body num r">{{ u.n }}</span>
               </div>
             </template>
           </template>
@@ -354,7 +358,7 @@ async function onSaved(msg: string) {
           </span>
           <div class="sq code">
             <pre class="tx-code">{{ curCode }}</pre>
-            <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '값 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
+            <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '값 복사'" :title="copied ? '복사했어요' : '값 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
           </div>
         </section>
       </template>
@@ -385,9 +389,6 @@ async function onSaved(msg: string) {
 /* 왼쪽 패널 — 에디터 panel-left 와 같은 폭 · 섹션 */
 .side { flex: 0 0 264px; display: flex; flex-direction: column; overflow: hidden; }
 .search-row { padding: var(--ref-spacing-06); }
-.search { color: var(--sys-color-neutral-500); }
-.search input::-webkit-search-cancel-button { display: none; }
-.search:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 .side-scroll { flex: 1; min-height: 0; overflow: auto; padding-bottom: var(--ref-spacing-08); }
 .sec { display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); }
 .sec-h { padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-08); }
@@ -395,7 +396,8 @@ async function onSaved(msg: string) {
 .cnt { margin-left: auto; color: var(--sys-color-neutral-500); font-weight: 400; }
 .warn-ic { flex: none; color: var(--sys-color-theme-warning-default); }
 .sk-row { padding: var(--ref-spacing-03) var(--ref-spacing-08); }
-.side-empty { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-12); }
+.side-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04) var(--ref-spacing-12); }
+.side-empty p { margin: 0; }
 
 /* 가운데 */
 .body { flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box; }
@@ -412,9 +414,11 @@ async function onSaved(msg: string) {
 .card-btn::after { content: ''; position: absolute; inset: 0; border-radius: var(--ref-radius-07); }
 .card-btn:focus-visible { outline: none; }
 .card-btn:focus-visible::after { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.card-btn .name { flex: 1; }
+.card-btn .num { flex: none; }
 .name { font-weight: 500; }
 .state { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-19) 0; text-align: center; }
-.state .act { margin-top: var(--ref-spacing-06); }
+.state .bd-button { margin-top: var(--ref-spacing-06); }
 
 .tok-sec { display: flex; flex-direction: column; gap: var(--ref-spacing-06); scroll-margin-top: var(--ref-spacing-10); }
 .tok-sec + .tok-sec { margin-top: var(--ref-spacing-14); }
@@ -422,6 +426,8 @@ async function onSaved(msg: string) {
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: var(--ref-spacing-06); }
 .tok-card { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .tok-card:hover, .tok-row:hover { --sq-line: var(--ref-color-gray-900-20); }
+.tok-card:active, .tok-row:active { --sq-overlay: var(--interaction-light-gray-hover); }
+.tok-card:focus-visible, .tok-row:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .tok-card.on, .tok-row.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 .swatch { height: 56px; box-shadow: inset 0 -1px 0 var(--iris-line); }
 .tok-txt { display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-05); min-width: 0; }
@@ -446,13 +452,15 @@ async function onSaved(msg: string) {
 .big-swatch { width: 100%; height: 100%; }
 .uses { gap: 0; }
 .uses-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--ref-spacing-06); }
+.r { text-align: right; }
 .tbl-h { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding-bottom: var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--iris-line-strong); }
 .use { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) 0; box-shadow: inset 0 -1px 0 var(--iris-line); }
+a.use .name { transition: color .12s ease; }
 a.use:hover .name { color: var(--sys-color-brand-primary-default); }
+a.use:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; border-radius: var(--ref-radius-03); }
 .use-col { display: flex; flex-direction: column; min-width: 0; }
 .sk-use { padding: var(--ref-spacing-08) 0; }
-.empty { margin: 0; padding: var(--ref-spacing-08) 0; }
-.link { color: var(--sys-color-brand-primary-default); }
+.empty { display: flex; align-items: center; gap: var(--ref-spacing-04); flex-wrap: wrap; margin: 0; padding: var(--ref-spacing-08) 0; }
 
 .toast-wrap { position: fixed; left: 50%; bottom: var(--ref-spacing-14); transform: translateX(-50%); z-index: 60; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-05) var(--ref-spacing-08); }

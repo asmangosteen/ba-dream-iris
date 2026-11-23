@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon, Skeleton } from '@ba-dream/design-system'
+import { Button, Icon, SearchField, Skeleton, TextButton } from '@ba-dream/design-system'
 import type { LinkRow, LinkStatus, ReqRow } from '~/composables/useIrisData'
 
 /**
@@ -130,6 +130,10 @@ const emptyText = computed(() => {
 function toggleTodo() {
   filter.value = filter.value === 'todo' ? 'all' : 'todo'
 }
+function clearFilters() {
+  filter.value = 'all'
+  query.value = ''
+}
 
 // ---------------------------------------------------------------------------
 // 선택한 요구사항 — 연결된 화면 · 상태
@@ -153,6 +157,7 @@ function select(id: string) {
   selectedId.value = selectedId.value === id ? null : id
   addOpen.value = false
   saveError.value = false
+  unlinking.value = null
 }
 const sourceHref = (r: ReqRow) => `/p/${projectId}?doc=${encodeURIComponent(r.document_id)}&req=${encodeURIComponent(r.id)}`
 
@@ -172,7 +177,12 @@ async function mutate(fn: () => Promise<void>) {
   }
 }
 const cycle = (l: LinkRow) => mutate(() => setLink({ ...l, status: NEXT_STATUS[l.status] }))
-const unlink = (l: LinkRow) => mutate(() => removeLink(l.screen_id, l.requirement_id))
+/** 연결 끊기는 두 번 확인합니다: 휴지통 → 카드 안 확인 줄 */
+const unlinking = ref<string | null>(null)
+async function unlink(l: LinkRow) {
+  await mutate(() => removeLink(l.screen_id, l.requirement_id))
+  unlinking.value = null
+}
 function link(screenId: string) {
   const s = selected.value
   addOpen.value = false
@@ -189,6 +199,7 @@ function onDocClick(e: MouseEvent) {
 function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
   if (addOpen.value) addOpen.value = false
+  else if (unlinking.value) unlinking.value = null
   else selectedId.value = null
 }
 onMounted(() => {
@@ -259,15 +270,15 @@ function exportCsv() {
           <span v-if="project" class="tx-meta">{{ project.name }}</span>
         </div>
         <div class="actions">
-          <button type="button" class="act line" :disabled="!shown.length" @click="exportCsv">내보내기</button>
-          <NuxtLink v-if="projectId" :to="`/p/${projectId}`" class="act pri"><Icon name="plus" :size="14" />요구사항 추가</NuxtLink>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="download" :disabled="!shown.length" @click="exportCsv">내보내기</Button>
+          <Button v-if="projectId" size="s" type="primary" contents="icon-text" icon-name="plus" @click="navigateTo(`/p/${projectId}`)">요구사항 추가</Button>
         </div>
       </div>
 
       <div v-if="!projectId" class="empty">
         <p class="tx-meta">{{ projectsError ? '프로젝트를 불러오지 못했어요' : '프로젝트를 먼저 만들어 주세요' }}</p>
-        <button v-if="projectsError" type="button" class="act line" @click="reload()"><Icon name="refresh" :size="14" />다시 불러오기</button>
-        <NuxtLink v-else to="/" class="act line">프로젝트로 가기</NuxtLink>
+        <Button v-if="projectsError" size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">다시 불러오기</Button>
+        <Button v-else size="s" type="tertiary" stroke @click="navigateTo('/')">프로젝트로 가기</Button>
       </div>
 
       <template v-else>
@@ -286,20 +297,16 @@ function exportCsv() {
             </button>
           </div>
           <div class="tools-right">
-            <button type="button" :class="['act', filter === 'todo' ? 'gray' : 'line']" :aria-pressed="filter === 'todo'" @click="toggleTodo">
-              <Icon :name="filter === 'todo' ? 'check' : 'warning'" :size="14" />미반영 모아보기 <span class="num">{{ count('todo') }}</span>
-            </button>
-            <label class="field search">
-              <Icon name="search" :size="14" />
-              <span class="sr">요구사항 검색</span>
-              <input v-model="query" type="search" placeholder="번호나 내용으로 찾기">
-            </label>
+            <Button size="s" type="tertiary" :stroke="filter !== 'todo'" contents="icon-text" :icon-name="filter === 'todo' ? 'check' : 'warning'" :aria-pressed="filter === 'todo'" @click="toggleTodo">
+              미반영 모아보기 <span class="num">{{ count('todo') }}</span>
+            </Button>
+            <SearchField v-model:value="query" class="search" type="contained" size="s" placeholder="번호나 내용으로 찾기" :input-props="{ 'aria-label': '요구사항 검색' }" />
           </div>
         </div>
 
         <div v-if="failed" class="empty">
           <p class="tx-meta">요구사항을 불러오지 못했어요</p>
-          <button type="button" class="act line" @click="reload()"><Icon name="refresh" :size="14" />다시 불러오기</button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">다시 불러오기</Button>
         </div>
 
         <table v-else class="grid">
@@ -334,10 +341,10 @@ function exportCsv() {
               @keydown.enter.prevent="select(r.req.id)"
               @keydown.space.prevent="select(r.req.id)"
             >
-              <td class="tx-head nowrap">{{ r.req.code }}</td>
-              <td class="tx-body">{{ r.req.title }}</td>
-              <td class="tx-meta"><span class="ellipsis">{{ r.doc }}<template v-if="r.docVersion"> · {{ r.docVersion }}</template></span></td>
-              <td class="tx-body"><span :class="['ellipsis', r.screen ? 'linked' : 'unlinked']">{{ r.screen || STATUS_TEXT.none }}</span></td>
+              <td class="tx-head nowrap num">{{ r.req.code }}</td>
+              <td class="tx-body t-title">{{ r.req.title }}</td>
+              <td class="tx-meta"><span class="ellipsis" :title="r.doc + (r.docVersion ? ` · ${r.docVersion}` : '')">{{ r.doc }}<template v-if="r.docVersion"> · {{ r.docVersion }}</template></span></td>
+              <td class="tx-body"><span :class="['ellipsis', r.screen ? 'linked' : 'unlinked']" :title="r.screen || undefined">{{ r.screen || STATUS_TEXT.none }}</span></td>
               <td class="tx-meta">{{ r.req.priority ? PRIORITY_LABEL[r.req.priority] : '—' }}</td>
               <td class="tx-body">
                 <span class="status">
@@ -352,17 +359,19 @@ function exportCsv() {
 
         <div v-if="!loading && !failed && !rows.length" class="empty">
           <p class="tx-meta">아직 요구사항이 없어요. 문서에 REQ-001 같은 번호를 적으면 자동으로 모아요</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="document" @click="navigateTo(`/p/${projectId}`)">문서 추가하러 가기</Button>
         </div>
         <div v-else-if="!loading && !failed && !shown.length" class="empty">
           <p class="tx-meta">{{ emptyText }}</p>
+          <TextButton size="s" color="blue" @click="clearFilters">거르기 지우기</TextButton>
         </div>
       </template>
     </main>
 
     <!-- 오른쪽: 선택한 요구사항 -->
     <aside v-if="selected" aria-label="요구사항 상세" class="sq float detail">
-      <div class="sec-h">
-        <span>{{ selected.req.code }}</span>
+      <div class="sec-h d-top">
+        <span class="num">{{ selected.req.code }}</span>
         <button type="button" class="ib s" aria-label="닫기" @click="selectedId = null"><Icon name="close" :size="14" /></button>
       </div>
       <div class="d-pad">
@@ -377,9 +386,9 @@ function exportCsv() {
             </span>
           </div>
           <div class="kv"><span class="tx-meta">중요도</span><span class="tx-body">{{ selected.req.priority ? PRIORITY_LABEL[selected.req.priority] : '정하지 않음' }}</span></div>
-          <div class="kv"><span class="tx-meta">문서</span><span class="tx-body ellipsis">{{ selected.doc }}<template v-if="selected.docVersion"> · {{ selected.docVersion }}</template></span></div>
+          <div class="kv"><span class="tx-meta">문서</span><span class="tx-body ellipsis" :title="selected.doc + (selected.docVersion ? ` · ${selected.docVersion}` : '')">{{ selected.doc }}<template v-if="selected.docVersion"> · {{ selected.docVersion }}</template></span></div>
         </div>
-        <NuxtLink :to="sourceHref(selected.req)" class="act line src"><Icon name="document" :size="14" />원문 보기<Icon name="arrow_up_right" :size="12" /></NuxtLink>
+        <TextButton class="src" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" @click="navigateTo(sourceHref(selected.req))">원문 보기</TextButton>
       </div>
 
       <section class="sec">
@@ -389,26 +398,34 @@ function exportCsv() {
             <button type="button" class="ib s" aria-label="화면 연결" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><Icon name="plus" :size="14" /></button>
             <div v-if="addOpen" class="sq menu" role="menu">
               <p v-if="!linkable.length" class="tx-meta menu-empty">더 연결할 화면이 없어요</p>
-              <button v-for="s in linkable" :key="s.id" type="button" role="menuitem" class="sq menu-item" @click="link(s.id)">
+              <button v-for="s in linkable" :key="s.id" type="button" role="menuitem" class="sq menu-item" :title="s.name" @click="link(s.id)">
                 <span class="ellipsis">{{ s.name }}</span><span class="tx-meta menu-page">{{ s.page }}</span>
               </button>
             </div>
           </div>
         </div>
         <div class="d-pad cards">
-          <p v-if="!selectedLinks.length" class="tx-meta">아직 연결된 화면이 없어요. + 로 화면을 연결해 주세요</p>
+          <div v-if="!selectedLinks.length" class="no-link">
+            <p class="tx-meta">아직 연결된 화면이 없어요</p>
+            <TextButton size="s" color="blue" contents="icon-text" icon-name="plus" :disabled="saving" @click.stop="addOpen = true">화면 연결</TextButton>
+          </div>
           <div v-for="{ link: l, screen } in selectedLinks" :key="l.screen_id" class="sq card">
             <div class="card-row">
               <button type="button" class="st-btn" :disabled="saving" :aria-label="`상태 바꾸기: 지금 ${LINK_STATUS[l.status].label}`" :title="`눌러서 ${LINK_STATUS[NEXT_STATUS[l.status]].label}(으)로 바꿔요`" @click="cycle(l)">
                 <StatusIcon :status="l.status" :size="12" />
               </button>
               <div class="card-col">
-                <NuxtLink :to="`/p/${projectId}?screen=${l.screen_id}`" class="tx-body card-name ellipsis">{{ screen?.name ?? '이름 없는 화면' }}</NuxtLink>
-                <span class="tx-meta">{{ LINK_STATUS[l.status].label }}<template v-if="screen?.page"> · {{ screen.page }}</template></span>
+                <NuxtLink :to="`/p/${projectId}?screen=${l.screen_id}`" class="tx-body card-name ellipsis" :title="screen?.name ?? undefined">{{ screen?.name ?? '이름 없는 화면' }}</NuxtLink>
+                <span class="tx-meta ellipsis">{{ LINK_STATUS[l.status].label }}<template v-if="screen?.page"> · {{ screen.page }}</template></span>
               </div>
-              <button type="button" class="ib s" :disabled="saving" aria-label="연결 끊기" @click="unlink(l)"><Icon name="trashbin" :size="14" /></button>
+              <button type="button" class="ib s" :disabled="saving" aria-label="연결 끊기" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><Icon name="trashbin" :size="14" /></button>
             </div>
             <p v-if="l.note" class="tx-body note">{{ l.note }}</p>
+            <div v-if="unlinking === l.screen_id" class="unlink" role="alertdialog" :aria-label="`${screen?.name ?? '화면'} 연결 끊기`">
+              <span class="tx-meta">이 화면과의 연결을 끊을까요?</span>
+              <Button size="s" type="tertiary" @click="unlinking = null">취소</Button>
+              <Button size="s" type="destructed" :loading="saving" @click="unlink(l)">끊기</Button>
+            </div>
           </div>
           <p v-if="saveError" class="tx-meta err" role="alert">바꾸지 못했어요. 잠시 뒤 다시 해 주세요</p>
         </div>
@@ -428,24 +445,25 @@ function exportCsv() {
 
 /* 가운데 표 */
 .body { flex: 1; min-width: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); box-sizing: border-box; }
-.head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--ref-spacing-10); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-10); }
 .title-col { display: flex; align-items: baseline; gap: var(--ref-spacing-06); min-width: 0; }
-.actions { display: flex; gap: var(--ref-spacing-06); }
-.act:disabled { opacity: .5; cursor: default; }
+.actions { display: flex; gap: var(--ref-spacing-04); }
 .tools { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-12) 0 var(--ref-spacing-08); }
 .filters { margin-left: calc(-1 * var(--ref-spacing-06)); flex-wrap: wrap; }
-.tools-right { display: flex; align-items: center; gap: var(--ref-spacing-06); flex: none; }
-.search { width: 220px; color: var(--sys-color-neutral-500); }
-.search input::-webkit-search-cancel-button { display: none; }
+.tools-right { display: flex; align-items: center; gap: var(--ref-spacing-04); flex: none; }
+.search { width: 220px; }
 
 .grid { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
 .grid th { padding: var(--ref-spacing-06) var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); }
 .grid td { padding: var(--ref-spacing-08) var(--ref-spacing-04); vertical-align: top; }
 .grid tbody tr { box-shadow: inset 0 -1px 0 var(--iris-line); }
 .grid tbody tr:not(.sk) { cursor: pointer; }
-.grid tbody tr:not(.sk):hover td { background: var(--sys-color-neutral-100); }
-.grid tbody tr.on td { background: var(--sys-color-brand-primary-lightest); }
-.grid tbody tr:focus-visible { outline: 0.5px solid var(--sys-color-brand-primary-default); outline-offset: -1px; }
+.grid td { transition: background-color .12s ease; }
+.grid tbody tr:not(.sk):hover td { background: var(--interaction-light-gray-hover); }
+.grid tbody tr:not(.sk):active td { background: var(--interaction-light-gray-pressed); }
+.grid tbody tr.on td, .grid tbody tr.on:hover td { background: var(--sys-color-neutral-100); }
+.grid tbody tr.on .t-title { font-weight: 500; }
+.grid tbody tr:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 .c-code { width: 84px; }
 .c-doc { width: 170px; }
 .c-screen { width: 150px; }
@@ -457,20 +475,22 @@ function exportCsv() {
 .unlinked { color: var(--sys-color-neutral-500); }
 .status { display: inline-flex; align-items: center; gap: var(--ref-spacing-04); white-space: nowrap; }
 .st-none { display: block; flex: none; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-300); }
-.empty { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-17) 0; text-align: center; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-17) 0; text-align: center; }
 .empty p { margin: 0; }
 
 /* 오른쪽 상세 */
 .detail { flex: 0 0 320px; box-sizing: border-box; overflow: auto; display: flex; flex-direction: column; padding-bottom: var(--ref-spacing-10); }
-.detail > .sec-h { height: 40px; }
+.d-top { height: 40px; }
 .ib.s { width: 24px; height: 24px; }
 .ib:disabled { opacity: .5; cursor: default; }
+.ib:disabled:hover { --sq-overlay: transparent; }
 .d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-08) var(--ref-spacing-10); }
 .d-pad p { margin: 0; }
 .d-title { font-weight: 500; }
 .summary { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); }
 .kv { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-06); }
 .src { align-self: flex-start; }
+.no-link { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); }
 .add { position: relative; }
 .add .menu { left: auto; right: 0; width: 220px; max-height: 240px; overflow: auto; }
 .menu-item { justify-content: space-between; flex: none; }
@@ -478,13 +498,19 @@ function exportCsv() {
 .menu-empty { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); }
 .cards { gap: var(--ref-spacing-04); }
 .card { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
-.card-row { display: flex; align-items: center; gap: var(--ref-spacing-06); }
+.card-row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .card-name { font-weight: 500; }
+.card-name { transition: color .12s ease; }
 .card-name:hover { color: var(--sys-color-brand-primary-default); }
-.st-btn { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-03); margin-left: calc(-1 * var(--ref-spacing-04)); }
+.card-name:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; border-radius: var(--ref-radius-01); }
+.st-btn { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-03); margin-left: calc(-1 * var(--ref-spacing-04)); transition: background-color .12s ease; }
 .st-btn:hover { background: var(--interaction-light-gray-hover); }
-.st-btn:disabled { cursor: default; }
-.note { padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); }
+.st-btn:active { background: var(--interaction-light-gray-pressed); }
+.st-btn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.st-btn:disabled { cursor: default; background: none; }
+.unlink { display: flex; align-items: center; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-06); box-shadow: inset 0 1px 0 var(--iris-line); }
+.unlink > span { flex: 1; min-width: 0; }
+.note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); }
 .err { color: var(--sys-color-theme-destructed-default); }
 </style>

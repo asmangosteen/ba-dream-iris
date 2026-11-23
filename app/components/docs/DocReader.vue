@@ -21,7 +21,7 @@ export function scrollToDocAnchor(
 </script>
 
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, TextButton } from '@ba-dream/design-system'
 import type { DocRow, ReqRow } from '~/composables/useIrisData'
 
 const props = withDefaults(defineProps<{
@@ -36,7 +36,11 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'pick-req': [reqId: string]
   'create-req': [payload: { text: string; block: string | null }]
+  /** 빈 문서에서 "내용 쓰기"를 눌렀을 때(넓은 화면 전용, compact 는 고치기 링크로 갑니다) */
+  edit: []
 }>()
+const editHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}?edit=1`)
+const wideHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}`)
 
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
@@ -138,7 +142,7 @@ async function openFile() {
   openError.value = ''
   const { data, error } = await supabase.storage.from('documents').createSignedUrl(props.doc.file_path, 3600)
   opening.value = false
-  if (error || !data?.signedUrl) { openError.value = '파일을 열지 못했어요. 잠시 뒤 다시 시도해주세요.'; return }
+  if (error || !data?.signedUrl) { openError.value = '파일을 열지 못했어요. 잠시 뒤 다시 시도해 주세요'; return }
   window.open(data.signedUrl, '_blank', 'noopener')
 }
 
@@ -154,7 +158,7 @@ async function savePaste() {
   saveError.value = ''
   const { error } = await supabase.from('documents').update({ plain_text: v, fetch_status: 'manual' }).eq('id', props.doc.id)
   saving.value = false
-  if (error) { saveError.value = '저장하지 못했어요. 잠시 뒤 다시 시도해주세요.'; return }
+  if (error) { saveError.value = '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요'; return }
   pasted.value = v
   refreshNuxtData(`docs-${props.doc.project_id}`)
 }
@@ -214,15 +218,15 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
   <div ref="root" :class="['reader', { compact }]">
     <header class="head">
       <div class="title-row">
-        <h2 v-if="compact" class="tx-head">{{ doc.title }}</h2>
+        <h2 v-if="compact" class="tx-head" :title="doc.title">{{ doc.title }}</h2>
         <h1 v-else class="tx-title">{{ doc.title }}</h1>
         <div v-if="$slots.actions" class="acts"><slot name="actions" /></div>
       </div>
       <div class="tx-meta meta">
         <span>{{ meta }}</span>
-        <NuxtLink v-if="compact" :to="`/p/${doc.project_id}/docs/${doc.id}`" class="lnk">넓게 보기</NuxtLink>
-        <NuxtLink v-if="compact" :to="`/p/${doc.project_id}/docs/${doc.id}?edit=1`" class="lnk">고치기</NuxtLink>
-        <button v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" type="button" class="lnk" :disabled="opening" @click="openFile">원본</button>
+        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(wideHref)">넓게 보기</TextButton>
+        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(editHref)">고치기</TextButton>
+        <TextButton v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" :loading="opening" @click="openFile">원본</TextButton>
       </div>
       <a v-if="doc.source_type === 'link' && doc.url" :href="doc.url" target="_blank" rel="noopener noreferrer" class="tx-meta src">
         <Icon name="link" :size="12" />
@@ -235,12 +239,10 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
     <div v-if="showFileCard" class="sq card">
       <span class="sq chip num">{{ fileLabel || '파일' }}</span>
       <span class="card-col">
-        <span class="tx-body name ellipsis">{{ fileName || doc.title }}</span>
+        <span class="tx-body name ellipsis" :title="fileName || doc.title">{{ fileName || doc.title }}</span>
         <span class="tx-meta">{{ preview ? '미리보기에서는 파일을 열 수 없어요' : '본문을 미리 볼 수 없는 파일이에요' }}</span>
       </span>
-      <button v-if="!preview" type="button" class="act line" :disabled="opening || !doc.file_path" @click="openFile">
-        <Icon name="arrow_up_right" :size="14" />파일 열기
-      </button>
+      <Button v-if="!preview" size="s" type="tertiary" stroke contents="icon-text" icon-name="arrow_up_right" :loading="opening" :disabled="!doc.file_path" @click="openFile">파일 열기</Button>
     </div>
 
     <!-- 링크 본문을 못 가져온 경우: 붙여넣기 -->
@@ -248,7 +250,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       <div class="sq card">
         <span class="sq chip"><Icon name="link" :size="16" /></span>
         <span class="card-col">
-          <span class="tx-body name ellipsis">{{ linkHost || doc.title }}</span>
+          <span class="tx-body name ellipsis" :title="linkHost || doc.title">{{ linkHost || doc.title }}</span>
           <span class="tx-meta warn"><Icon name="warning" :size="12" />본문을 불러오지 못했어요</span>
         </span>
       </div>
@@ -256,12 +258,16 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       <textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" placeholder="원본 페이지의 글을 복사해서 붙여넣어 주세요" />
       <div class="paste-foot">
         <span v-if="saveError" class="tx-meta warn" role="alert">{{ saveError }}</span>
-        <button type="button" :class="['act', compact ? 'line' : 'pri']" :disabled="!draft.trim() || saving" @click="savePaste">{{ saving ? '저장하는 중' : '저장하기' }}</button>
+        <Button size="s" :type="compact ? 'tertiary' : 'primary'" :stroke="compact" :loading="saving" :disabled="!draft.trim() && !saving" @click="savePaste">저장하기</Button>
       </div>
     </div>
 
     <article v-else ref="article" class="body" @mouseup="onSelectEnd" @keyup.shift="onSelectEnd">
-      <p v-if="!blocks.length" class="tx-meta">아직 내용이 없어요</p>
+      <div v-if="!blocks.length" class="empty">
+        <p class="tx-meta">아직 내용이 없어요</p>
+        <TextButton v-if="compact" size="s" color="blue" contents="icon-text" icon-name="pencil" @click="navigateTo(editHref)">내용 쓰기</TextButton>
+        <TextButton v-else size="s" color="blue" contents="icon-text" icon-name="pencil" @click="emit('edit')">내용 쓰기</TextButton>
+      </div>
       <div
         v-for="b in blocks"
         :key="b.id"
@@ -297,10 +303,11 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .title-row > h1, .title-row > h2 { flex: 1; min-width: 0; }
 .acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); margin-top: -1px; }
 .meta { display: flex; align-items: center; gap: var(--ref-spacing-06); flex-wrap: wrap; }
-.lnk { color: var(--sys-color-brand-primary-default); font-weight: 500; }
-.lnk:disabled { opacity: .5; cursor: default; }
-.src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; color: var(--sys-color-neutral-500); }
+.src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-02); transition: color .12s ease; }
 .src:hover { color: var(--sys-color-brand-primary-default); }
+.src:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); }
+.empty p { margin: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .body { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
@@ -317,8 +324,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .compact .blk.marked { padding: var(--ref-spacing-06) var(--ref-spacing-07); }
 .codes { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); text-align: inherit; }
+.code { transition: background-color .12s ease; }
 .code:hover, .code[aria-pressed='true'] { background: var(--sys-color-brand-primary-lighter); }
-.code:focus-visible { outline: 1px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 .card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; min-width: 0; }
 .chip { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; color: var(--sys-color-neutral-800); }
@@ -328,14 +336,17 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-theme-error-default); }
 
 .paste { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
-.area { width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; padding: var(--ref-spacing-06) var(--ref-spacing-08); border: 0; outline: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:focus { box-shadow: inset 0 0 0 0.5px var(--sys-color-brand-primary-default); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
+.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .paste-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); }
 .paste-foot .warn { margin-right: auto; }
-.act:disabled { opacity: .5; cursor: default; }
 
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
+.tool-btn { transition: background-color .12s ease; }
 .tool-btn:hover { background: rgb(253 253 253 / 12%); }
+.tool-btn:active { background: rgb(253 253 253 / 20%); }
+.tool-btn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-light); outline-offset: 1px; }
 </style>

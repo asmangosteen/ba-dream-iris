@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, IconButton, TextInput } from '@ba-dream/design-system'
 import type { DocBlock, DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -169,7 +169,7 @@ async function save() {
     done.value = { docId, found }
     emit('created', docId)
   } catch (e) {
-    error.value = (e as Error)?.message && !(e as Error).message.startsWith('{') ? (e as Error).message : '문서를 추가하지 못했어요. 잠시 뒤 다시 시도해주세요.'
+    error.value = (e as Error)?.message && !(e as Error).message.startsWith('{') ? (e as Error).message : '문서를 추가하지 못했어요. 잠시 뒤 다시 시도해 주세요'
   } finally {
     saving.value = false
   }
@@ -197,10 +197,21 @@ watch(open, async (v) => {
 function focusables(): HTMLElement[] {
   return Array.from(dialog.value?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])') ?? [])
 }
+/** data-autofocus 가 컴포넌트 바깥 요소에 붙어 있으면 그 안의 입력칸 · 버튼으로 */
+function autofocusTarget(): HTMLElement | null {
+  const el = dialog.value?.querySelector<HTMLElement>('[data-autofocus]') ?? null
+  if (!el || el.matches('input, textarea, button, a')) return el
+  return el.querySelector<HTMLElement>('input, textarea, button')
+}
 function focusFirst() {
-  const el = dialog.value?.querySelector<HTMLElement>('[data-autofocus]') ?? focusables()[0]
+  const el = autofocusTarget() ?? focusables()[0]
   el?.focus()
 }
+function openDoc(id: string) {
+  open.value = false
+  navigateTo(`/p/${props.projectId}/docs/${id}`)
+}
+const TI = { size: 's', showLeftIcon: false, showRightIcon: false, showButton: false, showSupportingText: false } as const
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') { e.stopPropagation(); close(); return }
   if (e.key !== 'Tab') return
@@ -210,7 +221,7 @@ function onKeydown(e: KeyboardEvent) {
   if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
 }
-watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.querySelector<HTMLElement>('[data-autofocus]')?.focus() })
+watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?.focus() })
 </script>
 
 <template>
@@ -226,7 +237,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
       >
         <div class="top">
           <h1 id="addDocTitle" class="tx-title">문서 추가</h1>
-          <button type="button" class="ib" aria-label="닫기" @click="close"><Icon name="close" :size="20" /></button>
+          <IconButton icon-name="close" size="s" type="ghost" ariaLabel="닫기" @click="close" />
         </div>
 
         <!-- 다 넣은 뒤 -->
@@ -237,8 +248,8 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
             <span class="tx-meta">{{ done.found ? `요구사항 ${done.found}개를 찾았어요` : '번호(REQ-001 등)가 붙은 요구사항은 찾지 못했어요' }}</span>
           </div>
           <div class="foot">
-            <button type="button" class="act m gray grow1" @click="close">닫기</button>
-            <NuxtLink :to="`/p/${projectId}/docs/${done.docId}`" class="act m pri grow2" data-autofocus @click="open = false">문서 보기</NuxtLink>
+            <Button size="m" type="tertiary" class="grow1" @click="close">닫기</Button>
+            <Button size="m" type="primary" class="grow2" data-autofocus @click="openDoc(done.docId)">문서 보기</Button>
           </div>
         </template>
 
@@ -273,30 +284,34 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
               <div v-else class="sq card">
                 <span class="sq chip num">{{ fileExt.toUpperCase() }}</span>
                 <span class="card-col">
-                  <span class="tx-body name ellipsis">{{ file.name }}</span>
+                  <span class="tx-body name ellipsis" :title="file.name">{{ file.name }}</span>
                   <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · 요구사항 {{ foundCount }}개</template><template v-else> · 본문은 파일로만 보관해요</template></span>
                 </span>
-                <button type="button" class="ib" aria-label="파일 빼기" data-autofocus @click="clearFile"><Icon name="close" :size="16" /></button>
+                <IconButton icon-name="close" size="s" type="ghost" ariaLabel="파일 빼기" data-autofocus @click="clearFile" />
               </div>
               <p v-if="preview && file" class="tx-meta">미리보기에서는 파일을 올리지 않고 이름만 저장해요</p>
             </div>
 
             <!-- 링크 -->
             <div v-else-if="mode === 'link'" class="col8">
-              <div class="col6">
-                <label for="docUrl" class="tx-head">문서 주소</label>
-                <div class="field m">
-                  <Icon name="link" :size="14" color="var(--sys-color-neutral-500)" />
-                  <input id="docUrl" v-model="url" type="url" inputmode="url" placeholder="https://" autocomplete="off" data-autofocus @keydown.enter.prevent="fetchLink" @blur="fetchLink">
-                  <button type="button" class="act line" :disabled="!urlValid || fetching" @click="fetchLink">
-                    <Icon :name="fetching ? 'refresh' : 'arrow_up_right'" :size="14" />{{ fetching ? '불러오는 중' : '불러오기' }}
-                  </button>
-                </div>
+              <div class="url-row" data-autofocus>
+                <TextInput
+                  v-model:value="url"
+                  v-bind="TI"
+                  class="url-in"
+                  label="문서 주소"
+                  placeholder="https://"
+                  show-left-icon
+                  left-icon-name="link"
+                  :input-props="{ id: 'docUrl', type: 'url', inputmode: 'url', autocomplete: 'off', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); fetchLink() } }, onBlur: fetchLink }"
+                  :label-props="{ htmlFor: 'docUrl' }"
+                />
+                <Button size="m" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">불러오기</Button>
               </div>
               <div v-if="fetched" class="sq card">
                 <span class="sq chip"><Icon name="document" :size="16" /></span>
                 <span class="card-col">
-                  <span class="tx-body name ellipsis">{{ fetched.title }}</span>
+                  <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
                   <span class="tx-meta num">{{ linkHost }} · 요구사항 {{ foundCount }}개</span>
                 </span>
               </div>
@@ -311,10 +326,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
 
             <!-- 직접 쓰기 -->
             <div v-else class="col10">
-              <div class="col6">
-                <label for="docName" class="tx-head">문서 이름</label>
-                <span class="field m"><input id="docName" v-model="title" placeholder="예: 신청 플로우 개발 메모" autocomplete="off" data-autofocus></span>
-              </div>
+              <TextInput v-model:value="title" v-bind="TI" data-autofocus label="문서 이름" essential placeholder="예: 신청 플로우 개발 메모" :input-props="{ id: 'docName', autocomplete: 'off' }" :label-props="{ htmlFor: 'docName' }" />
               <div class="col6">
                 <span id="tplLabel" class="tx-head">어떤 틀로 시작할까요?</span>
                 <div class="tpl" role="radiogroup" aria-labelledby="tplLabel">
@@ -324,7 +336,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
                     type="button"
                     role="radio"
                     :aria-checked="template === t.key"
-                    :class="['sq', 'tpl-item', { on: template === t.key, hov: template !== t.key }]"
+                    :class="['sq', 'tpl-item', { on: template === t.key }]"
                     @click="pickTemplate(t)"
                   >{{ t.label }}</button>
                 </div>
@@ -356,8 +368,8 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
           </div>
 
           <div class="foot">
-            <button type="button" class="act m gray grow1" @click="close">취소</button>
-            <button type="button" class="act m pri grow2" :disabled="!canSave" @click="save">{{ saving ? '추가하는 중' : '추가하기' }}</button>
+            <Button size="m" type="tertiary" class="grow1" :disabled="saving" @click="close">취소</Button>
+            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave && !saving" @click="save">추가하기</Button>
           </div>
         </template>
       </section>
@@ -374,8 +386,10 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
 .foot { display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
 .grow1 { flex: 1; }
 .grow2 { flex: 2.25; }
-.act:disabled { opacity: .5; cursor: default; }
-.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
+/* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
+.col6 > .tx-head:first-child { color: var(--sys-color-neutral-700); }
+.col6 > .tx-meta:last-child { margin-top: var(--ref-spacing-02); }
 .col8 { display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
 .col10 { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
 .cats { margin-left: calc(-1 * var(--ref-spacing-06)); }
@@ -383,27 +397,32 @@ watch(mode, async () => { error.value = ''; await nextTick(); dialog.value?.quer
 
 .drop { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-14) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 1px; text-align: center; cursor: pointer; }
 .drop:hover, .drop.over { --sq-fill: var(--sys-color-neutral-100); }
-.drop:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
-.up { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--sys-color-common-white-default); color: var(--sys-color-brand-primary-default); box-shadow: var(--shadow-01); }
+.drop:active { --sq-fill: var(--sys-color-neutral-200); }
+.drop:has(input:focus-visible) { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.up { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--sys-color-common-white-default); color: var(--sys-color-brand-primary-default); box-shadow: var(--shadow-01); }
 
 .card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .chip { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .name { font-weight: 500; }
 
-.field.m:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.field .act { margin-right: calc(-1 * var(--ref-spacing-05)); }
+.url-row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }
+.url-in { flex: 1; min-width: 0; }
 
 .tpl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }
-.tpl-item { padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; }
-.tpl-item.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
+.tpl-item { padding: var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 500; transition: color .12s ease; }
+.tpl-item:hover { --sq-overlay: var(--interaction-light-gray-hover); }
+.tpl-item:active { --sq-overlay: var(--interaction-light-gray-pressed); }
+.tpl-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.tpl-item.on { font-weight: 600; --sq-overlay: transparent; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
 
-.area { width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: var(--ref-spacing-06) var(--ref-spacing-08); border: 0; outline: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:focus { box-shadow: inset 0 0 0 0.5px var(--sys-color-brand-primary-default); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
+.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 
 .err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0; color: var(--sys-color-theme-error-default); }
 
 .success { align-items: center; justify-content: center; text-align: center; gap: var(--ref-spacing-04); }
-.badge-ok { width: 44px; height: 44px; margin-bottom: var(--ref-spacing-04); border-radius: 50%; display: grid; place-items: center; background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
+.badge-ok { width: 40px; height: 40px; margin-bottom: var(--ref-spacing-04); border-radius: 50%; display: grid; place-items: center; background: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
 </style>

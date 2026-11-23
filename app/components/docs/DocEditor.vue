@@ -136,7 +136,7 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
 </script>
 
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import { Button, Icon, TextInput } from '@ba-dream/design-system'
 import type { DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
 
 const props = defineProps<{
@@ -246,7 +246,7 @@ async function save() {
     }
   } catch {
     saving.value = false
-    error.value = '저장하지 못했어요. 잠시 뒤 다시 시도해주세요.'
+    error.value = '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요'
     return
   }
 
@@ -270,25 +270,35 @@ async function save() {
   emit('saved', { found: added, gone })
 }
 
-const titleInput = ref<HTMLInputElement | null>(null)
-onMounted(() => titleInput.value?.focus())
+const root = ref<HTMLElement | null>(null)
+onMounted(() => root.value?.querySelector<HTMLInputElement>(`#edTitle-${props.doc.id}`)?.focus())
+const TI = { size: 's', showLeftIcon: false, showRightIcon: false, showButton: false } as const
+/** 한 줄 칸에서 Enter 로 저장(예전 submit 버튼과 같은 동작) */
+const onEnter = (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save() } }
 defineExpose({ save })
 
 const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? '')
 </script>
 
 <template>
-  <form class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save">
+  <form ref="root" class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save">
     <header class="head">
       <h1 class="tx-title">문서 고치기</h1>
       <span class="tx-meta">{{ native ? '직접 쓴 문서' : doc.source_type === 'upload' ? '올린 파일 · 원본 파일은 그대로 두고 본문 글만 고쳐요' : '링크 · 원본 페이지는 그대로 두고 본문 글만 고쳐요' }}</span>
     </header>
 
-    <div class="col6">
-      <label :for="`edTitle-${doc.id}`" class="tx-head">문서 이름</label>
-      <span class="field"><input :id="`edTitle-${doc.id}`" ref="titleInput" v-model="form.title" autocomplete="off" placeholder="문서 이름"></span>
-      <span v-if="!form.title.trim()" class="tx-meta warn">문서 이름을 적어주세요</span>
-    </div>
+    <TextInput
+      v-model:value="form.title"
+      v-bind="TI"
+      label="문서 이름"
+      essential
+      placeholder="문서 이름"
+      :show-supporting-text="!form.title.trim()"
+      supporting-text="문서 이름을 적어 주세요"
+      supporting-theme="destructed"
+      :input-props="{ id: `edTitle-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
+      :label-props="{ htmlFor: `edTitle-${doc.id}` }"
+    />
 
     <div class="row">
       <div class="col6">
@@ -305,14 +315,20 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
           >{{ c[1] }}</button>
         </div>
       </div>
-      <div class="col6 ver">
-        <label :for="`edVer-${doc.id}`" class="tx-head">버전</label>
-        <span class="field"><input :id="`edVer-${doc.id}`" v-model="form.version" class="num" autocomplete="off" placeholder="예: v1.3"></span>
-      </div>
+      <TextInput
+        v-model:value="form.version"
+        v-bind="TI"
+        class="ver"
+        label="버전"
+        placeholder="예: v1.3"
+        :show-supporting-text="false"
+        :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
+        :label-props="{ htmlFor: `edVer-${doc.id}` }"
+      />
     </div>
 
-    <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><Icon name="clip" :size="12" /><span class="ellipsis">{{ fileName }}</span></div>
-    <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><Icon name="link" :size="12" /><span class="ellipsis">{{ doc.url }}</span></div>
+    <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><Icon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
+    <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><Icon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
 
     <div class="col6 grow">
       <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? '내용' : '본문' }}</label>
@@ -330,8 +346,8 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 
     <div class="foot">
       <span v-if="error" class="tx-meta warn" role="alert"><Icon name="warning" :size="12" />{{ error }}</span>
-      <button type="button" class="act gray" :disabled="saving" @click="emit('cancel')">취소</button>
-      <button type="submit" class="act pri" :disabled="!canSave"><Icon name="check" :size="14" />{{ saving ? '저장하는 중' : '저장하기' }}</button>
+      <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">취소</Button>
+      <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">저장하기</Button>
     </div>
   </form>
 </template>
@@ -339,20 +355,21 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 <style scoped>
 .editor { display: flex; flex-direction: column; gap: var(--ref-spacing-10); min-height: 100%; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .head { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-width: 0; }
+.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
+/* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
+.col6 > .tx-head:first-child { color: var(--sys-color-neutral-700); }
+.col6 > .tx-meta:last-child { margin-top: var(--ref-spacing-02); }
 .row { display: flex; align-items: flex-start; gap: var(--ref-spacing-12); flex-wrap: wrap; }
-.ver { width: 140px; }
+.ver { width: 140px; flex: none; }
 .cats { margin-left: calc(-1 * var(--ref-spacing-06)); }
 .grow { flex: 1; }
-.field:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.field input::placeholder { color: var(--sys-color-neutral-500); }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.area { flex: 1; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-06) var(--ref-spacing-08); border: 0; outline: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:focus { box-shadow: inset 0 0 0 0.5px var(--sys-color-brand-primary-default); }
+.area { flex: 1; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
+.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) 0; background: var(--sys-color-common-white-emphasis); }
 .foot .warn { margin-right: auto; }
 .warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-theme-error-default); }
-.act:disabled { opacity: .5; cursor: default; }
 </style>
