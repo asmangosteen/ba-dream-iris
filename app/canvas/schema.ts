@@ -2,7 +2,7 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export type LayerType = 'frame' | 'rect' | 'text' | 'image'
 
@@ -76,6 +76,8 @@ export interface LayerDoc {
   rootIds: string[]
   nodes: Record<string, LayerNode>
   schemaVersion: number
+  /** v4: 화면(프레임) 자체의 모양 — 채우기 · 선 · 모서리 · 투명도 · 내용 자르기. 없으면 흰 바탕 · 선 없음 */
+  frame?: LayerStyle
 }
 
 export const emptyDoc = (): LayerDoc => ({ rootIds: [], nodes: {}, schemaVersion: SCHEMA_VERSION })
@@ -87,7 +89,9 @@ export function migrate(raw: unknown): LayerDoc {
   if (!d.nodes || !Array.isArray(d.rootIds)) return emptyDoc()
   // v1 → v2: 회전 · 뒤집기 · 비율 고정 · 모서리 따로가 더해졌어요. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽습니다
   // v2 → v3: 변수 연결(style.vars) · 자간(style.letterSpacing) 이 더해졌어요. 역시 비어 있어도 되는 값이라 그대로 읽습니다
+  // v3 → v4: 화면 모양(frame) 이 더해졌어요. 비어 있어도 되는 값이라 그대로 읽습니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
+  if (d.frame && typeof d.frame === 'object' && !Array.isArray(d.frame)) doc.frame = { ...d.frame }
   for (const [id, n] of Object.entries(d.nodes)) {
     if (!n || typeof n !== 'object') continue
     const node: LayerNode = { ...(n as LayerNode), id, style: { ...((n as LayerNode).style ?? {}) } }
@@ -147,3 +151,16 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
 }
 
 export const TYPE_LABEL: Record<LayerType, string> = { frame: '프레임', rect: '사각형', text: '텍스트', image: '이미지' }
+
+/** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기 */
+export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined): Record<string, string | number> {
+  if (!f) return {}
+  const css: Record<string, string | number> = {}
+  if (f.fill !== undefined) css.background = f.fill ? (color(f.fill) ?? f.fill) : 'transparent'
+  if (f.radii) css.borderRadius = f.radii.map((r) => r + 'px').join(' ')
+  else if (f.radius) css.borderRadius = f.radius + 'px'
+  if (f.stroke && f.strokeWidth) css.boxShadow = `inset 0 0 0 ${f.strokeWidth}px ${color(f.stroke) ?? f.stroke}`
+  if (f.opacity !== undefined && f.opacity < 1) css.opacity = f.opacity
+  if (f.clip === false) css.overflow = 'visible'
+  return css
+}

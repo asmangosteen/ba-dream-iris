@@ -191,6 +191,19 @@ export function createLayerStore(opts: {
     })
   }
   const unbind = (sid: string, ids: string[], key: BindKey | BindKey[], patch?: Parameters<typeof bind>[4]) => bind(sid, ids, key, null, patch)
+  /** 화면(프레임) 자체의 모양 바꾸기. vars: 토큰 연결(키 → 토큰 id, null 이면 연결 끊기) */
+  function frameStyle(sid: string, patch: Partial<LayerStyle>, vars?: Record<string, string | null>) {
+    mutate(sid, (d) => {
+      const f: LayerStyle = { ...(d.frame ?? {}), ...patch }
+      for (const k of Object.keys(patch)) if ((patch as Record<string, unknown>)[k] === undefined) delete (f as Record<string, unknown>)[k]
+      const v: Record<string, string> = { ...(f.vars ?? {}) } as Record<string, string>
+      // 값을 직접 바꾼 키는 연결을 풀어요
+      for (const k of Object.keys(patch)) for (const vk of Object.keys(v)) if ((vk === k || vk.startsWith(k + '.')) && !(vars && vk in vars)) delete v[vk]
+      if (vars) for (const [k, id] of Object.entries(vars)) { if (id) v[k] = id; else delete v[k] }
+      if (Object.keys(v).length) f.vars = v as LayerStyle['vars']; else delete f.vars
+      d.frame = f
+    })
+  }
   function remove(sid: string, ids: string[]) {
     if (!ids.length) return
     mutate(sid, (d) => {
@@ -417,7 +430,7 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    selectScreen, selectLayer, add, update, style, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, update, style, frameStyle, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

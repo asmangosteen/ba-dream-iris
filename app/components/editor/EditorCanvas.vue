@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
-import { descendants, normAngle, ratioLocked, type LayerType } from '~/canvas/schema'
+import { descendants, normAngle, ratioLocked, frameCss, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
@@ -776,6 +776,8 @@ function onDrop(e: DragEvent) {
   const files = [...(e.dataTransfer?.files ?? [])]
   if (files.length) emit('drop-files', files, toWorld(e.clientX, e.clientY))
 }
+/** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
+const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color) : {})
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -801,7 +803,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         role="button"
         tabindex="-1"
         :data-screen="s.id"
-        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor }"
+        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor, ...frameLook(s) }"
         :aria-label="`${s.name} 화면`"
         @pointerdown.stop="start($event, s)"
         @dblclick="onDbl($event, s)"
@@ -832,7 +834,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-if="selFrame && !multi.length" class="sel" :class="{ dim: selBoxes.length }" :style="box(selFrame)">
         <template v-if="!selBoxes.length">
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
-          <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
+          <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
           <span class="size num">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
         </template>
       </div>
@@ -840,9 +842,9 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <template v-if="single">
         <div class="sel none" :style="rbox(single)">
           <template v-if="!single.locked">
-            <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', c]" @pointerdown.stop.prevent="startRotate($event)" />
+            <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" @pointerdown.stop.prevent="startRotate($event)" />
             <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, single.angle) }" @pointerdown.stop.prevent="startResize($event, h)" />
-            <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
+            <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
           </template>
         </div>
         <span class="size num below" :style="belowBox(single)">
@@ -864,27 +866,31 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 </template>
 
 <style scoped>
-.canvas { --grid-pixel: rgb(128 128 128 / 14%); --iris-measure: #F24822; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
+.canvas { --grid-pixel: var(--iris-grid-pixel); --iris-select: #0D99FF; --iris-measure: #F24822; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
 /* 움직이는 동안만 GPU 층으로(부드럽게), 멈추면 풀어서 확대 비율대로 다시 그려요 — 글자 · 도형이 늘 선명한 벡터 */
 .world.moving { will-change: transform; }
 .free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }
-.frame { position: absolute; pointer-events: auto; background: var(--iris-paper); box-shadow: 0 0 0 1px var(--iris-line-strong), 0 1px 3px rgb(3 9 26 / 6%); overflow: hidden; outline: none; }
+.frame { position: absolute; pointer-events: auto; background: var(--iris-paper); overflow: hidden; outline: none; }
+/* 피그마처럼 기본 테두리 · 그림자 없음. 마우스를 올리면 얇은 파란 선(확대와 상관없이 1px) */
+.frame:hover { outline: calc(1px / var(--z, 1)) solid var(--iris-select); }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
-.draft { position: absolute; background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
+.draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 .overlay { position: absolute; inset: 0; pointer-events: none; }
 .label { position: absolute; pointer-events: auto; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
-.label.on { color: var(--sys-color-brand-primary-default); font-weight: 500; }
-.sel { position: absolute; box-shadow: 0 0 0 1.5px var(--sys-color-brand-primary-default); }
-.sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); }
+.label.on { color: var(--iris-select); font-weight: 500; }
+.sel { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); }
+.sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--iris-select) 45%, transparent); }
 .sel.none { box-shadow: none; }
-.hl { position: absolute; box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default); background: color-mix(in srgb, var(--sys-color-brand-primary-default) 6%, transparent); }
-.handle.live { pointer-events: auto; width: 8px; height: 8px; }
-.handle.nw { left: -4px; top: -4px; cursor: nwse-resize; }
-.handle.se { right: -4px; bottom: -4px; cursor: nwse-resize; }
-.handle.ne { right: -4px; top: -4px; cursor: nesw-resize; }
-.handle.sw { left: -4px; bottom: -4px; cursor: nesw-resize; }
+.hl { position: absolute; box-shadow: 0 0 0 2px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); }
+.handle.live { pointer-events: auto; width: 6px; height: 6px; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 보이는 건 6px, 잡는 범위는 14px */
+.handle.live::after { content: ""; position: absolute; inset: -4px; }
+.handle.at-nw { left: -3px; top: -3px; cursor: nwse-resize; }
+.handle.at-se { right: -3px; bottom: -3px; cursor: nwse-resize; }
+.handle.at-ne { right: -3px; top: -3px; cursor: nesw-resize; }
+.handle.at-sw { left: -3px; bottom: -3px; cursor: nesw-resize; }
 .edge { position: absolute; pointer-events: auto; }
 .edge.n { left: 4px; right: 4px; top: -4px; height: 8px; }
 .edge.s { left: 4px; right: 4px; bottom: -4px; height: 8px; }
@@ -892,17 +898,17 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .edge.w { top: 4px; bottom: 4px; left: -4px; width: 8px; }
 /* 모서리 바로 바깥: 끌어서 돌리기 */
 .rot { position: absolute; pointer-events: auto; width: 16px; height: 16px; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 16.5a7 7 0 0 1 10-10M17.5 3v4h-4' stroke='white' stroke-width='4'/%3E%3Cpath d='M6.5 16.5a7 7 0 0 1 10-10M17.5 3v4h-4' stroke='black' stroke-width='1.5'/%3E%3C/g%3E%3C/svg%3E") 12 12, alias; }
-.rot.nw { left: -18px; top: -18px; }
-.rot.ne { right: -18px; top: -18px; }
-.rot.sw { left: -18px; bottom: -18px; }
-.rot.se { right: -18px; bottom: -18px; }
+.rot.at-nw { left: -18px; top: -18px; }
+.rot.at-ne { right: -18px; top: -18px; }
+.rot.at-sw { left: -18px; bottom: -18px; }
+.rot.at-se { right: -18px; bottom: -18px; }
 .size.below { top: auto; }
 .guides { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
 /* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
-.glabel { position: absolute; transform: translate(-50%, -50%); padding: 1px 5px; border-radius: 4px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 3px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
 /* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
-.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 2px 6px; border-radius: 4px; background: #2C7BE2; color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 0 4px; border-radius: 3px; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
 .size .mode { font-weight: 500; opacity: .8; margin-left: 2px; }
-.marq { position: absolute; box-shadow: 0 0 0 1px var(--sys-color-brand-primary-default); background: color-mix(in srgb, var(--sys-color-brand-primary-default) 8%, transparent); }
+.marq { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 </style>

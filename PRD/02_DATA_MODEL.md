@@ -126,7 +126,7 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
             "rotation": 90, "flipX": true, "lockRatio": true,
             "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 3
+  "schemaVersion": 4
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
@@ -150,6 +150,15 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 | style.vars | 속성 키 → 연결한 토큰 id. 피그마 변수처럼 값마다 디자인 시스템 토큰을 연결한다 | `{ "fill": "--sys-color-brand-primary-default", "radius": "--ref-radius-04" }` | 없음 = 연결 없음 |
 
 - **연결할 수 있는 키**: `fill` · `stroke` · `color`(색), `strokeWidth`(선 두께), `radius` · `radii.0`~`radii.3`(모서리), `opacity`(투명도), `fontSize` · `lineHeight` · `letterSpacing` · `fontWeight` · `textStyle`(글자), `x` · `y` · `w` · `h`(간격 토큰). `shadow` 는 효과 속성이 생기면 쓴다.
+
+- **schemaVersion 4 (2026-11-23)**: 화면(프레임) 자체의 모양 `frame` 을 문서 맨 위에 더했다. 레이어 `style` 과 같은 모양(LayerStyle)이라 채우기 · 선 · 모서리 · 투명도 · 내용 자르기 · 토큰 연결(`frame.vars`)을 똑같이 쓴다. 없으면 흰 바탕 · 선 없음 · 모서리 0 · 내용 자르기 켬. v1~v3 문서는 그대로 읽힌다.
+
+| 필드 | 설명 | 예시 | 기본 |
+|---|---|---|---|
+| frame.fill | 화면 바탕색. `""` 이면 투명(채우기 뺌) | `"#F6F7F7"` | 없음 = 흰색 |
+| frame.stroke · frame.strokeWidth | 화면 테두리(안쪽 선). 둘 다 있어야 보인다 | `"#202837"`, `1` | 없음 = 선 없음 |
+| frame.radius | 화면 모서리 | `24` | 0 |
+| frame.opacity · frame.clip | 투명도(0~1) · 내용 자르기(false 면 화면 밖도 보임) | `0.8`, `false` | 1, true |
 - **토큰 id**: 디자인 시스템 CSS 변수 이름(`--sys-color-…` · `--ref-color-…` · `--ref-spacing-…` · `--ref-radius-…` · `--ref-borderwidth-…` · `--ref-opacity-…` · `--font-weight-…` · `--typography-<스타일>-size|line-height|letter-spacing`), 글자 스타일 묶음 `ts:<스타일>`(예: `ts:body-1` = 크기 · 행간 · 자간 함께), DB 에 등록한 토큰 `db:<이름>`.
 - **값은 함께 저장한다**: 연결할 때 실제 값(밝은 모드 기준, 예: `fill: "#2C7BE2"`, `radius: 8`)도 그 속성에 써 둔다. 그래서 그리기 · 썸네일 · 내보내기는 `vars` 를 몰라도 되고, 앱을 다크모드로 바꿔도 캔버스 결과물 색은 바뀌지 않는다.
 - **연결 풀기**: 연결은 그대로인데 그 속성 값이 바뀌면(직접 입력 · ↑↓ · 캔버스에서 끌어 옮기기 · 크기 바꾸기) 그 키의 연결을 자동으로 푼다(`app/canvas/store.ts` 의 `record()` → `detachEdited`). 글자 크기 · 행간 · 자간 중 하나가 바뀌면 `textStyle` 도 풀린다.

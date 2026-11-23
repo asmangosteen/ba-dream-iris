@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { migrate } from '~/canvas/schema'
+import { frameCss, migrate } from '~/canvas/schema'
 import { LAYER_STORE, type LayerStore } from '~/canvas/store'
 import LayerView from '~/components/editor/LayerView.vue'
 
@@ -37,7 +37,7 @@ onBeforeUnmount(() => ro?.disconnect())
 <template>
   <div ref="el" class="sthumb" aria-hidden="true" inert>
     <img v-if="screen.source === 'figma' && screen.thumbnail_path" :src="screen.thumbnail_path" alt="">
-    <div v-else-if="scale" class="page" :style="{ width: screen.width + 'px', height: screen.height + 'px', transform: `scale(${scale})` }">
+    <div v-else-if="scale" class="page" :style="{ width: screen.width + 'px', height: screen.height + 'px', transform: `scale(${scale})`, ...frameCss(doc.frame, stub.color) }">
       <LayerView v-for="id in doc.rootIds" :key="id" :doc="doc" :id="id" :screen-id="screen.id" />
     </div>
   </div>

@@ -92,7 +92,7 @@ function onKey(e: KeyboardEvent) {
 
 <style scoped>
 .ly { position: absolute; box-sizing: border-box; font-family: var(--font-family-base); }
-.ly:not(.lk):hover:not(:has(.ly:hover)) { outline: calc(1px / var(--z, 1)) solid var(--sys-color-brand-primary-default); }
+.ly:not(.lk):hover:not(:has(.ly:hover)) { outline: calc(1px / var(--z, 1)) solid var(--iris-select, #0D99FF); }
 .image img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--sys-color-neutral-100); }
 .txt { display: block; outline: none; min-width: 1px; cursor: inherit; }
 .txt[contenteditable='true'] { cursor: text; user-select: text; -webkit-user-select: text; }

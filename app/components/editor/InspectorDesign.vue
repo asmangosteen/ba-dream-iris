@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { Button, Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
+import type { LayerStyle } from '~/canvas/schema'
+import { colorLabel, parseColor, type CatalogToken } from '~/canvas/tokens'
+import { useLayerStore } from '~/canvas/store'
+import TokenPicker from '~/components/editor/TokenPicker.vue'
 
-/** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기. 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
+/** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기 · 모양(채우기 · 선 · 모서리 · 투명도 · 내용 자르기). 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
 const props = defineProps<{ screen: ScreenRow }>()
 const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: [] }>()
 
@@ -39,6 +43,48 @@ function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
   const v = Math.max(key === 'width' || key === 'height' ? 1 : -1e9, Math.round(props.screen[key]) + d)
   emit('update', { [key]: v })
 }
+// --- 화면 모양: 레이어와 같은 방식(토큰 연결 포함). 기본은 흰 바탕 · 선 없음 · 모서리 0 ---
+const store = useLayerStore()
+const native = computed(() => props.screen.source === 'native')
+const look = computed<LayerStyle>(() => store.doc(props.screen.id).frame ?? {})
+const fstyle = (patch: Partial<LayerStyle>, vars?: Record<string, string | null>) => store.frameStyle(props.screen.id, patch, vars)
+const vb = (key: string) => (look.value.vars as Record<string, string> | undefined)?.[key] ?? null
+const hasFill = computed(() => look.value.fill !== '')
+const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
+const hasStroke = computed(() => !!(look.value.stroke && look.value.strokeWidth))
+const hex = (v?: string) => parseColor(store.color(v))?.hex ?? '#000000'
+const colorText = (v?: string) => (!v ? '없음' : v.startsWith('token:') ? v.slice(6) : colorLabel(v))
+const blurOnEnter = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
+function setHex(key: 'fill' | 'stroke', e: Event) {
+  const input = e.target as HTMLInputElement
+  let v = input.value.trim()
+  if (!v.startsWith('#')) v = '#' + v
+  if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map((c) => c + c).join('')
+  if (/^#[0-9a-f]{6}$/i.test(v)) fstyle({ [key]: v.toUpperCase() })
+  else input.value = colorText(key === 'fill' ? fillColor.value : look.value.stroke)
+}
+function setNumber(key: 'radius' | 'strokeWidth' | 'opacity', e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace(/[^\d.-]/g, ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = numText(key); return }
+  if (key === 'opacity') fstyle({ opacity: Math.min(1, Math.max(0, v / 100)) })
+  else fstyle({ [key]: Math.max(key === 'strokeWidth' ? 0.5 : 0, Math.round(v * 10) / 10), ...(key === 'radius' ? { radii: undefined } : {}) })
+}
+function stepNumber(key: 'radius' | 'strokeWidth' | 'opacity', d: number) {
+  if (key === 'opacity') fstyle({ opacity: Math.min(1, Math.max(0, Math.round(((look.value.opacity ?? 1) * 100 + d)) / 100)) })
+  else fstyle({ [key]: Math.max(key === 'strokeWidth' ? 0.5 : 0, (look.value[key] ?? 0) + d), ...(key === 'radius' ? { radii: undefined } : {}) })
+}
+function keyStep(key: 'radius' | 'strokeWidth' | 'opacity', e: KeyboardEvent) {
+  blurOnEnter(e)
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  stepNumber(key, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1))
+}
+const numText = (key: 'radius' | 'strokeWidth' | 'opacity') => String(key === 'opacity' ? Math.round((look.value.opacity ?? 1) * 100) : Math.round((look.value[key] ?? 0) * 10) / 10)
+function pickColor(key: 'fill' | 'stroke', t: CatalogToken) { fstyle({ [key]: t.color }, { [key]: t.id }) }
+function pickNum(key: 'radius' | 'strokeWidth' | 'opacity', t: CatalogToken) { fstyle({ [key]: t.num!, ...(key === 'radius' ? { radii: undefined } : {}) }, { [key]: t.id }) }
+function unbindKey(key: string) { fstyle({}, { [key]: null }) }
+
 const statusOpen = ref(false)
 const presetOpen = ref(false)
 const confirmDelete = ref(false)
@@ -96,6 +142,39 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       </div>
     </section>
 
+    <template v-if="native">
+      <section class="s">
+        <div class="sec-h h24"><span>모양</span></div>
+        <div class="grid2"><span class="sub">투명도</span><span class="sub">모서리</span></div>
+        <div class="grid2">
+          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="화면 투명도" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span>%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="화면 투명도" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
+          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="화면 모서리" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="화면 모서리" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+        </div>
+        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i />내용 자르기</button>
+      </section>
+
+      <section class="s">
+        <div class="sec-h h24"><span>채우기</span><button v-if="!hasFill" class="ib s24" aria-label="채우기 더하기" @click="fstyle({ fill: undefined })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="채우기 빼기" @click="fstyle({ fill: '' })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
+        <div v-if="hasFill" class="color-row">
+          <label class="sq fld"><input type="color" class="swatch" :value="hex(fillColor)" aria-label="화면 채우기 색" @change="fstyle({ fill: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('fill')" :key="'f' + fillColor" :value="colorText(fillColor)" aria-label="화면 채우기 값" @change="setHex('fill', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('fill')" label="화면 채우기 색" @pick="(t) => pickColor('fill', t)" @unbind="unbindKey('fill')" /></label>
+          <TokenPicker v-if="!vb('fill')" :kinds="['color']" label="화면 채우기 색" @pick="(t) => pickColor('fill', t)" />
+        </div>
+      </section>
+
+      <section class="s">
+        <div class="sec-h h24"><span>선</span><button v-if="!hasStroke" class="ib s24" aria-label="선 더하기" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="선 빼기" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
+        <template v-if="hasStroke">
+          <div class="color-row">
+            <label class="sq fld"><input type="color" class="swatch" :value="hex(look.stroke)" aria-label="화면 선 색" @change="fstyle({ stroke: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="화면 선 색 값" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="화면 선 색" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
+            <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="화면 선 색" @pick="(t) => pickColor('stroke', t)" />
+          </div>
+          <div class="grid2">
+            <label class="sq fld" title="선 두께"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 3.5h10" stroke="currentColor" stroke-width="1" /><path d="M2 7h10" stroke="currentColor" stroke-width="1.6" /><path d="M2 10.5h10" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="화면 선 두께" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span>px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="화면 선 두께" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+          </div>
+        </template>
+      </section>
+    </template>
+
     <section class="s">
       <div class="sec-h h24"><span>레이어</span></div>
       <p class="tx-meta m0">캔버스나 왼쪽 레이어 목록에서 레이어를 고르면 여기서 고쳐요</p>
@@ -129,5 +208,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .keys { display: grid; grid-template-columns: repeat(3, auto minmax(0, 1fr)); gap: var(--ref-spacing-04); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .keys dt { color: var(--sys-color-neutral-500); }
 .keys dd { margin: 0; font-weight: 600; color: var(--sys-color-neutral-700); }
+.s24 { width: 24px; height: 24px; }
+.color-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center; }
+.swatch { width: 14px !important; height: 14px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; background: none; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
+.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.swatch:focus-visible, .cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
+.fld > svg { flex: none; color: var(--sys-color-neutral-600); }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 </style>
