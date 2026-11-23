@@ -19,6 +19,8 @@ export default defineNuxtConfig({
     // 30일 쉬면 다시 인증하는 규칙은 app/middleware/auth.global.ts 가 맡습니다 — PRD/06_AUTH_SESSION.md
     cookieOptions: { sameSite: 'lax', secure: true },
   },
+  // 서버 함수를 Supabase(서울)와 같은 서울 지역(icn1)에서 돌립니다. 기본값(미국 동부)이면 로그인 확인 · DB 조회마다 태평양을 오갑니다
+  nitro: { vercel: { functions: { regions: ['icn1'] } } },
   runtimeConfig: {
     // 서버 전용 (브라우저에 노출되지 않음)
     figmaAccessToken: '',

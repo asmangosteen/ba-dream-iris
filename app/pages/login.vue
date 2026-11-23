@@ -34,12 +34,21 @@ async function verify() {
   busy.value = true
   error.value = ''
   const { error: e } = await supabase.auth.verifyOtp({ email: email.value, token: code.value.trim(), type: 'email' })
-  busy.value = false
   if (e) {
+    busy.value = false
     error.value = '코드가 맞지 않아요. 메일에 온 6자리를 다시 확인해주세요.'
     return
   }
+  // 로그인 상태(useSupabaseUser)가 채워진 뒤 이동해야 미들웨어가 로그인 화면으로 되돌리지 않습니다
+  const user = useSupabaseUser()
+  if (!user.value) {
+    await new Promise<void>((resolve) => {
+      const stop = watch(user, (v) => { if (v) { stop(); resolve() } })
+      setTimeout(() => { stop(); resolve() }, 3000)
+    })
+  }
   await navigateTo('/')
+  busy.value = false
 }
 </script>
 
