@@ -27,7 +27,7 @@ export const PREVIEW_PAGES: PageRow[] = [
 ]
 
 const frame = (id: string, name: string, col: number, status: ScreenRow['status'] = 'draft'): ScreenRow =>
-  ({ id, name, source: col % 2 ? 'figma' : 'native', x: col * 455, y: 0, width: 375, height: 812, status })
+  ({ id, name, source: col % 2 ? 'figma' : 'native', x: col * 470, y: 0, width: 390, height: 844, status })
 
 /** 예시 화면 안 레이어 (Iris 캔버스 화면만) */
 const L = (id: string, type: 'frame' | 'rect' | 'text' | 'image', name: string, parentId: string | null, x: number, y: number, w: number, h: number, style: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
@@ -43,7 +43,7 @@ const homeLayers = {
     h5: L('h5', 'text', '결제 안내', 'h3', 20, 50, 240, 20, { color: '#FFFFFF', fontSize: 14, fontWeight: 400, lineHeight: 20, opacity: 0.8, autoWidth: true }, { text: '다음 결제 12월 5일 · 89,000원' }),
     h8: L('h8', 'rect', '배터리 막대', 'h3', 20, 124, 295, 8, { fill: '#FFFFFF', radius: 4, opacity: 0.9 }),
     h6: L('h6', 'rect', '배너', null, 20, 332, 335, 96, { fill: '#F1F2F3', radius: 12 }),
-    h7: L('h7', 'rect', '하단 탭', null, 0, 756, 375, 56, { fill: '#FFFFFF', stroke: '#E4E6E8', strokeWidth: 1 }),
+    h7: L('h7', 'rect', '하단 탭', null, 0, 788, 390, 56, { fill: '#FFFFFF', stroke: '#E4E6E8', strokeWidth: 1 }),
   },
 }
 

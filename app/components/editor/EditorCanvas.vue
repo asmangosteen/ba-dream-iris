@@ -448,7 +448,7 @@ function end(e: PointerEvent) {
   if (d.kind === 'marqueeCanvas') { draft.value = null; marqueeOn.value = false; if (!d.moved) { store.selectScreen(null); multi.value = [] } }
   if (d.kind === 'screens' && d.moved) for (const id of d.ids) { const v = props.screens.find((x) => x.id === id); if (v) emit('move', id, v.x, v.y, true) }
   if (d.kind === 'draw') {
-    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 375, height: 812 }
+    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 390, height: 844 }
     draft.value = null
     emit('create', rect)
     tool.value = 'move'
@@ -731,21 +731,24 @@ function ticks(l: { x1: number; y1: number; x2: number; y2: number }) {
   return [[l.x1, l.y1], [l.x2, l.y2]].map(([x, y]) => (horiz ? { x1: sx(x!), y1: sy(y!) - k, x2: sx(x!), y2: sy(y!) + k } : { x1: sx(x!) - k, y1: sy(y!), x2: sx(x!) + k, y2: sy(y!) }))
 }
 /**
- * 캔버스 격자: 피그마처럼 촘촘한 선. 작은 칸은 8px(캔버스 좌표)에서 시작해 화면에서 12px 보다 좁아지면 두 배씩 넓히고,
- * 8칸마다 조금 진한 선을 긋습니다. 확대 · 이동에 맞춰 같이 움직여요.
+ * 캔버스 격자(피그마 기준): 칸은 캔버스 좌표에 고정돼 화면과 같은 비율로 커지고 작아져요.
+ * - 8px 칸 · 80px 진한 선(10칸). 화면에서 칸이 6px 보다 작아지면 옅게 사라지고 진한 선만 남아요
+ * - 400% 넘게 확대하면 피그마처럼 1px 픽셀 격자가 나와요
  */
 const gridStyle = computed(() => {
-  let step = 8
-  while (step * vp.value.zoom < 12) step *= 2
-  const minor = step * vp.value.zoom
-  const major = minor * 8
+  const z = vp.value.zoom
   const pos = `${vp.value.x}px ${vp.value.y}px`
-  const line = (c: string, dir: string) => `linear-gradient(${dir}, var(${c}) 1px, transparent 1px)`
-  return {
-    backgroundImage: [line('--grid-major', 'to right'), line('--grid-major', 'to bottom'), line('--grid-minor', 'to right'), line('--grid-minor', 'to bottom')].join(','),
-    backgroundSize: `${major}px ${major}px, ${major}px ${major}px, ${minor}px ${minor}px, ${minor}px ${minor}px`,
-    backgroundPosition: [pos, pos, pos, pos].join(','),
+  const layers: { size: number; color: string }[] = []
+  if (z >= 4) layers.push({ size: z, color: '--grid-minor' })
+  const minor = 8 * z, major = 80 * z
+  if (minor >= 6) layers.push({ size: minor, color: z >= 4 ? '--grid-major' : '--grid-minor' })
+  if (major >= 6) layers.push({ size: major, color: '--grid-major' })
+  const imgs: string[] = [], sizes: string[] = []
+  for (const l of layers.reverse()) {
+    imgs.push(`linear-gradient(to right, var(${l.color}) 1px, transparent 1px)`, `linear-gradient(to bottom, var(${l.color}) 1px, transparent 1px)`)
+    sizes.push(`${l.size}px ${l.size}px`, `${l.size}px ${l.size}px`)
   }
+  return { backgroundImage: imgs.join(',') || 'none', backgroundSize: sizes.join(','), backgroundPosition: imgs.map(() => pos).join(',') }
 })
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))

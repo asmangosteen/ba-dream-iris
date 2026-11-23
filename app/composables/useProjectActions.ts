@@ -2,7 +2,7 @@ import type { ProjectStatus } from './useProjects'
 
 export type ProjectKind = 'app' | 'web' | 'detail_page'
 export const KIND_INFO: Record<ProjectKind, { label: string; desc: string; w: number; h: number }> = {
-  app: { label: '앱', desc: '모바일 화면 375 × 812', w: 375, h: 812 },
+  app: { label: '앱', desc: '모바일 화면 390 × 844', w: 390, h: 844 },
   web: { label: '웹', desc: '데스크톱 화면 1440 × 900', w: 1440, h: 900 },
   detail_page: { label: '상세페이지', desc: '긴 세로 화면 860 × 3000', w: 860, h: 3000 },
 }

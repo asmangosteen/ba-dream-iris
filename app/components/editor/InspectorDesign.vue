@@ -12,8 +12,10 @@ const STATUS: { k: ScreenRow['status']; label: string }[] = [
   { k: 'approved', label: '확정' },
 ]
 const PRESETS = [
-  { label: '모바일', w: 375, h: 812 },
-  { label: '모바일 S', w: 360, h: 800 },
+  { label: '모바일', w: 390, h: 844 },
+  { label: '모바일 L', w: 430, h: 932 },
+  { label: '모바일 S', w: 375, h: 812 },
+  { label: '안드로이드', w: 360, h: 800 },
   { label: '태블릿', w: 768, h: 1024 },
   { label: '데스크톱', w: 1440, h: 900 },
 ]
