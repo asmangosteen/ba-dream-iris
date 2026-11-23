@@ -1,5 +1,5 @@
 import type { InjectionKey, Ref } from 'vue'
-import { absPos, descendants, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
+import { absPos, bindLiteral, descendants, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
 
@@ -60,7 +60,25 @@ export function createLayerStore(opts: {
   }
   const flushAll = () => Promise.all([...pending].map(flush))
 
+  /** 연결은 그대로인데 값이 바뀐 키(직접 고침 · 끌어서 옮기기 · 크기 바꾸기)는 연결을 풉니다 */
+  function detachEdited(sid: string, before: string) {
+    const d = doc(sid)
+    const bound = Object.values(d.nodes).filter((n) => n.style.vars)
+    if (!bound.length) return
+    const prev = JSON.parse(before) as LayerDoc
+    for (const n of bound) {
+      const p = prev.nodes[n.id]
+      if (!p) continue // 새로 생긴 레이어(붙여넣기 등)는 연결을 그대로
+      const vars = n.style.vars!
+      for (const k of Object.keys(vars) as BindKey[]) {
+        if (p.style.vars?.[k] !== vars[k]) continue // 이번 변경이 연결을 바꾼 것
+        if (bindLiteral(p, k) !== bindLiteral(n, k)) delete vars[k]
+      }
+      if (!Object.keys(vars).length) delete n.style.vars
+    }
+  }
   function record(sid: string, before: string) {
+    detachEdited(sid, before)
     const after = snap(sid)
     if (after === before) return
     push({ screenId: sid, before, after })
@@ -150,6 +168,29 @@ export function createLayerStore(opts: {
   function style(sid: string, ids: string[], s: Partial<LayerStyle>) {
     mutate(sid, (d) => { for (const id of ids) { const n = d.nodes[id]; if (n) n.style = { ...n.style, ...s } } })
   }
+  /**
+   * 변수(토큰) 연결 · 풀기. patch 로 실제 값도 함께 써 넣습니다(연결해도 그리기 · 내보내기는 그 값을 씀).
+   * tokenId 가 null 이면 연결만 풀고 값은 그대로 둡니다.
+   */
+  function bind(sid: string, ids: string[], key: BindKey | BindKey[], tokenId: string | null, patch?: (n: LayerNode) => { node?: Partial<Omit<LayerNode, 'style'>>; style?: Partial<LayerStyle> }) {
+    const keys = Array.isArray(key) ? key : [key]
+    mutate(sid, (d) => {
+      for (const id of ids) {
+        const n = d.nodes[id]
+        if (!n) continue
+        const p = patch?.(n)
+        if (p?.node) Object.assign(n, p.node)
+        const vars = { ...(n.style.vars ?? {}) }
+        for (const k of keys) {
+          if (tokenId) vars[k] = tokenId
+          else delete vars[k]
+        }
+        n.style = { ...n.style, ...p?.style, vars: Object.keys(vars).length ? vars : undefined }
+        if (!n.style.vars) delete n.style.vars
+      }
+    })
+  }
+  const unbind = (sid: string, ids: string[], key: BindKey | BindKey[], patch?: Parameters<typeof bind>[4]) => bind(sid, ids, key, null, patch)
   function remove(sid: string, ids: string[]) {
     if (!ids.length) return
     mutate(sid, (d) => {
@@ -376,7 +417,7 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    selectScreen, selectLayer, add, update, style, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, update, style, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

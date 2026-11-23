@@ -35,7 +35,7 @@ const style = computed(() => {
   if (s.stroke && s.strokeWidth) css.boxShadow = `inset 0 0 0 ${s.strokeWidth}px ${store.color(s.stroke)}`
   if (v.type === 'frame' && s.clip !== false) css.overflow = 'hidden'
   if (v.type === 'text') {
-    Object.assign(css, { color: store.color(s.color), fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: (s.lineHeight ?? Math.round((s.fontSize ?? 16) * 1.5)) + 'px', textAlign: s.align ?? 'left', whiteSpace: s.autoWidth ? 'pre' : 'pre-wrap' })
+    Object.assign(css, { color: store.color(s.color), fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: (s.lineHeight ?? Math.round((s.fontSize ?? 16) * 1.5)) + 'px', letterSpacing: s.letterSpacing ? s.letterSpacing + 'px' : undefined, textAlign: s.align ?? 'left', whiteSpace: s.autoWidth ? 'pre' : 'pre-wrap' })
   }
   return css
 })

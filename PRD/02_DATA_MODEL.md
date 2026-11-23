@@ -114,16 +114,19 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
   "nodes": {
     "n1": { "id": "n1", "type": "frame", "name": "Header", "parentId": null,
             "children": ["n2", "n3"], "x": 0, "y": 0, "w": 375, "h": 56,
-            "style": { "fill": "token:color.bg.default", "radius": 0 } },
+            "style": { "fill": "#FFFFFF", "radius": 0,
+                       "vars": { "fill": "--sys-color-common-white-default" } } },
     "n2": { "id": "n2", "type": "text", "name": "Title", "parentId": "n1",
             "x": 20, "y": 16, "w": 200, "h": 24,
-            "text": "요금제 선택", "style": { "textStyle": "token:type.title.17" } },
+            "text": "요금제 선택",
+            "style": { "fontSize": 20, "lineHeight": 28, "letterSpacing": -0.1, "fontWeight": 700,
+                       "vars": { "textStyle": "ts:title", "fontWeight": "--font-weight-bold" } } },
     "n3": { "id": "n3", "type": "image", "name": "Back", "parentId": "n1",
             "x": 335, "y": 16, "w": 24, "h": 24, "src": "storage://assets/back.svg",
             "rotation": 90, "flipX": true, "lockRatio": true,
             "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 2
+  "schemaVersion": 3
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
@@ -139,7 +142,19 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 
 - 그릴 때 순서: `transform: rotate(rotation) scaleX(flipX ? -1 : 1) scaleY(flipY ? -1 : 1)`, 축은 상자 가운데.
 - Phase 2 추가: `instance` (컴포넌트 배치, `componentId` + `props`), `layout` 속성 (Stack)
-- 스타일 값은 원시값(`#FF0000`) 또는 토큰 참조(`token:color.primary`)를 쓴다.
+- **schemaVersion 3 (2026-11-23)**: 변수(토큰) 연결 `style.vars` 와 자간 `style.letterSpacing` 을 더했다. 역시 비어 있어도 되는 값이라 v1 · v2 문서는 그대로 읽힌다.
+
+| 필드 | 설명 | 예시 | 기본 |
+|---|---|---|---|
+| style.letterSpacing | 자간(px) | -0.04 | 없음 = 0 |
+| style.vars | 속성 키 → 연결한 토큰 id. 피그마 변수처럼 값마다 디자인 시스템 토큰을 연결한다 | `{ "fill": "--sys-color-brand-primary-default", "radius": "--ref-radius-04" }` | 없음 = 연결 없음 |
+
+- **연결할 수 있는 키**: `fill` · `stroke` · `color`(색), `strokeWidth`(선 두께), `radius` · `radii.0`~`radii.3`(모서리), `opacity`(투명도), `fontSize` · `lineHeight` · `letterSpacing` · `fontWeight` · `textStyle`(글자), `x` · `y` · `w` · `h`(간격 토큰). `shadow` 는 효과 속성이 생기면 쓴다.
+- **토큰 id**: 디자인 시스템 CSS 변수 이름(`--sys-color-…` · `--ref-color-…` · `--ref-spacing-…` · `--ref-radius-…` · `--ref-borderwidth-…` · `--ref-opacity-…` · `--font-weight-…` · `--typography-<스타일>-size|line-height|letter-spacing`), 글자 스타일 묶음 `ts:<스타일>`(예: `ts:body-1` = 크기 · 행간 · 자간 함께), DB 에 등록한 토큰 `db:<이름>`.
+- **값은 함께 저장한다**: 연결할 때 실제 값(밝은 모드 기준, 예: `fill: "#2C7BE2"`, `radius: 8`)도 그 속성에 써 둔다. 그래서 그리기 · 썸네일 · 내보내기는 `vars` 를 몰라도 되고, 앱을 다크모드로 바꿔도 캔버스 결과물 색은 바뀌지 않는다.
+- **연결 풀기**: 연결은 그대로인데 그 속성 값이 바뀌면(직접 입력 · ↑↓ · 캔버스에서 끌어 옮기기 · 크기 바꾸기) 그 키의 연결을 자동으로 푼다(`app/canvas/store.ts` 의 `record()` → `detachEdited`). 글자 크기 · 행간 · 자간 중 하나가 바뀌면 `textStyle` 도 풀린다.
+- 토큰 목록은 저장소에 옮겨 적지 않고, 브라우저에 올라온 디자인 시스템 CSS 의 `:root` 변수에서 읽는다(`app/canvas/tokens.ts`, 철자가 틀린 중복 `--ref-boderwidth-*` · `turquiose` 는 뺀다). DB 토큰은 '등록한 토큰' 묶음으로 더한다.
+- 옛 문서의 색 값 `token:<DB 토큰 이름>` 은 그대로 읽고 `db:<이름>` 에 연결된 것으로 보여 준다(그릴 때는 DB 토큰 값으로 바꿈).
 
 ### Document (문서)
 기획·개발·디자인 문서. **출처 3종**을 하나의 테이블로 관리하고, 모두 같은 읽기 뷰로 보여준다.

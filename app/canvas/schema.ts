@@ -2,12 +2,12 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export type LayerType = 'frame' | 'rect' | 'text' | 'image'
 
 export interface LayerStyle {
-  fill?: string // '#RRGGBB' 또는 'token:brand/primary-default'
+  fill?: string // '#RRGGBB' · 'rgb(…)'. 옛 문서는 'token:<DB 토큰 이름>' 일 수 있어요(연결된 것으로 봅니다)
   stroke?: string
   strokeWidth?: number
   radius?: number
@@ -19,9 +19,33 @@ export interface LayerStyle {
   fontSize?: number
   fontWeight?: number
   lineHeight?: number
+  /** 자간(px) (v3) */
+  letterSpacing?: number
   align?: 'left' | 'center' | 'right'
   autoWidth?: boolean // 글자 길이에 맞춰 너비가 늘어남(직접 크기를 바꾸면 꺼짐)
   clip?: boolean // 프레임: 내용 자르기
+  /**
+   * 변수(토큰) 연결 (v3): 속성 키 → 토큰 id. 연결할 때 실제 값도 그 속성에 함께 써 두어서
+   * 그리기 · 내보내기는 연결을 몰라도 됩니다. 속성 값을 직접 고치면 그 키의 연결이 풀려요(store 의 record()).
+   * 토큰 id: CSS 변수 이름('--sys-color-brand-primary-default') · 글자 스타일('ts:body-1') · DB 토큰('db:<이름>')
+   */
+  vars?: Partial<Record<BindKey, string>>
+}
+
+/** 변수를 연결할 수 있는 속성 키 */
+export const BIND_KEYS = ['fill', 'stroke', 'color', 'strokeWidth', 'radius', 'radii.0', 'radii.1', 'radii.2', 'radii.3', 'opacity', 'fontSize', 'lineHeight', 'fontWeight', 'letterSpacing', 'textStyle', 'shadow', 'x', 'y', 'w', 'h'] as const
+export type BindKey = (typeof BIND_KEYS)[number]
+
+/** 연결된 키의 지금 값(비교용 문자열). 연결은 그대로인데 이 값이 바뀌면 직접 고친 것으로 보고 연결을 풉니다 */
+export function bindLiteral(n: LayerNode, key: BindKey): string {
+  const s = n.style
+  switch (key) {
+    case 'x': case 'y': case 'w': case 'h': return String(n[key])
+    case 'radii.0': case 'radii.1': case 'radii.2': case 'radii.3': return String(s.radii?.[Number(key.slice(6))])
+    case 'textStyle': return `${s.fontSize}/${s.lineHeight}/${s.letterSpacing}` // 굵기는 글자 스타일에 없을 수 있어서 빼요
+    case 'shadow': return ''
+    default: return String(s[key])
+  }
 }
 
 export interface LayerNode {
@@ -62,6 +86,7 @@ export function migrate(raw: unknown): LayerDoc {
   const d = raw as Partial<LayerDoc>
   if (!d.nodes || !Array.isArray(d.rootIds)) return emptyDoc()
   // v1 → v2: 회전 · 뒤집기 · 비율 고정 · 모서리 따로가 더해졌어요. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽습니다
+  // v2 → v3: 변수 연결(style.vars) · 자간(style.letterSpacing) 이 더해졌어요. 역시 비어 있어도 되는 값이라 그대로 읽습니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   for (const [id, n] of Object.entries(d.nodes)) {
     if (!n || typeof n !== 'object') continue
@@ -69,6 +94,8 @@ export function migrate(raw: unknown): LayerDoc {
     if (typeof node.rotation !== 'number' || !Number.isFinite(node.rotation) || !node.rotation) delete node.rotation
     const r = node.style.radii
     if (r && !(Array.isArray(r) && r.length === 4 && r.every((v) => typeof v === 'number'))) delete node.style.radii
+    const vars = node.style.vars
+    if (vars && (typeof vars !== 'object' || Array.isArray(vars) || !Object.keys(vars).length)) delete node.style.vars
     doc.nodes[id] = node
   }
   doc.rootIds = doc.rootIds.filter((id) => doc.nodes[id])

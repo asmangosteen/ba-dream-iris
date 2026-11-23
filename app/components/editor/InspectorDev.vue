@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameFromId, useTokenCatalog } from '~/canvas/tokens'
 import { Button, Icon, TextButton } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 import { useLayerStore } from '~/canvas/store'
@@ -28,21 +29,29 @@ const code = computed(() => {
   const lines = [`<!-- ${props.screen.name} · ${Math.round(props.screen.width)}×${Math.round(props.screen.height)} -->`, `<script setup lang="ts">`, `import { ${names.join(', ') || '…'} } from '@ba-dream/design-system'`, `<` + `/script>`]
   return lines.join('\n')
 })
-// 사용 토큰: Iris 캔버스 화면의 레이어 스타일에서 토큰 참조와 직접 넣은 색을 모읍니다
+// 사용 토큰: Iris 캔버스 화면의 레이어에 연결한 변수(style.vars · 옛 'token:<이름>')와 직접 넣은 색을 모읍니다
+const catalog = useTokenCatalog()
 const tokenUse = computed(() => {
   if (props.screen.source !== 'native') return { tokens: [], raw: [] as string[] }
   const d = store.doc(props.screen.id)
-  const tk = new Map<string, number>()
+  const tk = new Map<string, { n: number; value?: string }>()
   const raw = new Map<string, number>()
+  const add = (name: string, value?: string) => { const e = tk.get(name); tk.set(name, { n: (e?.n ?? 0) + 1, value: e?.value ?? value }) }
   for (const n of Object.values(d.nodes)) {
-    for (const v of [n.style.fill, n.style.stroke, n.style.color]) {
-      if (!v) continue
-      const m = v.startsWith('token:') ? tk : raw
-      const k = v.startsWith('token:') ? v.slice(6) : v.toUpperCase()
-      m.set(k, (m.get(k) ?? 0) + 1)
+    const vars = n.style.vars ?? {}
+    for (const [key, id] of Object.entries(vars)) {
+      if (!id) continue
+      const t = catalog.find(id)
+      add(t?.name ?? nameFromId(id), t?.color)
+    }
+    for (const key of ['fill', 'stroke', 'color'] as const) {
+      const v = n.style[key]
+      if (!v || vars[key]) continue
+      if (v.startsWith('token:')) add(v.slice(6), store.color(v))
+      else raw.set(v.toUpperCase(), (raw.get(v.toUpperCase()) ?? 0) + 1)
     }
   }
-  return { tokens: [...tk.entries()].map(([name, n]) => ({ name, n, value: store.color('token:' + name) })), raw: [...raw.keys()] }
+  return { tokens: [...tk.entries()].map(([name, e]) => ({ name, n: e.n, value: e.value })), raw: [...raw.keys()] }
 })
 
 // 피그마 화면 다시 불러오기: 썸네일 · 크기 · 사용 컴포넌트를 새로 받습니다
@@ -111,7 +120,7 @@ async function copy() {
         <Icon name="warning" :size="12" class="mt3" />
         <span>디자인 시스템 토큰이 아닌 색 {{ tokenUse.raw.length }}개: {{ tokenUse.raw.slice(0, 6).join(', ') }}{{ tokenUse.raw.length > 6 ? ' …' : '' }}</span>
       </div>
-      <p v-if="!tokenUse.tokens.length && !tokenUse.raw.length" class="tx-meta m0">아직 쓴 색이 없어요</p>
+      <p v-if="!tokenUse.tokens.length && !tokenUse.raw.length" class="tx-meta m0">아직 쓴 색 · 변수가 없어요</p>
     </section>
 
     <section class="s">
