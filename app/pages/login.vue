@@ -167,7 +167,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 .foot { margin: 0; text-align: center; }
 
 /* 오른쪽 장면: 회색 작업대 위 흰 화면 셋 + 인스펙터 카드 */
-.scene { position: relative; overflow: hidden; background-color: var(--iris-canvas); background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); background-size: 20px 20px; display: flex; align-items: center; justify-content: center; }
+.scene { position: relative; overflow: hidden; background-color: var(--iris-canvas); background-image: linear-gradient(to right, var(--ref-color-gray-900-10) 1px, transparent 1px), linear-gradient(to bottom, var(--ref-color-gray-900-10) 1px, transparent 1px), linear-gradient(to right, var(--ref-color-gray-900-5) 1px, transparent 1px), linear-gradient(to bottom, var(--ref-color-gray-900-5) 1px, transparent 1px); background-size: 128px 128px, 128px 128px, 16px 16px, 16px 16px; display: flex; align-items: center; justify-content: center; }
 .frames { display: flex; gap: 40px; transform: translateX(-80px); }
 .fr { display: flex; flex-direction: column; gap: 6px; }
 .fl { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }

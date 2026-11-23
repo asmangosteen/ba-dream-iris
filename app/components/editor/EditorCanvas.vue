@@ -730,6 +730,23 @@ function ticks(l: { x1: number; y1: number; x2: number; y2: number }) {
   const k = 3
   return [[l.x1, l.y1], [l.x2, l.y2]].map(([x, y]) => (horiz ? { x1: sx(x!), y1: sy(y!) - k, x2: sx(x!), y2: sy(y!) + k } : { x1: sx(x!) - k, y1: sy(y!), x2: sx(x!) + k, y2: sy(y!) }))
 }
+/**
+ * 캔버스 격자: 피그마처럼 촘촘한 선. 작은 칸은 8px(캔버스 좌표)에서 시작해 화면에서 12px 보다 좁아지면 두 배씩 넓히고,
+ * 8칸마다 조금 진한 선을 긋습니다. 확대 · 이동에 맞춰 같이 움직여요.
+ */
+const gridStyle = computed(() => {
+  let step = 8
+  while (step * vp.value.zoom < 12) step *= 2
+  const minor = step * vp.value.zoom
+  const major = minor * 8
+  const pos = `${vp.value.x}px ${vp.value.y}px`
+  const line = (c: string, dir: string) => `linear-gradient(${dir}, var(${c}) 1px, transparent 1px)`
+  return {
+    backgroundImage: [line('--grid-major', 'to right'), line('--grid-major', 'to bottom'), line('--grid-minor', 'to right'), line('--grid-minor', 'to bottom')].join(','),
+    backgroundSize: `${major}px ${major}px, ${major}px ${major}px, ${minor}px ${minor}px, ${minor}px ${minor}px`,
+    backgroundPosition: [pos, pos, pos, pos].join(','),
+  }
+})
 const marqueeOn = ref(false)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
@@ -739,7 +756,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     ref="el"
     aria-label="캔버스"
     class="canvas canvas-dots"
-    :style="{ cursor, backgroundPosition: `${vp.x}px ${vp.y}px`, backgroundSize: `${24 * vp.zoom}px ${24 * vp.zoom}px` }"
+    :style="{ cursor, ...gridStyle }"
     @pointerdown.self="start($event)"
     @pointermove="move"
     @pointerup="end"
@@ -813,7 +830,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 </template>
 
 <style scoped>
-.canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background-image: radial-gradient(circle, var(--ref-color-gray-900-10) 1px, transparent 1.2px); }
+.canvas { --grid-minor: var(--ref-color-gray-900-2); --grid-major: var(--ref-color-gray-900-5); position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }
