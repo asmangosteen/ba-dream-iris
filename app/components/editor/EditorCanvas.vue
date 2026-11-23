@@ -211,7 +211,8 @@ function move(e: PointerEvent) {
     drag.moved = true
     const r = { x: Math.min(w.x, drag.wx), y: Math.min(w.y, drag.wy), width: Math.abs(w.x - drag.wx), height: Math.abs(w.y - drag.wy) }
     draft.value = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
-    const s = props.screens.find((v) => v.id === drag!.sid)
+    const msid = drag.sid
+    const s = props.screens.find((v) => v.id === msid)
     if (!s) return
     const d = store.doc(s.id)
     // 맨 위 단계 레이어 중 상자와 겹치는 것 (프레임 안쪽은 프레임째로)
@@ -223,7 +224,8 @@ function move(e: PointerEvent) {
     })
     store.layerIds.value = [...new Set([...drag.base, ...hit])]
   } else if (drag.kind === 'drawLayer') {
-    const s = props.screens.find((v) => v.id === drag!.sid)
+    const dsid = drag.sid
+    const s = props.screens.find((v) => v.id === dsid)
     if (!s) return
     const w = toWorld(e.clientX, e.clientY)
     const lx = w.x - s.x, ly = w.y - s.y

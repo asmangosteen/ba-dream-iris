@@ -2,9 +2,12 @@
 import { Icon, Skeleton } from '@ba-dream/design-system'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
+import DocEditor from '~/components/docs/DocEditor.vue'
+import type { DocRow, LinkRow, ReqRow } from '~/composables/useIrisData'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
 const route = useRoute()
+const router = useRouter()
 const projectId = route.params.projectId as string
 const docId = computed(() => route.params.docId as string)
 
@@ -25,7 +28,7 @@ useHead({ title: computed(() => (doc.value ? `${doc.value.title} · Iris` : 'Iri
 // 선택 상태 --------------------------------------------------------------
 const activeReq = ref<string | null>(null)
 const activeScreen = ref<string | null>(null)
-watch(docId, () => { activeReq.value = null; activeScreen.value = null })
+watch(docId, () => { activeReq.value = null; activeScreen.value = null; editing.value = false; dirty.value = false; gone.value = []; closeBars() })
 
 /** 이 문서의 요구사항과 연결된 화면만 보여 줍니다 */
 const frames = computed(() => {
@@ -98,6 +101,119 @@ async function createReq({ text, block }: { text: string; block: string | null }
 }
 
 const addOpen = ref(false)
+
+// 고치기 ------------------------------------------------------------------
+const supabase = useSupabaseClient()
+const preview = useDevPreview()
+/** 에디터 패널의 "고치기"(?edit=1)로 들어오면 바로 고치기 모드(서버 · 브라우저가 같은 값으로 시작) */
+const editing = ref(route.query.edit === '1')
+const dirty = ref(false)
+/** 문서에서 사라진 요구사항 번호(지우지 않고 알려만 줍니다) */
+const gone = ref<string[]>([])
+const goneReqs = computed(() => gone.value.map((code) => docReqs.value.find((r) => r.code === code)).filter((r): r is ReqRow => !!r))
+
+/** 아래 확인 줄: 저장 안 한 내용 버리기 · 문서 지우기 */
+const bar = ref<'leave' | 'delete' | null>(null)
+let afterLeave: (() => void) | null = null
+function closeBars() { bar.value = null; afterLeave = null }
+
+function startEdit() {
+  if (!doc.value) return
+  closeBars()
+  menuOpen.value = false
+  gone.value = []
+  editing.value = true
+}
+/** 바뀐 내용이 있으면 바로 나가지 않고 확인 줄을 띄웁니다 */
+function guard(next: () => void) {
+  if (editing.value && dirty.value) { afterLeave = next; bar.value = 'leave'; return }
+  next()
+}
+function stopEdit() { editing.value = false; dirty.value = false }
+function cancelEdit() { guard(stopEdit) }
+function discard() {
+  const next = afterLeave
+  closeBars()
+  stopEdit()
+  next?.()
+}
+function onSaved({ found, gone: codes }: { found: number; gone: string[] }) {
+  stopEdit()
+  closeBars()
+  gone.value = codes
+  say(found > 0 ? `요구사항 ${found}개를 새로 찾았어요` : '문서를 저장했어요')
+}
+
+// 다른 문서 · 다른 화면으로 갈 때
+onBeforeRouteUpdate((to, from) => {
+  if (to.params.docId === from.params.docId || !editing.value || !dirty.value) return true
+  guard(() => router.replace(to.fullPath))
+  return false
+})
+onBeforeRouteLeave((to) => {
+  if (!editing.value || !dirty.value) return true
+  guard(() => router.push(to.fullPath))
+  return false
+})
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (editing.value && dirty.value) e.preventDefault()
+}
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+
+// 주소에서 ?edit=1 은 지워 둡니다(새로고침해도 읽기 화면으로)
+onMounted(() => {
+  if (route.query.edit === undefined) return
+  const { edit: _drop, ...query } = route.query
+  router.replace({ query })
+})
+
+// "…" 메뉴 ---------------------------------------------------------------
+const menuOpen = ref(false)
+const moreEl = ref<HTMLElement | null>(null)
+function onDocPointer(e: PointerEvent) {
+  if (menuOpen.value && moreEl.value && !moreEl.value.contains(e.target as Node)) menuOpen.value = false
+}
+onMounted(() => document.addEventListener('pointerdown', onDocPointer))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer))
+
+// 지우기 -----------------------------------------------------------------
+const deleting = ref(false)
+function askDelete() {
+  menuOpen.value = false
+  bar.value = 'delete'
+  afterLeave = null
+}
+async function removeDoc() {
+  const d = doc.value
+  if (!d || deleting.value) return
+  deleting.value = true
+  try {
+    if (preview) {
+      const docsStore = useState<Omit<DocRow, 'project_id'>[]>('pv-docs')
+      const reqStore = useState<Omit<ReqRow, 'project_id'>[]>('pv-reqs')
+      const linkStore = useState<LinkRow[]>('pv-links')
+      const reqIds = new Set((reqStore.value ?? []).filter((r) => r.document_id === d.id).map((r) => r.id))
+      if (docsStore.value) docsStore.value = docsStore.value.filter((x) => x.id !== d.id)
+      if (reqStore.value) reqStore.value = reqStore.value.filter((r) => r.document_id !== d.id)
+      if (linkStore.value) linkStore.value = linkStore.value.filter((l) => !reqIds.has(l.requirement_id))
+    } else {
+      // 요구사항 · 화면 연결은 DB 에서 같이 지워집니다(cascade)
+      const { error } = await supabase.from('documents').delete().eq('id', d.id)
+      if (error) throw error
+      if (d.source_type === 'upload' && d.file_path) await supabase.storage.from('documents').remove([d.file_path]).catch(() => null)
+    }
+  } catch {
+    deleting.value = false
+    say('문서를 지우지 못했어요. 잠시 뒤 다시 시도해주세요.')
+    return
+  }
+  stopEdit()
+  closeBars()
+  await refreshNuxtData([`docs-${projectId}`, `reqs-${projectId}`, `links-${projectId}`])
+  deleting.value = false
+  await navigateTo(`/p/${projectId}`)
+}
 </script>
 
 <template>
@@ -176,15 +292,68 @@ const addOpen = ref(false)
           <p class="tx-meta">지워졌거나 주소가 바뀌었을 수 있어요.</p>
           <NuxtLink :to="`/p/${projectId}`" class="act line">에디터로 돌아가기</NuxtLink>
         </div>
-        <DocReader
-          v-else
-          ref="reader"
+        <DocEditor
+          v-else-if="editing"
+          v-model:dirty="dirty"
           :doc="doc"
-          :reqs="docReqs"
-          :highlight="activeReq"
-          @pick-req="pickReq"
-          @create-req="createReq"
+          :doc-reqs="docReqs"
+          :all-reqs="reqs.data.value ?? []"
+          @cancel="cancelEdit"
+          @saved="onSaved"
         />
+        <template v-else>
+          <div v-if="goneReqs.length" class="sq gone" role="status">
+            <span class="gone-col">
+              <span class="tx-body gone-t">
+                문서에서 사라진 요구사항:
+                <button v-for="r in goneReqs" :key="r.id" type="button" class="code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
+              </span>
+              <span class="tx-meta">요구사항과 화면 연결은 그대로 남겨 뒀어요. 필요 없으면 <NuxtLink to="/requirements" class="lnk">요구사항</NuxtLink>에서 정리해주세요.</span>
+            </span>
+            <button type="button" class="ib s" aria-label="알림 닫기" @click="gone = []"><Icon name="close" :size="14" /></button>
+          </div>
+          <DocReader
+            ref="reader"
+            :doc="doc"
+            :reqs="docReqs"
+            :highlight="activeReq"
+            @pick-req="pickReq"
+            @create-req="createReq"
+          >
+            <template #actions>
+              <button type="button" class="act line" @click="startEdit"><Icon name="pencil" :size="14" />고치기</button>
+              <div ref="moreEl" class="more">
+                <button
+                  type="button"
+                  class="ib"
+                  aria-label="문서 메뉴"
+                  aria-haspopup="menu"
+                  :aria-expanded="menuOpen"
+                  @click="menuOpen = !menuOpen"
+                  @keydown.esc="menuOpen = false"
+                ><Icon name="menu_kebab" :size="16" /></button>
+                <div v-if="menuOpen" class="menu" role="menu" @keydown.esc="menuOpen = false">
+                  <button type="button" role="menuitem" class="menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />문서 지우기</button>
+                </div>
+              </div>
+            </template>
+          </DocReader>
+        </template>
+      </div>
+
+      <!-- 확인 줄 -->
+      <div v-if="bar === 'leave'" class="confirm" role="alertdialog" aria-labelledby="leaveMsg">
+        <span id="leaveMsg" class="tx-body confirm-t">저장하지 않은 내용이 있어요. 버리고 나갈까요?</span>
+        <button type="button" class="act gray" @click="closeBars">계속 고치기</button>
+        <button type="button" class="act line" @click="discard">버리기</button>
+      </div>
+      <div v-else-if="bar === 'delete' && doc" class="confirm" role="alertdialog" aria-labelledby="delMsg" aria-describedby="delSub">
+        <span class="confirm-col">
+          <span id="delMsg" class="tx-head">‘{{ doc.title }}’ 문서를 지울까요?</span>
+          <span id="delSub" class="tx-meta">요구사항과 화면 연결도 함께 지워져요. 되돌릴 수 없어요.</span>
+        </span>
+        <button type="button" class="act gray" :disabled="deleting" @click="closeBars">취소</button>
+        <button type="button" class="act line danger" :disabled="deleting" @click="removeDoc"><Icon name="trashbin" :size="14" />{{ deleting ? '지우는 중' : '지우기' }}</button>
       </div>
 
       <p class="sr" role="status" aria-live="polite">{{ notice }}</p>
@@ -235,6 +404,23 @@ const addOpen = ref(false)
 .loading { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .missing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
 .missing p { margin: 0 0 var(--ref-spacing-04); }
+
+.more { position: relative; }
+.more .menu { left: auto; right: 0; width: max-content; min-width: 120px; }
+.danger { color: var(--sys-color-theme-error-default); }
+.act:disabled { opacity: .5; cursor: default; }
+.lnk { color: var(--sys-color-brand-primary-default); font-weight: 500; }
+
+.gone { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); margin-bottom: var(--ref-spacing-10); padding: var(--ref-spacing-07) var(--ref-spacing-06) var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); }
+.gone-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gone-t { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-04); font-weight: 500; }
+.ib.s { width: 24px; height: 24px; }
+.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); }
+.code:hover, .code[aria-pressed='true'] { background: var(--sys-color-brand-primary-lighter); }
+
+.confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }
+.confirm-t, .confirm-col { flex: 1; min-width: 0; }
+.confirm-col { display: flex; flex-direction: column; }
 
 .toast { position: absolute; left: 50%; bottom: var(--ref-spacing-12); transform: translateX(-50%); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-weight: 500; white-space: nowrap; filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); }
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }

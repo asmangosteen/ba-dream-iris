@@ -213,11 +213,15 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 <template>
   <div ref="root" :class="['reader', { compact }]">
     <header class="head">
-      <h2 v-if="compact" class="tx-head">{{ doc.title }}</h2>
-      <h1 v-else class="tx-title">{{ doc.title }}</h1>
+      <div class="title-row">
+        <h2 v-if="compact" class="tx-head">{{ doc.title }}</h2>
+        <h1 v-else class="tx-title">{{ doc.title }}</h1>
+        <div v-if="$slots.actions" class="acts"><slot name="actions" /></div>
+      </div>
       <div class="tx-meta meta">
         <span>{{ meta }}</span>
         <NuxtLink v-if="compact" :to="`/p/${doc.project_id}/docs/${doc.id}`" class="lnk">넓게 보기</NuxtLink>
+        <NuxtLink v-if="compact" :to="`/p/${doc.project_id}/docs/${doc.id}?edit=1`" class="lnk">고치기</NuxtLink>
         <button v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" type="button" class="lnk" :disabled="opening" @click="openFile">원본</button>
       </div>
       <a v-if="doc.source_type === 'link' && doc.url" :href="doc.url" target="_blank" rel="noopener noreferrer" class="tx-meta src">
@@ -289,6 +293,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .reader { display: flex; flex-direction: column; gap: var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .head { display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
 .compact .head { gap: var(--ref-spacing-02); }
+.title-row { display: flex; align-items: flex-start; gap: var(--ref-spacing-08); min-width: 0; }
+.title-row > h1, .title-row > h2 { flex: 1; min-width: 0; }
+.acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); margin-top: -1px; }
 .meta { display: flex; align-items: center; gap: var(--ref-spacing-06); flex-wrap: wrap; }
 .lnk { color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .lnk:disabled { opacity: .5; cursor: default; }

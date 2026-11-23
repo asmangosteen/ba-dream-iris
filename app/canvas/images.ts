@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 /**
  * 이미지 레이어 src 해석: 'storage://screens/<path>' 는 Supabase Storage 서명 URL(하루)로 바꿔 캐시합니다.
  * data: · blob: · https: 는 그대로 씁니다.
@@ -24,7 +25,7 @@ export function useImageSrc() {
 }
 
 /** 이미지 파일 올리기 → src 와 원래 크기. 미리보기 모드에서는 data URL 로 둡니다(저장되지 않음) */
-export async function uploadImage(file: File, screenId: string, ctx: { supabase: ReturnType<typeof useSupabaseClient>; preview: boolean }): Promise<{ src: string; w: number; h: number }> {
+export async function uploadImage(file: File, screenId: string, ctx: { supabase: Pick<SupabaseClient, 'storage'>; preview: boolean }): Promise<{ src: string; w: number; h: number }> {
   const size = await new Promise<{ w: number; h: number }>((resolve) => {
     const url = URL.createObjectURL(file)
     const img = new Image()

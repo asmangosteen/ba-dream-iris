@@ -56,7 +56,7 @@ export function migrate(raw: unknown): LayerDoc {
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   for (const [id, n] of Object.entries(d.nodes)) {
     if (!n || typeof n !== 'object') continue
-    doc.nodes[id] = { style: {}, ...n, id } as LayerNode
+    doc.nodes[id] = { ...(n as LayerNode), id, style: (n as LayerNode).style ?? {} }
   }
   doc.rootIds = doc.rootIds.filter((id) => doc.nodes[id])
   return doc
