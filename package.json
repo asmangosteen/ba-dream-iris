@@ -13,9 +13,11 @@
     "@ba-dream/design-system": "1.0.0",
     "@nuxtjs/supabase": "2.1.0",
     "nuxt": "4.6.4",
+    "three": "0.170.0",
     "vue": "3.5.46"
   },
   "devDependencies": {
+    "@types/three": "0.170.0",
     "typescript": "5.9.3",
     "vue-tsc": "3.3.14"
   }

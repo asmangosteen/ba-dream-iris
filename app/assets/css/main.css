@@ -185,3 +185,10 @@ html,body{background:var(--iris-canvas)}
   :root:not([data-theme="light"]) :is(.bd-button[data-type=primary],.bd-button[data-type=destructed],.bd-button[data-type=tertiary][data-on=dark],.bd-icon-button[data-type=primary],.bd-icon-button[data-type=destructed],.bd-icon-button[data-type=tertiary][data-icon-color=white],.bd-badge[data-type=solid],.bd-chip[data-type=filled][data-selected=true]){--bd-btn-fg:#FFFFFF;--bd-ib-fg:#FFFFFF;--bd-badge-fg:#FFFFFF;--bd-chip-fg:#FFFFFF}
   :root:not([data-theme="light"]) :is(.bd-spinner[data-tone=on-fill],.bd-checkbox__box,.bd-text-input__button,.bd-fu-action[data-state=default],.bd-date-cell[data-type=pinned],.act.pri,.rail-btn.on){color:#FFFFFF}
 }
+
+/* 랜딩(/welcome) ↔ 로그인 화면 전환: 나가는 화면은 옅어지고, 들어오는 화면은 살짝 올라오며 나타남 */
+.iris-fade-enter-active{transition:opacity .5s ease,transform .5s cubic-bezier(.2,.7,.2,1)}
+.iris-fade-leave-active{transition:opacity .3s ease}
+.iris-fade-enter-from{opacity:0;transform:translateY(8px)}
+.iris-fade-leave-to{opacity:0}
+@media (prefers-reduced-motion:reduce){.iris-fade-enter-active,.iris-fade-leave-active{transition:opacity .2s linear}.iris-fade-enter-from{transform:none}}

@@ -5,6 +5,9 @@ import { Button, TextButton, TextInput } from '@ba-dream/design-system'
  * 로그인: 회사 메일 → 6자리 코드(또는 메일 링크).
  * 왼쪽은 입력, 오른쪽은 Iris 가 하는 일(화면 ↔ 요구사항 반영)을 보여 주는 작은 캔버스 장면입니다.
  */
+// 랜딩(/welcome) ↔ 로그인은 스르륵 바뀜 (main.css 의 iris-fade)
+definePageMeta({ pageTransition: { name: 'iris-fade', mode: 'out-in' } })
+
 const supabase = useSupabaseClient()
 const route = useRoute()
 const domain = useRuntimeConfig().public.allowedEmailDomain
@@ -68,10 +71,12 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 
 <template>
   <div class="page">
+    <!-- 랜딩으로 나가기: 랜딩의 Sign in 과 같은 크기 · 같은 높이, 왼쪽에 -->
+    <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" aria-label="처음 화면으로" @click="navigateTo('/welcome')" />
     <section class="side">
 
       <form class="form" novalidate @submit.prevent="submit">
-        <IrisLogo kind="horizontal" :height="44" class="brand" />
+        <NuxtLink to="/welcome" class="brand" aria-label="처음 화면으로"><IrisLogo kind="horizontal" :height="44" /></NuxtLink>
         <div class="head">
           <h1 class="tx-title">{{ step === 'email' ? '로그인' : '메일을 확인해주세요' }}</h1>
           <p class="tx-meta m0">
@@ -154,9 +159,13 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 </template>
 
 <style scoped>
-.page { min-height: 100vh; display: grid; grid-template-columns: minmax(400px, 520px) 1fr; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
+.page { position: relative; min-height: 100vh; display: grid; grid-template-columns: minmax(400px, 520px) 1fr; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
 .side { display: flex; flex-direction: column; padding: var(--ref-spacing-14) var(--ref-spacing-20); box-sizing: border-box; min-height: 100vh; }
-.brand { margin-bottom: var(--ref-spacing-12); }
+.brand { display: inline-flex; align-self: flex-start; margin-bottom: var(--ref-spacing-12); border-radius: var(--ref-radius-02); }
+.brand:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 4px; }
+/* 랜딩 위 막대(높이 72)의 Sign in 과 같은 자리: 세로 가운데 · 가장자리에서 40 */
+.out { position: absolute; z-index: 2; top: 17px; left: 40px; }
+@media (max-width: 760px) { .out { top: 11px; left: 16px; } }
 .form { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--ref-spacing-10); width: 100%; max-width: 360px; margin: 0 auto; }
 .head { display: flex; flex-direction: column; gap: var(--ref-spacing-02); margin-bottom: var(--ref-spacing-04); }
 .who { font-weight: 500; color: var(--sys-color-neutral-700); }
