@@ -20,6 +20,16 @@ const busy = ref(false)
 const resent = ref(false)
 const error = ref(route.query.blocked ? `Only company emails (@${domain}) can sign in` : route.query.expired ? 'Your session expired after 30 days. Please sign in again' : '')
 const email = computed(() => `${local.value.trim()}@${domain}`)
+// 도메인 글자: 입력칸 오른쪽에 늘 보이게(입력 글자는 그 앞에서 끝나요)
+const emailField = ref<HTMLElement | null>(null)
+const unitEl = ref<HTMLElement | null>(null)
+const unitW = ref(0)
+const boxH = ref(38)
+function measureUnit() {
+  unitW.value = Math.ceil(unitEl.value?.offsetWidth ?? 0)
+  boxH.value = emailField.value?.querySelector<HTMLElement>('.bd-text-input__box')?.offsetHeight || boxH.value
+}
+onMounted(() => { measureUnit(); document.fonts?.ready.then(measureUnit) })
 
 async function sendCode() {
   if (busy.value) return
@@ -111,7 +121,7 @@ function onBoxFocus(i: number, e: FocusEvent) {
   focused.value = i
   ;(e.target as HTMLInputElement).select()
 }
-watch(step, (v) => { if (v === 'code') focusBox(0) })
+watch(step, (v) => { if (v === 'code') focusBox(0); else nextTick(measureUnit) })
 function submit() { if (step.value === 'email') sendCode(); else verify() }
 // 코드 6자리를 다 적으면 바로 확인
 watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) code.value = d; else if (d.length === 6 && !busy.value) verify() })
@@ -129,14 +139,13 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
         <!-- 코드 단계: 어디로 보냈는지만 알려요 -->
         <p v-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
 
+        <!-- 도메인은 디자인 시스템 단위 대신 직접 붙여요: 단위는 입력 중(포커스)에 감춰지는 규칙이라 -->
+        <div v-if="step === 'email'" ref="emailField" class="email-field" :style="{ '--unit-w': unitW + 'px', '--box-h': boxH + 'px' }">
         <TextInput
-          v-if="step === 'email'"
           v-model:value="local"
           size="m"
           :show-label="false"
           placeholder="Email"
-          show-unit
-          :unit="`@${domain}`"
           :show-left-icon="false"
           :show-right-icon="false"
           :show-button="false"
@@ -146,6 +155,8 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
           supporting-theme="destructed"
           :input-props="{ id: 'email', name: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: false, autofocus: true, 'aria-label': 'Company email' }"
         />
+        <span ref="unitEl" class="email-unit" aria-hidden="true">@{{ domain }}</span>
+        </div>
         <!-- 코드 6칸: 칸마다 숫자 하나. 붙여넣기 · 자동 채우기는 한 번에, ← → 로 칸 옮기기, 지우면 앞 칸으로 -->
         <div v-else class="otp-wrap">
           <div class="otp" role="group" aria-label="Sign-in code">
@@ -198,6 +209,10 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 .bar-title { position: absolute; z-index: 1; top: 17px; left: 0; right: 0; height: 40px; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 22px; font-weight: 500; color: var(--sys-color-neutral-800); pointer-events: none; }
 @media (max-width: 760px) { .bar-title { top: 11px; } }
 .sent { text-align: center; }
+.email-field { position: relative; }
+/* 디자인 시스템 단위와 같은 자리 · 모양(오른쪽 12, 14px), 입력 글자는 도메인 앞까지만 */
+.email-unit { position: absolute; top: 0; right: 12px; height: var(--box-h); display: flex; align-items: center; font-size: 14px; line-height: 22px; color: var(--sys-color-neutral-800); pointer-events: none; white-space: nowrap; }
+.email-field :deep(.bd-text-input__value) { padding-right: calc(var(--unit-w) + 8px); }
 .who { font-weight: 500; color: var(--sys-color-neutral-700); }
 .m0 { margin: 0; }
 .full { width: 100%; }
