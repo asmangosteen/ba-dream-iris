@@ -111,7 +111,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string; dup?: boolean }
   | { kind: 'draw'; wx: number; wy: number; moved: boolean }
-  | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean }
+  | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
@@ -209,9 +209,11 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
   const roots = dg.ids.filter((id) => !dg.ids.some((o) => o !== id && descendants(d, o).includes(id)))
   dragOut.value = out && !isCanvas(sc) ? sc.id : null
   dragOutIds.value = dragOut.value ? roots : []
-  if (out) return
+  // 들어갈 프레임 · 화면에 파란 테두리(피그마와 같아요): 다른 화면으로 나가면 그 화면, 같은 화면이면 부모가 바뀔 때 새 부모
+  if (out) { setDropLine(under ? rectOf(under) : null); return }
   const ex = new Set(roots.flatMap((id) => descendants(d, id)))
   const target = frameAt(sc.id, w.x - sc.x, w.y - sc.y, ex)
+  setDropLine(target !== dg.parent0 ? (target ? layerWorld(sc, target) : isCanvas(sc) ? null : rectOf(sc)) : null)
   const moving = roots.filter((id) => d.nodes[id] && d.nodes[id]!.parentId !== target)
   if (moving.length) store.reparent(sc.id, moving, target)
   for (const id of moving) {
@@ -449,6 +451,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       before: store.begin(sc.id), moved: false,
       carry: sectionCarry(sc, ids),
       clickLayer: anc ? lid : pickOne,
+      parent0: ids[0] ? d.nodes[ids[0]]?.parentId ?? null : null,
     }
     return
   }
@@ -825,6 +828,7 @@ function end(e: PointerEvent) {
   }
   if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
   dragOut.value = null
+  if (d.kind === 'layers') setDropLine(null)
   dragOutIds.value = []
   // 화면 밖으로 끌어 놓기: 다른 화면 안으로, 아니면 캔버스 위로
   if (d.kind === 'layers' && d.moved && d.out) {
@@ -1365,6 +1369,12 @@ function dropTarget(wx: number, wy: number) {
 }
 /** 파일을 끌고 있는 동안 놓일 자리(화면 · 프레임) 테두리 */
 const dropAt = ref<Rect | null>(null)
+/** 레이어를 끌 때는 테두리만(파일 끌어 놓기는 옅은 바탕까지) */
+const dropLine = ref(false)
+function setDropLine(r: Rect | null) {
+  dropLine.value = !!r
+  if (r?.x !== dropAt.value?.x || r?.y !== dropAt.value?.y || r?.w !== dropAt.value?.w || r?.h !== dropAt.value?.h) dropAt.value = r
+}
 function onFileDragOver(e: DragEvent) {
   if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return
   const w = toWorld(e.clientX, e.clientY)
@@ -1448,7 +1458,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </div>
       </div>
       <!-- 파일 끌어 놓을 자리 -->
-      <div v-if="dropAt" class="drop-at" :style="{ left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
+      <div v-if="dropAt" class="drop-at" :class="{ line: dropLine }" :style="{ left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
  <div v-if="draft && !marqueeOn" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
     </div>
 
@@ -1537,6 +1547,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .ghost { position: absolute; width: 0; height: 0; overflow: visible; pointer-events: none; z-index: 3; }
 .ghost-at { position: absolute; width: 0; height: 0; overflow: visible; }
 .ghost :deep(.ly) { pointer-events: none !important; }
+.drop-at.line { outline-width: calc(1.5px / var(--z, 1)); background: none; }
 .drop-at { position: absolute; pointer-events: none; outline: calc(2px / var(--z, 1)) solid var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); z-index: 4; }
 .frame:hover { outline: calc(1px / var(--z, 1)) solid var(--iris-select); }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }

@@ -11,4 +11,7 @@ export const LAYER_ICON: Partial<Record<LayerType, string>> = {
   polygon: 'M6 1.6l4.6 8.4H1.4z',
   star: 'M6 1.3l1.4 3 3.3.4-2.4 2.3.6 3.3L6 8.7 3.1 10.3l.6-3.3L1.3 4.7l3.3-.4z',
   path: 'M1.8 9.6c1.6-4.4 3.2-6.6 4.6-6.4 1.6.2.4 4.6 1.8 4.8.8.1 1.4-.9 2-2',
+  vector: 'M6 1.5l3.6 5L7.4 10.5H4.6L2.4 6.5zM6 1.5V6.5M4.6 10.5h2.8',
+  instance: 'M6 1.4l4.6 4.6L6 10.6 1.4 6z',
+  boolean: 'M1.8 1.8h5.4v3h3v5.4H4.8v-3h-3z',
 }

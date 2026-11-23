@@ -15,6 +15,7 @@ const closed = ref<Set<string>>(new Set()) // 접은 화면 · 프레임
 const toggle = (k: string) => { const s = new Set(closed.value); if (s.has(k)) s.delete(k); else s.add(k); closed.value = s }
 
 interface Row { sid: string; n: LayerNode; depth: number }
+const isCanvasRow = (s: { id: string }) => s.id.startsWith('page:')
 function rowsOf(s: ScreenRow): Row[] {
   if (s.source !== 'native' || closed.value.has(s.id)) return []
   const d = store.doc(s.id)
@@ -27,7 +28,8 @@ function rowsOf(s: ScreenRow): Row[] {
       if (isContainer(n) && !closed.value.has(s.id + ':' + id)) walk(n.children ?? [], depth + 1)
     }
   }
-  walk(d.rootIds, 1)
+  // 캔버스 위 레이어는 묶음 줄 없이 화면들과 같은 단계로(피그마와 같아요)
+  walk(d.rootIds, isCanvasRow(s) ? 0 : 1)
   return out
 }
 
@@ -84,7 +86,7 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
 <template>
   <div class="tree" role="tree" aria-label="Layers">
     <template v-for="s in screens" :key="s.id">
-      <div role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
+      <div v-if="!isCanvasRow(s)" role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
         <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
