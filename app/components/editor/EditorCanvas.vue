@@ -706,11 +706,16 @@ const measure = computed<Guides | null>(() => {
   void tick.value
   const s = selScreen.value
   const h = hover.value
-  if (!altOn.value || !h || guides.value || !s || !store.layerIds.value.length || store.editing.value) return null
+  if (!altOn.value || !h || guides.value || !s || store.editing.value) return null
   const hs = props.screens.find((v) => v.id === h.sid)
   if (!hs) return null
-  const sel = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b)
+  // 고른 것: 레이어들, 없으면 고른 화면(프레임)들 — 프레임끼리 · 캔버스 위에서도 재요
+  const sel = store.layerIds.value.length
+    ? store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b)
+    : isCanvas(s) ? [] : (multi.value.length ? multiBoxes.value : [s]).map(rectOf)
   if (!sel.length) return null
+  // 화면만 골랐을 때 그 화면 자신(이나 그 안)을 가리키면 잴 것이 없어요
+  if (!store.layerIds.value.length && (multi.value.length ? multi.value.includes(hs.id) : hs.id === s.id) && !h.id) return null
   let id = h.id
   // 고른 레이어(나 그 안)를 가리키면 부모와 견줘요
   if (id && hs.id === s.id) {
