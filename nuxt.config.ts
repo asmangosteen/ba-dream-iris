@@ -1,6 +1,10 @@
 // Iris — 바드림 디자인 협업 툴 (PRD/04_PROJECT_SPEC.md)
 import dsPropsPlugin from './build/ds-props-plugin'
 
+// 링크 미리보기(OG)는 절대 주소가 필요해서 배포 주소를 씁니다
+const SITE_URL = 'https://ba-dream-iris.vercel.app'
+const DESCRIPTION = 'Design collaboration tool by Ba-dream'
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-23',
   devtools: { enabled: false },
@@ -12,8 +16,31 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'ko' },
       title: 'Iris',
-      meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
-      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/logo/iris-symbol.svg' }],
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'description', content: DESCRIPTION },
+        // 링크 공유 미리보기 — 썸네일은 랜딩(/welcome)의 3D 로고 (design/logo 참고)
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'Iris' },
+        { property: 'og:locale', content: 'ko_KR' },
+        { property: 'og:title', content: 'Iris' },
+        { property: 'og:description', content: DESCRIPTION },
+        { property: 'og:url', content: SITE_URL },
+        { property: 'og:image', content: `${SITE_URL}/og.png` },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
+        { property: 'og:image:alt', content: 'Iris logo' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: 'Iris' },
+        { name: 'twitter:description', content: DESCRIPTION },
+        { name: 'twitter:image', content: `${SITE_URL}/og.png` },
+      ],
+      // 파비콘: design/logo/favicon.mjs 로 만듦 (진한 타일 · 코너 스무딩 60%)
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      ],
     },
   },
   // 로그인 · 도메인 확인은 app/middleware/auth.global.ts 한 곳에서 합니다
