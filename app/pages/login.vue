@@ -135,7 +135,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
     <section class="side">
 
       <form class="form" novalidate @submit.prevent="submit">
-        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" /></NuxtLink>
+        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" theme="light" /></NuxtLink>
         <!-- 코드 단계: 어디로 보냈는지만 알려요 -->
         <p v-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
 
