@@ -11,6 +11,7 @@ import InspectorPaints from '~/components/editor/InspectorPaints.vue'
 import InspectorEffects from '~/components/editor/InspectorEffects.vue'
 import StyleCreate from '~/components/editor/StyleCreate.vue'
 import InspectorAutoLayout from '~/components/editor/InspectorAutoLayout.vue'
+import InspectorInstance from '~/components/editor/InspectorInstance.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
 import { isPageCanvas } from '~/composables/useEditor'
 import type { Constraints, Sizing } from '~/canvas/schema'
@@ -196,12 +197,19 @@ const weights = computed(() => {
   return [...new Set([...base, ...cur])].sort((a, b) => a - b)
 })
 const weightNow = computed(() => same((n) => n.style.fontWeight ?? 400))
+// --- v7: 불리언 · 마스크 ---
+const BOOL_OPS = [
+  { k: 'union' as const, label: 'Union selection', key: '⌥⇧U', d: 'M2.5 2.5h7v4h4v7h-7v-4h-4z' },
+  { k: 'subtract' as const, label: 'Subtract selection', key: '⌥⇧S', d: 'M2.5 2.5h7v4h-3v3h-4z' },
+  { k: 'intersect' as const, label: 'Intersect selection', key: '⌥⇧I', d: 'M6.5 6.5h3v3h-3z' },
+  { k: 'exclude' as const, label: 'Exclude selection', key: '⌥⇧E', d: 'M2.5 2.5h7v4h-3v3h-4zM9.5 6.5h4v7h-7v-4h3z' },
+]
 // --- v6: 크기 방식(Fixed · Hug · Fill) · 제약 · 오토 레이아웃 안 자리 무시 ---
 const parentOf = (n: LayerNode) => (n.parentId ? store.node(sid.value, n.parentId) : undefined)
 const inFlow = computed(() => nodes.value.every((n) => !!parentOf(n)?.style.layout))
 const sizingOpts = (axis: 'w' | 'h') => {
   const o: { k: Sizing; label: string }[] = [{ k: 'fixed', label: axis === 'w' ? 'Fixed width' : 'Fixed height' }]
-  if (nodes.value.every((n) => !!n.style.layout || n.type === 'text')) o.push({ k: 'hug', label: 'Hug contents' })
+  if (nodes.value.every((n) => !!n.style.layout || n.type === 'text' || n.type === 'instance')) o.push({ k: 'hug', label: 'Hug contents' })
   if (inFlow.value) o.push({ k: 'fill', label: 'Fill container' })
   return o
 }
@@ -285,6 +293,16 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <button class="ib s24" aria-label="Delete" title="Delete ⌫" @click="store.remove(sid, ids)"><Icon name="trashbin" :size="14" /></button>
         </span>
       </div>
+      <!-- 불리언 · 마스크(피그마 위 막대의 Boolean groups 와 같아요): 여러 개면 만들기, 불리언 그룹이면 방식 바꾸기 -->
+      <div v-if="nodes.length > 1 || one?.type === 'boolean'" class="bool-row">
+        <div class="grp">
+          <button v-for="b in BOOL_OPS" :key="b.k" :class="['ib', { on: one?.op === b.k }]" :aria-label="b.label" :title="`${b.label} ${b.key}`" @click="one?.type === 'boolean' ? store.update(sid, ids, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid, ids, b.k)">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="b.d" fill="currentColor" fill-rule="evenodd" /><path d="M2.5 2.5h7v7h-7zM6.5 6.5h7v7h-7z" fill="none" stroke="currentColor" stroke-width="0.8" /></svg>
+          </button>
+        </div>
+        <button v-if="nodes.length > 1" class="ib" aria-label="Use as mask" title="Use as mask ⌃⌘M" @click="store.toggleMask(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" /></svg></button>
+      </div>
+      <button v-if="one?.isMask" class="cb on" @click="store.toggleMask(sid, ids)"><i />Use as mask</button>
       <label v-if="one" class="sq fld"><span>Name</span><input :key="one.id + one.name" :value="one.name" aria-label="Layer name" @change="store.update(sid, ids, { name: ($event.target as HTMLInputElement).value.trim() || one.name })" @keydown="blurOnEnter"></label>
     </section>
 
@@ -324,6 +342,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <button v-if="inFlow" :class="['cb', { on: same((n) => !!n.absolute) === true }]" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><i />Absolute position</button>
       <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i />Clip content</button>
     </section>
+
+    <InspectorInstance v-if="one?.type === 'instance'" :sid="sid" :ids="ids" />
 
     <InspectorAutoLayout :sid="sid" :ids="ids" />
 
@@ -495,6 +515,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .ct.t { top: 8px; left: 35px; width: 2px; height: 10px; } .ct.b { bottom: 8px; left: 35px; width: 2px; height: 10px; }
 .ct.ch { left: 30px; top: 35px; width: 12px; height: 2px; } .ct.cv { top: 30px; left: 35px; width: 2px; height: 12px; }
 .cons-sel { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.bool-row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .ts-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-02); align-items: center; }
 .tools { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .txt-b { width: auto; min-width: 24px; padding: 0 4px; font-size: 11px; font-weight: 500; }

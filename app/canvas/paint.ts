@@ -1,4 +1,4 @@
-import type { Effect, LayerStyle, LayerType, Paint } from './schema'
+import type { Effect, LayerStyle, LayerType, Paint, VPath } from './schema'
 
 /**
  * 칠 · 선 · 효과 → CSS / SVG (v5). 캔버스(LayerView) · 썸네일 · 화면 모양이 함께 씁니다.
@@ -140,8 +140,27 @@ export function pointsPath(pts: number[], w: number, h: number, smooth: boolean,
   return d + `L${r2(last[0])} ${r2(last[1])}` + (closed ? 'Z' : '')
 }
 
+/** 벡터 경로(0~1 비율) → SVG d. 핸들이 있으면 3차 베지어 */
+export function vnetPath(vnet: VPath[] | undefined, w: number, h: number, ox = 0, oy = 0): string {
+  let d = ''
+  for (const p of vnet ?? []) {
+    const pts = p.pts
+    if (!pts.length) continue
+    const X = (v: number) => r2(ox + v * w), Y = (v: number) => r2(oy + v * h)
+    d += `M${X(pts[0]!.x)} ${Y(pts[0]!.y)}`
+    const seg = (a: VPath['pts'][number], b: VPath['pts'][number]) => {
+      if (a.o || b.i) { const o = a.o ?? [a.x, a.y], i = b.i ?? [b.x, b.y]; d += `C${X(o[0])} ${Y(o[1])} ${X(i[0])} ${Y(i[1])} ${X(b.x)} ${Y(b.y)}` }
+      else d += `L${X(b.x)} ${Y(b.y)}`
+    }
+    for (let k = 1; k < pts.length; k++) seg(pts[k - 1]!, pts[k]!)
+    if (p.closed && pts.length > 1) { seg(pts[pts.length - 1]!, pts[0]!); d += 'Z' }
+  }
+  return d
+}
+
 /** 점으로 그리는 레이어의 경로 */
-export function vectorPath(t: LayerType, s: LayerStyle, w: number, h: number, pts?: number[], closed?: boolean): string {
+export function vectorPath(t: LayerType, s: LayerStyle, w: number, h: number, pts?: number[], closed?: boolean, vnet?: VPath[]): string {
+  if (t === 'vector') return vnetPath(vnet, w, h)
   if (t === 'polygon') return closedD(polygonPoints(s.sides ?? 3, w, h))
   if (t === 'star') return closedD(starPoints(s.points ?? 5, s.inner ?? 0.38, w, h))
   if (t === 'line') return pointsPath(pts ?? [0, 0, 1, 0], w, h, false)

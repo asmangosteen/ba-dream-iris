@@ -4,6 +4,9 @@ import { useLayerStore } from '~/canvas/store'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
 import { GHOST_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
+import InstanceView from '~/components/editor/InstanceView.vue'
+import BooleanView from '~/components/editor/BooleanView.vue'
+import { nodePathIn } from '~/canvas/vector'
 import { backgroundCss, defaultAlign, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
@@ -76,6 +79,16 @@ const style = computed(() => {
   return css
 })
 
+// 마스크: 자식 중 isMask 인 것(보이는 것) 기준으로 아래 · 위 나누기
+const mask = computed(() => {
+  const v = n.value
+  if (!v || !isContainer(v) || v.type === 'boolean') return null
+  const kids = v.children ?? []
+  const i = kids.findIndex((c) => props.doc.nodes[c]?.isMask && !props.doc.nodes[c]?.hidden)
+  if (i < 0) return null
+  const m = props.doc.nodes[kids[i]!]!
+  return { below: kids.slice(0, i), above: kids.slice(i + 1), clip: `path(${m.evenodd ? 'evenodd, ' : ''}'${nodePathIn(props.doc, m, 0, 0)}')` }
+})
 // 텍스트: 여러 칠 · 그라디언트는 글자 모양으로 잘라서
 const textFill = computed(() => {
   const s = n.value?.style
@@ -113,17 +126,17 @@ const vec = computed(() => {
   const v = n.value
   if (!v || !vector.value) return null
   const s = v.style
-  const d = vectorPath(v.type, s, v.w, v.h, v.pts, v.closed)
-  const closed = v.type === 'polygon' || v.type === 'star' || !!v.closed
+  const d = vectorPath(v.type, s, v.w, v.h, v.pts, v.closed, v.vnet)
+  const closed = v.type === 'polygon' || v.type === 'star' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
   const w = s.strokeWidth ?? 0
   const align = closed ? (s.strokeAlign ?? defaultAlign(v.type)) : 'center'
   const cols = strokeColors(s, color).reverse() // 아래부터 그려요
   const size = Math.max(8, w * 4)
   return {
     d, closed, w, align, cols, size,
-    fill: closed && hasFill(s) ? { clipPath: `path('${d}')`, ...backgroundCss(s, color, imageSrc) } : null,
-    start: (v.type === 'line' || v.type === 'path') && s.arrowStart && s.arrowStart !== 'none' ? s.arrowStart : null,
-    end: (v.type === 'line' || v.type === 'path') && s.arrowEnd && s.arrowEnd !== 'none' ? s.arrowEnd : null,
+    fill: closed && hasFill(s) ? { clipPath: `path(${v.evenodd ? 'evenodd, ' : ''}'${d}')`, ...backgroundCss(s, color, imageSrc) } : null,
+    start: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowStart && s.arrowStart !== 'none' ? s.arrowStart : null,
+    end: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowEnd && s.arrowEnd !== 'none' ? s.arrowEnd : null,
     dash: s.dash ? s.dash.join(' ') : undefined,
     cap: s.cap ?? (v.type === 'path' ? 'round' : 'butt'),
   }
@@ -165,10 +178,19 @@ function onKey(e: KeyboardEvent) {
 <template>
   <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="ghosted ? { ...style, visibility: 'hidden' } : style">
     <span v-if="n.type === 'section'" class="sec-name">{{ n.name }}</span>
-    <template v-if="isContainer(n)">
-      <LayerView v-for="c in n.children ?? []" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
+    <BooleanView v-if="n.type === 'boolean'" :doc="doc" :node="n" />
+    <template v-else-if="isContainer(n)">
+      <template v-if="mask">
+        <LayerView v-for="c in mask.below" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
+        <!-- 마스크: 그 위 형제들을 마스크 모양으로 잘라요(마스크 자체는 그리지 않아요) -->
+        <div class="maskwrap" :style="{ clipPath: mask.clip }">
+          <LayerView v-for="c in mask.above" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
+        </div>
+      </template>
+      <LayerView v-for="c in mask ? [] : n.children ?? []" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
       <GridOverlay v-if="n.style.grids" :grids="n.style.grids" :w="n.w" :h="n.h" />
     </template>
+    <InstanceView v-else-if="n.type === 'instance'" :node="n" :screen-id="screenId" />
     <video v-else-if="n.type === 'image' && video" :src="imageSrc(n.src)" :style="imgStyle" autoplay muted loop playsinline disablepictureinpicture aria-hidden="true" />
     <img v-else-if="n.type === 'image'" :src="imageSrc(n.src)" alt="" draggable="false" :style="imgStyle">
     <template v-else-if="n.type === 'text'">
@@ -239,6 +261,7 @@ function onKey(e: KeyboardEvent) {
 .stk { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .dash { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
 .vfill { position: absolute; inset: 0; }
+.maskwrap { position: absolute; inset: 0; overflow: visible; }
 .vec { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .vec .hit { pointer-events: stroke; }
 .line .vec path, .path .vec path { pointer-events: stroke; }

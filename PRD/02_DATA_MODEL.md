@@ -126,7 +126,7 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
             "rotation": 90, "flipX": true, "lockRatio": true,
             "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 6
+  "schemaVersion": 7
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
@@ -188,6 +188,16 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 | style.grids · frame.grids | 레이아웃 그리드 columns · rows(count · gutter · margin) · grid(size), color · visible | `[{"type":"columns","count":4,"gutter":16,"margin":16,"color":"#FF000019"}]` | 없음 |
 
 - **페이지 설정** `pages.viewport.guides`: 가이드선 { x: number[], y: number[] } (캔버스 좌표). 눈금자에서 끌어 만들고, 레이어 · 화면을 옮길 때 붙는 대상이 된다.
+
+- **schemaVersion 7 (2026-11-23)**: 4묶음(구성 요소 · 고급 편집). 모두 비어 있어도 되는 값이라 v1~v6 문서는 그대로 읽힌다.
+
+| 필드 | 설명 | 예시 |
+|---|---|---|
+| type `vector` · vnet | 펜 · 평탄화(⌘E) · SVG 가져오기로 만든 벡터. 경로 [{ pts: [{ x, y, i?, o? }], closed? }] — 점과 곡선 핸들(i 들어오는 쪽 · o 나가는 쪽) 모두 레이어 상자 안 0~1 비율 | `[{"closed":true,"pts":[{"x":0,"y":0},{"x":1,"y":0.5,"i":[0.8,0],"o":[0.8,1]}]}]` |
+| evenodd | 벡터 채우기 규칙(겹친 부분 구멍) | `true` |
+| type `boolean` · op | 불리언 그룹(살아 있는 결과): union · subtract(맨 아래에서 나머지 빼기) · intersect · exclude. 자식 도형은 그대로 남고 칠 · 선은 그룹 것 | `"subtract"` |
+| isMask | 마스크: 같은 부모 안에서 이 레이어 위 형제들을 이 모양으로 자른다(⌃⌘M 은 'Mask group' 으로 묶어서) | `true` |
+| type `instance` · component · props | 디자인 시스템(@ba-dream/design-system) 컴포넌트 인스턴스: export 이름과 속성 값. 글자 슬롯은 `props["#default"]`. 속성 목록 · 선택지는 빌드할 때 DS 타입 파일에서 읽는다(저장소에 생성 파일 없음, build/ds-props-plugin.ts) | `{"component":"Button","props":{"size":"m","#default":"확인"}}` |
 - **토큰 id**: 디자인 시스템 CSS 변수 이름(`--sys-color-…` · `--ref-color-…` · `--ref-spacing-…` · `--ref-radius-…` · `--ref-borderwidth-…` · `--ref-opacity-…` · `--font-weight-…` · `--typography-<스타일>-size|line-height|letter-spacing`), 글자 스타일 묶음 `ts:<스타일>`(예: `ts:body-1` = 크기 · 행간 · 자간 함께), DB 에 등록한 토큰 `db:<이름>`.
 - **값은 함께 저장한다**: 연결할 때 실제 값(밝은 모드 기준, 예: `fill: "#2C7BE2"`, `radius: 8`)도 그 속성에 써 둔다. 그래서 그리기 · 썸네일 · 내보내기는 `vars` 를 몰라도 되고, 앱을 다크모드로 바꿔도 캔버스 결과물 색은 바뀌지 않는다.
 - **연결 풀기**: 연결은 그대로인데 그 속성 값이 바뀌면(직접 입력 · ↑↓ · 캔버스에서 끌어 옮기기 · 크기 바꾸기) 그 키의 연결을 자동으로 푼다(`app/canvas/store.ts` 의 `record()` → `detachEdited`). 글자 크기 · 행간 · 자간 중 하나가 바뀌면 `textStyle` 도 풀린다.

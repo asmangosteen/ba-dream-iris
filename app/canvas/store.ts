@@ -1,6 +1,7 @@
 import type { InjectionKey, Ref } from 'vue'
 import { relayout as layoutDoc, constrain, boxes0 } from './layout'
 import { guessAxis, currentGap } from './geom'
+import { shapeVnet } from './vector'
 import { absPos, bindLiteral, descendants, isContainer, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
@@ -117,6 +118,14 @@ export function createLayerStore(opts: {
     layoutDoc(doc(sid)) // 오토 레이아웃은 바뀔 때마다 다시 계산
     record(sid, before)
     return out
+  }
+  /** 그려진 크기를 재서 넣기(인스턴스 Hug 등) — 실행취소 기록 없이 저장만 */
+  function setMeasured(sid: string, id: string, w: number, h: number) {
+    const n = doc(sid).nodes[id]
+    if (!n || (Math.abs(n.w - w) < 0.5 && Math.abs(n.h - h) < 0.5)) return
+    n.w = Math.round(w); n.h = Math.round(h)
+    layoutDoc(doc(sid))
+    scheduleSave(sid)
   }
   /** 끄는 중(기록 없이) 오토 레이아웃 다시 계산 */
   const relayout = (sid: string) => layoutDoc(doc(sid))
@@ -304,6 +313,90 @@ export function createLayerStore(opts: {
   function duplicate() { if (copy()) paste() }
   /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름 */
   function duplicateInPlace() { const keep = clipboard; if (copy()) paste(undefined, 0); clipboard = keep }
+
+  /** 여러 레이어를 한 번에(실행취소 한 번): 부모 하나 + 그 안 자식들. SVG 가져오기가 써요 */
+  function insertTree(sid: string, parentId: string | null, root: Partial<LayerNode> & { type: LayerType }, kids: (Partial<LayerNode> & { type: LayerType })[]): string {
+    return mutate(sid, (d) => {
+      const id = newId()
+      d.nodes[id] = { id, name: nextName(d, root.type), parentId, x: 0, y: 0, w: 100, h: 100, ...root, children: [], style: { ...DEFAULT_STYLE[root.type], ...root.style } }
+      siblings(d, parentId).push(id)
+      for (const k of kids) {
+        const cid = newId()
+        d.nodes[cid] = { id: cid, name: nextName(d, k.type), parentId: id, x: 0, y: 0, w: 100, h: 100, ...k, style: { ...DEFAULT_STYLE[k.type], ...k.style } }
+        d.nodes[id]!.children!.push(cid)
+      }
+      layerIds.value = [id]
+      screenId.value = sid
+      return id
+    })
+  }
+  /** 같은 부모 안에서 고른 것들(아래 → 위 순서) */
+  function orderedSiblings(d: LayerDoc, ids: string[]) {
+    const first = d.nodes[ids[0]!]
+    if (!first) return []
+    const sib = siblings(d, first.parentId)
+    return ids.filter((id) => d.nodes[id]?.parentId === first.parentId).sort((a, b) => sib.indexOf(a) - sib.indexOf(b))
+  }
+  /**
+   * 불리언(피그마의 Boolean group): 원본 도형을 그대로 두고 결과를 그려요 — 나중에 안쪽 도형을 고치면 결과도 바뀌어요.
+   * 칠 · 선은 맨 아래 도형 것을 이어받아요
+   */
+  function booleanOp(sid: string, ids: string[], op: 'union' | 'subtract' | 'intersect' | 'exclude') {
+    const d0 = doc(sid)
+    const list = orderedSiblings(d0, ids).filter((id) => { const n = d0.nodes[id]!; return n.type !== 'text' && n.type !== 'instance' })
+    if (list.length < 2) return
+    let gid = ''
+    mutate(sid, (d) => {
+      const parentId = d.nodes[list[0]!]!.parentId
+      const ns = list.map((id) => d.nodes[id]!)
+      const x0 = Math.min(...ns.map((n) => n.x)), y0 = Math.min(...ns.map((n) => n.y))
+      const x1 = Math.max(...ns.map((n) => n.x + n.w)), y1 = Math.max(...ns.map((n) => n.y + n.h))
+      const base = ns[0]!
+      gid = newId()
+      const sib = siblings(d, parentId)
+      const at = Math.max(...list.map((k) => sib.indexOf(k)))
+      const label = { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' }[op]
+      d.nodes[gid] = { id: gid, type: 'boolean', op, name: label, parentId, x: x0, y: y0, w: x1 - x0, h: y1 - y0, children: [], style: { fill: base.style.fill ?? '#D9D9D9', ...(base.style.fills ? { fills: base.style.fills } : {}), ...(base.style.stroke && base.style.strokeWidth ? { stroke: base.style.stroke, strokeWidth: base.style.strokeWidth } : {}) } }
+      sib.splice(at + 1, 0, gid)
+      for (const n of ns) {
+        sib.splice(sib.indexOf(n.id), 1)
+        n.parentId = gid; n.x -= x0; n.y -= y0
+        d.nodes[gid]!.children!.push(n.id)
+      }
+    })
+    layerIds.value = [gid]
+  }
+  /** ⌘E 평탄화: 도형을 점 편집 가능한 벡터로 */
+  function flatten(sid: string, ids: string[]) {
+    mutate(sid, (d) => {
+      for (const id of ids) {
+        const n = d.nodes[id]
+        if (!n || n.type === 'vector' || n.type === 'text' || n.type === 'image' || n.type === 'instance' || isContainer(n)) continue
+        const vnet = shapeVnet(n)
+        const keep = { ...n.style }
+        for (const k of ['radius', 'radii', 'sides', 'points', 'inner'] as const) delete keep[k]
+        Object.assign(n, { type: 'vector', vnet, style: keep })
+        delete n.pts
+      }
+    })
+  }
+  /** ⌃⌘M 마스크로 쓰기: 고른 것 중 맨 아래가 마스크, 모두 'Mask group' 으로. 마스크 하나만 고르고 다시 누르면 풀어요 */
+  function toggleMask(sid: string, ids: string[]) {
+    const d0 = doc(sid)
+    if (ids.length === 1 && d0.nodes[ids[0]!]?.isMask) { update(sid, ids, { isMask: undefined }); return }
+    const list = orderedSiblings(d0, ids)
+    if (!list.length) return
+    wrap(sid, list, 'group')
+    const gid = layerIds.value[0]
+    if (!gid) return
+    mutate(sid, (d) => {
+      const g = d.nodes[gid]!
+      g.name = 'Mask group'
+      const m = d.nodes[list[0]!]
+      if (m) m.isMask = true
+    })
+    layerIds.value = [gid]
+  }
 
   /**
    * ⇧A 오토 레이아웃 더하기(피그마와 같아요): 프레임 하나면 그 프레임에, 아니면 고른 것들을 새 프레임으로 감싸서.
@@ -553,7 +646,7 @@ export function createLayerStore(opts: {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     hold, release,
-    selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

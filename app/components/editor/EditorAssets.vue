@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { IconButton, SearchField, TextButton } from '@ba-dream/design-system'
+import { Button, IconButton, SearchField, TextButton } from '@ba-dream/design-system'
 import DsPreview from '~/components/ds/DsPreview.vue'
+import { dsComponent } from '~/components/editor/InstanceView.vue'
+import { DS_DRAG } from '~/composables/useDsInstances'
 
 /** 왼쪽 패널 · 에셋: 디자인 시스템 컴포넌트 찾기 → 상세(속성 · 이 파일에서 쓰는 곳) */
 const props = defineProps<{ screenIds: string[]; screenName: (id: string) => string; open?: string | null }>()
-const emit = defineEmits<{ 'update:open': [id: string | null]; 'pick-screen': [id: string] }>()
+const emit = defineEmits<{ 'update:open': [id: string | null]; 'pick-screen': [id: string]; insert: [name: string] }>()
 
 const { components } = useDesignSystem()
 const usages = useUsages('assets', () => props.screenIds)
@@ -21,6 +23,19 @@ const useCount = (id: string) => (usages.data.value ?? []).filter((u) => u.compo
 
 const detail = computed(() => (components.data.value ?? []).find((c) => c.id === props.open) ?? null)
 const uses = computed(() => (usages.data.value ?? []).filter((u) => u.component_id === props.open))
+// 목록 이름 → 디자인 시스템 export 이름. 이름이 다른 것만 적어요(Map 은 맞는 컴포넌트가 없어 넣을 수 없음)
+const EXPORT_ALIAS: Record<string, string> = { Calendar: 'DatePicker' }
+/** 캔버스에 넣을 수 있는 실제 컴포넌트 이름. 없으면 null(끌기 · Insert 를 열지 않아요) */
+function exportName(c: { name: string; code_name?: string | null }) {
+  for (const n of [EXPORT_ALIAS[c.name], c.code_name, c.name]) if (n && dsComponent(n)) return n
+  return null
+}
+function onDrag(e: DragEvent, name: string) {
+  if (!e.dataTransfer) return
+  e.dataTransfer.setData(DS_DRAG, name)
+  e.dataTransfer.effectAllowed = 'copy'
+}
+const detailExport = computed(() => (detail.value ? exportName(detail.value) : null))
 const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {}).map(([k, v]) => ({ k, v: Array.isArray(v) ? v.join(' · ') : v === 'boolean' ? 'On · Off' : 'Text' })))
 </script>
 
@@ -33,7 +48,7 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
       <section v-for="g in groups" :key="g.label" class="grp-sec">
         <span class="nav-label p2">{{ g.label }}</span>
         <div class="grid">
-          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="`View ${c.name} details`" @click="emit('update:open', c.id)">
+          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="`View ${c.name} details`" :title="exportName(c) ? 'Drag onto the canvas' : undefined" :draggable="exportName(c) ? 'true' : 'false'" @dragstart="(e) => { const n = exportName(c); if (n) onDrag(e, n); else e.preventDefault() }" @click="emit('update:open', c.id)">
             <span class="sq asset-thumb" data-preview><DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" /></span>
             <span class="tname">{{ c.name }}</span>
             <span class="tx-meta tuse">{{ useCount(c.id) ? `${useCount(c.id)} in this file` : 'Unused' }}</span>
@@ -57,6 +72,10 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
       <div class="pad">
         <span class="sq big" data-preview><DsPreview :names="[detail.name, detail.code_name, ...(detail.match_aliases ?? [])]" :label="detail.name" /></span>
         <p v-if="detail.description" class="tx-meta m0 mt4">{{ detail.description }}</p>
+        <div v-if="detailExport" class="ins mt8">
+          <Button size="s" type="primary" class="grow" @click="emit('insert', detailExport)">Insert instance</Button>
+          <span class="tx-meta">Drag onto the canvas or click Insert</span>
+        </div>
       </div>
       <section v-if="propRows.length" class="dsec">
         <div class="sec-h h24 p0"><span>Properties</span></div>
@@ -71,7 +90,6 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
         <span v-if="!uses.length" class="tx-meta">Not used on this page yet</span>
       </section>
       <section class="dsec">
-        <span class="tx-meta">Inserting instances onto the canvas is coming soon</span>
         <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" class="self-start" @click="navigateTo('/design-system')">View in design system</TextButton>
       </section>
     </div>
@@ -101,6 +119,10 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
 .big :deep(.pv) { position: absolute; left: 0; top: 0; width: 133.33%; height: 133.33%; transform: scale(.75); transform-origin: 0 0; }
 .big { overflow: hidden; height: 128px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: grid; place-items: center; }
 .mt4 { margin-top: var(--ref-spacing-04); }
+.mt8 { margin-top: var(--ref-spacing-08); }
+.ins { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.ins .grow { width: 100%; }
+.tile[draggable='true'] { cursor: grab; }
 .m0 { margin: 0; }
 .dsec { padding: var(--ref-spacing-07) var(--ref-spacing-08) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
 .h24 { height: 24px; }

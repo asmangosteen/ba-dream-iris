@@ -2,7 +2,7 @@
 import { Icon } from '@ba-dream/design-system'
 
 /** 아래 도구 막대. 피그마처럼 묶음 버튼(프레임 · 섹션 / 도형 / 그리기)을 누르면 마지막 도구, ▾ 로 펼쳐서 고르기 */
-export type Tool = 'move' | 'hand' | 'scale' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
+export type Tool = 'move' | 'hand' | 'scale' | 'pen' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
 const tool = defineModel<Tool>({ default: 'move' })
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
@@ -20,6 +20,7 @@ const ITEMS: Record<Tool, Item> = {
   polygon: { key: 'polygon', label: 'Polygon', d: 'M8 2l6.2 11H1.8z' },
   star: { key: 'star', label: 'Star', d: 'M8 1.6l1.9 4 4.4.6-3.2 3 .8 4.4L8 11.5l-3.9 2.1.8-4.4-3.2-3 4.4-.6z' },
   image: { key: 'image', label: 'Place image', key2: '⇧⌘K', icon: 'image' },
+  pen: { key: 'pen', label: 'Pen', key2: 'P', d: 'M8 1.8l4.6 6.4L9.5 13H6.5L3.4 8.2zM8 1.8V8M6.5 13h3v1.5h-3z' },
   pencil: { key: 'pencil', label: 'Pencil', key2: '⇧P', d: 'M2.5 13.5l1-3.5 7.6-7.6a1.4 1.4 0 0 1 2 2L5.5 12z M9.8 3.7l2.5 2.5' },
   text: { key: 'text', label: 'Text', key2: 'T', d: 'M3 4.5V3h10v1.5M8 3v10M6 13h4' },
 }
@@ -28,18 +29,18 @@ const GROUPS: { id: string; tools: Tool[] }[] = [
   { id: 'frame', tools: ['frame', 'section'] },
   // 이미지 · 영상은 캔버스에 끌어 놓거나 Fill 의 Image 칠로(피그마와 같아요). ⇧⌘K 로 파일 고르기는 그대로
   { id: 'shape', tools: ['rect', 'line', 'arrow', 'ellipse', 'polygon', 'star'] },
-  { id: 'draw', tools: ['pencil'] },
+  { id: 'draw', tools: ['pen', 'pencil'] },
   { id: 'text', tools: ['text'] },
 ]
 /** 묶음마다 마지막에 고른 도구 */
-const last = reactive<Record<string, Tool>>({ move: 'move', frame: 'frame', shape: 'rect', draw: 'pencil', text: 'text' })
+const last = reactive<Record<string, Tool>>({ move: 'move', frame: 'frame', shape: 'rect', draw: 'pen', text: 'text' })
 watch(tool, (t) => { const g = GROUPS.find((x) => x.tools.includes(t)); if (g && t !== 'image') last[g.id] = t })
 const open = ref<string | null>(null)
 const tip = (it: Item) => (it.key2 ? `${it.label} (${it.key2})` : it.label)
 function pick(t: Tool) { tool.value = t; open.value = null }
 
 // 단축키: 피그마와 같아요
-const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', k: 'scale', f: 'frame', a: 'frame', r: 'rect', l: 'line', o: 'ellipse', t: 'text' }
+const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', k: 'scale', p: 'pen', f: 'frame', a: 'frame', r: 'rect', l: 'line', o: 'ellipse', t: 'text' }
 const SHIFT_KEYS: Record<string, Tool> = { s: 'section', l: 'arrow', p: 'pencil' }
 function onKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement

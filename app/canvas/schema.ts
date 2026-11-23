@@ -4,9 +4,13 @@
  */
 import { backgroundCss } from './paint'
 
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
-export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section'
+export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section' | 'vector' | 'instance' | 'boolean'
+
+/** 벡터 점 (v7). x · y · 핸들(i 들어오는 쪽, o 나가는 쪽)은 모두 레이어 상자 안 0~1 비율 */
+export interface VPoint { x: number; y: number; i?: [number, number]; o?: [number, number] }
+export interface VPath { pts: VPoint[]; closed?: boolean }
 
 /** 칠(채우기 · 선 색). solid 는 한 색, linear · radial 은 그라디언트, image 는 이미지 채우기 (v5) */
 export type Paint =
@@ -52,9 +56,9 @@ export interface LayoutGrid {
 }
 
 /** 자식을 담는 레이어 */
-export const isContainer = (n?: Pick<LayerNode, 'type'> | null) => !!n && (n.type === 'frame' || n.type === 'section')
+export const isContainer = (n?: Pick<LayerNode, 'type'> | null) => !!n && (n.type === 'frame' || n.type === 'section' || n.type === 'boolean')
 /** 점으로 그리는 레이어(SVG) */
-export const isVector = (t: LayerType) => t === 'line' || t === 'polygon' || t === 'star' || t === 'path'
+export const isVector = (t: LayerType) => t === 'line' || t === 'polygon' || t === 'star' || t === 'path' || t === 'vector'
 
 export interface LayerStyle {
   fill?: string // '#RRGGBB' · 'rgb(…)'. 옛 문서는 'token:<DB 토큰 이름>' 일 수 있어요(연결된 것으로 봅니다)
@@ -162,6 +166,18 @@ export interface LayerNode {
   /** 오토 레이아웃 안에서 자리 무시하고 마음대로 두기 */
   absolute?: boolean
   constraints?: Constraints
+  // --- v7 ---
+  /** 벡터(펜 · 불리언 · SVG 가져오기): 경로들. 0~1 비율이라 크기를 바꿔도 그대로 따라와요 */
+  vnet?: VPath[]
+  /** 벡터 채우기 규칙(겹친 부분 구멍) */
+  evenodd?: boolean
+  /** 디자인 시스템 컴포넌트 인스턴스: 컴포넌트 이름 · 속성 값 */
+  component?: string
+  props?: Record<string, unknown>
+  /** 마스크: 같은 부모 안에서 이 레이어 위에 있는 형제들을 이 모양으로 잘라요 */
+  isMask?: boolean
+  /** 불리언 그룹(살아 있는 결과): 합치기 · 빼기(맨 아래에서 나머지) · 교차 · 제외 */
+  op?: 'union' | 'subtract' | 'intersect' | 'exclude'
   src?: string // 'storage://screens/<path>' · data: · https:
   style: LayerStyle
 }
@@ -184,6 +200,7 @@ export function migrate(raw: unknown): LayerDoc {
   // v1 → v2: 회전 · 뒤집기 · 비율 고정 · 모서리 따로가 더해졌어요. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽습니다
   // v2 → v3: 변수 연결(style.vars) · 자간(style.letterSpacing) 이 더해졌어요. 역시 비어 있어도 되는 값이라 그대로 읽습니다
   // v3 → v4: 화면 모양(frame) 이 더해졌어요. 비어 있어도 되는 값이라 그대로 읽습니다
+  // v6 → v7: 벡터(vnet) · 디자인 시스템 인스턴스(component · props) · 마스크(isMask)가 더해졌어요. 비어 있어도 되는 값입니다
   // v5 → v6: 오토 레이아웃 · 크기 방식(Hug · Fill) · 제약 · 레이아웃 그리드가 더해졌어요. 비어 있어도 되는 값입니다
   // v4 → v5: 원 · 선 · 다각형 · 별 · 연필 · 섹션, 여러 칠 · 그라디언트 · 효과 · 선 위치 · 점선 · 혼합 모드 · 텍스트 고급이 더해졌어요. 모두 비어 있어도 되는 값입니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
@@ -253,9 +270,12 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
   star: { fill: '#E9EBED', points: 5, inner: 0.38 },
   path: { stroke: '#202837', strokeWidth: 2, cap: 'round' },
   section: { fill: '#F2F3F5', radius: 2 },
+  vector: { stroke: '#000000', strokeWidth: 1 },
+  instance: {},
+  boolean: { fill: '#D9D9D9' },
 }
 
-export const TYPE_LABEL: Record<LayerType, string> = { frame: 'Frame', rect: 'Rectangle', text: 'Text', image: 'Image', ellipse: 'Ellipse', line: 'Line', polygon: 'Polygon', star: 'Star', path: 'Vector', section: 'Section' }
+export const TYPE_LABEL: Record<LayerType, string> = { frame: 'Frame', rect: 'Rectangle', text: 'Text', image: 'Image', ellipse: 'Ellipse', line: 'Line', polygon: 'Polygon', star: 'Star', path: 'Vector', section: 'Section', vector: 'Vector', instance: 'Instance', boolean: 'Boolean' }
 
 /** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기, img: 'storage://' 이미지 주소 풀기 */
 export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined, img: (src?: string) => string | undefined = (s) => s): Record<string, string | number> {

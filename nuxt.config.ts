@@ -1,9 +1,13 @@
 // Iris — 바드림 디자인 협업 툴 (PRD/04_PROJECT_SPEC.md)
+import dsPropsPlugin from './build/ds-props-plugin'
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-23',
   devtools: { enabled: false },
   modules: ['@nuxtjs/supabase'],
   css: ['~/assets/css/main.css'],
+  // virtual:iris-ds-props — 디자인 시스템 컴포넌트 속성 목록을 빌드 때 d.ts 에서 만듭니다(저장소에 넣지 않아요)
+  vite: { plugins: [dsPropsPlugin()] },
   app: {
     head: {
       htmlAttrs: { lang: 'ko' },

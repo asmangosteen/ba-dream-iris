@@ -5,6 +5,7 @@ import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
 import ContextMenu from '~/components/editor/ContextMenu.vue'
+import { importSvg } from '~/canvas/vector'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
 import InspectorPage from '~/components/editor/InspectorPage.vue'
 import InspectorScreens from '~/components/editor/InspectorScreens.vue'
@@ -66,14 +67,14 @@ const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void; insertInstance: (name: string, at?: { x: number; y: number }) => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
 /** 캔버스 위(화면 밖)에 그린 레이어: 페이지에 저장되는 가상 화면 하나로 다룹니다(좌표 = 캔버스 좌표) */
 const canvasScreen = computed<ScreenRow | null>(() => {
   const p = pages.data.value?.find((x) => x.id === pageId.value)
-  return p ? { id: pageCanvasId(p.id), name: '캔버스', source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
+  return p ? { id: pageCanvasId(p.id), name: 'Canvas', source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
 })
 const currentPage = computed(() => pages.data.value?.find((x) => x.id === pageId.value) ?? null)
 async function onPageSettings(patch: PageSettings) {
@@ -402,8 +403,25 @@ function onPaste(e: ClipboardEvent) {
   if (files.length) { e.preventDefault(); onDropFiles(files, current.value ? { x: current.value.x + current.value.width / 2, y: current.value.y + current.value.height / 2 } : center); return }
   if (/^<svg[\s>]/i.test(text) || (/^<\?xml/i.test(text) && text.includes('<svg'))) {
     e.preventDefault()
-    insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
+    // 피그마처럼 벡터 레이어들로(안쪽 도형까지 고칠 수 있게). 읽지 못하면 이미지로
+    if (!importSvgVectors(text, current.value ? undefined : center)) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
   }
+}
+/** SVG 코드 → 'svg' 프레임 안 벡터 레이어들. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false */
+function importSvgVectors(text: string, at?: { x: number; y: number }): boolean {
+  const r = importSvg(text)
+  if (!r) return false
+  const s = (at ? null : current.value?.source === 'native' ? current.value : null) ?? canvasScreen.value
+  if (!s) return false
+  const onCanvas = isPageCanvas(s.id)
+  const k = onCanvas ? Math.min(1, 480 / r.w, 480 / r.h) : Math.min(1, (s.width * 0.7) / r.w, (s.height * 0.5) / r.h)
+  const w = r.w * k, h = r.h * k
+  const c = at ?? (onCanvas ? { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) } : { x: s.width / 2, y: s.height / 2 })
+  const r2 = (v: number) => Math.round(v * 100) / 100
+  store.insertTree(s.id, null, { type: 'frame', name: 'svg', x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w: r2(w), h: r2(h), style: { fill: undefined, clip: false } },
+    r.layers.map((l) => ({ type: 'vector' as const, name: l.name, x: r2(l.x * k), y: r2(l.y * k), w: r2(l.w * k), h: r2(l.h * k), vnet: l.vnet, evenodd: l.evenodd || undefined, style: { fill: l.fill, stroke: l.stroke, strokeWidth: l.strokeWidth ? r2(l.strokeWidth * k) : undefined, opacity: l.opacity } })))
+  tab.value = 'design'
+  return true
 }
 onMounted(() => window.addEventListener('paste', onPaste))
 onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
@@ -536,7 +554,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         </section>
       </template>
 
-      <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" />
+      <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" @insert="(name: string) => canvas?.insertInstance(name)" />
 
       <div v-else class="docs">
         <div class="sec-h"><span>Docs</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="Add doc" @click="addDocOpen = true" /></div>
