@@ -15,17 +15,17 @@ const gap = computed(() => currentGap(rects.value, axis.value))
 <template>
   <div class="design">
     <section class="s">
-      <div class="sec-h h24"><span>화면 {{ screens.length }}개</span></div>
+      <div class="sec-h h24"><span>{{ screens.length }} frames</span></div>
       <ul class="names">
         <li v-for="s in screens" :key="s.id" class="tx-meta ellipsis">{{ s.name }} · <span class="num">{{ Math.round(s.width) }} × {{ Math.round(s.height) }}</span></li>
       </ul>
     </section>
     <section class="s">
-      <div class="sec-h h24"><span>위치</span></div>
+      <div class="sec-h h24"><span>Position</span></div>
       <ArrangeControls :count="screens.length" :gap="gap" :axis="axis" @op="emit('arrange', $event)" />
     </section>
     <section class="s">
-      <p class="tx-meta m0">Shift 를 누른 채 화면을 누르거나 빈 캔버스를 끌어 여러 화면을 골라요</p>
+      <p class="tx-meta m0">Shift-click frames or drag on empty canvas to select multiple frames</p>
     </section>
   </div>
 </template>

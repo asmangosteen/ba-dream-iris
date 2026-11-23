@@ -59,7 +59,7 @@ async function onPageSettings(patch: PageSettings) {
   try {
     await updatePageSettings(p.id, patch)
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
-  } catch { say('페이지 설정을 저장하지 못했어요') }
+  } catch { say('Couldn\'t save page settings') }
 }
 const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
@@ -107,12 +107,12 @@ watch(() => [pageId.value, screens.status.value] as const, ([pid, st]) => {
 onMounted(() => { if (screens.status.value === 'success' && fitted !== pageId.value) { fitted = pageId.value; canvas.value?.fit() } })
 
 async function onAddPage() {
-  try { await addPage() } catch { say('페이지를 만들지 못했어요. 다시 시도해주세요') }
+  try { await addPage() } catch { say('Couldn\'t add a page. Try again') }
 }
 const renaming = ref<string | null>(null)
 async function onRename(id: string, e: Event) {
   renaming.value = null
-  try { await renamePage(id, (e.target as HTMLInputElement).value) } catch { say('이름을 바꾸지 못했어요') }
+  try { await renamePage(id, (e.target as HTMLInputElement).value) } catch { say('Couldn\'t rename') }
 }
 
 const moveFrom = new Map<string, { x: number; y: number }>()
@@ -122,7 +122,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
   if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
   const from = moveFrom.get(id) ?? { x, y }
   moveFrom.delete(id)
-  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요')
+  const fail = () => say('Couldn\'t save the position. Try again')
   updateScreen(id, { x, y }).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
 }
@@ -135,7 +135,7 @@ function onResizeScreen(id: string, r: ScreenRect, done: boolean) {
   if (!done) { if (!resizeFrom.has(id)) resizeFrom.set(id, { x: s.x, y: s.y, width: s.width, height: s.height }); Object.assign(s, r); return }
   const from = resizeFrom.get(id) ?? r
   resizeFrom.delete(id)
-  const fail = () => say('크기를 저장하지 못했어요. 다시 시도해주세요')
+  const fail = () => say('Couldn\'t save the size. Try again')
   updateScreen(id, r).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, r).catch(fail))
 }
@@ -149,7 +149,7 @@ function onArrangeScreens(op: ArrangeOp) {
   const before = rows.map((s) => ({ id: s.id, x: s.x, y: s.y }))
   const after = rows.map((s, i) => ({ id: s.id, x: out[i]!.x, y: out[i]!.y })).filter((p, i) => p.x !== before[i]!.x || p.y !== before[i]!.y)
   if (!after.length) return
-  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요')
+  const fail = () => say('Couldn\'t save the position. Try again')
   const apply = (ps: { id: string; x: number; y: number }[]) => Promise.all(ps.map((p) => updateScreen(p.id, { x: p.x, y: p.y }))).catch(fail)
   const back = before.filter((b) => after.some((a) => a.id === b.id))
   apply(after)
@@ -163,20 +163,20 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
       let cur = row.id
       store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
     }
-  } catch { say('화면을 만들지 못했어요. 다시 시도해주세요') }
+  } catch { say('Couldn\'t create the frame. Try again') }
 }
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
   const s = current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
-  const fail = () => say('저장하지 못했어요. 다시 시도해주세요')
+  const fail = () => say('Couldn\'t save. Try again')
   updateScreen(s.id, patch).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); store.selectScreen(null); say(`'${name}' 화면을 지웠어요`) } catch { say('화면을 지우지 못했어요') }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(`Deleted ${name}`) } catch { say('화면을 지우지 못했어요') }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 
@@ -188,7 +188,7 @@ const screenClip = ref<string | null>(null)
 async function cloneScreen(srcId: string, at?: { x: number; y: number }) {
   const src = list.value.find((v) => v.id === srcId)
   if (!src) return null
-  if (src.source !== 'native') { say('피그마 화면은 복제할 수 없어요. 피그마에서 다시 가져와주세요'); return null }
+  if (src.source !== 'native') { say('Figma frames can\'t be duplicated. Import it again from Figma'); return null }
   const rect = { x: at?.x ?? src.x + src.width + 40, y: at?.y ?? src.y, width: src.width, height: src.height }
   const row = await addScreen(rect, `${src.name} 사본`)
   if (!row) return null
@@ -200,11 +200,19 @@ async function cloneScreen(srcId: string, at?: { x: number; y: number }) {
   store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(src.id) }, async () => { const r = await addScreen(rect, row.name); if (r) { cur = r.id; await updateScreen(r.id, { layers }); delete store.docs[r.id] } })
   return row
 }
+/** 피그마처럼 원래 화면 바로 오른쪽(40px 띄워서). 그 자리에 다른 화면이 있으면 맨 오른쪽 끝 */
+function spotRightOf(id: string): { x: number; y: number } {
+  const src = list.value.find((v) => v.id === id)
+  if (!src) return { x: nextX.value, y: 0 }
+  const r = { x: src.x + src.width + 40, y: src.y, w: src.width, h: src.height }
+  const hit = list.value.some((v) => v.x < r.x + r.w && v.x + v.width > r.x && v.y < r.y + r.h && v.y + v.height > r.y)
+  return hit ? { x: nextX.value, y: src.y } : { x: r.x, y: r.y }
+}
 async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge', dx = 0, dy = 0) {
   const s = current.value
   try {
-    if (action === 'copy' && s) { screenClip.value = s.id; say(`'${s.name}' 화면을 복사했어요`); return }
-    if (action === 'paste') { if (screenClip.value) await cloneScreen(screenClip.value, { x: nextX.value, y: 0 }); return }
+    if (action === 'copy' && s) { screenClip.value = s.id; say(`Copied ${s.name}`); return }
+    if (action === 'paste') { if (screenClip.value) await cloneScreen(screenClip.value, spotRightOf(screenClip.value)); return }
     if (!s) return
     if (action === 'duplicate') { await cloneScreen(s.id); return }
     if (action === 'nudge') {
@@ -224,17 +232,17 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
       let cur = s.id
       await removeScreen(cur)
       store.selectScreen(null)
-      say(`'${s.name}' 화면을 지웠어요 · ⌘Z 로 되돌려요`)
+      say(`Deleted ${s.name} · ⌘Z to undo`)
       store.pushAction(null, async () => {
         const r = await addScreen(snap.rect, snap.name)
         if (r) { cur = r.id; await updateScreen(r.id, { layers: snap.layers, status: snap.status }); delete store.docs[r.id]; store.selectScreen(r.id) }
       }, async () => { await removeScreen(cur); store.selectScreen(null) })
     }
-  } catch { say('처리하지 못했어요. 다시 시도해주세요') }
+  } catch { say('Something went wrong. Try again') }
 }
 async function onFigmaCreated() {
   await screens.refresh()
-  say('피그마 화면을 가져왔어요')
+  say('Imported from Figma')
 }
 
 /** 다른 페이지의 화면이면 그 페이지로 옮긴 뒤 고르기 */
@@ -283,7 +291,7 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? `${code}를 만들고 '${current.value.name}'에 연결했어요` : `${code}를 만들었어요`)
-  } catch { say('요구사항을 만들지 못했어요. 다시 시도해주세요') }
+  } catch { say('Couldn\'t create the requirement. Try again') }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -303,14 +311,14 @@ onMounted(async () => {
 // 그리기 도구: 그린 뒤에는 디자인 탭, 이미지는 파일 고르기
 // ---------------------------------------------------------------------------
 watch(tool, (t, prev) => {
-  if (t === 'move' && (prev === 'rect' || prev === 'text' || prev === 'frame') && store.layerIds.value.length) tab.value = 'design'
+  if (t === 'move' && prev !== 'move' && prev !== 'hand' && prev !== 'image' && store.layerIds.value.length) tab.value = 'design'
   if (t === 'image') { tool.value = 'move'; pickImage() }
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 let replaceId: string | null = null
 function pickImage(replace?: string) {
   const s = current.value
-  if (s && s.source !== 'native') return say('피그마 화면에는 이미지를 넣을 수 없어요')
+  if (s && s.source !== 'native') return say('Images can\'t be added to Figma frames')
   replaceId = typeof replace === 'string' ? replace : null
   fileInput.value?.click()
 }
@@ -325,8 +333,8 @@ async function onImageFile(e: Event) {
  * at 이 Iris 화면 위면 그 화면 안으로, 아니면 캔버스 위로 들어가요.
  */
 async function insertImage(file: File, at?: { x: number; y: number }) {
-  if (!file.type.startsWith('image/')) return say('이미지 파일만 넣을 수 있어요')
-  if (file.size > 10 * 1024 * 1024) return say('10MB 보다 작은 이미지만 넣을 수 있어요')
+  if (!file.type.startsWith('image/')) return say('Only image files can be added')
+  if (file.size > 10 * 1024 * 1024) return say('Images must be smaller than 10MB')
   const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
   const s = (at ? hitScreen : current.value) ?? canvasScreen.value
   if (!s) return
@@ -342,12 +350,12 @@ async function insertImage(file: File, at?: { x: number; y: number }) {
     else { cx = Math.round(s.width / 2); cy = Math.round(s.height / 2) }
     store.add(s.id, null, { type: 'image', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40) || '이미지', src: img.src, x: cx - Math.round(w / 2), y: cy - Math.round(h / 2), w, h, lockRatio: true })
     tab.value = 'design'
-  } catch { say('이미지를 올리지 못했어요. 다시 시도해주세요') }
+  } catch { say('Couldn\'t upload the image. Try again') }
 }
 /** 캔버스에 파일 끌어 놓기 */
 async function onDropFiles(files: File[], at: { x: number; y: number }) {
   const imgs = files.filter((f) => f.type.startsWith('image/'))
-  if (!imgs.length) return say('이미지 파일(PNG · JPG · SVG 등)만 넣을 수 있어요')
+  if (!imgs.length) return say('Only image files (PNG, JPG, SVG…) can be added')
   for (const [i, f] of imgs.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 })
 }
 /** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
@@ -377,14 +385,14 @@ function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   if (k === 'assets') { left.value = 'assets'; asset.value = null }
   else if (k === 'figma') figmaOpen.value = true
   else if (k === 'link') {
-    if (!current.value) return say('먼저 캔버스에서 화면을 골라주세요')
+    if (!current.value) return say('Select a frame on the canvas first')
     closeDoc(); tab.value = 'plan'; nextTick(() => plan.value?.openPicker())
-  } else say('코멘트는 다음 단계에서 열려요')
+  } else say('Comments are coming soon')
 }
 
 async function share() {
-  try { await navigator.clipboard.writeText(location.origin + route.path); say('이 프로젝트 링크를 복사했어요') }
-  catch { say('링크를 복사하지 못했어요') }
+  try { await navigator.clipboard.writeText(location.origin + route.path); say('Link copied') }
+  catch { say('Couldn\'t copy the link') }
 }
 
 const zoomOpen = ref(false)
@@ -442,53 +450,53 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       @drop-files="onDropFiles"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="canvas-empty">
-      <span class="tx-head">이 페이지는 비어 있어요</span>
-      <span class="tx-meta">프레임 도구(F)로 화면을 그리거나 피그마 화면을 가져와요</span>
+      <span class="tx-head">This page is empty</span>
+      <span class="tx-meta">Draw a frame with the Frame tool (F) or import one from Figma</span>
       <span class="row">
-        <Button size="s" type="tertiary" stroke @click="tool = 'frame'">프레임 그리기</Button>
-        <Button size="s" type="tertiary" stroke @click="figmaOpen = true">피그마에서 가져오기</Button>
+        <Button size="s" type="tertiary" stroke @click="tool = 'frame'">Draw frame</Button>
+        <Button size="s" type="tertiary" stroke @click="figmaOpen = true">Import from Figma</Button>
       </span>
     </div>
 
     <!-- 왼쪽 위: 파일 알약 -->
     <div class="sq float s pill-left">
       <div class="home-wrap">
-        <button class="sq hov home" aria-label="프로젝트 메뉴" :aria-expanded="projMenu" @click="projMenu = !projMenu"><IrisLogo kind="symbol" :height="16" /><Icon name="chevron_down" :size="12" /></button>
+        <button class="sq hov home" aria-label="Main menu" :aria-expanded="projMenu" @click="projMenu = !projMenu"><IrisLogo kind="symbol" :height="16" /><Icon name="chevron_down" :size="12" /></button>
         <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
-          <NuxtLink to="/" class="sq menu-item" role="menuitem">프로젝트 홈으로</NuxtLink>
-          <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">프로젝트 설정</button>
-          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">요구사항 보드</NuxtLink>
-          <NuxtLink to="/design-system" class="sq menu-item" role="menuitem">디자인 시스템</NuxtLink>
+          <NuxtLink to="/" class="sq menu-item" role="menuitem">Back to files</NuxtLink>
+          <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">Project settings</button>
+          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">Requirements board</NuxtLink>
+          <NuxtLink to="/design-system" class="sq menu-item" role="menuitem">Design system</NuxtLink>
           <div class="psep" role="separator" />
           <ThemeSwitch />
         </div>
       </div>
       <span class="tx-head ellipsis">{{ project.data.value?.name ?? '' }}</span>
-      <span v-if="store.saveState.state === 'saving'" class="tx-meta save">저장 중</span>
-      <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">저장 못 함 · 다시 시도</TextButton>
+      <span v-if="store.saveState.state === 'saving'" class="tx-meta save">Saving…</span>
+      <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">Couldn't save · Retry</TextButton>
     </div>
 
     <!-- 왼쪽 패널 -->
-    <aside aria-label="왼쪽 패널" class="sq float panel-left">
-      <div role="tablist" aria-label="왼쪽 패널" class="seg tabs">
-        <button v-for="t in [['file', '파일'], ['assets', '에셋'], ['docs', '문서']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]">{{ t[1] }}</button>
+    <aside aria-label="Left sidebar" class="sq float panel-left">
+      <div role="tablist" aria-label="Left sidebar" class="seg tabs">
+        <button v-for="t in [['file', 'File'], ['assets', 'Assets'], ['docs', 'Docs']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]">{{ t[1] }}</button>
       </div>
 
       <template v-if="left === 'file'">
         <section class="pages">
-          <div class="sec-h"><span>페이지</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="페이지 추가" @click="onAddPage" /></div>
+          <div class="sec-h"><span>Pages</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="Add new page" @click="onAddPage" /></div>
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <template v-for="p in pages.data.value ?? []" :key="p.id">
-            <input v-if="renaming === p.id" class="txt-in rename" :value="p.name" aria-label="페이지 이름" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
-            <button v-else :class="['sq', 'nav-item', 's', { on: pageId === p.id }]" :title="'두 번 눌러 이름 바꾸기'" @click="pageId = p.id" @dblclick="renaming = p.id">{{ p.name }}</button>
+            <input v-if="renaming === p.id" class="txt-in rename" :value="p.name" aria-label="Page name" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
+            <button v-else :class="['sq', 'nav-item', 's', { on: pageId === p.id }]" :title="'Double-click to rename'" @click="pageId = p.id" @dblclick="renaming = p.id">{{ p.name }}</button>
           </template>
         </section>
         <section class="layers">
-          <span class="nav-label">레이어</span>
+          <span class="nav-label">Layers</span>
           <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" @pick-screen="pickScreen" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
-            <span class="tx-meta">화면이 아직 없어요</span>
-            <TextButton size="s" color="blue" @click="tool = 'frame'">프레임 그리기</TextButton>
+            <span class="tx-meta">No frames yet</span>
+            <TextButton size="s" color="blue" @click="tool = 'frame'">Draw frame</TextButton>
           </div>
         </section>
       </template>
@@ -496,7 +504,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" />
 
       <div v-else class="docs">
-        <div class="sec-h"><span>문서</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="문서 추가" @click="addDocOpen = true" /></div>
+        <div class="sec-h"><span>Docs</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="Add doc" @click="addDocOpen = true" /></div>
         <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
           <span class="nav-label">{{ g.label }}</span>
@@ -508,8 +516,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           </button>
         </div>
         <div v-if="docs.status.value === 'success' && !docGroups.length" class="empty-col">
-          <span class="tx-meta">아직 문서가 없어요</span>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="addDocOpen = true">문서 추가</Button>
+          <span class="tx-meta">No docs yet</span>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="addDocOpen = true">Add doc</Button>
         </div>
       </div>
     </aside>
@@ -518,19 +526,19 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
     <div class="sq float s pill-right">
       <Avatar :size="24" :alt="myName" :title="myName" />
       <span class="pill-acts">
-        <Button size="s" type="tertiary" :text-color="docId ? 'blue' : 'gray'" :class="['doc-toggle', { 'is-on': !!docId }]" :aria-pressed="!!docId" @click="toggleDocs">문서</Button>
-        <Button size="s" type="primary" @click="share">공유</Button>
+        <Button size="s" type="tertiary" :text-color="docId ? 'blue' : 'gray'" :class="['doc-toggle', { 'is-on': !!docId }]" :aria-pressed="!!docId" @click="toggleDocs">Docs</Button>
+        <Button size="s" type="primary" @click="share">Share</Button>
       </span>
     </div>
 
     <!-- 오른쪽 패널 -->
-    <aside aria-label="오른쪽 패널" class="sq float panel-right">
+    <aside aria-label="Right sidebar" class="sq float panel-right">
       <!-- 문서 읽기 -->
       <template v-if="openDoc">
         <div class="panel-h line-b">
-          <span class="tx-head flex-none">문서</span>
-          <span class="tx-meta ellipsis f1">{{ current ? `'${current.name}' 화면과 함께 보는 중` : '' }}</span>
-          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="문서 닫기" @click="closeDoc" />
+          <span class="tx-head flex-none">Docs</span>
+          <span class="tx-meta ellipsis f1">{{ current ? `Viewing with ${current.name}` : '' }}</span>
+          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="Close doc" @click="closeDoc" />
         </div>
         <div class="scroll reader">
           <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="(id: string) => (docReq = docReq === id ? null : id)" @create-req="onCreateReq" />
@@ -539,15 +547,15 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 
       <!-- 인스펙터 -->
       <template v-else>
-        <div role="tablist" aria-label="인스펙터 탭" class="seg tabs">
-          <button v-for="t in [['design', '디자인'], ['plan', '기획'], ['dev', '개발']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]">{{ t[1] }}</button>
+        <div role="tablist" aria-label="Properties tabs" class="seg tabs">
+          <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]">{{ t[1] }}</button>
           <div class="zoom-wrap">
-            <button class="sq hov zoom" aria-label="확대 비율" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><Icon name="chevron_down" :size="12" class="muted" /></button>
+            <button class="sq hov zoom" aria-label="Zoom" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><Icon name="chevron_down" :size="12" class="muted" /></button>
             <div v-if="zoomOpen" class="sq menu zmenu" role="menu" @click="zoomOpen = false">
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">확대</span><span class="tx-meta">⌘ +</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">축소</span><span class="tx-meta">⌘ −</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">전체 보기</span><span class="tx-meta">⇧ 1</span></button>
-              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">선택 보기</span><span class="tx-meta">⇧ 2</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">Zoom in</span><span class="tx-meta">⌘ +</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">Zoom out</span><span class="tx-meta">⌘ −</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">Zoom to fit</span><span class="tx-meta">⇧ 1</span></button>
+              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">Zoom to selection</span><span class="tx-meta">⇧ 2</span></button>
               <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">{{ z * 100 }}%</button>
             </div>
           </div>
@@ -559,7 +567,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
               <span class="tx-head ellipsis">{{ current.name }}</span>
               <span class="sq badge">{{ STATUS_BADGE[current.status] }}</span>
             </div>
-            <span class="tx-meta">{{ current.source === 'figma' ? '피그마 화면' : 'Iris 캔버스' }} · <span class="num">{{ Math.round(current.width) }} × {{ Math.round(current.height) }}</span></span>
+            <span class="tx-meta">{{ current.source === 'figma' ? 'Figma frame' : 'Iris frame' }} · <span class="num">{{ Math.round(current.width) }} × {{ Math.round(current.height) }}</span></span>
           </div>
           <div class="scroll">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
@@ -575,16 +583,16 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
         <div v-else-if="tab === 'design' && currentPage" class="scroll">
-          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say('이름을 바꾸지 못했어요'))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
+          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say('Couldn\'t rename the page'))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
-          <span class="tx-head">화면을 골라주세요</span>
-          <span class="tx-meta">캔버스나 왼쪽 레이어에서 화면을 누르면 요구사항 · 디자인 · 개발 정보가 여기 나와요</span>
-          <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">첫 화면 고르기</TextButton>
+          <span class="tx-head">Select a frame</span>
+          <span class="tx-meta">Select a frame on the canvas or in Layers to see its requirements, design and dev info here</span>
+          <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">Select first frame</TextButton>
           <dl class="sq keys">
-            <dt>이동</dt><dd>스페이스 + 드래그 · 빈 곳 드래그</dd>
-            <dt>확대</dt><dd>⌘ + 스크롤 · 핀치</dd>
-            <dt>전체 보기</dt><dd>⇧ 1</dd>
+            <dt>Pan</dt><dd>Space + drag · H</dd>
+            <dt>Zoom</dt><dd>⌘ + scroll · pinch</dd>
+            <dt>Zoom to fit</dt><dd>⇧ 1</dd>
           </dl>
         </div>
       </template>

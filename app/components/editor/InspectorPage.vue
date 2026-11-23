@@ -28,55 +28,55 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 <template>
   <div class="pg">
     <section class="s first">
-      <div class="sec-h h24"><span>페이지</span><span class="tx-meta">화면 {{ screenCount }}개</span></div>
-      <label class="sq fld"><span>이름</span><input :key="page.id + page.name" :value="page.name" aria-label="페이지 이름" @change="emit('rename', ($event.target as HTMLInputElement).value)" @keydown="blur"></label>
+      <div class="sec-h h24"><span>Page</span><span class="tx-meta">{{ screenCount }} {{ screenCount === 1 ? 'frame' : 'frames' }}</span></div>
+      <label class="sq fld"><span>Name</span><input :key="page.id + page.name" :value="page.name" aria-label="Page name" @change="emit('rename', ($event.target as HTMLInputElement).value)" @keydown="blur"></label>
     </section>
 
     <section class="s">
       <div class="sec-h h24">
-        <span>배경</span>
-        <button class="ib s24" :aria-label="bg ? '기본 배경으로' : '배경색 정하기'" :title="bg ? '기본 배경으로 되돌리기' : '배경색 정하기'" @click="emit('settings', { background: bg ? null : '#E5E5E5' })">
+        <span>Background</span>
+        <button class="ib s24" :aria-label="bg ? 'Use default background' : 'Set background color'" :title="bg ? 'Reset to default background' : 'Set background color'" @click="emit('settings', { background: bg ? null : '#E5E5E5' })">
           <Icon :name="bg ? 'minus_in_circle' : 'plus'" :size="14" />
         </button>
       </div>
       <div v-if="bg" class="color-row">
-        <label class="sq fld"><input type="color" class="swatch" :value="hex" aria-label="캔버스 배경색" @change="emit('settings', { background: ($event.target as HTMLInputElement).value.toUpperCase() })"><input :value="bg.toUpperCase()" aria-label="배경색 값" @change="setHex" @keydown="blur"></label>
+        <label class="sq fld"><input type="color" class="swatch" :value="hex" aria-label="Canvas background color" @change="emit('settings', { background: ($event.target as HTMLInputElement).value.toUpperCase() })"><input :value="bg.toUpperCase()" aria-label="Background color value" @change="setHex" @keydown="blur"></label>
       </div>
-      <p v-else class="tx-meta m0">화면 모드(라이트 · 다크)에 맞춘 기본 배경이에요</p>
-      <div class="presets" role="group" aria-label="자주 쓰는 배경">
-        <button v-for="c in PRESETS" :key="c" class="pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="`배경 ${c}`" :title="c" @click="emit('settings', { background: c })" />
+      <p v-else class="tx-meta m0">Default background that follows the theme (light or dark)</p>
+      <div class="presets" role="group" aria-label="Common backgrounds">
+        <button v-for="c in PRESETS" :key="c" class="pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="`Background ${c}`" :title="c" @click="emit('settings', { background: c })" />
       </div>
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>캔버스</span></div>
-      <button :class="['cb', { on: page.viewport?.pixelGrid !== false }]" role="switch" :aria-checked="page.viewport?.pixelGrid !== false" @click="emit('settings', { pixelGrid: page.viewport?.pixelGrid === false })"><i />픽셀 격자 (800% 이상 확대할 때)</button>
+      <div class="sec-h h24"><span>Canvas</span></div>
+      <button :class="['cb', { on: page.viewport?.pixelGrid !== false }]" role="switch" :aria-checked="page.viewport?.pixelGrid !== false" @click="emit('settings', { pixelGrid: page.viewport?.pixelGrid === false })"><i />Pixel grid (at 800% zoom and above)</button>
       <div class="zoom-row">
-        <span class="tx-meta">확대</span>
+        <span class="tx-meta">Zoom</span>
         <span class="num zv">{{ Math.round(zoom * 100) }}%</span>
         <span class="zb">
-          <button class="ib s24" aria-label="축소" @click="emit('zoom', zoom / 1.25)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
-          <button class="ib s24" aria-label="확대" @click="emit('zoom', zoom * 1.25)"><Icon name="plus" :size="14" /></button>
+          <button class="ib s24" aria-label="Zoom out" @click="emit('zoom', zoom / 1.25)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
+          <button class="ib s24" aria-label="Zoom in" @click="emit('zoom', zoom * 1.25)"><Icon name="plus" :size="14" /></button>
           <button class="ib s24" aria-label="100%" title="100% (⇧0)" @click="emit('zoom', 1)"><span class="t1">1:1</span></button>
-          <button class="ib s24" aria-label="전체 보기" title="전체 보기 (⇧1)" @click="emit('zoom', 'fit')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+          <button class="ib s24" aria-label="Zoom to fit" title="Zoom to fit (⇧1)" @click="emit('zoom', 'fit')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
         </span>
       </div>
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>스타일</span></div>
-      <div class="style-row"><span class="dot c" aria-hidden="true" /><span class="tx-body f1">색 토큰</span><span class="tx-meta num">{{ colorCount }}</span></div>
-      <div class="style-row"><span class="dot t" aria-hidden="true">Ag</span><span class="tx-body f1">텍스트 스타일</span><span class="tx-meta num">{{ textCount }}</span></div>
-      <TextButton size="s" color="blue" class="self-start" @click="navigateTo('/design-system')">디자인 시스템에서 보기</TextButton>
+      <div class="sec-h h24"><span>Styles</span></div>
+      <div class="style-row"><span class="dot c" aria-hidden="true" /><span class="tx-body f1">Color styles</span><span class="tx-meta num">{{ colorCount }}</span></div>
+      <div class="style-row"><span class="dot t" aria-hidden="true">Ag</span><span class="tx-body f1">Text styles</span><span class="tx-meta num">{{ textCount }}</span></div>
+      <TextButton size="s" color="blue" class="self-start" @click="navigateTo('/design-system')">View in design system</TextButton>
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>단축키</span></div>
+      <div class="sec-h h24"><span>Shortcuts</span></div>
       <dl class="keys">
-        <dt>이동</dt><dd>스페이스+끌기 · H</dd>
-        <dt>확대</dt><dd>⌘+스크롤 · 핀치</dd>
-        <dt>전체 보기</dt><dd>⇧1</dd>
-        <dt>그리기</dt><dd>F · R · T</dd>
+        <dt>Pan</dt><dd>Space+drag · H</dd>
+        <dt>Zoom</dt><dd>⌘+scroll · Pinch</dd>
+        <dt>Zoom to fit</dt><dd>⇧1</dd>
+        <dt>Draw</dt><dd>F · R · T</dd>
       </dl>
     </section>
   </div>

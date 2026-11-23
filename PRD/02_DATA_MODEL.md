@@ -126,7 +126,7 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
             "rotation": 90, "flipX": true, "lockRatio": true,
             "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 4
+  "schemaVersion": 5
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
@@ -159,6 +159,23 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 | frame.stroke · frame.strokeWidth | 화면 테두리(안쪽 선). 둘 다 있어야 보인다 | `"#202837"`, `1` | 없음 = 선 없음 |
 | frame.radius | 화면 모서리 | `24` | 0 |
 | frame.opacity · frame.clip | 투명도(0~1) · 내용 자르기(false 면 화면 밖도 보임) | `0.8`, `false` | 1, true |
+
+- **schemaVersion 5 (2026-11-23)**: 2묶음(도형 · 스타일). 새 레이어 종류와 스타일 값이 더해졌다. 모두 비어 있어도 되는 값이라 v1~v4 문서는 그대로 읽힌다.
+  - 레이어 종류: `ellipse`(원) · `line`(선 · 화살표) · `polygon`(다각형) · `star`(별) · `path`(연필) · `section`(섹션 — 자식을 담고, 캔버스 위에서는 화면 아래에 깔리며 옮기면 안에 든 화면도 함께 움직임)
+  - `pts`: 선 · 연필의 점 [x0, y0, x1, y1, …] — 레이어 상자 안 0~1 비율. `closed`: 연필 닫힌 모양
+
+| 필드 | 설명 | 예시 | 기본 |
+|---|---|---|---|
+| style.fills | fill 위에 쌓는 칠 목록(마지막이 맨 위). `solid` · `linear` · `radial` · `image` | `[{"type":"linear","angle":180,"stops":[{"pos":0,"color":"#2C7BE2"},{"pos":1,"color":"#2C7BE200"}]}]` | 없음 |
+| style.strokes | stroke 위에 쌓는 선 색 | `[{"type":"solid","color":"#FF0000"}]` | 없음 |
+| style.strokeAlign | 선 위치 inside · center · outside | `"outside"` | 상자 도형 inside, 선 · 연필 center |
+| style.dash | 점선 [선, 간격] | `[4, 4]` | 실선 |
+| style.cap · arrowStart · arrowEnd | 선 끝 모양, 화살표(arrow · triangle · circle) | `"round"`, `"arrow"` | butt, 없음 |
+| style.effects | 효과: drop · inner(그림자), blur · bgblur(흐림) | `[{"type":"drop","x":0,"y":4,"blur":4,"spread":0,"color":"#00000040"}]` | 없음 |
+| style.blend | 혼합 모드(CSS mix-blend-mode) | `"multiply"` | normal |
+| style.sides · points · inner | 다각형 꼭짓점 · 별 꼭짓점 · 별 안쪽 비율 | `5`, `5`, `0.38` | 3, 5, 0.38 |
+| style.fit · crop | 이미지 채우기(fill · fit · crop · tile), 자르기 { scale, x, y } | `"crop"`, `{"scale":1.5,"x":50,"y":30}` | fill |
+| style.decoration · textCase · list · paraSpacing | 밑줄 · 취소선, 대소문자, 글머리 · 번호 목록, 문단 간격 | `"underline"`, `"upper"`, `"bullet"`, `8` | 없음 |
 - **토큰 id**: 디자인 시스템 CSS 변수 이름(`--sys-color-…` · `--ref-color-…` · `--ref-spacing-…` · `--ref-radius-…` · `--ref-borderwidth-…` · `--ref-opacity-…` · `--font-weight-…` · `--typography-<스타일>-size|line-height|letter-spacing`), 글자 스타일 묶음 `ts:<스타일>`(예: `ts:body-1` = 크기 · 행간 · 자간 함께), DB 에 등록한 토큰 `db:<이름>`.
 - **값은 함께 저장한다**: 연결할 때 실제 값(밝은 모드 기준, 예: `fill: "#2C7BE2"`, `radius: 8`)도 그 속성에 써 둔다. 그래서 그리기 · 썸네일 · 내보내기는 `vars` 를 몰라도 되고, 앱을 다크모드로 바꿔도 캔버스 결과물 색은 바뀌지 않는다.
 - **연결 풀기**: 연결은 그대로인데 그 속성 값이 바뀌면(직접 입력 · ↑↓ · 캔버스에서 끌어 옮기기 · 크기 바꾸기) 그 키의 연결을 자동으로 푼다(`app/canvas/store.ts` 의 `record()` → `detachEdited`). 글자 크기 · 행간 · 자간 중 하나가 바뀌면 `textStyle` 도 풀린다.

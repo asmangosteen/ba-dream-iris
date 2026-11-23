@@ -1,5 +1,5 @@
 import type { InjectionKey, Ref } from 'vue'
-import { absPos, bindLiteral, descendants, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
+import { absPos, bindLiteral, descendants, isContainer, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
 
@@ -150,7 +150,7 @@ export function createLayerStore(opts: {
     return mutate(sid, (d) => {
       const id = newId()
       d.nodes[id] = { id, name: nextName(d, part.type), parentId, x: 0, y: 0, w: 100, h: 100, ...part, style: { ...DEFAULT_STYLE[part.type], ...part.style } }
-      if (part.type === 'frame') d.nodes[id]!.children = []
+      if (isContainer(part)) d.nodes[id]!.children = []
       siblings(d, parentId).push(id)
       layerIds.value = [id]
       screenId.value = sid
@@ -242,9 +242,9 @@ export function createLayerStore(opts: {
       const abs = absPos(dd, id)
       siblings(dd, n.parentId).splice(siblings(dd, n.parentId).indexOf(id), 1)
       const t = targetId ? dd.nodes[targetId] : null
-      const parentId = into && t?.type === 'frame' ? t.id : t ? t.parentId : null
+      const parentId = into && isContainer(t) ? t!.id : t ? t.parentId : null
       const sib = siblings(dd, parentId)
-      if (into && t?.type === 'frame') sib.push(id)
+      if (into && isContainer(t)) sib.push(id)
       else sib.splice(t ? sib.indexOf(t.id) + 1 : sib.length, 0, id)
       n.parentId = parentId
       // 화면에서 보이는 위치는 그대로
@@ -262,15 +262,15 @@ export function createLayerStore(opts: {
     clipboard = { rootIds: ids, nodes: ids.flatMap((id) => descendants(d, id)).map((k) => JSON.parse(JSON.stringify(d.nodes[k]))) }
     return true
   }
-  /** 붙여넣기: 고른 프레임 레이어가 있으면 그 안, 아니면 원래 부모(없으면 화면) — 10px 비켜서 */
-  function paste(targetSid?: string, offset = 10) {
+  /** 붙여넣기: 고른 프레임 레이어가 있으면 그 안, 아니면 원래 부모(없으면 화면) — 피그마처럼 같은 자리에 */
+  function paste(targetSid?: string, offset = 0) {
     const sid = targetSid ?? screenId.value
     if (!clipboard || !sid) return
     const cb = clipboard
     mutate(sid, (d) => {
       const map = new Map(cb.nodes.map((n) => [n.id, newId()]))
       const sel = layerIds.value.length === 1 ? d.nodes[layerIds.value[0]!] : undefined
-      const into = sel?.type === 'frame' && !cb.rootIds.includes(sel.id) ? sel.id : null
+      const into = sel && isContainer(sel) && !cb.rootIds.includes(sel.id) ? sel.id : null
       const fresh: string[] = []
       for (const n of cb.nodes) {
         const id = map.get(n.id)!
@@ -286,6 +286,54 @@ export function createLayerStore(opts: {
   function duplicate() { if (copy()) paste() }
   /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름 */
   function duplicateInPlace() { const keep = clipboard; if (copy()) paste(undefined, 0); clipboard = keep }
+
+  /**
+   * 같은 화면 안에서 부모 바꾸기(끌어서 프레임 밖으로 · 안으로). 화면 위 위치는 그대로.
+   * 기록은 하지 않아요 — 끌기가 begin/commit 으로 한 번에 기록합니다
+   */
+  function reparent(sid: string, ids: string[], parentId: string | null) {
+    const d = doc(sid)
+    const pp = parentId ? absPos(d, parentId) : { x: 0, y: 0 }
+    for (const id of ids) {
+      const n = d.nodes[id]
+      if (!n || n.parentId === parentId || (parentId && descendants(d, id).includes(parentId))) continue
+      const a = absPos(d, id)
+      const from = siblings(d, n.parentId)
+      from.splice(from.indexOf(id), 1)
+      siblings(d, parentId).push(id)
+      n.parentId = parentId
+      n.x = a.x - pp.x
+      n.y = a.y - pp.y
+    }
+  }
+  /**
+   * 다른 화면(또는 캔버스)으로 옮기기. offset: 원래 화면 왼쪽 위 - 새 화면 왼쪽 위(캔버스 좌표).
+   * 두 화면이 함께 바뀌어서 실행취소 한 번에 둘 다 되돌려요
+   */
+  function transfer(fromSid: string, ids: string[], toSid: string, parentId: string | null, offset: { x: number; y: number }) {
+    const src = doc(fromSid), dst = doc(toSid)
+    const b0 = snap(fromSid), c0 = snap(toSid)
+    const roots = ids.filter((id) => src.nodes[id] && !ids.some((o) => o !== id && descendants(src, o).includes(id)))
+    if (!roots.length) return
+    const pp = parentId ? absPos(dst, parentId) : { x: 0, y: 0 }
+    for (const id of roots) {
+      const a = absPos(src, id)
+      for (const k of descendants(src, id)) {
+        const n = JSON.parse(JSON.stringify(src.nodes[k])) as LayerNode
+        if (k === id) { n.parentId = parentId; n.x = a.x + offset.x - pp.x; n.y = a.y + offset.y - pp.y }
+        dst.nodes[k] = n
+      }
+      siblings(dst, parentId).push(id)
+      const from = siblings(src, src.nodes[id]!.parentId)
+      from.splice(from.indexOf(id), 1)
+      for (const k of descendants(src, id)) delete src.nodes[k]
+    }
+    const b1 = snap(fromSid), c1 = snap(toSid)
+    scheduleSave(fromSid); scheduleSave(toSid)
+    pushAction(toSid, () => { restore(fromSid, b0); restore(toSid, c0) }, () => { restore(fromSid, b1); restore(toSid, c1) })
+    screenId.value = toSid
+    layerIds.value = roots
+  }
 
   // --- 고르기 이동 (피그마: ⌘A · Enter · Shift+Enter · Tab) ---
   function selectAll(sid: string) {
@@ -332,7 +380,7 @@ export function createLayerStore(opts: {
       const id = newId()
       const sib = siblings(d, parentId)
       const at = Math.max(...same.map((k) => sib.indexOf(k)))
-      d.nodes[id] = { id, type: 'frame', name: nextName(d, 'frame').replace('프레임', kind === 'group' ? '그룹' : '프레임'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : { fill: '#FFFFFF', clip: true } }
+      d.nodes[id] = { id, type: 'frame', name: kind === 'group' ? `Group ${Object.values(d.nodes).filter((v) => v.name.startsWith('Group ')).length + 1}` : nextName(d, 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : { fill: '#FFFFFF', clip: true } }
       sib.splice(at + 1, 0, id)
       for (const b of boxes.sort((a, c) => sib.indexOf(a.id) - sib.indexOf(c.id))) {
         sib.splice(sib.indexOf(b.id), 1)
@@ -345,7 +393,7 @@ export function createLayerStore(opts: {
   }
   function unwrap(sid: string, ids: string[]) {
     const d0 = doc(sid)
-    const frames = ids.filter((id) => d0.nodes[id]?.type === 'frame')
+    const frames = ids.filter((id) => isContainer(d0.nodes[id]))
     if (!frames.length) return
     mutate(sid, (d) => {
       const freed: string[] = []
@@ -430,7 +478,7 @@ export function createLayerStore(opts: {
   return {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    selectScreen, selectLayer, add, update, style, frameStyle, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, update, style, frameStyle, reparent, transfer, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

@@ -39,7 +39,7 @@ const relDocs = computed(() => {
 
 function anchorLabel(r: ReqRow) {
   const d = docById.value.get(r.document_id)
-  if (!d) return '문서 없음'
+  if (!d) return 'No doc'
   const block = r.anchor?.block ? d.content_blocks?.find((b) => b.id === r.anchor!.block) : null
   const head = block && d.content_blocks ? [...d.content_blocks.slice(0, d.content_blocks.indexOf(block))].reverse().find((b) => b.type === 'h2') : null
   return head?.text ?? d.title
@@ -50,7 +50,7 @@ async function cycle(link: { requirement_id: string; status: LinkStatus; note: s
   const before = link.status
   link.status = next
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: next, note: link.note }) }
-  catch { link.status = before; emit('toast', '상태를 바꾸지 못했어요. 다시 시도해주세요') }
+  catch { link.status = before; emit('toast', "Couldn't change status. Try again") }
 }
 
 // 요구사항 연결 고르기
@@ -65,13 +65,13 @@ async function link(r: ReqRow) {
   const row = { screen_id: props.screen.id, requirement_id: r.id, status: 'missing' as const, note: null }
   links.data.value = [...(links.data.value ?? []), row]
   try { await setLink(row) }
-  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', '연결하지 못했어요. 다시 시도해주세요') }
+  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', "Couldn't link. Try again") }
 }
 async function unlink(requirement_id: string) {
   const before = links.data.value
   links.data.value = (links.data.value ?? []).filter((x) => !(x.screen_id === props.screen.id && x.requirement_id === requirement_id))
   try { await removeLink(props.screen.id, requirement_id) }
-  catch { links.data.value = before; emit('toast', '연결을 풀지 못했어요') }
+  catch { links.data.value = before; emit('toast', "Couldn't unlink") }
 }
 
 // 메모 고치기
@@ -83,7 +83,7 @@ async function saveNote(link: { requirement_id: string; status: LinkStatus; note
   link.note = noteDraft.value.trim() || null
   editing.value = null
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: link.status, note: link.note }) }
-  catch { link.note = before; emit('toast', '메모를 저장하지 못했어요') }
+  catch { link.note = before; emit('toast', "Couldn't save note") }
 }
 defineExpose({ openPicker: () => (picking.value = true) })
 </script>
@@ -92,67 +92,67 @@ defineExpose({ openPicker: () => (picking.value = true) })
   <div class="plan">
     <section v-if="mine.length" class="pad">
       <div class="sq sum">
-        <div class="row"><span class="tx-head">요구사항 반영</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
-        <div role="img" :aria-label="`반영 ${count('reflected')}개, 일부 ${count('partial')}개, 미반영 ${count('missing')}개`" class="bars">
+        <div class="row"><span class="tx-head">Requirements coverage</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
+        <div role="img" :aria-label="`${count('reflected')} reflected, ${count('partial')} partial, ${count('missing')} missing`" class="bars">
           <span :style="bar('reflected')" /><span :style="bar('partial')" /><span :style="bar('missing')" />
         </div>
         <div class="legend">
-          <span><StatusIcon status="reflected" />반영 {{ count('reflected') }}</span>
-          <span><StatusIcon status="partial" />일부 {{ count('partial') }}</span>
-          <span><StatusIcon status="missing" />미반영 {{ count('missing') }}</span>
+          <span><StatusIcon status="reflected" />Reflected {{ count('reflected') }}</span>
+          <span><StatusIcon status="partial" />Partial {{ count('partial') }}</span>
+          <span><StatusIcon status="missing" />Missing {{ count('missing') }}</span>
         </div>
       </div>
     </section>
 
     <section class="sec2">
-      <div class="sec-h h24"><span>{{ mine.length ? `요구사항 ${mine.length}` : '요구사항' }}</span><button class="ib s24" aria-label="요구사항 연결" :aria-expanded="picking" @click="picking = !picking"><Icon name="plus" :size="14" /></button></div>
+      <div class="sec-h h24"><span>{{ mine.length ? `Requirements ${mine.length}` : 'Requirements' }}</span><button class="ib s24" aria-label="Link requirement" :aria-expanded="picking" @click="picking = !picking"><Icon name="plus" :size="14" /></button></div>
 
       <div v-if="picking" class="sq picker">
-        <SearchField v-model:value="q" type="contained" size="s" placeholder="번호나 내용으로 찾기" :input-props="{ 'aria-label': '요구사항 찾기', autofocus: true }" />
+        <SearchField v-model:value="q" type="contained" size="s" placeholder="Search by number or text" :input-props="{ 'aria-label': 'Search requirements', autofocus: true }" />
         <div class="plist">
           <button v-for="r in candidates" :key="r.id" class="sq menu-item" @click="link(r)"><span class="num w6">{{ r.code }}</span><span class="ell">{{ r.title }}</span></button>
-          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? '찾는 요구사항이 없어요' : (reqs.data.value ?? []).length ? '연결할 요구사항이 없어요' : '문서에서 요구사항을 먼저 만들어주세요' }}</p>
+          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? 'No requirements found' : (reqs.data.value ?? []).length ? 'No requirements left to link' : 'Create requirements in a doc first' }}</p>
         </div>
-        <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">닫기</Button></div>
+        <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">Close</Button></div>
       </div>
 
       <div v-for="g in groups" :key="g.k" class="grp-list">
         <span class="glabel"><StatusIcon :status="g.k" />{{ g.label }}<span class="sq count num">{{ g.items.length }}</span></span>
         <div v-for="{ link: lk, req } in g.items" :key="req.id" class="sq card">
           <div class="head">
-            <button class="st" :aria-label="`${req.code} ${LINK_STATUS[lk.status].label}, 눌러서 상태 바꾸기`" :title="`${LINK_STATUS[lk.status].label} · 눌러서 바꾸기`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
+            <button class="st" :aria-label="`${req.code} ${LINK_STATUS[lk.status].label}, click to change status`" :title="`${LINK_STATUS[lk.status].label} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
             <span class="tx-body w5">{{ req.title }}</span>
             <span />
             <span class="tx-meta ell"><span class="num">{{ req.code }}</span> · {{ anchorLabel(req) }}</span>
           </div>
           <div v-if="editing === req.id" class="note-edit">
-            <textarea v-model="noteDraft" rows="2" class="sq txt" aria-label="메모" placeholder="무엇이 빠졌는지 적어주세요" @keydown.meta.enter="saveNote(lk)" />
-            <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">취소</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">저장</Button></span>
+            <textarea v-model="noteDraft" rows="2" class="sq txt" aria-label="Note" placeholder="Describe what is missing" @keydown.meta.enter="saveNote(lk)" />
+            <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">Cancel</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">Save</Button></span>
           </div>
           <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><Icon name="warning" :size="12" class="mt3" /><span>{{ lk.note }}</span></button>
           <div class="foot">
             <span class="src"><Icon name="document" :size="12" /><span class="ell">{{ docById.get(req.document_id)?.title ?? '' }}</span></span>
             <span class="acts">
-              <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">메모</TextButton>
-              <TextButton size="s" color="gray" :aria-label="`${req.code} 연결 풀기`" @click="unlink(req.id)">풀기</TextButton>
-              <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" @click="emit('open-doc', req.document_id, req.id)">원문</TextButton>
+              <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">Note</TextButton>
+              <TextButton size="s" color="gray" :aria-label="`Unlink ${req.code}`" @click="unlink(req.id)">Unlink</TextButton>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" @click="emit('open-doc', req.document_id, req.id)">Source</TextButton>
             </span>
           </div>
         </div>
       </div>
 
       <div v-if="!mine.length && !picking" class="empty-col">
-        <span class="tx-meta">연결된 요구사항이 없어요</span>
-        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">요구사항 연결</Button>
+        <span class="tx-meta">No linked requirements</span>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">Link requirement</Button>
       </div>
     </section>
 
     <section class="sec2 tight">
-      <div class="sec-h h24"><span>관련 문서</span><button class="ib s24" aria-label="문서 추가" @click="emit('add-doc')"><Icon name="plus" :size="14" /></button></div>
+      <div class="sec-h h24"><span>Linked docs</span><button class="ib s24" aria-label="Add doc" @click="emit('add-doc')"><Icon name="plus" :size="14" /></button></div>
       <button v-for="d in relDocs" :key="d!.id" class="sq hov doc" @click="emit('open-doc', d!.id)">
         <Icon :name="docIcon(d!)" :size="14" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ DOC_CATEGORY_LABEL[d!.category] }}</span>
       </button>
-      <p v-if="!relDocs.length" class="tx-meta m0 pb2">요구사항을 연결하면 문서가 여기 모여요</p>
+      <p v-if="!relDocs.length" class="tx-meta m0 pb2">Docs appear here once you link requirements</p>
     </section>
   </div>
 </template>

@@ -69,7 +69,7 @@ async function load() {
   result.value = null
   thumbFailed.value = false
   if (!/figma\.com\//i.test(raw)) {
-    error.value = { code: 'invalid_url', message: '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요' }
+    error.value = { code: 'invalid_url', message: "That isn't a Figma link. Paste a URL that starts with figma.com/design/…" }
     focusInput()
     return
   }
@@ -85,7 +85,7 @@ async function load() {
     const body = (e as { data?: { message?: string; data?: { code?: string; message?: string } } }).data
     error.value = {
       code: body?.data?.code ?? 'figma_error',
-      message: body?.data?.message ?? '피그마에서 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해주세요',
+      message: body?.data?.message ?? "Couldn't import the frame from Figma. Try again in a moment",
     }
   } finally {
     loading.value = false
@@ -125,7 +125,7 @@ async function add() {
   }).select('id').single()
   if (e1 || !screen) {
     saving.value = false
-    error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요' }
+    error.value = { code: 'save', message: "Couldn't add the frame. Try again in a moment" }
     return
   }
   const screenId = (screen as { id: string }).id
@@ -137,7 +137,7 @@ async function add() {
       // 컴포넌트 기록이 빠진 화면이 남지 않도록 되돌립니다
       await supabase.from('screens').delete().eq('id', screenId)
       saving.value = false
-      error.value = { code: 'save', message: '화면을 추가하지 못했어요. 잠시 뒤 다시 시도해주세요' }
+      error.value = { code: 'save', message: "Couldn't add the frame. Try again in a moment" }
       return
     }
   }
@@ -192,8 +192,8 @@ onBeforeUnmount(() => {
     <div v-if="open" class="backdrop" @mousedown.self="close">
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog">
         <header class="head">
-          <h2 id="figmaTitle" class="tx-title">피그마 화면 가져오기</h2>
-          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="닫기" @click="close" />
+          <h2 id="figmaTitle" class="tx-title">Import from Figma</h2>
+          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="Close" @click="close" />
         </header>
 
         <div class="body">
@@ -201,7 +201,7 @@ onBeforeUnmount(() => {
             <TextInput
               v-model:value="url"
               size="s"
-              label="피그마 링크"
+              label="Figma link"
               :label-props="{ htmlFor: 'figmaUrl' }"
               placeholder="figma.com/design/…?node-id=…"
               :show-left-icon="false"
@@ -212,9 +212,9 @@ onBeforeUnmount(() => {
               :input-props="{ id: 'figmaUrl', type: 'text', inputmode: 'url', autocomplete: 'off', 'aria-describedby': 'figmaHint', 'aria-invalid': error?.code === 'invalid_url' || error?.code === 'no_node', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); load() } } }"
               class="grow"
             />
-            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">불러오기</Button>
+            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">Import</Button>
           </div>
-          <p id="figmaHint" class="tx-meta">피그마에서 프레임을 고르고 '링크 복사'한 주소를 붙여주세요</p>
+          <p id="figmaHint" class="tx-meta">Select a frame in Figma, choose Copy link to selection, and paste the URL here</p>
         </div>
 
         <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
@@ -225,38 +225,38 @@ onBeforeUnmount(() => {
         <div v-if="result" class="result" aria-live="polite">
           <div class="sq card">
             <div class="sq thumb" data-preview>
-              <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="`${result.name} 썸네일`" @error="thumbFailed = true">
-              <Icon v-else name="image" :size="20" class="dim" aria-label="썸네일 없음" />
+              <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="`${result.name} thumbnail`" @error="thumbFailed = true">
+              <Icon v-else name="image" :size="20" class="dim" aria-label="No thumbnail" />
             </div>
             <div class="info">
               <div class="col">
                 <span class="tx-body name">{{ result.name }}</span>
                 <span class="tx-meta num">{{ result.width }} × {{ result.height }}</span>
               </div>
-              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">피그마에서 열기</TextButton>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">Open in Figma</TextButton>
 
               <div class="divider" />
               <div class="sum-h">
-                <span class="tx-head">찾은 컴포넌트</span>
-                <span class="tx-meta num">{{ result.components.length }}종 · {{ total }}개<template v-if="!preview && result.components.length"> · 디자인 시스템 {{ matched }}종</template></span>
+                <span class="tx-head">Components found</span>
+                <span class="tx-meta num">{{ result.components.length }} types · {{ total }} instances<template v-if="!preview && result.components.length"> · {{ matched }} in design system</template></span>
               </div>
               <ul v-if="result.components.length" class="list">
                 <li v-for="c in result.components" :key="c.name" class="item">
-                  <Icon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" aria-label="디자인 시스템 컴포넌트" />
+                  <Icon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" aria-label="Design system component" />
                   <span v-else class="dot" aria-hidden="true" />
                   <span class="tx-body ellipsis">{{ c.name }}</span>
-                  <span class="tx-meta num">{{ c.count }}개</span>
+                  <span class="tx-meta num">{{ c.count }}</span>
                 </li>
               </ul>
-              <p v-else class="tx-meta">이 프레임에는 컴포넌트 인스턴스가 없어요</p>
+              <p v-else class="tx-meta">This frame has no component instances</p>
             </div>
           </div>
-          <p v-if="preview" class="tx-meta">미리보기 모드라 저장하지 않고 닫아요</p>
+          <p v-if="preview" class="tx-meta">Preview mode: nothing is saved when you close</p>
         </div>
 
         <footer class="foot">
-          <Button size="m" type="tertiary" :disabled="saving" @click="close">취소</Button>
-          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">화면 추가</Button>
+          <Button size="m" type="tertiary" :disabled="saving" @click="close">Cancel</Button>
+          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">Add frame</Button>
         </footer>
       </section>
     </div>

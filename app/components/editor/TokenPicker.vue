@@ -26,9 +26,9 @@ const emit = defineEmits<{ pick: [t: CatalogToken]; unbind: []; step: [d: number
 
 const catalog = useTokenCatalog()
 const kindLabel = computed(() => KIND_LABEL[props.kinds[0]!])
-const mixed = computed(() => props.bound === '여러 값')
+const mixed = computed(() => props.bound === 'Mixed')
 const boundToken = computed(() => (props.bound && !mixed.value ? catalog.find(props.bound) : undefined))
-const boundName = computed(() => (mixed.value ? '여러 값' : props.bound ? boundToken.value?.name ?? nameFromId(props.bound) : ''))
+const boundName = computed(() => (mixed.value ? 'Mixed' : props.bound ? boundToken.value?.name ?? nameFromId(props.bound) : ''))
 const chipName = computed(() => (props.short && !mixed.value ? boundName.value.split('/').pop()! : boundName.value))
 const asChip = computed(() => props.variant === 'auto' && !!props.bound)
 
@@ -157,7 +157,7 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
     <button
       ref="trigger"
       :class="['sq', 'tchip', { open, mixed }]"
-      :aria-label="`${label || kindLabel} 변수 ${boundName} — 바꾸기`"
+      :aria-label="`${label || kindLabel} variable ${boundName} — change`"
       aria-haspopup="listbox"
       :aria-expanded="open"
       :aria-controls="open ? uid : undefined"
@@ -166,14 +166,14 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
       @keydown.up.prevent.stop="emit('step', $event.shiftKey ? 10 : 1)"
       @keydown.down.prevent.stop="emit('step', $event.shiftKey ? -10 : -1)"
     ><svg v-if="!short" class="tchip-i" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1l4 4-4 4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg><span class="tchip-t">{{ chipName }}</span></button>
-    <button v-if="!short" class="ib tchip-x" :aria-label="`${label || kindLabel} 변수 연결 끊기`" title="연결 끊기" @click.prevent="emit('unbind')"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 7.5l3-3M3.6 5.4l-.9.9a1.9 1.9 0 0 0 2.7 2.7l.9-.9M8.4 6.6l.9-.9a1.9 1.9 0 0 0-2.7-2.7l-.9.9M1.5 1.5l9 9" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" /></svg></button>
+    <button v-if="!short" class="ib tchip-x" :aria-label="`Detach variable: ${label || kindLabel}`" title="Detach variable" @click.prevent="emit('unbind')"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 7.5l3-3M3.6 5.4l-.9.9a1.9 1.9 0 0 0 2.7 2.7l.9-.9M8.4 6.6l.9-.9a1.9 1.9 0 0 0-2.7-2.7l-.9.9M1.5 1.5l9 9" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" /></svg></button>
   </span>
   <button
     v-else
     ref="trigger"
     :class="['ib', 'vb', { reveal, open }]"
-    :aria-label="`${label || kindLabel} 변수 연결`"
-    :title="`${label || kindLabel} 변수 연결`"
+    :aria-label="`Apply variable: ${label || kindLabel}`"
+    :title="`Apply variable: ${label || kindLabel}`"
     aria-haspopup="listbox"
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
@@ -182,11 +182,11 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
 
   <Teleport to="body">
     <div v-if="open" ref="menu" class="sq menu tp" :style="pos" @keydown="onKey">
-      <label class="sq fld tp-s"><Icon name="search" :size="14" class="muted" /><input ref="search" v-model="q" :placeholder="`${kindLabel} 변수 검색`" :aria-label="`${kindLabel} 변수 검색`" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
-      <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="`${kindLabel} 변수`">
+      <label class="sq fld tp-s"><Icon name="search" :size="14" class="muted" /><input ref="search" v-model="q" :placeholder="`Search ${kindLabel.toLowerCase()} variables`" :aria-label="`Search ${kindLabel.toLowerCase()} variables`" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
+      <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="`${kindLabel} variables`">
         <button v-if="bound" :id="`${uid}-0`" data-i="0" role="option" :aria-selected="active === 0" :class="['sq', 'menu-item', { cur: active === 0 }]" @click="choose(0)" @pointermove="active = 0">
           <svg class="pv" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5.5 8.5l3-3M4.5 6.5l-1 1a2.1 2.1 0 0 0 3 3l1-1M9.5 7.5l1-1a2.1 2.1 0 0 0-3-3l-1 1M2 2l10 10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
-          <span class="nm">연결 끊기</span>
+          <span class="nm">Detach variable</span>
         </button>
         <template v-for="g in groups" :key="g.name">
           <div class="tp-g" role="presentation">{{ g.name }}</div>
@@ -210,7 +210,7 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
             <span class="vl">{{ t.value }}</span>
           </button>
         </template>
-        <span v-if="!items.length" class="tp-e">{{ q ? '맞는 변수가 없어요' : `${kindLabel} 변수가 없어요` }}</span>
+        <span v-if="!items.length" class="tp-e">{{ q ? 'No variables found' : `No ${kindLabel.toLowerCase()} variables` }}</span>
       </div>
     </div>
   </Teleport>

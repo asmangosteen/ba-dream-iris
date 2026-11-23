@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
-import type { LayerNode } from '~/canvas/schema'
+import { isContainer, type LayerNode } from '~/canvas/schema'
+import { LAYER_ICON } from '~/canvas/icons'
 import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
@@ -22,7 +23,7 @@ function rowsOf(s: ScreenRow): Row[] {
       const n = d.nodes[id]
       if (!n) continue
       out.push({ sid: s.id, n, depth })
-      if (n.type === 'frame' && !closed.value.has(s.id + ':' + id)) walk(n.children ?? [], depth + 1)
+      if (isContainer(n) && !closed.value.has(s.id + ':' + id)) walk(n.children ?? [], depth + 1)
     }
   }
   walk(d.rootIds, 1)
@@ -43,7 +44,7 @@ function onDragOver(e: DragEvent, r: Row) {
   if (!dragging.value || dragging.value.sid !== r.sid || dragging.value.id === r.n.id) return
   e.preventDefault()
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const into = r.n.type === 'frame' && e.clientY > rect.top + rect.height * 0.3 && e.clientY < rect.bottom - rect.height * 0.3
+  const into = isContainer(r.n) && e.clientY > rect.top + rect.height * 0.3 && e.clientY < rect.bottom - rect.height * 0.3
   over.value = { id: r.n.id, into }
 }
 function onDrop(r: Row) {
@@ -56,10 +57,10 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
 </script>
 
 <template>
-  <div class="tree" role="tree" aria-label="레이어">
+  <div class="tree" role="tree" aria-label="Layers">
     <template v-for="s in screens" :key="s.id">
       <div role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
-        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? '펼치기' : '접기'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
+        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
         <span class="name">{{ s.name }}</span>
@@ -85,19 +86,17 @@ function pick(r: Row, e: MouseEvent) { store.selectLayer(r.sid, r.n.id, e.shiftK
         @drop.prevent="onDrop(r)"
         @dragend="dragging = null; over = null"
       >
-        <button v-if="r.n.type === 'frame' && r.n.children?.length" class="chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? '펼치기' : '접기'" @click.stop="toggle(r.sid + ':' + r.n.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
+        <button v-if="isContainer(r.n) && r.n.children?.length" class="chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(r.sid + ':' + r.n.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
         <span v-else class="chev" />
-        <svg v-if="r.n.type === 'frame'" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
-        <svg v-else-if="r.n.type === 'rect'" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><rect x="1.6" y="1.6" width="8.8" height="8.8" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
-        <svg v-else-if="r.n.type === 'text'" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M2 3V2h8v1M6 2v8M4.5 10h3" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
+        <svg v-if="LAYER_ICON[r.n.type]" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path :d="LAYER_ICON[r.n.type]" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
         <Icon v-else name="image" :size="12" class="ic" />
-        <input v-if="renaming === r.n.id" class="txt-in ren" :value="r.n.name" aria-label="레이어 이름" autofocus @click.stop @blur="rename(r, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
+        <input v-if="renaming === r.n.id" class="txt-in ren" :value="r.n.name" aria-label="Layer name" autofocus @click.stop @blur="rename(r, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
         <span v-else class="name">{{ r.n.name }}</span>
         <span class="tools" :class="{ keep: r.n.hidden || r.n.locked }">
-          <button class="mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? '잠금 풀기' : '잠그기'" :title="r.n.locked ? '잠금 풀기' : '잠그기'" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
+          <button class="mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? 'Unlock' : 'Lock'" :title="r.n.locked ? 'Unlock' : 'Lock'" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
             <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="5.5" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.1" /><path :d="r.n.locked ? 'M4 5.5V4a2 2 0 0 1 4 0v1.5' : 'M4 5.5V4a2 2 0 0 1 3.8-.9'" fill="none" stroke="currentColor" stroke-width="1.1" /></svg>
           </button>
-          <button class="mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? '보이기' : '숨기기'" :title="r.n.hidden ? '보이기' : '숨기기'" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
+          <button class="mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? 'Show' : 'Hide'" :title="r.n.hidden ? 'Show' : 'Hide'" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
             <svg v-if="!r.n.hidden" width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7s2-3.8 5.5-3.8S12.5 7 12.5 7 10.5 10.8 7 10.8 1.5 7 1.5 7z" stroke="currentColor" stroke-width="1.2" fill="none" /><circle cx="7" cy="7" r="1.6" fill="currentColor" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M5.2 3.6A6 6 0 0 1 7 3.2c3.5 0 5.5 3.8 5.5 3.8a10 10 0 0 1-1.7 2.2M3.2 4.9A10 10 0 0 0 1.5 7S3.5 10.8 7 10.8c.7 0 1.3-.1 1.9-.4" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
           </button>

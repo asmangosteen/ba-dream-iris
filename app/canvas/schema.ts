@@ -2,9 +2,28 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
-export type LayerType = 'frame' | 'rect' | 'text' | 'image'
+export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section'
+
+/** 칠(채우기 · 선 색). solid 는 한 색, linear · radial 은 그라디언트, image 는 이미지 채우기 (v5) */
+export type Paint =
+  | { type: 'solid'; color: string; opacity?: number; visible?: boolean }
+  | { type: 'linear' | 'radial'; stops: { pos: number; color: string }[]; angle?: number; opacity?: number; visible?: boolean }
+  | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean }
+export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
+
+/** 효과 (v5): 그림자 · 안쪽 그림자 · 레이어 흐림 · 배경 흐림 */
+export type Effect =
+  | { type: 'drop' | 'inner'; x: number; y: number; blur: number; spread?: number; color: string; visible?: boolean }
+  | { type: 'blur' | 'bgblur'; blur: number; visible?: boolean }
+
+export type ArrowHead = 'none' | 'arrow' | 'triangle' | 'circle'
+
+/** 자식을 담는 레이어 */
+export const isContainer = (n?: Pick<LayerNode, 'type'> | null) => !!n && (n.type === 'frame' || n.type === 'section')
+/** 점으로 그리는 레이어(SVG) */
+export const isVector = (t: LayerType) => t === 'line' || t === 'polygon' || t === 'star' || t === 'path'
 
 export interface LayerStyle {
   fill?: string // '#RRGGBB' · 'rgb(…)'. 옛 문서는 'token:<DB 토큰 이름>' 일 수 있어요(연결된 것으로 봅니다)
@@ -24,6 +43,35 @@ export interface LayerStyle {
   align?: 'left' | 'center' | 'right'
   autoWidth?: boolean // 글자 길이에 맞춰 너비가 늘어남(직접 크기를 바꾸면 꺼짐)
   clip?: boolean // 프레임: 내용 자르기
+  // --- v5 ---
+  /** 덧붙인 칠: fill 위에 차례로 그려요(마지막이 맨 위) */
+  fills?: Paint[]
+  /** 덧붙인 선 색: stroke 위에 차례로. 두께 · 위치 · 점선은 함께 써요(피그마와 같아요) */
+  strokes?: Paint[]
+  /** 선 위치. 비어 있으면 상자 도형은 안쪽, 선 · 연필은 가운데 */
+  strokeAlign?: 'inside' | 'center' | 'outside'
+  /** 점선 [선 길이, 간격] */
+  dash?: [number, number]
+  /** 선 끝 모양 */
+  cap?: 'butt' | 'round' | 'square'
+  /** 선 · 연필 끝 화살표 */
+  arrowStart?: ArrowHead
+  arrowEnd?: ArrowHead
+  effects?: Effect[]
+  /** 혼합 모드(CSS mix-blend-mode 이름) */
+  blend?: string
+  /** 다각형 꼭짓점 수 · 별 꼭짓점 수 · 별 안쪽 비율(0~1) */
+  sides?: number
+  points?: number
+  inner?: number
+  /** 이미지 레이어: 채우는 방식, 자르기(확대 배율 · 가로 · 세로 위치 0~100) */
+  fit?: ImageFit
+  crop?: { scale: number; x: number; y: number }
+  // 텍스트 고급
+  decoration?: 'underline' | 'strike'
+  textCase?: 'upper' | 'lower' | 'title'
+  list?: 'bullet' | 'number'
+  paraSpacing?: number
   /**
    * 변수(토큰) 연결 (v3): 속성 키 → 토큰 id. 연결할 때 실제 값도 그 속성에 함께 써 두어서
    * 그리기 · 내보내기는 연결을 몰라도 됩니다. 속성 값을 직접 고치면 그 키의 연결이 풀려요(store 의 record()).
@@ -68,6 +116,10 @@ export interface LayerNode {
   hidden?: boolean
   locked?: boolean
   text?: string
+  /** 선 · 연필: 상자 안 점 [x0, y0, x1, y1, …], 0~1 비율 (v5) */
+  pts?: number[]
+  /** 연필: 닫힌 모양 */
+  closed?: boolean
   src?: string // 'storage://screens/<path>' · data: · https:
   style: LayerStyle
 }
@@ -90,6 +142,7 @@ export function migrate(raw: unknown): LayerDoc {
   // v1 → v2: 회전 · 뒤집기 · 비율 고정 · 모서리 따로가 더해졌어요. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽습니다
   // v2 → v3: 변수 연결(style.vars) · 자간(style.letterSpacing) 이 더해졌어요. 역시 비어 있어도 되는 값이라 그대로 읽습니다
   // v3 → v4: 화면 모양(frame) 이 더해졌어요. 비어 있어도 되는 값이라 그대로 읽습니다
+  // v4 → v5: 원 · 선 · 다각형 · 별 · 연필 · 섹션, 여러 칠 · 그라디언트 · 효과 · 선 위치 · 점선 · 혼합 모드 · 텍스트 고급이 더해졌어요. 모두 비어 있어도 되는 값입니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   if (d.frame && typeof d.frame === 'object' && !Array.isArray(d.frame)) doc.frame = { ...d.frame }
   for (const [id, n] of Object.entries(d.nodes)) {
@@ -100,6 +153,9 @@ export function migrate(raw: unknown): LayerDoc {
     if (r && !(Array.isArray(r) && r.length === 4 && r.every((v) => typeof v === 'number'))) delete node.style.radii
     const vars = node.style.vars
     if (vars && (typeof vars !== 'object' || Array.isArray(vars) || !Object.keys(vars).length)) delete node.style.vars
+    for (const k of ['fills', 'strokes', 'effects'] as const) if (node.style[k] !== undefined && !Array.isArray(node.style[k])) delete node.style[k]
+    if (node.pts && !(Array.isArray(node.pts) && node.pts.every((v) => typeof v === 'number'))) delete node.pts
+    if (isContainer(node) && !Array.isArray(node.children)) node.children = []
     doc.nodes[id] = node
   }
   doc.rootIds = doc.rootIds.filter((id) => doc.nodes[id])
@@ -148,9 +204,15 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
   rect: { fill: '#E9EBED', radius: 0 },
   text: { color: '#202837', fontSize: 16, fontWeight: 400, lineHeight: 24, align: 'left', autoWidth: true },
   image: { radius: 0 },
+  ellipse: { fill: '#E9EBED' },
+  line: { stroke: '#202837', strokeWidth: 1 },
+  polygon: { fill: '#E9EBED', sides: 3 },
+  star: { fill: '#E9EBED', points: 5, inner: 0.38 },
+  path: { stroke: '#202837', strokeWidth: 2, cap: 'round' },
+  section: { fill: '#F2F3F5', radius: 2 },
 }
 
-export const TYPE_LABEL: Record<LayerType, string> = { frame: '프레임', rect: '사각형', text: '텍스트', image: '이미지' }
+export const TYPE_LABEL: Record<LayerType, string> = { frame: 'Frame', rect: 'Rectangle', text: 'Text', image: 'Image', ellipse: 'Ellipse', line: 'Line', polygon: 'Polygon', star: 'Star', path: 'Vector', section: 'Section' }
 
 /** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기 */
 export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined): Record<string, string | number> {

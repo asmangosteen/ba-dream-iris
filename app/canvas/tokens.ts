@@ -26,8 +26,8 @@ export interface CatalogToken {
 }
 
 export const KIND_LABEL: Record<TokenKind, string> = {
-  color: '색', spacing: '간격', radius: '모서리', borderWidth: '선 두께', opacity: '투명도', shadow: '그림자',
-  textStyle: '텍스트 스타일', fontWeight: '굵기', fontSize: '글자 크기', lineHeight: '행간', letterSpacing: '자간',
+  color: 'Color', spacing: 'Spacing', radius: 'Corner radius', borderWidth: 'Stroke weight', opacity: 'Opacity', shadow: 'Shadow',
+  textStyle: 'Text style', fontWeight: 'Font weight', fontSize: 'Font size', lineHeight: 'Line height', letterSpacing: 'Letter spacing',
 }
 
 const WEIGHT_NAME: Record<string, string> = { thin: 'Thin', extralight: 'ExtraLight', light: 'Light', regular: 'Regular', medium: 'Medium', semibold: 'SemiBold', bold: 'Bold', extrabold: 'ExtraBold', black: 'Black' }
@@ -112,31 +112,31 @@ function fromCss(vars: Map<string, string>): CatalogToken[] {
     if (!KEEP.test(id) || SKIP.some((r) => r.test(id)) || !value) continue
     let m: RegExpExecArray | null
     if ((m = /^--sys-color-([a-z]+)-(.+)$/i.exec(id))) {
-      sys.push({ id, kind: 'color', name: `${m[1]}/${m[2]}`, group: `시스템 · ${m[1]}`, value: colorLabel(value), color: value })
+      sys.push({ id, kind: 'color', name: `${m[1]}/${m[2]}`, group: `System · ${m[1]}`, value: colorLabel(value), color: value })
     } else if ((m = /^--ref-color-([a-zA-Z]+)-(.+)$/.exec(id))) {
-      ref.push({ id, kind: 'color', name: `${m[1]}/${m[2]}`, group: `팔레트 · ${m[1]}`, value: colorLabel(value), color: value })
+      ref.push({ id, kind: 'color', name: `${m[1]}/${m[2]}`, group: `Palette · ${m[1]}`, value: colorLabel(value), color: value })
     } else if ((m = /^--interaction-(.+)$/.exec(id))) {
-      if (parseColor(value)) inter.push({ id, kind: 'color', name: `interaction/${m[1]}`, group: '상호작용', value: colorLabel(value), color: value })
+      if (parseColor(value)) inter.push({ id, kind: 'color', name: `interaction/${m[1]}`, group: 'Interaction', value: colorLabel(value), color: value })
     } else if ((m = /^--ref-spacing-(.+)$/.exec(id))) {
-      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'spacing', name: `spacing/${m[1]}`, group: '간격', value: String(n), num: n })
+      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'spacing', name: `spacing/${m[1]}`, group: 'Spacing', value: String(n), num: n })
     } else if ((m = /^--ref-radius-(.+)$/.exec(id)) || (m = /^--radius-(.+)$/.exec(id))) {
-      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'radius', name: `radius/${m[1]}`, group: id.startsWith('--ref-') ? '모서리' : '모서리 · 용도', value: String(n), num: n })
+      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'radius', name: `radius/${m[1]}`, group: id.startsWith('--ref-') ? 'Corner radius' : 'Corner radius · Semantic', value: String(n), num: n })
     } else if ((m = /^--ref-borderwidth-(.+)$/.exec(id))) {
-      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'borderWidth', name: `border-width/${m[1]}`, group: '선 두께', value: String(n), num: n })
+      const n = px(value); if (Number.isFinite(n)) out.push({ id, kind: 'borderWidth', name: `border-width/${m[1]}`, group: 'Stroke weight', value: String(n), num: n })
     } else if ((m = /^--ref-opacity-(.+)$/.exec(id))) {
-      const n = Number(value.replace('%', '')); if (Number.isFinite(n)) out.push({ id, kind: 'opacity', name: `opacity/${m[1]}`, group: '투명도', value: `${n}%`, num: n / 100 })
+      const n = Number(value.replace('%', '')); if (Number.isFinite(n)) out.push({ id, kind: 'opacity', name: `opacity/${m[1]}`, group: 'Opacity', value: `${n}%`, num: n / 100 })
     } else if ((m = /^--shadow-(.+)$/.exec(id))) {
-      out.push({ id, kind: 'shadow', name: `shadow/${m[1]}`, group: '그림자', value, css: value })
+      out.push({ id, kind: 'shadow', name: `shadow/${m[1]}`, group: 'Shadow', value, css: value })
     } else if ((m = /^--font-weight-(.+)$/.exec(id))) {
-      const n = Number(value); if (Number.isFinite(n)) out.push({ id, kind: 'fontWeight', name: WEIGHT_NAME[m[1]!] ?? titleCase(m[1]!), group: '굵기', value: String(n), num: n })
+      const n = Number(value); if (Number.isFinite(n)) out.push({ id, kind: 'fontWeight', name: WEIGHT_NAME[m[1]!] ?? titleCase(m[1]!), group: 'Font weight', value: String(n), num: n })
     } else if ((m = /^--typography-(.+)-(size|line-height|letter-spacing|weight|font-weight)$/.exec(id))) {
       const [, style, prop] = m as unknown as [string, string, string]
       const n = px(value)
       if (!Number.isFinite(n)) continue
       const s = styles.get(style) ?? { order: order++ }
-      if (prop === 'size') { s.size = n; out.push({ id, kind: 'fontSize', name: `${style}/size`, group: '글자 크기', value: String(n), num: n }) }
-      if (prop === 'line-height') { s.lineHeight = n; out.push({ id, kind: 'lineHeight', name: `${style}/line-height`, group: '행간', value: String(n), num: n }) }
-      if (prop === 'letter-spacing') { s.letterSpacing = n; out.push({ id, kind: 'letterSpacing', name: `${style}/letter-spacing`, group: '자간', value: String(n), num: n }) }
+      if (prop === 'size') { s.size = n; out.push({ id, kind: 'fontSize', name: `${style}/size`, group: 'Font size', value: String(n), num: n }) }
+      if (prop === 'line-height') { s.lineHeight = n; out.push({ id, kind: 'lineHeight', name: `${style}/line-height`, group: 'Line height', value: String(n), num: n }) }
+      if (prop === 'letter-spacing') { s.letterSpacing = n; out.push({ id, kind: 'letterSpacing', name: `${style}/letter-spacing`, group: 'Letter spacing', value: String(n), num: n }) }
       if (prop === 'weight' || prop === 'font-weight') s.weight = n
       styles.set(style, s)
     }
@@ -144,7 +144,7 @@ function fromCss(vars: Map<string, string>): CatalogToken[] {
   for (const [style, s] of [...styles].sort((a, b) => a[1].order - b[1].order)) {
     if (s.size === undefined) continue
     const text: TextStyleValue = { size: s.size, lineHeight: s.lineHeight, letterSpacing: s.letterSpacing, weight: s.weight }
-    out.push({ id: `ts:${style}`, kind: 'textStyle', name: titleCase(style), group: '텍스트 스타일', value: textValue(text), text })
+    out.push({ id: `ts:${style}`, kind: 'textStyle', name: titleCase(style), group: 'Text styles', value: textValue(text), text })
   }
   return [...sys, ...ref, ...inter, ...out]
 }
@@ -154,7 +154,7 @@ export const textValue = (t: TextStyleValue) => [t.size, t.lineHeight].filter((v
 /** DB 에 등록한 토큰 → 같은 꼴로 */
 function fromDb(rows: { name: string; type: string; value: string }[]): CatalogToken[] {
   const out: CatalogToken[] = []
-  const group = '등록한 토큰'
+  const group = 'Local styles'
   for (const r of rows) {
     const id = 'db:' + r.name
     if (r.type === 'color' && parseColor(r.value)) out.push({ id, kind: 'color', name: r.name, group, value: colorLabel(r.value), color: r.value })

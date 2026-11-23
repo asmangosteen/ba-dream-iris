@@ -11,17 +11,17 @@ const props = defineProps<{ screen: ScreenRow }>()
 const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: [] }>()
 
 const STATUS: { k: ScreenRow['status']; label: string }[] = [
-  { k: 'draft', label: '작업 중' },
-  { k: 'review', label: '검토 요청' },
-  { k: 'approved', label: '확정' },
+  { k: 'draft', label: 'In progress' },
+  { k: 'review', label: 'Ready for review' },
+  { k: 'approved', label: 'Approved' },
 ]
 const PRESETS = [
-  { label: '모바일', w: 390, h: 844 },
-  { label: '모바일 L', w: 430, h: 932 },
-  { label: '모바일 S', w: 375, h: 812 },
-  { label: '안드로이드', w: 360, h: 800 },
-  { label: '태블릿', w: 768, h: 1024 },
-  { label: '데스크톱', w: 1440, h: 900 },
+  { label: 'iPhone 14', w: 390, h: 844 },
+  { label: 'iPhone 14 Pro Max', w: 430, h: 932 },
+  { label: 'iPhone 13 mini', w: 375, h: 812 },
+  { label: 'Android Small', w: 360, h: 800 },
+  { label: 'iPad mini', w: 768, h: 1024 },
+  { label: 'Desktop', w: 1440, h: 900 },
 ]
 
 function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
@@ -53,7 +53,7 @@ const hasFill = computed(() => look.value.fill !== '')
 const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
 const hasStroke = computed(() => !!(look.value.stroke && look.value.strokeWidth))
 const hex = (v?: string) => parseColor(store.color(v))?.hex ?? '#000000'
-const colorText = (v?: string) => (!v ? '없음' : v.startsWith('token:') ? v.slice(6) : colorLabel(v))
+const colorText = (v?: string) => (!v ? 'None' : v.startsWith('token:') ? v.slice(6) : colorLabel(v))
 const blurOnEnter = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 function setHex(key: 'fill' | 'stroke', e: Event) {
   const input = e.target as HTMLInputElement
@@ -103,21 +103,21 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 <template>
   <div ref="root" class="design">
     <section class="s">
-      <div class="sec-h h24"><span>화면</span></div>
-      <label class="sq fld"><span>이름</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="화면 이름" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-      <span class="sub">상태</span>
+      <div class="sec-h h24"><span>Frame</span></div>
+      <label class="sq fld"><span>Name</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="Frame name" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+      <span class="sub">Status</span>
       <div class="rel">
         <button :class="['sq', 'dd', { open: statusOpen }]" :aria-expanded="statusOpen" @click="statusOpen = !statusOpen">
           <span>{{ STATUS.find((s) => s.k === screen.status)?.label }}</span><Icon name="chevron_down" :size="12" class="muted" />
         </button>
-        <div v-if="statusOpen" class="sq menu" role="listbox" aria-label="상태">
+        <div v-if="statusOpen" class="sq menu" role="listbox" aria-label="Status">
           <button v-for="s in STATUS" :key="s.k" role="option" :aria-selected="screen.status === s.k" :class="['sq', 'menu-item', { on: screen.status === s.k }]" @click="emit('update', { status: s.k }); statusOpen = false">{{ s.label }}</button>
         </div>
       </div>
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>위치</span></div>
+      <div class="sec-h h24"><span>Position</span></div>
       <div class="grid2">
         <label class="sq fld"><span>X</span><input :key="'x' + screen.x" :value="Math.round(screen.x)" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <label class="sq fld"><span>Y</span><input :key="'y' + screen.y" :value="Math.round(screen.y)" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
@@ -125,68 +125,68 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>크기</span></div>
+      <div class="sec-h h24"><span>Layout</span></div>
       <div class="rel">
         <button :class="['sq', 'dd', { open: presetOpen }]" :aria-expanded="presetOpen" @click="presetOpen = !presetOpen">
-          <span>{{ PRESETS.find((p) => p.w === screen.width && p.h === screen.height)?.label ?? '직접 입력' }}</span><Icon name="chevron_down" :size="12" class="muted" />
+          <span>{{ PRESETS.find((p) => p.w === screen.width && p.h === screen.height)?.label ?? 'Custom' }}</span><Icon name="chevron_down" :size="12" class="muted" />
         </button>
-        <div v-if="presetOpen" class="sq menu" role="listbox" aria-label="크기 프리셋">
+        <div v-if="presetOpen" class="sq menu" role="listbox" aria-label="Size presets">
           <button v-for="p in PRESETS" :key="p.label" role="option" :aria-selected="p.w === screen.width && p.h === screen.height" :class="['sq', 'menu-item', { on: p.w === screen.width && p.h === screen.height }]" @click="emit('update', { width: p.w, height: p.h }); presetOpen = false">
             <span class="f1">{{ p.label }}</span><span class="tx-meta num">{{ p.w }} × {{ p.h }}</span>
           </button>
         </div>
       </div>
       <div class="grid2">
-        <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" aria-label="너비" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" aria-label="높이" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" aria-label="Width" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" aria-label="Height" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
       </div>
     </section>
 
     <template v-if="native">
       <section class="s">
-        <div class="sec-h h24"><span>모양</span></div>
-        <div class="grid2"><span class="sub">투명도</span><span class="sub">모서리</span></div>
+        <div class="sec-h h24"><span>Appearance</span></div>
+        <div class="grid2"><span class="sub">Opacity</span><span class="sub">Corner radius</span></div>
         <div class="grid2">
-          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="화면 투명도" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span>%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="화면 투명도" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
-          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="화면 모서리" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="화면 모서리" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="Frame opacity" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span>%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
+          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="Frame corner radius" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
         </div>
-        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i />내용 자르기</button>
+        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i />Clip content</button>
       </section>
 
       <section class="s">
-        <div class="sec-h h24"><span>채우기</span><button v-if="!hasFill" class="ib s24" aria-label="채우기 더하기" @click="fstyle({ fill: undefined })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="채우기 빼기" @click="fstyle({ fill: '' })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
+        <div class="sec-h h24"><span>Fill</span><button v-if="!hasFill" class="ib s24" aria-label="Add fill" @click="fstyle({ fill: undefined })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="Remove fill" @click="fstyle({ fill: '' })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
         <div v-if="hasFill" class="color-row">
-          <label class="sq fld"><input type="color" class="swatch" :value="hex(fillColor)" aria-label="화면 채우기 색" @change="fstyle({ fill: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('fill')" :key="'f' + fillColor" :value="colorText(fillColor)" aria-label="화면 채우기 값" @change="setHex('fill', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('fill')" label="화면 채우기 색" @pick="(t) => pickColor('fill', t)" @unbind="unbindKey('fill')" /></label>
-          <TokenPicker v-if="!vb('fill')" :kinds="['color']" label="화면 채우기 색" @pick="(t) => pickColor('fill', t)" />
+          <label class="sq fld"><input type="color" class="swatch" :value="hex(fillColor)" aria-label="Frame fill color" @change="fstyle({ fill: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('fill')" :key="'f' + fillColor" :value="colorText(fillColor)" aria-label="Frame fill value" @change="setHex('fill', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('fill')" label="Frame fill color" @pick="(t) => pickColor('fill', t)" @unbind="unbindKey('fill')" /></label>
+          <TokenPicker v-if="!vb('fill')" :kinds="['color']" label="Frame fill color" @pick="(t) => pickColor('fill', t)" />
         </div>
       </section>
 
       <section class="s">
-        <div class="sec-h h24"><span>선</span><button v-if="!hasStroke" class="ib s24" aria-label="선 더하기" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="선 빼기" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
+        <div class="sec-h h24"><span>Stroke</span><button v-if="!hasStroke" class="ib s24" aria-label="Add stroke" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="Remove stroke" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
         <template v-if="hasStroke">
           <div class="color-row">
-            <label class="sq fld"><input type="color" class="swatch" :value="hex(look.stroke)" aria-label="화면 선 색" @change="fstyle({ stroke: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="화면 선 색 값" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="화면 선 색" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
-            <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="화면 선 색" @pick="(t) => pickColor('stroke', t)" />
+            <label class="sq fld"><input type="color" class="swatch" :value="hex(look.stroke)" aria-label="Frame stroke color" @change="fstyle({ stroke: ($event.target as HTMLInputElement).value.toUpperCase() })"><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="Frame stroke color value" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
+            <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
           </div>
           <div class="grid2">
-            <label class="sq fld" title="선 두께"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 3.5h10" stroke="currentColor" stroke-width="1" /><path d="M2 7h10" stroke="currentColor" stroke-width="1.6" /><path d="M2 10.5h10" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="화면 선 두께" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span>px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="화면 선 두께" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+            <label class="sq fld" title="Stroke weight"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 3.5h10" stroke="currentColor" stroke-width="1" /><path d="M2 7h10" stroke="currentColor" stroke-width="1.6" /><path d="M2 10.5h10" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="Frame stroke weight" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span>px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
           </div>
         </template>
       </section>
     </template>
 
     <section class="s">
-      <div class="sec-h h24"><span>레이어</span></div>
-      <p class="tx-meta m0">캔버스나 왼쪽 레이어 목록에서 레이어를 고르면 여기서 고쳐요</p>
-      <dl class="sq keys"><dt>사각형</dt><dd>R</dd><dt>텍스트</dt><dd>T</dd><dt>프레임</dt><dd>F</dd></dl>
+      <div class="sec-h h24"><span>Layer</span></div>
+      <p class="tx-meta m0">Select a layer on the canvas or in the layers list to edit it here</p>
+      <dl class="sq keys"><dt>Rectangle</dt><dd>R</dd><dt>Text</dt><dd>T</dd><dt>Frame</dt><dd>F</dd></dl>
     </section>
 
     <section class="s">
-      <Button v-if="!confirmDelete" size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" class="full" @click="confirmDelete = true">화면 지우기</Button>
-      <div v-else class="sq confirm" role="alertdialog" aria-label="화면 지우기 확인">
-        <span class="tx-head">'{{ screen.name }}' 화면을 지울까요?</span>
-        <span class="tx-meta">연결된 요구사항 상태도 함께 지워지고 되돌릴 수 없어요</span>
-        <span class="row-end"><Button size="s" type="tertiary" @click="confirmDelete = false">취소</Button><Button size="s" type="destructed" @click="emit('remove')">지우기</Button></span>
+      <Button v-if="!confirmDelete" size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" class="full" @click="confirmDelete = true">Delete frame</Button>
+      <div v-else class="sq confirm" role="alertdialog" aria-label="Confirm delete frame">
+        <span class="tx-head">Delete '{{ screen.name }}'?</span>
+        <span class="tx-meta">Linked requirement statuses are deleted too, and this can't be undone</span>
+        <span class="row-end"><Button size="s" type="tertiary" @click="confirmDelete = false">Cancel</Button><Button size="s" type="destructed" @click="emit('remove')">Delete</Button></span>
       </div>
     </section>
   </div>

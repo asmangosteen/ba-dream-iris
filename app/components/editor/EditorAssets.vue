@@ -21,36 +21,36 @@ const useCount = (id: string) => (usages.data.value ?? []).filter((u) => u.compo
 
 const detail = computed(() => (components.data.value ?? []).find((c) => c.id === props.open) ?? null)
 const uses = computed(() => (usages.data.value ?? []).filter((u) => u.component_id === props.open))
-const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {}).map(([k, v]) => ({ k, v: Array.isArray(v) ? v.join(' · ') : v === 'boolean' ? '켜기 · 끄기' : '글자' })))
+const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {}).map(([k, v]) => ({ k, v: Array.isArray(v) ? v.join(' · ') : v === 'boolean' ? 'On · Off' : 'Text' })))
 </script>
 
 <template>
   <div v-if="!detail" class="wrap">
     <div class="top">
-      <SearchField v-model:value="q" type="contained" size="s" placeholder="컴포넌트 찾기" :input-props="{ 'aria-label': '컴포넌트 찾기' }" />
+      <SearchField v-model:value="q" type="contained" size="s" placeholder="Search assets" :input-props="{ 'aria-label': 'Search assets' }" />
     </div>
     <div class="list">
       <section v-for="g in groups" :key="g.label" class="grp-sec">
         <span class="nav-label p2">{{ g.label }}</span>
         <div class="grid">
-          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="`${c.name} 자세히 보기`" @click="emit('update:open', c.id)">
+          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="`View ${c.name} details`" @click="emit('update:open', c.id)">
             <span class="sq asset-thumb" data-preview><DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" /></span>
             <span class="tname">{{ c.name }}</span>
-            <span class="tx-meta tuse">{{ useCount(c.id) ? `이 파일 ${useCount(c.id)}개` : '안 씀' }}</span>
+            <span class="tx-meta tuse">{{ useCount(c.id) ? `${useCount(c.id)} in this file` : 'Unused' }}</span>
           </button>
         </div>
       </section>
       <div v-if="components.status.value === 'success' && !groups.length" class="empty-col p2">
-        <span class="tx-meta">{{ q ? '찾는 컴포넌트가 없어요' : '디자인 시스템에 등록된 컴포넌트가 없어요' }}</span>
-        <TextButton v-if="q" size="s" color="blue" @click="q = ''">검색어 지우기</TextButton>
-        <TextButton v-else size="s" color="blue" @click="navigateTo('/design-system')">디자인 시스템에서 등록하기</TextButton>
+        <span class="tx-meta">{{ q ? 'No components found' : 'No components in the design system' }}</span>
+        <TextButton v-if="q" size="s" color="blue" @click="q = ''">Clear search</TextButton>
+        <TextButton v-else size="s" color="blue" @click="navigateTo('/design-system')">Add in design system</TextButton>
       </div>
     </div>
   </div>
 
   <div v-else class="wrap">
     <div class="dhead">
-      <IconButton size="s" type="ghost" icon-name="chevron_left" ariaLabel="에셋 목록으로" @click="emit('update:open', null)" />
+      <IconButton size="s" type="ghost" icon-name="chevron_left" ariaLabel="Back to assets" @click="emit('update:open', null)" />
       <span class="tx-head ell">{{ detail.name }}</span>
     </div>
     <div class="dbody">
@@ -59,20 +59,20 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
         <p v-if="detail.description" class="tx-meta m0 mt4">{{ detail.description }}</p>
       </div>
       <section v-if="propRows.length" class="dsec">
-        <div class="sec-h h24 p0"><span>속성</span></div>
+        <div class="sec-h h24 p0"><span>Properties</span></div>
         <div v-for="p in propRows" :key="p.k" class="prop-row"><span class="k">{{ p.k }}</span><span class="tx-body ell">{{ p.v }}</span></div>
       </section>
       <section class="dsec">
-        <div class="sec-h h24 p0"><span>이 파일에서 쓰는 곳</span><span class="tx-meta">{{ uses.reduce((n, u) => n + u.count, 0) }}</span></div>
+        <div class="sec-h h24 p0"><span>Used in this file</span><span class="tx-meta">{{ uses.reduce((n, u) => n + u.count, 0) }}</span></div>
         <button v-for="u in uses" :key="u.id" class="sq menu-item" @click="emit('pick-screen', u.screen_id)">
           <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="dia"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor" /></svg>
           <span class="ell f1">{{ screenName(u.screen_id) }}</span><span class="tx-meta num">{{ u.count }}</span>
         </button>
-        <span v-if="!uses.length" class="tx-meta">이 페이지에서는 아직 쓰지 않았어요</span>
+        <span v-if="!uses.length" class="tx-meta">Not used on this page yet</span>
       </section>
       <section class="dsec">
-        <span class="tx-meta">캔버스에 넣기는 컴포넌트 인스턴스와 함께 열려요</span>
-        <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" class="self-start" @click="navigateTo('/design-system')">디자인 시스템에서 보기</TextButton>
+        <span class="tx-meta">Inserting instances onto the canvas is coming soon</span>
+        <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" class="self-start" @click="navigateTo('/design-system')">View in design system</TextButton>
       </section>
     </div>
   </div>
