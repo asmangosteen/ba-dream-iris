@@ -16,6 +16,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // 서버 전용 (브라우저에 노출되지 않음)
     figmaAccessToken: '',
+    figmaToken: '', // NUXT_FIGMA_TOKEN — figmaAccessToken 의 별칭(둘 중 하나만 채우면 됩니다)
     public: {
       allowedEmailDomain: 'ba-dream.com',
       devPreview: '',

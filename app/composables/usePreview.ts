@@ -6,7 +6,7 @@ import type { PageRow, ScreenRow } from './useEditor'
  * `NUXT_PUBLIC_DEV_PREVIEW=1 npx nuxt dev` 로 켜고, 배포(빌드) 결과물에서는 항상 꺼져 있습니다.
  * 예시 데이터는 화면 확인용이라 DB 에 저장하지 않습니다.
  */
-export function usePreviewMode(): boolean {
+export function useDevPreview(): boolean {
   return import.meta.dev && !!useRuntimeConfig().public.devPreview
 }
 

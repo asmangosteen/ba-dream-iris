@@ -2,6 +2,7 @@
 import { Button, EmptyState, Skeleton } from '@ba-dream/design-system'
 
 const { data: projects, status, error, refresh } = useProjects()
+const { data: progress } = useProjectProgress()
 const filter = ref<'active' | 'done' | 'all'>('active')
 const filters = [
   { key: 'active', label: '진행 중' },
@@ -14,7 +15,7 @@ const count = (k: string) => (projects.value ?? []).filter((p) => k === 'all' ||
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const creating = ref(false)
-const preview = usePreviewMode()
+const preview = useDevPreview()
 async function createProject() {
   if (preview) return navigateTo('/p/preview-1')
   if (creating.value || !user.value) return
@@ -73,7 +74,7 @@ async function createProject() {
             <span class="sq thumb" aria-hidden="true" />
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
-              <span class="tx-meta">{{ STATUS_LABEL[p.status] }} · {{ relativeTime(p.updated_at) }}</span>
+              <span class="tx-meta">{{ STATUS_LABEL[p.status] }}<template v-if="progress?.[p.id]?.total"> · 반영 <span class="num">{{ progress[p.id]!.done }}/{{ progress[p.id]!.total }}</span></template> · {{ relativeTime(p.updated_at) }}</span>
             </span>
           </NuxtLink>
         </div>

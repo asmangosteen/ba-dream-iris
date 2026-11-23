@@ -3,7 +3,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const user = useSupabaseUser()
   const domain = useRuntimeConfig().public.allowedEmailDomain
 
-  if (usePreviewMode()) return
+  if (useDevPreview()) return
   if (to.path === '/confirm') return
   if (to.path === '/login') {
     if (user.value) return navigateTo('/')
