@@ -665,6 +665,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
 /* 접기: 아래 변이 위로 올라가서 탭 줄(42px)만 남아요 */
 .panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - 56px - 42px); }
 .fold { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
+.panel-left .fold { margin-left: auto; }
 .fold:hover { color: var(--sys-color-neutral-800); }
 .pill-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); width: 288px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); z-index: 3; }
 .pill-acts { margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-04); }
