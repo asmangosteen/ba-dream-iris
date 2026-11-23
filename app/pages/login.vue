@@ -18,14 +18,14 @@ const local = ref('')
 const code = ref('')
 const busy = ref(false)
 const resent = ref(false)
-const error = ref(route.query.blocked ? `회사 이메일(@${domain})로만 로그인할 수 있어요` : route.query.expired ? '30일 동안 쓰지 않아서 다시 로그인해 주세요' : '')
+const error = ref(route.query.blocked ? `Only company emails (@${domain}) can sign in` : route.query.expired ? 'Your session expired after 30 days. Please sign in again' : '')
 const email = computed(() => `${local.value.trim()}@${domain}`)
 
 async function sendCode() {
   if (busy.value) return
   const v = local.value.trim()
   if (!v || v.includes('@')) {
-    error.value = v.includes('@') ? `@ 앞부분만 적어주세요. @${domain} 은 붙여 둘게요` : '이메일 앞부분을 적어주세요'
+    error.value = v.includes('@') ? `Enter only the part before @. We'll add @${domain} for you` : 'Enter your email'
     return
   }
   busy.value = true
@@ -33,7 +33,7 @@ async function sendCode() {
   const { error: e } = await supabase.auth.signInWithOtp({ email: email.value, options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/confirm` } })
   busy.value = false
   if (e) {
-    error.value = e.message.includes('회사 이메일') ? e.message : e.message.includes('rate') || e.status === 429 ? '방금 보냈어요. 1분 뒤에 다시 받을 수 있어요' : '메일을 보내지 못했어요. 이메일을 확인해주세요'
+    error.value = e.message.includes('회사 이메일') ? `Only company emails (@${domain}) can sign in` : e.message.includes('rate') || e.status === 429 ? 'Code just sent. You can request a new one in a minute' : 'Couldn\'t send the email. Check your address and try again'
     return
   }
   if (step.value === 'code') resent.value = true
@@ -43,13 +43,13 @@ async function sendCode() {
 
 async function verify() {
   if (busy.value) return
-  if (code.value.trim().length !== 6) { error.value = '메일에 온 6자리 코드를 적어주세요'; return }
+  if (code.value.trim().length !== 6) { error.value = 'Enter the 6-digit code from your email'; return }
   busy.value = true
   error.value = ''
   const { error: e } = await supabase.auth.verifyOtp({ email: email.value, token: code.value.trim(), type: 'email' })
   if (e) {
     busy.value = false
-    error.value = '코드가 맞지 않아요. 메일에 온 6자리를 다시 확인해주세요'
+    error.value = 'That code didn\'t match. Check the 6 digits in your email'
     return
   }
   // 로그인 상태(useSupabaseUser)가 채워진 뒤 이동해야 미들웨어가 로그인 화면으로 되돌리지 않습니다
@@ -65,6 +65,53 @@ async function verify() {
 }
 
 function back() { step.value = 'email'; code.value = ''; error.value = ''; resent.value = false }
+
+// --- 코드 6칸 ---
+const boxes = ref<HTMLInputElement[]>([])
+const digits = computed(() => Array.from({ length: 6 }, (_, i) => code.value[i] ?? ''))
+const focusBox = (i: number) => nextTick(() => { const el = boxes.value[Math.max(0, Math.min(5, i))]; el?.focus(); el?.select() })
+/** i 칸부터 숫자들 채우기(한 글자 입력 · 붙여넣기 · 자동 채우기 공용) */
+function fill(i: number, text: string) {
+  const d = text.replace(/\D/g, '')
+  if (!d) return
+  // 6자리를 통째로 붙여넣으면 어느 칸에서든 전체를 바꿔요
+  if (d.length >= 6) { code.value = d.slice(0, 6); error.value = ''; focusBox(5); return }
+  // 틀린 코드(에러)가 떠 있으면: 숫자는 보이게 두었다가, 새로 치는 순간 전부 지우고 첫 칸부터
+  if (error.value) { code.value = ''; i = 0 }
+  const at = Math.min(i, code.value.length) // 빈 칸을 건너뛰지 않게
+  code.value = (code.value.slice(0, at) + d + code.value.slice(at + d.length)).slice(0, 6)
+  error.value = ''
+  focusBox(at + d.length)
+}
+function onBox(i: number, e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = input.value
+  const had = digits.value[i] ?? ''
+  input.value = had
+  // 이미 숫자가 있던 칸에 새 숫자를 치면 새 숫자로 바꿔요
+  fill(i, had && v.length === 2 && v.startsWith(had) ? v.slice(1) : v)
+}
+function onPaste(i: number, e: ClipboardEvent) { fill(i, e.clipboardData?.getData('text') ?? '') }
+function onBoxKey(i: number, e: KeyboardEvent) {
+  if (e.key === 'Backspace') {
+    e.preventDefault()
+    // 틀린 코드가 떠 있을 때 지우기: 전부 지우고 첫 칸으로
+    if (error.value) { error.value = ''; code.value = ''; focusBox(0); return }
+    if (digits.value[i]) code.value = code.value.slice(0, i) + code.value.slice(i + 1)
+    else if (i > 0) { code.value = code.value.slice(0, i - 1) + code.value.slice(i); focusBox(i - 1) }
+  } else if (e.key === 'ArrowLeft') { e.preventDefault(); focusBox(i - 1) }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); focusBox(Math.min(i + 1, code.value.length)) }
+  else if (e.key === 'Enter') { e.preventDefault(); verify() }
+}
+/** 빈 칸을 건너뛰어 누르면 채울 차례인 칸으로 */
+// 고른 칸: 클래스로 표시해야 squircle 선 두께가 다시 그려져요(:focus-within 만으로는 안 바뀌어요)
+const focused = ref(-1)
+function onBoxFocus(i: number, e: FocusEvent) {
+  if (i > code.value.length) { focusBox(code.value.length); return }
+  focused.value = i
+  ;(e.target as HTMLInputElement).select()
+}
+watch(step, (v) => { if (v === 'code') focusBox(0) })
 function submit() { if (step.value === 'email') sendCode(); else verify() }
 // 코드 6자리를 다 적으면 바로 확인
 watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) code.value = d; else if (d.length === 6 && !busy.value) verify() })
@@ -73,25 +120,21 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 <template>
   <div class="page">
     <!-- 랜딩으로 나가기: 랜딩의 Sign in 과 같은 크기 · 같은 높이, 왼쪽에 -->
-    <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" aria-label="처음 화면으로" @click="navigateTo('/welcome')" />
+    <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" aria-label="Back to home" @click="navigateTo('/welcome')" />
+    <h1 class="bar-title">Sign in</h1>
     <section class="side">
 
       <form class="form" novalidate @submit.prevent="submit">
-        <NuxtLink to="/welcome" class="brand" aria-label="처음 화면으로"><IrisLogo kind="horizontal" :height="44" /></NuxtLink>
-        <div class="head">
-          <h1 class="tx-title">{{ step === 'email' ? '로그인' : '메일을 확인해주세요' }}</h1>
-          <p class="tx-meta m0">
-            <template v-if="step === 'email'">바드림 회사 메일로 로그인 코드를 보내 드려요</template>
-            <template v-else>메일로 받은 6자리 코드를 적거나 메일의 링크를 눌러주세요<br><strong class="who">{{ email }}</strong></template>
-          </p>
-        </div>
+        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" /></NuxtLink>
+        <!-- 코드 단계: 어디로 보냈는지만 알려요 -->
+        <p v-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
 
         <TextInput
           v-if="step === 'email'"
           v-model:value="local"
           size="m"
-          label="회사 이메일"
-          placeholder="이메일 앞부분"
+          :show-label="false"
+          placeholder="Email"
           show-unit
           :unit="`@${domain}`"
           :show-left-icon="false"
@@ -101,35 +144,43 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
           :show-supporting-text="!!error"
           :supporting-text="error"
           supporting-theme="destructed"
-          :input-props="{ id: 'email', name: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: false, autofocus: true }"
-          :label-props="{ htmlFor: 'email' }"
+          :input-props="{ id: 'email', name: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: false, autofocus: true, 'aria-label': 'Company email' }"
         />
-        <TextInput
-          v-else
-          v-model:value="code"
-          size="m"
-          label="로그인 코드"
-          placeholder="6자리 숫자"
-          :show-left-icon="false"
-          :show-right-icon="false"
-          :show-button="false"
-          :destructed="!!error"
-          :show-supporting-text="!!error || resent"
-          :supporting-text="error || '새 코드를 보냈어요. 가장 최근 메일의 코드를 적어주세요'"
-          :supporting-theme="error ? 'destructed' : 'gray'"
-          :input-props="{ id: 'code', name: 'code', autocomplete: 'one-time-code', inputmode: 'numeric', maxlength: 6, pattern: '[0-9]*', autofocus: true }"
-          :label-props="{ htmlFor: 'code' }"
-        />
+        <!-- 코드 6칸: 칸마다 숫자 하나. 붙여넣기 · 자동 채우기는 한 번에, ← → 로 칸 옮기기, 지우면 앞 칸으로 -->
+        <div v-else class="otp-wrap">
+          <div class="otp" role="group" aria-label="Sign-in code">
+            <!-- 칸 모양(채우기 · 선)은 squircle 층(.sq)이 그려요: input 은 투명하게 안에 -->
+            <span v-for="(d, i) in digits" :key="i" class="sq otp-cell" :class="{ bad: !!error, filled: !!d, on: focused === i }">
+            <input
+              :ref="(el) => { if (el) boxes[i] = el as HTMLInputElement }"
+              :value="d"
+              class="otp-box"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :maxlength="i === 0 ? 6 : 1"
+              :autocomplete="i === 0 ? 'one-time-code' : 'off'"
+              :name="i === 0 ? 'code' : undefined"
+              :aria-label="`Digit ${i + 1} of 6`"
+              @input="onBox(i, $event)"
+              @keydown="onBoxKey(i, $event)"
+              @paste.prevent="onPaste(i, $event)"
+              @focus="onBoxFocus(i, $event)"
+              @blur="focused = -1"
+            >
+            </span>
+          </div>
+          <p v-if="error || resent" class="otp-msg tx-meta m0" :class="{ bad: !!error }" role="status">{{ error || 'We sent a new code. Use the code from the latest email' }}</p>
+        </div>
 
-        <Button size="l" type="primary" :loading="busy" class="full" @click="submit">{{ step === 'email' ? '로그인 코드 받기' : '로그인' }}</Button>
+        <Button size="l" type="primary" :loading="busy" class="full" @click="submit">{{ step === 'email' ? 'Send sign-in code' : 'Sign in' }}</Button>
 
         <div v-if="step === 'code'" class="links">
-          <TextButton size="s" color="gray" contents="icon-text" icon-name="chevron_left" @click="back">다른 메일로</TextButton>
-          <TextButton size="s" color="blue" :disabled="busy" @click="sendCode">코드 다시 받기</TextButton>
+          <TextButton size="s" color="gray" contents="icon-text" icon-name="chevron_left" @click="back">Use a different email</TextButton>
+          <TextButton size="s" color="blue" :disabled="busy" @click="sendCode">Resend code</TextButton>
         </div>
       </form>
 
-      <p class="foot tx-meta">한 번 로그인하면 30일 동안 다시 묻지 않아요</p>
     </section>
   </div>
 </template>
@@ -143,12 +194,24 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 .out { position: absolute; z-index: 2; top: 17px; left: 40px; }
 @media (max-width: 760px) { .out { top: 11px; left: 16px; } }
 .form { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: var(--ref-spacing-10); width: 100%; max-width: 360px; margin: 0 auto; }
-.head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--ref-spacing-02); margin-bottom: var(--ref-spacing-04); }
+/* 위 막대 가운데 제목: 뒤로 가기 버튼과 같은 높이 */
+.bar-title { position: absolute; z-index: 1; top: 17px; left: 0; right: 0; height: 40px; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 22px; font-weight: 500; color: var(--sys-color-neutral-800); pointer-events: none; }
+@media (max-width: 760px) { .bar-title { top: 11px; } }
+.sent { text-align: center; }
 .who { font-weight: 500; color: var(--sys-color-neutral-700); }
 .m0 { margin: 0; }
 .full { width: 100%; }
 .links { display: flex; justify-content: space-between; align-items: center; margin-top: calc(-1 * var(--ref-spacing-04)); }
-.form :deep(input[name='code']) { font-variant-numeric: tabular-nums; letter-spacing: 0.2em; }
-.foot { margin: 0; text-align: center; }
+.otp-wrap { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.otp { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--ref-spacing-08); }
+/* 코너 스무딩: 채우기 · 선을 .sq 층으로(테두리 · 그림자는 각진 모서리라 쓰지 않아요) */
+.otp-cell { display: block; height: 64px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.otp-cell:hover { --sq-line: var(--ref-color-gray-900-20); }
+.otp-cell.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
+.otp-cell.bad { --sq-line: var(--sys-color-theme-destructed-default); }
+.otp-cell.bad.on { --sq-line: var(--sys-color-theme-destructed-default); }
+.otp-box { width: 100%; height: 100%; box-sizing: border-box; padding: 0; border: 0; background: transparent; text-align: center; font-family: var(--font-family-base); font-size: 28px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--sys-color-neutral-800); caret-color: var(--sys-color-brand-primary-default); outline: none; }
+.otp-msg { text-align: center; }
+.otp-msg.bad { color: var(--sys-color-theme-destructed-default); }
 @media (max-width: 760px) { .side { padding: var(--ref-spacing-12) var(--ref-spacing-08); } }
 </style>
