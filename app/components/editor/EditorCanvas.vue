@@ -906,9 +906,9 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .guides { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
 /* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
-.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 3px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 3px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
 /* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
-.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 0 4px; border-radius: 3px; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 0 4px; border-radius: 3px; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
 .size .mode { font-weight: 500; opacity: .8; margin-left: 2px; }
 .marq { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 </style>
