@@ -870,7 +870,15 @@ const measure = computed<Guides | null>(() => {
     const own = store.layerIds.value.find((k) => descendants(d, k).includes(id!))
     if (own) id = d.nodes[own]?.parentId ?? null
   }
-  const target = id ? layerWorld(hs, id) : isCanvas(hs) ? null : rectOf(hs)
+  // 화면(프레임)을 골랐으면 다른 화면은 화면째로 재요(피그마와 같아요). 안쪽 레이어는 화면을 고르지 않았을 때만
+  if (!store.layerIds.value.length && !isCanvas(hs)) id = null
+  let target = id ? layerWorld(hs, id) : isCanvas(hs) ? null : rectOf(hs)
+  // 화면 밖으로 넘쳐 잘린 부분은 빼고 보이는 만큼만
+  if (target && id && !isCanvas(hs)) {
+    const f = rectOf(hs)
+    const x0 = Math.max(target.x, f.x), y0 = Math.max(target.y, f.y), x1 = Math.min(target.x + target.w, f.x + f.w), y1 = Math.min(target.y + target.h, f.y + f.h)
+    target = x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
+  }
   return target ? measureGuides(union(sel), target) : null
 })
 const shown = computed(() => guides.value ?? measure.value)
@@ -985,7 +993,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <template v-if="!selBoxes.length">
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
           <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
-          <span class="size num">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
+          <span class="size">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :style="rbox(b)" />
@@ -997,7 +1005,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
             <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
           </template>
         </div>
-        <span class="size num below" :style="belowBox(single)">
+        <span class="size below" :style="belowBox(single)">
           <template v-if="rotating">{{ fmt(single.rotation) }}°</template>
           <template v-else>{{ fmt(single.w) }}<span v-if="singleHug" class="mode">Hug</span> × {{ fmt(single.h) }}<span v-if="singleHug" class="mode">Hug</span></template>
         </span>
@@ -1008,8 +1016,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
           <template v-if="l.tick"><line v-for="(t, j) in ticks(l)" :key="j" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" /></template>
         </template>
       </svg>
-      <template v-if="shown"><span v-for="(lb, i) in shown.labels" :key="'g' + i" class="glabel num" :style="{ left: sx(lb.x) + 'px', top: sy(lb.y) + 'px' }">{{ lb.text }}</span></template>
-      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size num">{{ fmt(draft.width) }} × {{ fmt(draft.height) }}</span></div>
+      <template v-if="shown"><span v-for="(lb, i) in shown.labels" :key="'g' + i" class="glabel" :style="{ left: sx(lb.x) + 'px', top: sy(lb.y) + 'px' }">{{ lb.text }}</span></template>
+      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size">{{ fmt(draft.width) }} × {{ fmt(draft.height) }}</span></div>
       <div v-if="draft && marqueeOn" class="marq" :style="box(draft)" />
       <svg v-if="draftPts" class="guides draw" width="100%" height="100%"><polyline :points="draftPts.map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ')" /></svg>
     </div>
