@@ -119,12 +119,25 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
             "x": 20, "y": 16, "w": 200, "h": 24,
             "text": "요금제 선택", "style": { "textStyle": "token:type.title.17" } },
     "n3": { "id": "n3", "type": "image", "name": "Back", "parentId": "n1",
-            "x": 335, "y": 16, "w": 24, "h": 24, "src": "storage://assets/back.svg" }
+            "x": 335, "y": 16, "w": 24, "h": 24, "src": "storage://assets/back.svg",
+            "rotation": 90, "flipX": true, "lockRatio": true,
+            "style": { "radii": [8, 8, 0, 0] } }
   },
-  "schemaVersion": 1
+  "schemaVersion": 2
 }
 ```
 - Phase 1 레이어 타입: `frame` · `rect` · `text` · `image`
+- 위치 `x` · `y` 는 부모(화면 또는 프레임 레이어) 왼쪽 위 기준, `w` · `h` 는 돌리기 전 상자 크기다.
+- **schemaVersion 2 (2026-11-23)** 에서 더한 값. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽히고(`app/canvas/schema.ts` 의 `migrate()`), 다음 저장 때 `schemaVersion: 2` 로 저장된다.
+
+| 필드 | 설명 | 예시 | 기본 |
+|---|---|---|---|
+| rotation | 가운데를 축으로 돌린 각도(도, 시계 방향, -180 초과 ~ 180 이하) | 15 | 없음 = 0 |
+| flipX / flipY | 좌우 · 상하 뒤집기(가운데 축). 프레임이면 안의 레이어도 함께 뒤집혀 보인다 | true | 없음 = false |
+| lockRatio | 비율 고정. 켜면 W · H 를 고치거나 크기를 끌 때 비율을 지킨다 | true | 없음 = 이미지만 고정 |
+| style.radii | 모서리 따로 `[왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래]`. 있으면 `style.radius` 대신 쓴다 | [12, 12, 0, 0] | 없음 = `radius` 하나 |
+
+- 그릴 때 순서: `transform: rotate(rotation) scaleX(flipX ? -1 : 1) scaleY(flipY ? -1 : 1)`, 축은 상자 가운데.
 - Phase 2 추가: `instance` (컴포넌트 배치, `componentId` + `props`), `layout` 속성 (Stack)
 - 스타일 값은 원시값(`#FF0000`) 또는 토큰 참조(`token:color.primary`)를 쓴다.
 

@@ -15,7 +15,7 @@ const tools: { key: Tool; label: string; d?: string; icon?: string }[] = [
 const KEYS: Record<string, Tool> = { v: 'move', h: 'hand', f: 'frame', a: 'frame', r: 'rect', t: 'text' }
 function onKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement
-  if (e.metaKey || e.ctrlKey || e.altKey || el.closest('input, textarea, [contenteditable]')) return
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || el.closest?.('input, textarea, [contenteditable]')) return
   const t = KEYS[e.key.toLowerCase()]
   if (t) tool.value = t
 }

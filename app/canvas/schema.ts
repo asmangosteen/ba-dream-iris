@@ -2,7 +2,7 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export type LayerType = 'frame' | 'rect' | 'text' | 'image'
 
@@ -11,6 +11,8 @@ export interface LayerStyle {
   stroke?: string
   strokeWidth?: number
   radius?: number
+  /** 모서리 따로 [왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래] — 있으면 radius 대신 씁니다 (v2) */
+  radii?: [number, number, number, number]
   opacity?: number // 0~1
   // 텍스트
   color?: string
@@ -32,6 +34,13 @@ export interface LayerNode {
   y: number
   w: number
   h: number
+  /** 가운데를 축으로 돌린 각도(도, 시계 방향). x · y · w · h 는 돌리기 전 상자 (v2) */
+  rotation?: number
+  /** 좌우 · 상하 뒤집기 (v2) */
+  flipX?: boolean
+  flipY?: boolean
+  /** 비율 고정. 비어 있으면 이미지만 고정 (v2) */
+  lockRatio?: boolean
   hidden?: boolean
   locked?: boolean
   text?: string
@@ -52,11 +61,15 @@ export function migrate(raw: unknown): LayerDoc {
   if (!raw || typeof raw !== 'object') return emptyDoc()
   const d = raw as Partial<LayerDoc>
   if (!d.nodes || !Array.isArray(d.rootIds)) return emptyDoc()
-  // schemaVersion 1 이 첫 버전이라 아직 변환할 것이 없습니다
+  // v1 → v2: 회전 · 뒤집기 · 비율 고정 · 모서리 따로가 더해졌어요. 모두 비어 있어도 되는 값이라 v1 문서는 그대로 읽습니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   for (const [id, n] of Object.entries(d.nodes)) {
     if (!n || typeof n !== 'object') continue
-    doc.nodes[id] = { ...(n as LayerNode), id, style: (n as LayerNode).style ?? {} }
+    const node: LayerNode = { ...(n as LayerNode), id, style: { ...((n as LayerNode).style ?? {}) } }
+    if (typeof node.rotation !== 'number' || !Number.isFinite(node.rotation) || !node.rotation) delete node.rotation
+    const r = node.style.radii
+    if (r && !(Array.isArray(r) && r.length === 4 && r.every((v) => typeof v === 'number'))) delete node.style.radii
+    doc.nodes[id] = node
   }
   doc.rootIds = doc.rootIds.filter((id) => doc.nodes[id])
   return doc
@@ -86,6 +99,17 @@ export function descendants(doc: LayerDoc, id: string): string[] {
   const out = [id]
   for (const c of doc.nodes[id]?.children ?? []) out.push(...descendants(doc, c))
   return out
+}
+
+/** 비율 고정: 값이 없으면 이미지만 고정 */
+export const ratioLocked = (n: Pick<LayerNode, 'lockRatio' | 'type'>) => n.lockRatio ?? n.type === 'image'
+
+/** 각도를 -180 < r ≤ 180 으로 */
+export function normAngle(r: number) {
+  let v = r % 360
+  if (v > 180) v -= 360
+  if (v <= -180) v += 360
+  return Math.round(v * 100) / 100
 }
 
 export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {

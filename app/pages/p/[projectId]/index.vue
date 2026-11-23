@@ -5,6 +5,8 @@ import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
+import InspectorScreens from '~/components/editor/InspectorScreens.vue'
+import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
 import { uploadImage } from '~/canvas/images'
@@ -112,6 +114,35 @@ function onMove(id: string, x: number, y: number, done: boolean) {
   const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요')
   updateScreen(id, { x, y }).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
+}
+/** 화면 변 · 모서리 끌어 크기: 끄는 동안은 바로 반영, 놓을 때 저장하고 실행취소 한 번 */
+type ScreenRect = { x: number; y: number; width: number; height: number }
+const resizeFrom = new Map<string, ScreenRect>()
+function onResizeScreen(id: string, r: ScreenRect, done: boolean) {
+  const s = list.value.find((v) => v.id === id)
+  if (!s) return
+  if (!done) { if (!resizeFrom.has(id)) resizeFrom.set(id, { x: s.x, y: s.y, width: s.width, height: s.height }); Object.assign(s, r); return }
+  const from = resizeFrom.get(id) ?? r
+  resizeFrom.delete(id)
+  const fail = () => say('크기를 저장하지 못했어요. 다시 시도해주세요')
+  updateScreen(id, r).catch(fail)
+  store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, r).catch(fail))
+}
+/** 여러 화면 정렬 · 균등 분배 · 간격 맞추기: 한 번에 실행취소 */
+const multiScreens = ref<string[]>([])
+const multiList = computed(() => multiScreens.value.map((id) => list.value.find((s) => s.id === id)).filter((s): s is ScreenRow => !!s))
+function onArrangeScreens(op: ArrangeOp) {
+  const rows = multiList.value
+  if (rows.length < 2) return
+  const out = arrangeRects(rows.map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height })), op)
+  const before = rows.map((s) => ({ id: s.id, x: s.x, y: s.y }))
+  const after = rows.map((s, i) => ({ id: s.id, x: out[i]!.x, y: out[i]!.y })).filter((p, i) => p.x !== before[i]!.x || p.y !== before[i]!.y)
+  if (!after.length) return
+  const fail = () => say('위치를 저장하지 못했어요. 다시 시도해주세요')
+  const apply = (ps: { id: string; x: number; y: number }[]) => Promise.all(ps.map((p) => updateScreen(p.id, { x: p.x, y: p.y }))).catch(fail)
+  const back = before.filter((b) => after.some((a) => a.id === b.id))
+  apply(after)
+  store.pushAction(null, () => apply(back), () => apply(after))
 }
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
   try {
@@ -355,9 +386,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
       ref="canvas"
       v-model:tool="tool"
       v-model:viewport="vp"
+      v-model:multi="multiScreens"
       :screens="canvasList"
       :highlight="highlight"
       @move="onMove"
+      @resize-screen="onResizeScreen"
+      @arrange-screens="onArrangeScreens"
       @create="onCreate"
       @hint="say"
       @screen-action="onScreenAction"
@@ -486,6 +520,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <InspectorLayer v-else-if="store.layerIds.value.length" :screen="current" @replace-image="pickImage" />
+            <InspectorScreens v-else-if="multiList.length > 1" :screens="multiList" @arrange="onArrangeScreens" />
             <InspectorDesign v-else :screen="current" @update="onUpdate" @remove="onRemove" />
           </div>
         </template>

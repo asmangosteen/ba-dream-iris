@@ -1,5 +1,6 @@
 import type { InjectionKey, Ref } from 'vue'
-import { absPos, descendants, migrate, newId, siblings, DEFAULT_STYLE, TYPE_LABEL, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
+import { absPos, descendants, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
+import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
 
 /**
@@ -313,6 +314,56 @@ export function createLayerStore(opts: {
   function copyStyle() { const sid = screenId.value; const n = sid && layerIds.value[0] ? node(sid, layerIds.value[0]) : undefined; if (n) { styleClip = { ...n.style }; return true } return false }
   function pasteStyle() { const sid = screenId.value; if (sid && styleClip && layerIds.value.length) style(sid, layerIds.value, styleClip) }
 
+  // --- 회전 · 뒤집기 ---
+  function rotateBy(sid: string, ids: string[], deg: number) {
+    update(sid, ids, (n) => ({ rotation: normAngle((n.rotation ?? 0) + deg) || undefined }))
+  }
+  function flip(sid: string, ids: string[], axis: 'x' | 'y') {
+    const d0 = doc(sid)
+    const list = ids.filter((id) => d0.nodes[id] && !d0.nodes[id]!.locked)
+    if (!list.length) return
+    update(sid, list, (n) => (axis === 'x' ? { flipX: !n.flipX || undefined } : { flipY: !n.flipY || undefined }))
+  }
+
+  // --- 정렬 · 균등 분배 · 간격 맞추기 (돌린 레이어는 감싸는 상자 기준) ---
+  /** 화면 기준 감싸는 상자 */
+  function box(d: LayerDoc, id: string): Rect { const n = d.nodes[id]!; return aabb(layerMatrix(d, id), n.w, n.h) }
+  /** 화면 기준으로 (dx, dy) 옮기기 — 돌린 부모 안이면 부모 좌표로 바꿔서 */
+  function shiftBy(d: LayerDoc, id: string, dx: number, dy: number) {
+    const n = d.nodes[id]!
+    const v = applyVec(invert(parentMatrix(d, id)), dx, dy)
+    n.x = Math.round(n.x + v.x); n.y = Math.round(n.y + v.y)
+  }
+  function place(sid: string, ids: string[], next: (rs: Rect[]) => { x: number; y: number }[]) {
+    const d0 = doc(sid)
+    const list = ids.filter((id) => d0.nodes[id] && !d0.nodes[id]!.locked)
+    if (!list.length) return
+    mutate(sid, (d) => {
+      const rs = list.map((id) => box(d, id))
+      const out = next(rs)
+      list.forEach((id, i) => shiftBy(d, id, out[i]!.x - rs[i]!.x, out[i]!.y - rs[i]!.y))
+    })
+  }
+  /** 하나면 부모(화면 · 프레임) 기준, 여러 개면 고른 범위 기준 */
+  function align(sid: string, ids: string[], kind: AlignKind) {
+    const d = doc(sid)
+    const first = ids.map((id) => d.nodes[id]).find((n) => n)
+    if (!first) return
+    let area: Rect | undefined
+    if (ids.length === 1) {
+      if (first.parentId && d.nodes[first.parentId]) area = box(d, first.parentId)
+      else {
+        const s = opts.screens.value.find((v) => v.id === sid)
+        if (!s || !s.width || !s.height) return // 캔버스 위 레이어 하나는 기준이 없어요
+        area = { x: 0, y: 0, w: s.width, h: s.height }
+      }
+    }
+    place(sid, ids, (rs) => alignRects(rs, kind, area))
+  }
+  function distribute(sid: string, ids: string[], axis: Axis) { if (ids.length >= 3) place(sid, ids, (rs) => distributeRects(rs, axis)) }
+  function space(sid: string, ids: string[], axis: Axis, gap: number) { if (ids.length >= 2) place(sid, ids, (rs) => spaceRects(rs, axis, gap)) }
+  const boxes = (sid: string, ids: string[]) => { const d = doc(sid); return ids.filter((id) => d.nodes[id]).map((id) => box(d, id)) }
+
   /** 색 값 → CSS 색 (토큰 참조는 디자인 시스템 토큰 값으로) */
   function color(v?: string): string | undefined {
     if (!v) return undefined
@@ -327,6 +378,7 @@ export function createLayerStore(opts: {
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     selectScreen, selectLayer, add, update, style, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard,
+    rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),
   }
 }

@@ -11,6 +11,11 @@ const imageSrc = useImageSrc()
 const n = computed(() => props.doc.nodes[props.id])
 const editingThis = computed(() => store.editing.value === props.id && store.screenId.value === props.screenId)
 
+/** 가운데를 축으로 돌리기 · 뒤집기 */
+function transform(r?: number, fx?: boolean, fy?: boolean) {
+  const t = [r ? `rotate(${r}deg)` : '', fx ? 'scaleX(-1)' : '', fy ? 'scaleY(-1)' : ''].filter(Boolean).join(' ')
+  return t || undefined
+}
 const style = computed(() => {
   const v = n.value
   if (!v) return {}
@@ -22,7 +27,8 @@ const style = computed(() => {
     height: v.type === 'text' ? 'auto' : v.h + 'px',
     minHeight: v.type === 'text' ? v.h + 'px' : undefined,
     opacity: s.opacity ?? 1,
-    borderRadius: s.radius ? s.radius + 'px' : undefined,
+    borderRadius: s.radii ? s.radii.map((r) => r + 'px').join(' ') : s.radius ? s.radius + 'px' : undefined,
+    transform: transform(v.rotation, v.flipX, v.flipY),
     pointerEvents: v.locked ? 'none' : undefined,
   }
   if (v.type === 'frame' || v.type === 'rect') css.background = store.color(s.fill)

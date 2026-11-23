@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Button, Icon } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
-import { TYPE_LABEL, type LayerNode, type LayerStyle } from '~/canvas/schema'
+import { normAngle, ratioLocked, TYPE_LABEL, type LayerNode, type LayerStyle } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
+import { currentGap, guessAxis, type ArrangeOp } from '~/canvas/geom'
+import ArrangeControls from '~/components/editor/ArrangeControls.vue'
 
-/** 오른쪽 패널 · 디자인 탭(레이어를 골랐을 때): 위치 · 크기 · 정렬 · 모양 · 채우기 · 선 · 텍스트 · 순서 */
+/** 오른쪽 패널 · 디자인 탭(레이어를 골랐을 때): 위치 · 크기(비율 고정) · 회전 · 뒤집기 · 정렬 · 균등 분배 · 모양(모서리 따로) · 채우기 · 선 · 텍스트 · 순서 */
 const props = defineProps<{ screen: ScreenRow }>()
 const emit = defineEmits<{ 'replace-image': [id: string] }>()
 const store = useLayerStore()
@@ -23,16 +25,58 @@ function same<T>(get: (n: LayerNode) => T): T | '여러 값' {
 }
 const show = (v: unknown) => (v === '여러 값' ? '' : v === undefined || v === null ? '' : String(typeof v === 'number' ? Math.round(v * 100) / 100 : v))
 
+/** 크기 바꾸기: 비율을 고정했으면 다른 쪽도 같은 비율로 */
+function sized(n: LayerNode, key: 'w' | 'h', v: number): Partial<LayerNode> {
+  const val = Math.max(1, Math.round(v))
+  const patch: Partial<LayerNode> = { [key]: val }
+  if (ratioLocked(n) && n.w > 0 && n.h > 0) {
+    if (key === 'w') patch.h = Math.max(1, Math.round((n.h * val) / n.w))
+    else patch.w = Math.max(1, Math.round((n.w * val) / n.h))
+  }
+  if (n.type === 'text' && patch.w !== undefined) n.style.autoWidth = false
+  return patch
+}
 function setNum(key: 'x' | 'y' | 'w' | 'h', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value)
   if (!input.value.trim() || !Number.isFinite(v)) { input.value = show(same((n) => n[key])); return }
+  store.update(sid.value, ids.value, (n) => (key === 'w' || key === 'h' ? sized(n, key, v) : { [key]: Math.max(-1e6, Math.round(v)) }))
+}
+const locked = computed(() => same((n) => ratioLocked(n)) === true)
+function toggleRatio() { const on = !locked.value; store.update(sid.value, ids.value, { lockRatio: on }) }
+
+// 회전 · 뒤집기
+function setRotation(e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace('°', ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = show(same((n) => n.rotation ?? 0)); return }
+  store.update(sid.value, ids.value, { rotation: normAngle(v) || undefined })
+}
+
+// 모서리 따로
+const separate = computed(() => same((n) => !!n.style.radii) === true)
+function toggleCorners() {
+  const on = !separate.value
   store.update(sid.value, ids.value, (n) => {
-    const patch: Partial<LayerNode> = { [key]: Math.max(key === 'w' || key === 'h' ? 1 : -1e6, Math.round(v)) }
-    if (n.type === 'text' && key === 'w') n.style.autoWidth = false
-    return patch
+    const r = n.style.radius ?? 0
+    return { style: on ? { ...n.style, radii: [r, r, r, r] } : { ...n.style, radius: n.style.radii?.[0] ?? r, radii: undefined } }
   })
 }
+/** i: 0 왼쪽 위 · 1 오른쪽 위 · 2 오른쪽 아래 · 3 왼쪽 아래, 없으면 네 모서리 모두 */
+function setCorner(e: Event, i?: number) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value)
+  if (!input.value.trim() || !Number.isFinite(v)) return
+  const val = Math.max(0, Math.round(v * 10) / 10)
+  store.update(sid.value, ids.value, (n) => {
+    const cur = n.style.radii ?? [n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0]
+    const radii = cur.map((r, k) => (i === undefined || i === k ? val : r)) as [number, number, number, number]
+    return { style: { ...n.style, radii, radius: i === undefined ? val : n.style.radius } }
+  })
+}
+const corner = (i: number) => same((n) => n.style.radii?.[i] ?? n.style.radius ?? 0)
+const allCorners = computed(() => same((n) => (n.style.radii ? (n.style.radii.every((r) => r === n.style.radii![0]) ? n.style.radii[0] : '여러 값') : n.style.radius ?? 0)))
+const CORNER_LABEL = ['왼쪽 위', '오른쪽 위', '오른쪽 아래', '왼쪽 아래']
 function setStyle(key: keyof LayerStyle, value: LayerStyle[keyof LayerStyle]) { store.style(sid.value, ids.value, { [key]: value }) }
 function setStyleNum(key: 'radius' | 'strokeWidth' | 'fontSize' | 'lineHeight', e: Event, min = 0) {
   const input = e.target as HTMLInputElement
@@ -65,31 +109,14 @@ function setHex(key: 'fill' | 'stroke' | 'color', e: Event) {
 }
 function addStroke() { store.style(sid.value, ids.value, { stroke: '#202837', strokeWidth: 1 }) }
 
-// 정렬: 하나면 부모(화면 · 프레임) 기준, 여러 개면 고른 범위 기준
-function align(kind: 'l' | 'c' | 'r' | 't' | 'm' | 'b') {
-  const d = store.doc(sid.value)
-  const list = nodes.value
-  if (!list.length) return
-  const absBox = (n: LayerNode) => ({ ...store.absPos(sid.value, n.id), w: n.w, h: n.h })
-  let area: { x: number; y: number; w: number; h: number }
-  if (list.length === 1) {
-    const p = list[0]!.parentId ? d.nodes[list[0]!.parentId!] : null
-    area = p ? absBox(p) : { x: 0, y: 0, w: props.screen.width, h: props.screen.height }
-  } else {
-    const bs = list.map(absBox)
-    const x0 = Math.min(...bs.map((b) => b.x)), y0 = Math.min(...bs.map((b) => b.y))
-    area = { x: x0, y: y0, w: Math.max(...bs.map((b) => b.x + b.w)) - x0, h: Math.max(...bs.map((b) => b.y + b.h)) - y0 }
-  }
-  store.update(sid.value, ids.value, (n) => {
-    const a = absBox(n)
-    const off = { x: a.x - n.x, y: a.y - n.y } // 부모 위치
-    if (kind === 'l') return { x: area.x - off.x }
-    if (kind === 'c') return { x: Math.round(area.x + (area.w - n.w) / 2 - off.x) }
-    if (kind === 'r') return { x: area.x + area.w - n.w - off.x }
-    if (kind === 't') return { y: area.y - off.y }
-    if (kind === 'm') return { y: Math.round(area.y + (area.h - n.h) / 2 - off.y) }
-    return { y: area.y + area.h - n.h - off.y }
-  })
+// 정렬(하나면 부모 기준, 여러 개면 고른 범위 기준) · 균등 분배 · 간격 맞추기
+const rects = computed(() => store.boxes(sid.value, ids.value))
+const axis = computed(() => (rects.value.length >= 2 ? guessAxis(rects.value) : 'x'))
+const gap = computed(() => currentGap(rects.value, axis.value))
+function onArrange(op: ArrangeOp) {
+  if (op.kind === 'align') store.align(sid.value, ids.value, op.k)
+  else if (op.kind === 'distribute') store.distribute(sid.value, ids.value, op.axis)
+  else store.space(sid.value, ids.value, op.axis, op.gap)
 }
 const WEIGHTS = [[400, 'Regular'], [500, 'Medium'], [600, 'SemiBold'], [700, 'Bold']] as const
 watch(ids, () => (menu.value = null))
@@ -121,20 +148,25 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 
     <section class="s">
       <div class="sec-h h24"><span>위치</span></div>
-      <span class="sub">정렬</span>
-      <div class="grp">
-        <button class="ib" aria-label="왼쪽 맞춤" @click="align('l')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1.5v11M4.5 4h7M4.5 9h4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
-        <button class="ib" aria-label="가로 가운데" @click="align('c')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11M3.5 4h7M4.5 9h5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
-        <button class="ib" aria-label="오른쪽 맞춤" @click="align('r')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M12 1.5v11M2.5 4h7M5.5 9h4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
-        <button class="ib" aria-label="위쪽 맞춤" @click="align('t')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 2h11M4 4.5v7M9 4.5v4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
-        <button class="ib" aria-label="세로 가운데" @click="align('m')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11M4 3.5v7M9 4.5v5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
-        <button class="ib" aria-label="아래쪽 맞춤" @click="align('b')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 12h11M4 2.5v7M9 5.5v4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+      <ArrangeControls :count="nodes.length" :gap="gap" :axis="axis" @op="onArrange" />
+      <div class="grid3">
+        <label class="sq fld"><span>X</span><input :value="show(same((n) => n.x))" :placeholder="same((n) => n.x) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ x: n.x + d })))"></label>
+        <span />
+        <label class="sq fld"><span>Y</span><input :value="show(same((n) => n.y))" :placeholder="same((n) => n.y) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ y: n.y + d })))"></label>
+        <label class="sq fld"><span>W</span><input :value="show(same((n) => n.w))" :placeholder="same((n) => n.w) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="너비" @change="setNum('w', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, 'w', n.w + d)))"></label>
+        <button :class="['ib', 's24', 'tog', { on: locked }]" :aria-pressed="locked" :aria-label="locked ? '비율 고정 풀기' : '비율 고정'" :title="locked ? '비율 고정 풀기' : '비율 고정'" @click="toggleRatio">
+          <svg v-if="locked" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M6 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8 9.5l-1 1A2.5 2.5 0 0 1 3.5 7l1-1M5.5 8.5l3-3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
+          <svg v-else width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M6 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8 9.5l-1 1A2.5 2.5 0 0 1 3.5 7l1-1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
+        </button>
+        <label class="sq fld"><span>H</span><input :value="show(same((n) => n.h))" :placeholder="same((n) => n.h) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="높이" @change="setNum('h', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, 'h', n.h + d)))"></label>
       </div>
       <div class="grid2">
-        <label class="sq fld"><span>X</span><input :value="show(same((n) => n.x))" :placeholder="same((n) => n.x) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ x: n.x + d })))"></label>
-        <label class="sq fld"><span>Y</span><input :value="show(same((n) => n.y))" :placeholder="same((n) => n.y) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ y: n.y + d })))"></label>
-        <label class="sq fld"><span>W</span><input :value="show(same((n) => n.w))" :placeholder="same((n) => n.w) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="너비" @change="setNum('w', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ w: Math.max(1, n.w + d) })))"></label>
-        <label class="sq fld"><span>H</span><input :value="show(same((n) => n.h))" :placeholder="same((n) => n.h) === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="높이" @change="setNum('h', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ h: Math.max(1, n.h + d) })))"></label>
+        <label class="sq fld" title="회전"><span>∠</span><input :value="show(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === '여러 값' ? '여러 값' : ''" inputmode="decimal" aria-label="회전" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span>°</span></label>
+        <div class="grp">
+          <button class="ib" aria-label="90° 돌리기" title="90° 돌리기" @click="store.rotateBy(sid, ids, 90)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.5a4.5 4.5 0 1 0 1.6-3.5M4.5 1.5v2.7h2.7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <button :class="['ib', { on: same((n) => !!n.flipX) === true }]" aria-label="좌우 뒤집기 (⇧H)" title="좌우 뒤집기 ⇧H" @click="store.flip(sid, ids, 'x')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.5 1.5" /><path d="M5 3.5v7L1.5 10.5zM9 3.5v7l3.5 0z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg></button>
+          <button :class="['ib', { on: same((n) => !!n.flipY) === true }]" aria-label="상하 뒤집기 (⇧V)" title="상하 뒤집기 ⇧V" @click="store.flip(sid, ids, 'y')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.5 1.5" /><path d="M3.5 5h7L10.5 1.5zM3.5 9h7l0 3.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg></button>
+        </div>
       </div>
       <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i />내용 자르기</button>
     </section>
@@ -144,7 +176,14 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <div class="grid2"><span class="sub">투명도</span><span v-if="!has('text')" class="sub">모서리</span></div>
       <div class="grid2">
         <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><input :value="same((n) => Math.round((n.style.opacity ?? 1) * 100)) === '여러 값' ? '' : same((n) => Math.round((n.style.opacity ?? 1) * 100))" inputmode="numeric" aria-label="투명도" @change="setOpacity" @keydown="blurOnEnter"><span>%</span></label>
-        <label v-if="!has('text')" class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input :value="show(same((n) => n.style.radius ?? 0))" inputmode="numeric" aria-label="모서리" @change="setStyleNum('radius', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ style: { ...n.style, radius: Math.max(0, (n.style.radius ?? 0) + d) } })))"></label>
+        <div v-if="!has('text')" class="rad">
+          <label v-if="separate" class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input :key="'all' + String(allCorners)" :value="show(allCorners)" :placeholder="allCorners === '여러 값' ? '여러 값' : ''" inputmode="numeric" aria-label="모서리" @change="setCorner($event)" @keydown="blurOnEnter"></label>
+          <label v-else class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input :value="show(same((n) => n.style.radius ?? 0))" inputmode="numeric" aria-label="모서리" @change="setStyleNum('radius', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => ({ style: { ...n.style, radius: Math.max(0, (n.style.radius ?? 0) + d) } })))"></label>
+          <button :class="['ib', 's28', 'tog', { on: separate }]" :aria-pressed="separate" aria-label="모서리 따로" title="모서리 따로" @click="toggleCorners"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+        </div>
+      </div>
+      <div v-if="!has('text') && separate" class="grid4">
+        <label v-for="(c, i) in CORNER_LABEL" :key="c" class="sq fld" :title="`${c} 모서리`"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true" :style="{ transform: `rotate(${i * 90}deg)` }"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.4" fill="none" /></svg><input :value="show(corner(i))" :placeholder="corner(i) === '여러 값' ? '여러 값' : ''" inputmode="numeric" :aria-label="`${c} 모서리`" @change="setCorner($event, i)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => { const r = [...(n.style.radii ?? [0, 0, 0, 0])] as [number, number, number, number]; r[i] = Math.max(0, r[i]! + d); return { style: { ...n.style, radii: r } } }))"></label>
       </div>
     </section>
 
@@ -207,6 +246,14 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .h24 { height: 24px; padding: 0; }
 .s24 { width: 24px; height: 24px; }
 .s28 { width: 28px; height: 28px; }
+.grid3 { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: var(--ref-spacing-04); align-items: center; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
+.grid4 .fld { padding: 0 var(--ref-spacing-04); gap: var(--ref-spacing-02); }
+.grid4 .fld svg { flex: none; color: var(--sys-color-neutral-600); }
+.rad { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: var(--ref-spacing-02); align-items: center; min-width: 0; }
+.tog { color: var(--sys-color-neutral-500); }
+.tog.on { --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); }
+.tog:hover { color: var(--sys-color-neutral-800); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center; }
 .color-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center; }
 .w64 { width: 64px; }
