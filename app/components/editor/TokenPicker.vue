@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import { KIND_LABEL, nameFromId, parseColor, useTokenCatalog, type CatalogToken, type TokenKind } from '~/canvas/tokens'
 
 /**
  * 변수(토큰) 고르기 — 피그마 변수 버튼처럼 속성 줄 끝(또는 입력칸 안)에 둡니다.
  * - 연결 안 됨: 작은 변수 버튼(◇) → 누르면 그 종류의 모든 값을 검색 · 묶음 · 스크롤 목록으로
  * - 연결됨: 입력칸 대신 토큰 이름 칩 → 누르면 같은 목록(맨 위 '연결 끊기')
- * - variant 'dropdown': 입력칸 너비의 드롭다운(텍스트 스타일)
+ * - variant 'dropdown': 입력칸 너비의 드롭다운
+ * - variant 'style': 글자 스타일이 걸린 칸(피그마: [Ag Body 1/16 SB · 16/24] — 흰 칸, 누르면 Text styles 창)
+ * - 글자 스타일 목록(kinds = textStyle)은 피그마 Text styles 창처럼 오른쪽 패널 왼쪽에, 제목 · 닫기 · 묶음(Body 1) · 행(Ag 16 SB · 16/24)
  * 목록은 body 에 띄워서 패널 스크롤에 잘리지 않습니다. ↑↓ · Enter · Esc · 바깥 누르기로 닫기
  */
 const props = withDefaults(defineProps<{
   kinds: TokenKind[]
   /** 연결된 토큰 id, 고른 레이어마다 다르면 '여러 값' */
   bound?: string | null
-  variant?: 'auto' | 'icon' | 'dropdown'
+  variant?: 'auto' | 'icon' | 'dropdown' | 'style'
+  /** variant 'icon' 의 아이콘(EditorIcon 이름) — 비우면 변수 아이콘 */
+  icon?: string
   /** 드롭다운에서 연결이 없을 때 보이는 글 */
   placeholder?: string
   label?: string
@@ -21,7 +25,7 @@ const props = withDefaults(defineProps<{
   reveal?: boolean
   /** 좁은 칸: 칩에 이름 끝 마디만('radius/04' → '04') */
   short?: boolean
-}>(), { bound: null, variant: 'auto', placeholder: '', label: '', reveal: false, short: false })
+}>(), { bound: null, variant: 'auto', placeholder: '', label: '', reveal: false, short: false, icon: '' })
 const emit = defineEmits<{ pick: [t: CatalogToken]; unbind: []; step: [d: number] }>()
 
 const catalog = useTokenCatalog()
@@ -31,6 +35,9 @@ const boundToken = computed(() => (props.bound && !mixed.value ? catalog.find(pr
 const boundName = computed(() => (mixed.value ? 'Mixed' : props.bound ? boundToken.value?.name ?? nameFromId(props.bound) : ''))
 const chipName = computed(() => (props.short && !mixed.value ? boundName.value.split('/').pop()! : boundName.value))
 const asChip = computed(() => props.variant === 'auto' && !!props.bound)
+/** 글자 스타일 목록: 피그마 Text styles 창 모양. 떼기는 목록이 아니라 칸 옆 버튼으로(피그마와 같아요) */
+const isTS = computed(() => props.kinds[0] === 'textStyle')
+const hasDetach = computed(() => !!props.bound && !isTS.value)
 
 const open = ref(false)
 const q = ref('')
@@ -56,7 +63,7 @@ const items = computed(() => {
 })
 const groups = computed(() => {
   const out: { name: string; items: { t: CatalogToken; i: number }[] }[] = []
-  const base = props.bound ? 1 : 0 // 0번은 '연결 끊기'
+  const base = hasDetach.value ? 1 : 0 // 0번은 '연결 끊기'
   items.value.forEach((t, k) => {
     let g = out[out.length - 1]
     if (!g || g.name !== t.group) out.push((g = { name: t.group, items: [] }))
@@ -64,26 +71,39 @@ const groups = computed(() => {
   })
   return out
 })
-const count = computed(() => items.value.length + (props.bound ? 1 : 0))
+const count = computed(() => items.value.length + (hasDetach.value ? 1 : 0))
 
+/** 목록 자리: 트리거가 든 칸(.fld · .dd) 왼쪽 끝 · 바로 아래(+4). 아래 자리가 모자라면 위로 뒤집어요 */
+const W = 240
 function place() {
   const el = trigger.value
   if (!el) return
-  const r = el.getBoundingClientRect()
-  const W = 256, H = 372, vw = window.innerWidth, vh = window.innerHeight
-  const left = Math.max(8, Math.min(vw - W - 8, r.right - W))
-  const below = vh - r.bottom - 8
-  pos.value = below >= Math.min(H, r.top - 8) || below >= H
-    ? { left: left + 'px', top: r.bottom + 4 + 'px', maxHeight: Math.max(160, below - 4) + 'px' }
-    : { left: left + 'px', bottom: vh - r.top + 4 + 'px', maxHeight: Math.max(160, r.top - 12) + 'px' }
+  const box = (el.closest('.fld, .dd, .field, .tp-anchor') as HTMLElement | null) ?? el
+  const r = box.getBoundingClientRect()
+  const vw = window.innerWidth, vh = window.innerHeight
+  // 편집기 팝오버 양식(Text styles 창 기준): 오른쪽 패널(또는 설정 창) 바로 왼쪽, 칸 위쪽에 맞춰서(칠 창과 같은 자리)
+  const panel = el.closest('aside, [role="dialog"], [data-inspector]')?.getBoundingClientRect()
+  if (panel) {
+    const h = menu.value?.offsetHeight || 420
+    pos.value = { left: Math.max(8, panel.left - W - 8) + 'px', top: Math.max(8, Math.min(vh - h - 8, r.top - 48)) + 'px', maxHeight: Math.min(vh - 16, 560) + 'px' }
+    return
+  }
+  const H = Math.min(372, (menu.value?.offsetHeight || 372))
+  const left = Math.max(8, Math.min(vw - W - 8, r.left))
+  const below = vh - r.bottom - 12
+  const above = r.top - 12
+  pos.value = below >= H || below >= above
+    ? { left: left + 'px', top: r.bottom + 4 + 'px', maxHeight: Math.max(120, below) + 'px' }
+    : { left: left + 'px', bottom: vh - r.top + 4 + 'px', maxHeight: Math.max(120, above) + 'px' }
 }
 async function show() {
   catalog.ensure()
   q.value = ''
   open.value = true
   place()
+  nextTick(place)
   const cur = props.bound && !mixed.value ? items.value.findIndex((t) => t.id === props.bound) : -1
-  active.value = cur >= 0 ? cur + 1 : props.bound ? 1 : 0
+  active.value = cur >= 0 ? cur + (hasDetach.value ? 1 : 0) : hasDetach.value ? 1 : 0
   await nextTick()
   search.value?.focus()
   scrollActive('center')
@@ -96,10 +116,40 @@ function close(refocus = false) {
 const toggle = () => (open.value ? close() : show())
 defineExpose({ show, close })
 
+/**
+ * 칩 편집(피그마와 같아요): 칩을 누르면 칩 오른쪽에 커서. Backspace 한 번 → 연결 끊고 그 칸 숫자 입력으로(이어서 지우고 새 값),
+ * 글자를 치면 그 글자로 토큰 검색 목록 → 새 토큰. Enter · ↓ 는 목록 열기, ↑ · ↓ + 값 단계는 칩에서처럼
+ */
+const caret = ref<HTMLInputElement | null>(null)
+const caretOn = ref(false)
+function focusCaret() { caretOn.value = true; nextTick(() => caret.value?.focus()) }
+async function caretKey(e: KeyboardEvent) {
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault()
+    const fld = caret.value?.closest('.fld, label')
+    caretOn.value = false
+    emit('unbind')
+    await nextTick()
+    // 연결이 풀리면 칸에 숫자 입력이 다시 생겨요 — 거기로 커서(끝에)
+    const inp = fld?.querySelector<HTMLInputElement>('input:not(.tchip-caret)')
+    if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange?.(n, n) }
+    return
+  }
+  if (e.key === 'Escape') { caretOn.value = false; caret.value?.blur(); return }
+  if (e.key === 'Enter' || (e.key === 'ArrowDown' && e.altKey)) { e.preventDefault(); caretOn.value = false; show(); return }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); emit('step', (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)); return }
+  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault()
+    caretOn.value = false
+    await show()
+    q.value = e.key
+  }
+}
+
 function choose(i: number) {
-  if (props.bound && i === 0) emit('unbind')
+  if (hasDetach.value && i === 0) emit('unbind')
   else {
-    const t = items.value[i - (props.bound ? 1 : 0)]
+    const t = items.value[i - (hasDetach.value ? 1 : 0)]
     if (!t) return
     emit('pick', t)
   }
@@ -109,6 +159,7 @@ function scrollActive(block: ScrollLogicalPosition = 'nearest') {
   nextTick(() => list.value?.querySelector<HTMLElement>(`[data-i="${active.value}"]`)?.scrollIntoView({ block }))
 }
 function onKey(e: KeyboardEvent) {
+  if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) e.stopPropagation()
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault()
     if (!count.value) return
@@ -118,7 +169,7 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true) }
   else if (e.key === 'Tab') close()
 }
-watch(q, () => { active.value = props.bound ? (items.value.length ? 1 : 0) : 0; nextTick(() => { if (list.value) list.value.scrollTop = 0 }) })
+watch(q, () => { active.value = hasDetach.value ? (items.value.length ? 1 : 0) : 0; nextTick(() => { if (list.value) list.value.scrollTop = 0 }) })
 
 function onDocPointer(e: PointerEvent) {
   const t = e.target as Node | null
@@ -136,9 +187,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onReflow)
 })
 
+/** 색 행 이름: 묶음 머리(System · brand …)가 위에 있으니 마지막 조각만 — 값 열 없이 이름이 잘리지 않게 */
+const leaf = (n: string) => n.split('/').pop() || n
 const alpha = (c?: string) => (parseColor(c)?.a ?? 1) < 1
 const sampleSize = (n: number) => Math.min(n, 20)
+/** 글자 스타일 행의 Ag: 피그마처럼 크기는 고르게(16), 굵기만 스타일대로 */
+const boundWeight = computed(() => boundToken.value?.text?.weight ?? 400)
 const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${boundToken.value.value}` : boundName.value))
+/** 숫자 변수 행 앞 아이콘(피그마 변수 목록처럼 종류가 먼저 보이게) */
+/** 16 그리드 선 아이콘(EditorIcon 규칙 — 1.25px · round). 끊긴 고리 = 변수 연결 끊기, 둥근 사각 + ◇ = 변수 연결 */
+const UNLINK = 'M6 10l4-4M7.3 4l.3-.35a3.3 3.3 0 0 1 4.7 4.7l-.35.3M8.7 12l-.27.36a3.4 3.4 0 0 1-4.75 0a3.3 3.3 0 0 1 0-4.7l.35-.31M11.3 14.5v-1.3M13.2 11.3h1.3M1.5 4.7h1.3M4.7 1.5v1.3'
+const VARIABLE = 'M4.5 2.5h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM8 5.2L10.8 8 8 10.8 5.2 8z'
+const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', radius: 'var_radius', borderWidth: 'var_border', opacity: 'var_opacity', fontSize: 'var_number', lineHeight: 'var_number', letterSpacing: 'var_number' }
 </script>
 
 <template>
@@ -152,7 +212,19 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
     :aria-controls="open ? uid : undefined"
     :title="title || undefined"
     @click="toggle"
-  ><span class="dd-l"><span :class="{ ph: !bound }">{{ boundName || placeholder }}</span><span v-if="boundToken" class="dd-v">{{ boundToken.value }}</span></span><Icon name="chevron_down" :size="12" class="muted" /></button>
+  ><span class="dd-l"><span v-if="bound" :class="['sq', 'tchip', 'dd-chip', { mixed }]"><span class="tchip-t">{{ boundName }}</span></span><span v-else class="ph">{{ placeholder }}</span><span v-if="boundToken" class="dd-v">{{ boundToken.value }}</span></span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
+  <button
+    v-else-if="variant === 'style'"
+    ref="trigger"
+    type="button"
+    :class="['sq', 'tsf', { open, mixed }]"
+    :aria-label="`${label || kindLabel}: ${boundName} — change`"
+    aria-haspopup="listbox"
+    :aria-expanded="open"
+    :aria-controls="open ? uid : undefined"
+    :title="title || undefined"
+    @click="toggle"
+  ><span class="tsf-ag" aria-hidden="true" :style="{ fontWeight: boundWeight }">Ag</span><span class="tsf-n">{{ boundName }}<span v-if="boundToken" class="tsf-v"> · {{ boundToken.value }}</span></span></button>
   <span v-else-if="asChip" :class="['tchip-w', { short }]">
     <button
       ref="trigger"
@@ -162,30 +234,34 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
       :aria-expanded="open"
       :aria-controls="open ? uid : undefined"
       :title="title"
-      @click.prevent="toggle"
+      @click.prevent="focusCaret"
       @keydown.up.prevent.stop="emit('step', $event.shiftKey ? 10 : 1)"
       @keydown.down.prevent.stop="emit('step', $event.shiftKey ? -10 : -1)"
-    ><svg v-if="!short" class="tchip-i" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1l4 4-4 4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg><span class="tchip-t">{{ chipName }}</span></button>
-    <button v-if="!short" class="ib tchip-x" :aria-label="`Detach variable: ${label || kindLabel}`" title="Detach variable" @click.prevent="emit('unbind')"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 7.5l3-3M3.6 5.4l-.9.9a1.9 1.9 0 0 0 2.7 2.7l.9-.9M8.4 6.6l.9-.9a1.9 1.9 0 0 0-2.7-2.7l-.9.9M1.5 1.5l9 9" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" /></svg></button>
+      @keydown.enter.prevent="toggle"
+    ><span class="tchip-t"><bdi>{{ chipName }}</bdi></span></button>
+    <!-- 칩 오른쪽 커서: 누르면 여기로. Backspace = 연결 끊기, 글자 = 새 토큰 찾기 -->
+    <input v-show="caretOn" ref="caret" class="tchip-caret" :aria-label="`${label || kindLabel}: Backspace to detach, type to search`" @keydown="caretKey" @blur="caretOn = false">
+    <button v-if="!short" type="button" class="ib tchip-x" :aria-label="`Detach variable: ${label || kindLabel}`" title="Detach variable" @click.prevent="emit('unbind')"><svg class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
   </span>
   <button
     v-else
     ref="trigger"
     :class="['ib', 'vb', { reveal, open }]"
-    :aria-label="`Apply variable: ${label || kindLabel}`"
-    :title="`Apply variable: ${label || kindLabel}`"
+    :aria-label="icon ? label || kindLabel : `Apply variable: ${label || kindLabel}`"
+    :data-tip="icon ? label || kindLabel : `Apply variable: ${label || kindLabel}`"
     aria-haspopup="listbox"
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
     @click.prevent="toggle"
-  ><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="3" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M7 4.2L9.8 7 7 9.8 4.2 7z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg></button>
+  ><EditorIcon v-if="icon" :name="icon" :size="16" /><svg v-else class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="VARIABLE" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
 
   <Teleport to="body">
-    <div v-if="open" ref="menu" class="sq menu tp" :style="pos" @keydown="onKey">
-      <label class="sq fld tp-s"><Icon name="search" :size="14" class="muted" /><input ref="search" v-model="q" :placeholder="`Search ${kindLabel.toLowerCase()} variables`" :aria-label="`Search ${kindLabel.toLowerCase()} variables`" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
+    <div v-if="open" ref="menu" :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
+      <div class="tsp-h"><span>{{ isTS ? 'Text styles' : `${kindLabel} variables` }}</span><button type="button" class="ib tsp-x" aria-label="Close" data-tip="Close" @click="close(true)"><EditorIcon name="close" :size="16" /></button></div>
+      <label class="sq tp-s"><EditorIcon name="search" :size="16" class="muted" /><input ref="search" v-model="q" :placeholder="'Search'" :aria-label="`Search ${kindLabel.toLowerCase()} variables`" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
       <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="`${kindLabel} variables`">
-        <button v-if="bound" :id="`${uid}-0`" data-i="0" role="option" :aria-selected="active === 0" :class="['sq', 'menu-item', { cur: active === 0 }]" @click="choose(0)" @pointermove="active = 0">
-          <svg class="pv" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5.5 8.5l3-3M4.5 6.5l-1 1a2.1 2.1 0 0 0 3 3l1-1M9.5 7.5l1-1a2.1 2.1 0 0 0-3-3l-1 1M2 2l10 10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
+        <button v-if="hasDetach" :id="`${uid}-0`" data-i="0" role="option" :aria-selected="active === 0" :class="['sq', 'menu-item', { cur: active === 0 }]" @click="choose(0)" @pointermove="active = 0">
+          <svg class="pv" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
           <span class="nm">Detach variable</span>
         </button>
         <template v-for="g in groups" :key="g.name">
@@ -198,71 +274,108 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
             role="option"
             :aria-selected="t.id === bound"
             :class="['sq', 'menu-item', { on: t.id === bound, cur: active === i }]"
-            :title="`${t.name} · ${t.value}`"
+            :title="t.kind === 'color' ? t.name : `${t.name} · ${t.value}`"
             @click="choose(i)"
             @pointermove="active = i"
           >
             <span v-if="t.kind === 'color'" :class="['sqc', 'pv', 'sw', { al: alpha(t.color) }]"><i class="sq" :style="{ '--sq-fill': t.color }" /></span>
-            <span v-else-if="t.kind === 'textStyle'" class="pv ts" data-preview :style="{ fontSize: sampleSize(t.text!.size) + 'px', fontWeight: t.text!.weight ?? 400 }">Ag</span>
+            <span v-else-if="t.kind === 'textStyle'" class="pv ts" data-preview :style="{ fontWeight: t.text!.weight ?? 400 }">Ag</span>
             <span v-else-if="t.kind === 'fontWeight'" class="pv ts" :style="{ fontWeight: t.num }">Ag</span>
             <span v-else-if="t.kind === 'shadow'" class="sq pv sh" :style="{ boxShadow: t.css }" />
-            <span class="nm">{{ t.name }}</span>
-            <span class="vl">{{ t.value }}</span>
+            <EditorIcon v-else :name="KIND_ICON[t.kind] ?? 'var_number'" :size="16" class="pv" />
+            <span v-if="t.kind === 'textStyle'" class="nm">{{ leaf(t.name) }}<span class="tsv"> · {{ t.value }}</span></span>
+            <template v-else>
+              <span class="nm">{{ t.kind === 'color' ? leaf(t.name) : t.name }}</span>
+              <span v-if="t.kind !== 'color'" class="vl">{{ t.value }}</span>
+            </template>
           </button>
         </template>
-        <span v-if="!items.length" class="tp-e">{{ q ? 'No variables found' : `No ${kindLabel.toLowerCase()} variables` }}</span>
+        <span v-if="!items.length" class="tp-e">{{ isTS ? (q ? 'No styles found' : 'No text styles') : q ? 'No variables found' : `No ${kindLabel.toLowerCase()} variables` }}</span>
       </div>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-/* 변수 버튼: 촘촘한 줄 아이콘 버튼 24 (입력칸 안에서는 20) */
-.vb { width: 24px; height: 24px; color: var(--sys-color-neutral-500); }
+/* 변수 버튼: 줄 끝 아이콘 버튼 24 · 아이콘 16. 상태 표시 색(neutral-500) → 호버 800 (PRD/08 색 규칙) */
+.eic { flex: none; display: block; }
+.vb { width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
 .vb:hover, .vb.open { color: var(--sys-color-neutral-800); }
 .vb.open { --sq-fill: var(--sys-color-neutral-300); }
-.vb.reveal { width: 20px; height: 20px; margin-right: calc(-1 * var(--ref-spacing-04)); opacity: 0; transition: opacity .12s ease, background-color .12s ease, color .12s ease; }
+/* 입력칸 안: 칸 오른쪽 안쪽 8 에 아이콘 끝이 오게(버튼 24 − 아이콘 16 = 4 를 당겨요). 칸에 올리거나 포커스가 있을 때만, 바로(애니메이션 없음) */
+.vb.reveal { margin-right: calc(-1 * var(--ref-spacing-04)); opacity: 0; }
 .fld:hover .vb.reveal, .fld:focus-within .vb.reveal, .vb.reveal.open, .vb.reveal:focus-visible { opacity: 1; }
 
-/* 연결된 값: 입력칸 자리를 채우는 칩 */
-.tchip-w { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
-/* 연결 끊기: 마우스를 올리면 칩 오른쪽 끝에 겹쳐 보여요(자리를 차지하지 않게) */
-.tchip-x { position: absolute; right: 0; top: 50%; width: 20px; height: 20px; margin-top: -10px; --sq-fill: var(--sys-color-common-white-emphasis); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
-.tchip-x:hover { color: var(--sys-color-neutral-800); }
-.fld:hover .tchip-x, .tchip-x:focus-visible { opacity: 1; }
-.tchip { flex: 1; min-width: 0; height: 20px; display: flex; align-items: center; gap: var(--ref-spacing-03); padding: 0 var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; transition: box-shadow .12s ease; }
+/* 연결된 값: 입력칸 자리에 [칩(내용만큼, 넘치면 …)] — 칸에 올리면 오른쪽 끝에 연결 끊기 24 가 생기고 칩 글자는 그 앞에서 잘려요(피그마와 같아요) */
+.tchip-w { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.tchip { flex: 0 1 auto; min-width: 0; height: 20px; display: flex; align-items: center; padding: 0 var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
 .tchip:hover { --sq-line: var(--ref-color-gray-900-20); }
 .tchip.open { --sq-line: var(--sys-color-brand-primary-default); }
 .tchip.mixed { color: var(--sys-color-neutral-600); }
 .short .tchip { padding: 0 var(--ref-spacing-03); margin-left: 0; }
 .tchip:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.tchip-i { flex: none; color: var(--sys-color-neutral-500); }
 .tchip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 칩 이름이 넘치면 앞을 줄여요(피그마: "…ight/600") — 뒤쪽 마디가 값을 구분해 줘요 */
+.tchip-w .tchip-t { direction: rtl; text-align: left; }
+.tchip-t > bdi { direction: ltr; unicode-bidi: isolate; }
+/* 연결 끊기(피그마 ⛓ 분리): 바탕 없는 아이콘 버튼 24 · 아이콘 16, neutral-500 → 호버 800. 아이콘 끝이 칸 안쪽 8 에 맞게 −4 */
+.tchip-caret { flex: none; width: 2px; min-width: 2px; height: 16px; padding: 0; margin-left: -2px; border: 0; outline: none; background: transparent; caret-color: var(--sys-color-brand-primary-default); color: transparent; }
+.tchip:has(+ .tchip-caret:focus) { --sq-line: var(--sys-color-brand-primary-default); }
+.tchip-x { flex: none; width: 24px; height: 24px; margin: 0 calc(-1 * var(--ref-spacing-04)) 0 auto; color: var(--sys-color-neutral-500); }
+.tchip-x:hover { color: var(--sys-color-neutral-800); }
+.fld:not(:hover):not(:focus-within) .tchip-x:not(:focus-visible) { display: none; }
 
 .dd-l { min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); overflow: hidden; }
 .dd-l > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 드롭다운(텍스트 스타일)에 연결된 값: 다른 칸과 같은 흰 칩 — 칩 자체는 버튼이 아니라 드롭다운 전체가 눌려요 */
+.dd-chip { flex: 0 1 auto; }
+.dd:hover .dd-chip { --sq-line: var(--ref-color-gray-900-20); }
+.dd.open .dd-chip { --sq-line: var(--sys-color-brand-primary-default); }
 .dd-v { flex: none; color: var(--sys-color-neutral-500); }
 .ph { color: var(--sys-color-neutral-600); }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
 
-/* 목록 카드 */
-.tp { position: fixed; right: auto; top: auto; width: 256px; z-index: 50; gap: var(--ref-spacing-02); box-sizing: border-box; }
-.tp-s { flex: none; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04); }
-.tp-l { display: flex; flex-direction: column; min-height: 0; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; scroll-padding: var(--ref-spacing-12) 0 var(--ref-spacing-02); }
+/* 목록 카드 — 피그마 변수 목록: 폭 240 · 안쪽 4 · 검색 28 · 묶음 라벨 11/16 · 행 28 (body 로 옮겨져서 .editor 규칙을 받지 않아요: 값을 여기서 모두 정해요) */
+.tp { position: fixed; right: auto; top: auto; width: 240px; z-index: 50; padding: var(--ref-spacing-06) var(--ref-spacing-04) var(--ref-spacing-04); gap: var(--ref-spacing-04); box-sizing: border-box; border-radius: var(--ref-radius-06); /* 테두리 · 그림자는 .menu 공통(= 사이드바 .float) 그대로 */ }
+.tp-s { flex: none; margin: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); cursor: text; }
+.tp-s input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; color: var(--sys-color-neutral-800); }
+.tp-s input::placeholder { color: var(--sys-color-neutral-500); }
+.tp-s:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
+.tp-l { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; scroll-padding: 28px 0 0; }
 .tp-l > * { flex: none; }
-.tp-g { position: sticky; top: 0; z-index: 1; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-02); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); background: var(--sys-color-common-white-default); }
+.tp-g { position: sticky; top: 0; z-index: 1; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-02); font-size: 11px; line-height: 16px; font-weight: 400; color: var(--sys-color-neutral-500); background: var(--sys-color-common-white-emphasis); }
 .tp-e { padding: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); }
-.menu-item { min-height: 26px; height: auto; }
-.menu-item.cur { --sq-fill: var(--sys-color-neutral-100); }
-.menu-item.on { font-weight: 400; }
-.menu-item.on.cur { --sq-fill: var(--sys-color-brand-primary-lightest); }
+.tp .menu-item { height: 28px; min-height: 28px; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); transition: none; }
+.tp .menu-item::before { transition: none; }
+.tp .menu-item:hover, .tp .menu-item.cur { --sq-fill: var(--sys-color-neutral-100); }
+/* 고른 행: 레이어 패널에서 고른 행과 같은 옅은 파랑(--iris-sel), 올려도 그대로 · 글자는 그대로 */
+.tp .menu-item.on, .tp .menu-item.on:hover, .tp .menu-item.on.cur { --sq-fill: var(--iris-sel); color: var(--sys-color-neutral-800); font-weight: 400; }
 .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vl { flex: none; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sys-color-neutral-500); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
-.menu-item.on .vl { color: var(--sys-color-brand-primary-default); }
-.pv { flex: none; width: 14px; height: 14px; display: grid; place-items: center; color: var(--sys-color-neutral-600); }
-.sw { position: relative; border-radius: 3px; overflow: hidden; }
+.vl { flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+.pv { flex: none; width: 16px; height: 16px; display: grid; place-items: center; color: var(--sys-color-neutral-500); }
+.sw { position: relative; border-radius: var(--ref-radius-02); overflow: hidden; }
 .sw.al { background: repeating-conic-gradient(var(--iris-paper) 0 25%, #D6D9DD 0 50%) 0 0 / 6px 6px; }
 .sw i { position: absolute; inset: 0; --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 0.5px; border-radius: inherit; }
-.ts { width: 28px; height: auto; min-height: 18px; line-height: 1.2; color: var(--sys-color-neutral-800); font-family: var(--font-family-base); }
-.sh { border-radius: 3px; --sq-fill: var(--iris-paper); margin: 0 2px; width: 12px; height: 12px; }
+.ts { width: 24px; height: auto; min-height: 18px; line-height: 1.2; color: var(--sys-color-neutral-800); font-family: var(--font-family-base); overflow: hidden; }
+/* 글자 스타일이 걸린 칸(피그마): 흰 칸 · 0.5px 선 · 28h, [Ag(스타일 굵기) 이름 · 값]. 열면 파란 바탕 · 파란 선 · 파란 글자 */
+.tsf { width: 100%; min-width: 0; height: 28px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); box-sizing: border-box; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
+.tsf:hover { --sq-line: var(--sys-color-neutral-400); }
+.tsf.open { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); color: var(--sys-color-brand-primary-default); }
+.tsf:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.tsf-ag { flex: none; font-size: 14px; line-height: 18px; }
+.tsf-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tsf-v { color: var(--sys-color-neutral-600); }
+.tsf.open .tsf-v { color: inherit; }
+/* 편집기 팝오버 양식(Text styles 창 기준 — 변수 목록도 같아요): 제목 줄 40(제목 · 닫기) / 안쪽 4 · 검색 28 / 묶음 이름(진하게 12) / 행 32 */
+.tsp { padding-top: 0; }
+.tsp-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.tsp-x { width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
+.tsp .tp-l { max-height: none; }
+.tsp .tp-g { padding: var(--ref-spacing-08) var(--ref-spacing-06) var(--ref-spacing-02); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.tsp .menu-item { height: 32px; min-height: 32px; }
+.tsp .ts { width: 20px; font-size: 14px; line-height: 18px; }
+.tsv { color: var(--sys-color-neutral-500); }
+
+.sh { border-radius: var(--ref-radius-02); --sq-fill: var(--iris-paper); width: 12px; height: 12px; margin: 0 2px; }
 </style>

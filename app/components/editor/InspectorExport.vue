@@ -1,0 +1,149 @@
+<script setup lang="ts">
+import EditorIcon from '~/components/editor/EditorIcon.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
+import type { ExportSetting, LayerNode } from '~/canvas/schema'
+import { useLayerStore } from '~/canvas/store'
+import { EXPORT_FORMATS, EXPORT_SCALES, download, fileNameOf, isVectorFormat, normScale, previewOf, renderExport } from '~/canvas/exporter'
+
+/**
+ * Export 칸(피그마와 같아요): [배율 ▾] [형식 ▾] [⋯] [−] 줄을 여러 개, 아래 'Export 이름' 버튼과 Preview.
+ * 화면(프레임)을 고르면 화면 설정(doc.exports), 레이어를 고르면 레이어 설정(node.exports). 설정은 파일에 함께 저장돼요
+ */
+const props = defineProps<{ sid: string; ids: string[]; screen?: { id: string; name: string } | null }>()
+const store = useLayerStore()
+const emit = defineEmits<{ toast: [text: string] }>()
+const toast = (t: string) => emit('toast', t)
+
+const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
+const list = computed<ExportSetting[]>(() => (props.screen ? store.doc(props.sid).exports : nodes.value[0]?.exports) ?? [])
+function save(next: ExportSetting[]) {
+  if (props.screen) store.setScreenExports(props.sid, next.length ? next : undefined)
+  else store.update(props.sid, props.ids, { exports: next.length ? next.map((e) => ({ ...e })) : undefined })
+}
+/** + : 처음은 1x PNG, 다음부터는 한 단계 큰 배율(피그마와 같아요) */
+function add() {
+  const cur = list.value
+  if (!cur.length) { save([{ scale: '1x', format: 'PNG' }]); return }
+  const last = cur[cur.length - 1]!
+  const steps = ['1x', '2x', '3x', '4x']
+  const next = steps[steps.indexOf(last.scale) + 1] ?? last.scale
+  save([...cur, { scale: next, format: last.format }])
+}
+const setAt = (i: number, patch: Partial<ExportSetting>) => save(list.value.map((e, k) => (k === i ? { ...e, ...patch } : e)))
+const removeAt = (i: number) => { menu.value = null; save(list.value.filter((_, k) => k !== i)) }
+function typedScale(i: number, ev: Event) {
+  const el = ev.target as HTMLInputElement
+  const v = normScale(el.value)
+  if (v) setAt(i, { scale: v })
+  else el.value = list.value[i]!.scale
+}
+const SCALE_OPTS = EXPORT_SCALES.map((s) => ({ value: s, label: s }))
+const FORMAT_OPTS = EXPORT_FORMATS.map((f) => ({ value: f, label: f === 'JPG' ? 'JPEG' : f }))
+
+// ⋯ 설정(피그마와 같은 항목): Suffix · Color profile · Ignore overlapping layers
+const menu = ref<number | null>(null)
+function setSuffix(i: number, ev: Event) {
+  const v = (ev.target as HTMLInputElement).value
+  setAt(i, { suffix: v === '' ? undefined : v })
+}
+
+/** 내보낼 대상: 캔버스에 그려진 그 요소 */
+function targets(): { el: HTMLElement; name: string }[] {
+  const world = document.querySelector('.canvas .world')
+  if (!world) return []
+  if (props.screen) {
+    const el = world.querySelector<HTMLElement>(`.frame[data-screen="${props.screen.id}"]`)
+    return el ? [{ el, name: props.screen.name }] : []
+  }
+  return nodes.value.map((n) => ({ el: world.querySelector<HTMLElement>(`[data-screen="${props.sid}"] [data-layer="${n.id}"]`), name: n.name })).filter((t): t is { el: HTMLElement; name: string } => !!t.el)
+}
+const label = computed(() => (props.screen ? props.screen.name : nodes.value.length > 1 ? `${nodes.value.length} layers` : nodes.value[0]?.name ?? ''))
+const busy = ref(false)
+async function run() {
+  if (busy.value || !list.value.length) return
+  busy.value = true
+  try {
+    const ts = targets()
+    for (const t of ts) for (const e of list.value) download(await renderExport(t.el, e), fileNameOf(t.name, e))
+    if (!ts.length) toast('Nothing to export')
+  } catch (err) {
+    console.error(err)
+    toast('Couldn’t export. Try again')
+  } finally { busy.value = false }
+}
+
+// Preview: 첫 대상을 작게
+const pvOpen = ref(false)
+const pvSrc = ref<string | null>(null)
+async function refreshPreview() {
+  pvSrc.value = null
+  const t = targets()[0]
+  if (!pvOpen.value || !t) return
+  try { pvSrc.value = await previewOf(t.el) } catch { pvSrc.value = null }
+}
+watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id], () => nextTick(refreshPreview))
+</script>
+
+<template>
+  <section class="s ex">
+    <div :class="['sec-h', 'h24', { empty: !list.length }]">
+      <span>Export</span>
+      <button class="ib s24" aria-label="Add export setting" title="Add export setting" @click="add"><EditorIcon name="plus" :size="16" /></button>
+    </div>
+    <template v-if="list.length">
+      <div v-for="(e, i) in list" :key="i" class="erow">
+        <!-- 배율: 직접 입력 + ▾ 고르기. SVG · PDF 는 피그마처럼 배율 없음 -->
+        <label :class="['sq', 'fld', 'esc', { off: isVectorFormat(e.format) }]">
+          <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" aria-label="Export scale" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
+          <EditorSelect v-if="!isVectorFormat(e.format)" variant="inline" :model-value="e.scale" :options="SCALE_OPTS" aria-label="Export scale presets" @update:model-value="(v) => setAt(i, { scale: v })" />
+        </label>
+        <EditorSelect :model-value="e.format" :options="FORMAT_OPTS" aria-label="Export format" @update:model-value="(v) => setAt(i, { format: v as ExportSetting['format'] })" />
+        <button :class="['ib', 's24', { on: menu === i }]" aria-label="Export settings" title="Export settings" @click="menu = menu === i ? null : i">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="12.5" cy="8" r="1.2" fill="currentColor" /></svg>
+        </button>
+        <button class="ib s24" aria-label="Remove export setting" title="Remove export setting" @click="removeAt(i)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+        <div v-if="menu === i" class="sq float emenu" role="dialog" aria-label="Export settings">
+          <div class="em-h"><span>Export</span><button class="ib s24" aria-label="Close" @click="menu = null"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button></div>
+          <div class="em-r"><span class="tx-meta">Suffix</span><label class="sq fld"><input :value="e.suffix ?? ''" :placeholder="fileNameOf('', e).replace(/^Untitled|\.\w+$/g, '') || 'None'" aria-label="Suffix" @change="setSuffix(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label></div>
+          <div class="em-r"><span class="tx-meta">Color profile</span><span class="sq fld ro">sRGB</span></div>
+          <button class="cb on dis" disabled title="Only this layer is exported — layers on top aren't included"><i class="sq" />Ignore overlapping layers</button>
+        </div>
+      </div>
+      <button class="sq exbtn" :disabled="busy" @click="run">{{ busy ? 'Exporting…' : `Export ${label}` }}</button>
+      <button class="pvt" :aria-expanded="pvOpen" @click="pvOpen = !pvOpen"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !pvOpen }" />Preview</button>
+      <div v-if="pvOpen" class="sq sq-clip pv">
+        <img v-if="pvSrc" :src="pvSrc" alt="Export preview">
+        <span v-else class="tx-meta">Rendering…</span>
+      </div>
+    </template>
+  </section>
+</template>
+
+<style scoped>
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
+.h24 { height: 24px; padding: 0; }
+.sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
+.s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
+.s24 { width: 24px; height: 24px; }
+/* 패널 맨 끝 칸: 아래 여백(다른 패널과 같은 12) */
+.ex:last-child { margin-bottom: var(--ref-spacing-12); }
+/* 한 줄: [배율] [형식] [⋯] [−] */
+.erow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px 24px; gap: var(--ref-spacing-04); align-items: center; }
+.esc input { flex: 1; min-width: 0; }
+.esc.off { opacity: .5; }
+.ib.on { --sq-fill: var(--sys-color-neutral-200); }
+/* ⋯ 설정: 줄 아래 떠 있는 작은 패널 */
+.emenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.em-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.em-r { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-04); }
+.ro { color: var(--sys-color-neutral-600); }
+.cb.dis { opacity: .6; cursor: default; }
+.exbtn { height: 28px; border-radius: var(--ref-radius-03); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-800); }
+.exbtn:hover:not(:disabled) { --sq-overlay: var(--interaction-light-gray-hover); }
+.exbtn:disabled { color: var(--sys-color-neutral-500); }
+.pvt { display: flex; align-items: center; gap: var(--ref-spacing-02); width: max-content; font-size: 12px; color: var(--sys-color-neutral-600); }
+.pvt:hover { color: var(--sys-color-neutral-800); }
+.pvt .rot { transform: rotate(-90deg); }
+.pv { display: grid; place-items: center; min-height: 80px; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
+.pv img { display: block; max-width: 100%; max-height: 240px; box-shadow: 0 0 0 1px var(--ref-color-gray-900-5); }
+</style>

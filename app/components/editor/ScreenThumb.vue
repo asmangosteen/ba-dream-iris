@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { frameCss, migrate } from '~/canvas/schema'
+import { frameCss, frameStroke, migrate } from '~/canvas/schema'
 import { LAYER_STORE, type LayerStore } from '~/canvas/store'
 import LayerView from '~/components/editor/LayerView.vue'
 import { useImageSrc } from '~/canvas/images'
@@ -41,6 +41,8 @@ onBeforeUnmount(() => ro?.disconnect())
     <img v-if="screen.source === 'figma' && screen.thumbnail_path" :src="screen.thumbnail_path" alt="">
     <div v-else-if="scale" class="page" :style="{ width: screen.width + 'px', height: screen.height + 'px', transform: `scale(${scale})`, ...frameCss(doc.frame, stub.color, thumbImg) }">
       <LayerView v-for="id in doc.rootIds" :key="id" :doc="doc" :id="id" :screen-id="screen.id" />
+      <!-- 화면 스트로크(안쪽)는 자식 위에 -->
+      <i v-if="frameStroke(doc.frame, stub.color)" class="page-stk" :style="{ boxShadow: frameStroke(doc.frame, stub.color) }" />
     </div>
   </div>
 </template>
@@ -48,5 +50,6 @@ onBeforeUnmount(() => ro?.disconnect())
 <style scoped>
 .sthumb { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sthumb img { width: 100%; display: block; }
-.page { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--iris-paper); }
+.page { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: var(--iris-paper); overflow: hidden; }
+.page-stk { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; }
 </style>

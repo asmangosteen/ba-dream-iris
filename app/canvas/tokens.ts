@@ -23,6 +23,10 @@ export interface CatalogToken {
   num?: number
   css?: string
   text?: TextStyleValue
+  /** 글자 스타일 안에 든 변수(스타일을 떼면 각 칸이 이 변수에 이어져요 — 피그마와 같아요) */
+  refs?: Partial<Record<'fontSize' | 'lineHeight' | 'letterSpacing' | 'fontWeight', string>>
+  /** 고르는 목록에는 안 보여요(옛 문서가 연결한 값은 계속 읽어요) */
+  hidden?: boolean
 }
 
 export const KIND_LABEL: Record<TokenKind, string> = {
@@ -31,6 +35,8 @@ export const KIND_LABEL: Record<TokenKind, string> = {
 }
 
 const WEIGHT_NAME: Record<string, string> = { thin: 'Thin', extralight: 'ExtraLight', light: 'Light', regular: 'Regular', medium: 'Medium', semibold: 'SemiBold', bold: 'Bold', extrabold: 'ExtraBold', black: 'Black' }
+/** 글자 스타일 이름의 굵기 줄임(피그마 라이브러리: 16 B · 16 SB · 16 M · 16 R) */
+export const WEIGHT_ABBR = (w: number) => ({ 100: 'T', 200: 'EL', 300: 'L', 400: 'R', 500: 'M', 600: 'SB', 700: 'B', 800: 'EB', 900: 'BL' } as Record<number, string>)[w] ?? String(w)
 export const WEIGHT_LABEL = (w: number) => ({ 100: 'Thin', 200: 'ExtraLight', 300: 'Light', 400: 'Regular', 500: 'Medium', 600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black' } as Record<number, string>)[w] ?? String(w)
 
 /** 읽지 않는 이름: 철자가 틀린 중복 · 앱 전용 값 */
@@ -141,10 +147,19 @@ function fromCss(vars: Map<string, string>): CatalogToken[] {
       styles.set(style, s)
     }
   }
+  // 글자 스타일 = 크기 묶음 × 굵기(피그마 라이브러리와 같은 꼴: 'Body 1/16 SB', 묶음 'Body 1', 굵은 것부터)
+  const weights = out.filter((t) => t.kind === 'fontWeight').sort((a, b) => b.num! - a.num!)
   for (const [style, s] of [...styles].sort((a, b) => a[1].order - b[1].order)) {
     if (s.size === undefined) continue
+    const v = (p: string) => `--typography-${style}-${p}`
+    const refs = { fontSize: v('size'), ...(s.lineHeight !== undefined ? { lineHeight: v('line-height') } : {}), ...(s.letterSpacing !== undefined ? { letterSpacing: v('letter-spacing') } : {}) }
     const text: TextStyleValue = { size: s.size, lineHeight: s.lineHeight, letterSpacing: s.letterSpacing, weight: s.weight }
-    out.push({ id: `ts:${style}`, kind: 'textStyle', name: titleCase(style), group: 'Text styles', value: textValue(text), text })
+    // 굵기 없는 옛 스타일('ts:body-1'): 이미 연결된 문서를 위해 남겨 두고 목록에서는 빼요
+    out.push({ id: `ts:${style}`, kind: 'textStyle', name: titleCase(style), group: titleCase(style), value: textValue(text), text, refs, hidden: weights.length > 0 })
+    for (const w of weights) {
+      const tw: TextStyleValue = { ...text, weight: w.num }
+      out.push({ id: `ts:${style}/${w.num}`, kind: 'textStyle', name: `${titleCase(style)}/${s.size} ${WEIGHT_ABBR(w.num!)}`, group: titleCase(style), value: [s.size, s.lineHeight].filter((x) => x !== undefined).join('/'), text: tw, refs: { ...refs, fontWeight: w.id } })
+    }
   }
   return [...sys, ...ref, ...inter, ...out]
 }
@@ -177,7 +192,7 @@ function fromDb(rows: { name: string; type: string; value: string }[]): CatalogT
 /** 연결 id 에서 이름 짐작(목록을 아직 못 읽었거나 지워진 토큰) */
 export function nameFromId(id: string): string {
   if (id.startsWith('db:')) return id.slice(3)
-  if (id.startsWith('ts:')) return titleCase(id.slice(3))
+  if (id.startsWith('ts:')) { const [st, w] = id.slice(3).split('/'); return w ? `${titleCase(st!)}/${WEIGHT_ABBR(Number(w))}` : titleCase(st!) }
   let m = /^--(?:sys|ref)-color-([a-zA-Z]+)-(.+)$/.exec(id)
   if (m) return `${m[1]}/${m[2]}`
   m = /^--(?:ref-)?([a-z]+)-(.+)$/.exec(id)
@@ -196,6 +211,7 @@ export function useTokenCatalog() {
   const all = computed<CatalogToken[]>(() => [...css.value, ...fromDb(tokens.data.value ?? [])])
   const byId = computed(() => new Map(all.value.map((t) => [t.id, t])))
   const find = (id?: string | null) => (id ? byId.value.get(id) : undefined)
-  const list = (kinds: TokenKind[]) => all.value.filter((t) => kinds.includes(t.kind))
+  /** 고르는 목록에는 디자인 시스템 토큰만(로컬 스타일 db:* 는 빼요 — 이미 연결된 값은 find 로 계속 읽혀요) */
+  const list = (kinds: TokenKind[]) => all.value.filter((t) => kinds.includes(t.kind) && !t.id.startsWith('db:') && !t.hidden)
   return { all, find, list, ensure }
 }

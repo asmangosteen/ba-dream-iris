@@ -181,9 +181,10 @@ export function simplify(p: [number, number][], eps: number): [number, number][]
   return [...simplify(p.slice(0, at + 1), eps).slice(0, -1), ...simplify(p.slice(at), eps)]
 }
 
-export const BLEND_MODES: { k: string; label: string }[] = [
-  { k: 'normal', label: 'Normal' }, { k: 'darken', label: 'Darken' }, { k: 'multiply', label: 'Multiply' }, { k: 'color-burn', label: 'Color burn' },
-  { k: 'lighten', label: 'Lighten' }, { k: 'screen', label: 'Screen' }, { k: 'color-dodge', label: 'Color dodge' }, { k: 'overlay', label: 'Overlay' },
-  { k: 'soft-light', label: 'Soft light' }, { k: 'hard-light', label: 'Hard light' }, { k: 'difference', label: 'Difference' }, { k: 'exclusion', label: 'Exclusion' },
-  { k: 'hue', label: 'Hue' }, { k: 'saturation', label: 'Saturation' }, { k: 'color', label: 'Color' }, { k: 'luminosity', label: 'Luminosity' },
+/** 피그마처럼 묶음(Normal | 어둡게 | 밝게 | 대비 | 차이 | 색) 사이에 구분선 — sep 이 묶음의 첫 항목 */
+export const BLEND_MODES: { k: string; label: string; sep?: boolean }[] = [
+  { k: 'normal', label: 'Normal' }, { k: 'darken', label: 'Darken', sep: true }, { k: 'multiply', label: 'Multiply' }, { k: 'color-burn', label: 'Color burn' },
+  { k: 'lighten', label: 'Lighten', sep: true }, { k: 'screen', label: 'Screen' }, { k: 'color-dodge', label: 'Color dodge' }, { k: 'overlay', label: 'Overlay', sep: true },
+  { k: 'soft-light', label: 'Soft light' }, { k: 'hard-light', label: 'Hard light' }, { k: 'difference', label: 'Difference', sep: true }, { k: 'exclusion', label: 'Exclusion' },
+  { k: 'hue', label: 'Hue', sep: true }, { k: 'saturation', label: 'Saturation' }, { k: 'color', label: 'Color' }, { k: 'luminosity', label: 'Luminosity' },
 ]

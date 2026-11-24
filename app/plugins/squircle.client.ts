@@ -36,7 +36,10 @@ function irisSquircle(): void {
   };
   const last = new WeakMap<HTMLElement, string>(), seen = new WeakSet<HTMLElement>();
   const apply = (el: HTMLElement) => {
-    const ow = el.offsetWidth, oh = el.offsetHeight;
+    // 글자 폭으로 크기가 정해지는 요소(토큰 칩 등)는 59.55px 처럼 소수점이라 offsetWidth(반올림)로 그리면 선이 어긋나요 → 실제 폭(회전 · 확대 중이면 offset 값)
+    const br = el.getBoundingClientRect();
+    const ow = Math.abs(br.width - el.offsetWidth) < 1 ? Math.round(br.width * 100) / 100 : el.offsetWidth;
+    const oh = Math.abs(br.height - el.offsetHeight) < 1 ? Math.round(br.height * 100) / 100 : el.offsetHeight;
     if (!(ow > 0 && oh > 0)) return;
     const cs = getComputedStyle(el);
     const raw = cs.borderTopLeftRadius;

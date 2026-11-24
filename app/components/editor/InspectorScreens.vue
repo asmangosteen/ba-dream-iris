@@ -24,18 +24,14 @@ const gap = computed(() => currentGap(rects.value, axis.value))
       <div class="sec-h h24"><span>Position</span></div>
       <ArrangeControls :count="screens.length" :gap="gap" :axis="axis" @op="emit('arrange', $event)" />
     </section>
-    <section class="s">
-      <p class="tx-meta m0">Shift-click frames or drag on empty canvas to select multiple frames</p>
-    </section>
   </div>
 </template>
 
 <style scoped>
 .design { padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column; }
-.s { padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:first-child { box-shadow: none; }
 .h24 { height: 24px; padding: 0; }
 .names { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 144px; overflow: auto; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.m0 { margin: 0; }
 </style>

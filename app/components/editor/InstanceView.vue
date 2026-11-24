@@ -2,12 +2,21 @@
 import * as DS from '@ba-dream/design-system'
 import type { Component } from 'vue'
 import meta, { type DsPropMeta } from 'virtual:iris-ds-props'
+import DsStatusBar from '~/components/ds/DsStatusBar.vue'
+import IrisTopBar from '~/components/ds/IrisTopBar.vue'
 
 /** 글자로 채우는 default 슬롯 값을 node.props 에 담는 키(속성 이름과 겹치지 않게 #) */
 export const SLOT_KEY = '#default'
 
+/**
+ * 패키지(@ba-dream/design-system 1.0.0) 빌드에서 빈 자리로 들어간 컴포넌트를 Iris 가 대신 그려요.
+ * Status Bar 가 빈 컴포넌트(render: () => null)라 Status Bar 와, 그걸 품은 Top Bar 를 바꿔요. 속성 이름 · 기본값은 패키지와 같아요
+ */
+const OVERRIDE: Record<string, Component> = { StatusBar: DsStatusBar, TopBar: IrisTopBar }
+
 /** 컴포넌트 이름 → 실제 디자인 시스템 컴포넌트. 모르는 이름이면 null */
 export function dsComponent(name: string | undefined): Component | null {
+  if (name && OVERRIDE[name]) return OVERRIDE[name]!
   const c = name ? (DS as Record<string, unknown>)[name] : null
   return c && (typeof c === 'object' || typeof c === 'function') ? (c as Component) : null
 }
@@ -66,14 +75,23 @@ const slotText = computed(() => {
   return typeof v === 'string' ? v : slotFallback(props.node.component)
 })
 
+/** 스케일(K) 배율: 컴포넌트를 이 배율로 확대해 그려요. 고정 · 채우기 축은 확대 전 크기를 나눠서 상자에 딱 맞게 */
+const scale = computed(() => props.node.instScale ?? 1)
+const boxStyle = computed(() => (scale.value === 1 ? undefined : {
+  transform: `scale(${scale.value})`, transformOrigin: '0 0',
+  width: hugH.value ? undefined : props.node.w / scale.value + 'px',
+  height: hugV.value ? undefined : props.node.h / scale.value + 'px',
+}))
 // Hug: 내용 크기를 재서 저장(기록 없이). 고정 · 채우기 축은 저장된 값 그대로
 const box = ref<HTMLElement | null>(null)
 let ro: ResizeObserver | undefined
 function measure(w: number, h: number) {
   const n = props.node
   if (!hugH.value && !hugV.value) return
-  const nw = hugH.value ? Math.ceil(w) : n.w
-  const nh = hugV.value ? Math.ceil(h) : n.h
+  // 그려진 크기 그대로(소수 둘째 자리) — 올림하면 선택선이 컴포넌트보다 커서 떠 보여요
+  const r2 = (v: number) => Math.round(v * 100) / 100
+  const nw = hugH.value ? r2(w * scale.value) : n.w
+  const nh = hugV.value ? r2(h * scale.value) : n.h
   if (nw < 1 || nh < 1) return // 띄운 오버레이처럼 크기가 없는 내용은 그대로 둡니다
   store.setMeasured(props.screenId, n.id, nw, nh)
 }
@@ -88,13 +106,13 @@ onMounted(() => {
 })
 onBeforeUnmount(() => ro?.disconnect())
 // 크기 방식을 hug 로 바꾸면 바로 다시 재요(내용 크기가 그대로면 ResizeObserver 가 안 불려요)
-watch([hugH, hugV], () => nextTick(() => { if (box.value) measure(box.value.offsetWidth, box.value.offsetHeight) }))
+watch([hugH, hugV, scale], () => nextTick(() => { if (box.value) { const cs = getComputedStyle(box.value); measure(parseFloat(cs.width) || box.value.offsetWidth, parseFloat(cs.height) || box.value.offsetHeight) } }))
 </script>
 
 <template>
   <!-- inert + pointer-events:none — 안쪽 버튼 · 입력칸은 반응하지 않고, 누르면 바깥 .ly 가 받아요 -->
   <div class="inst" inert aria-hidden="true">
-    <div v-if="comp && !failed" ref="box" data-preview :class="['box', { hw: hugH, hh: hugV }]">
+    <div v-if="comp && !failed" ref="box" data-preview :class="['box', { hw: hugH, hh: hugV }]" :style="boxStyle">
       <component :is="comp" v-bind="bound">
         <template v-if="slotText !== undefined" #default>{{ slotText }}</template>
       </component>

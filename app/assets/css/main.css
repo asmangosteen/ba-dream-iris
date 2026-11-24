@@ -8,7 +8,8 @@
   --iris-line:var(--ref-color-gray-900-5);
   --iris-line-strong:var(--ref-color-gray-900-10);
   --iris-canvas:var(--sys-color-neutral-100);
-  --iris-component:var(--sys-color-brand-primary-default);
+  /* 컴포넌트 · 인스턴스 색: 피그마와 같은 보라(아이콘 · 이름 · 캔버스 선택선 · 레이어 목록) */
+  --iris-component:#9747FF;
   --iris-ink:var(--sys-color-neutral-800);
 }
 
@@ -41,7 +42,8 @@ input,textarea{font:inherit;color:inherit}
 :where(.sq,.ib,.fld,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field){position:relative;isolation:isolate;--sq-fill:transparent;--sq-overlay:transparent;--sq-line:transparent;--sq-line-w:0px}
 .sq::before,.sq::after,.ib::before,.ib::after,.fld::before,.fld::after,.float::before,.float::after,.seg-item::before,.seg-item::after,.rail-btn::before,.rail-btn::after,.dd::before,.dd::after,.menu::before,.menu::after,.menu-item::before,.menu-item::after,.grp::before,.grp::after,.act::before,.act::after,.field::before,.field::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1}
 .sq::before,.ib::before,.fld::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before,.grp::before,.act::before,.field::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
-.sq::after,.ib::after,.fld::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after,.act::after,.field::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line)}
+/* 선(::after)은 내용 위에 — 안에 든 그림 · 미리보기 · 썸네일이 가장자리까지 닿아도 테두리가 끊기지 않아요(피그마 안쪽 스트로크와 같게). 선 모양 밖은 잘려서 내용을 가리지 않아요 */
+.sq::after,.ib::after,.fld::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after,.act::after,.field::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line);z-index:1}
 [data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
 [data-sq]::before{clip-path:var(--sq-path)}
 [data-sq]::after{box-shadow:none!important;background:var(--sq-line);clip-path:var(--sq-ring)}
@@ -70,7 +72,7 @@ button:active{cursor:grabbing}
    pen.dev 기반 앱 셸 — 화면 전체가 회색 캔버스이고, 패널은 그 위에 떠 있는 흰 카드
    ============================================================ */
 /* 떠 있는 패널 테두리: 라이트는 얇고 진하게(0.5px — 레티나에서 한 화소), 다크는 1px 옅은 흰 선 */
-:root{--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%));--iris-float-line:rgb(3 9 26 / 22%);--iris-float-line-w:.5px}
+:root{--iris-sel:color-mix(in srgb,var(--sys-color-brand-primary-default) 11%,transparent);--iris-sel-under:color-mix(in srgb,var(--sys-color-brand-primary-default) 5%,transparent);--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%));--iris-float-line:rgb(3 9 26 / 22%);--iris-float-line-w:.5px}
 .float{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-float-line);--sq-line-w:var(--iris-float-line-w);border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
 .float.s{border-radius:var(--ref-radius-06)}
 .seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
@@ -93,7 +95,8 @@ button:active{cursor:grabbing}
 .dd{font-variant-numeric:tabular-nums;font-feature-settings:'tnum';display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left;--sq-line-w:0.5px}
 .dd:hover{--sq-line:var(--ref-color-gray-900-10)}
 .dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
-.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-default);--sq-line:var(--ref-color-gray-900-10);--sq-line-w:1px;border-radius:var(--ref-radius-04);filter:drop-shadow(0 1px 2px rgb(3 9 26 / 6%)) drop-shadow(0 8px 16px rgb(3 9 26 / 10%))}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-float-line);--sq-line-w:var(--iris-float-line-w);border-radius:var(--ref-radius-04);filter:var(--iris-float-shadow)}
+/* 메뉴 · 팝오버는 사이드바(.float)와 같은 테두리선 · 그림자(라이트 0.5px 진한 선 / 다크 1px 옅은 흰 선 + --iris-float-shadow) */
 .menu-item{display:flex;align-items:center;gap:var(--ref-spacing-04);height:26px;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-03);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left}
 .menu-item:hover{--sq-fill:var(--sys-color-neutral-100)}
 .menu-item.on{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default);font-weight:600}
@@ -111,11 +114,14 @@ button:active{cursor:grabbing}
 .grp{display:flex;padding:var(--ref-spacing-02);border-radius:var(--ref-radius-03);--sq-fill:var(--sys-color-neutral-200)}
 .grp>.ib{flex:1;height:24px}
 .grp>.ib.on{--sq-fill:var(--sys-color-common-white-emphasis);color:var(--sys-color-neutral-800);filter:drop-shadow(0 1px 1px rgb(3 9 26 / 10%))}
-.cb{display:flex;align-items:center;gap:var(--ref-spacing-04);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800)}
-/* 체크 상자: <i class="sq"> — 채우기 · 선은 squircle 레이어, 체크 표시는 채우기(::before) 위에 */
-.cb>i{width:12px;height:12px;border-radius:3px;--sq-line:var(--sys-color-neutral-400);--sq-line-w:1px;flex:none}
-.cb.on>i{--sq-fill:var(--sys-color-neutral-800);--sq-line:transparent}
-.cb.on>i::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2l2 2 4-4.4' stroke='white' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-position:center;background-size:10px;background-repeat:no-repeat}
+.cb{display:flex;align-items:center;gap:var(--ref-spacing-06);min-height:24px;font-size:12px;line-height:18px;color:var(--sys-color-neutral-800)}
+/* 체크 상자: <i class="sq"> — 피그마처럼 16 상자 · 라벨 앞 8 · 모서리 4 · 체크 12(굵기 1.5). 채우기 · 선은 squircle 레이어, 체크 표시는 채우기(::before) 위에 */
+.cb>i{width:16px;height:16px;border-radius:var(--ref-radius-02);--sq-line:var(--sys-color-neutral-400);--sq-line-w:1px;flex:none}
+.cb:hover>i{--sq-line:var(--sys-color-neutral-600)}
+.cb.on>i{--sq-fill:var(--sys-color-brand-primary-default);--sq-line:transparent}
+.cb.on:hover>i{--sq-overlay:rgb(13 45 87 / 15%)}
+.cb.on>i::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.8 6.3l2.2 2.2 4.2-4.8' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),linear-gradient(var(--sq-overlay),var(--sq-overlay));background-position:center,0 0;background-size:12px,auto;background-repeat:no-repeat}
+/* 켜짐: 브랜드 파랑 + 흰 체크(라이트 · 다크 같음) */
 .sw{width:12px;height:12px;flex:none;border-radius:3px;--sq-line:var(--ref-color-gray-900-20);--sq-line-w:0.5px}
 
 /* ============================================================
@@ -147,10 +153,103 @@ button:active{cursor:grabbing}
 .seg-item,.nav-item,.menu-item,.ib,.rail-btn,.act,.dd,.hov{transition:background-color .12s ease,color .12s ease,box-shadow .12s ease}
 .sq::before,.ib::before,.seg-item::before,.rail-btn::before,.menu-item::before,.act::before,.dd::before{transition:background-color .12s ease}
 .seg-item:active,.nav-item:active,.menu-item:active,.ib:active,.rail-btn:not(.on):active{--sq-overlay:var(--interaction-light-gray-pressed)}
-.seg-item:focus-visible,.nav-item:focus-visible,.menu-item:focus-visible,.ib:focus-visible,.rail-btn:focus-visible,.act:focus-visible,.dd:focus-visible,.hov:focus-visible{outline:2px solid var(--sys-color-brand-primary-default);outline-offset:1px}
+.seg-item:focus-visible,.nav-item:focus-visible,.menu-item:focus-visible,.ib:focus-visible,.rail-btn:focus-visible,.more:focus-visible,.act:focus-visible,.dd:focus-visible,.hov:focus-visible{outline:2px solid var(--sys-color-brand-primary-default);outline-offset:1px}
 .menu-item:focus-visible{outline-offset:-2px}
 .ib:disabled,.act:disabled,.menu-item:disabled{opacity:.45;cursor:default}
 @media (prefers-reduced-motion: reduce){*{transition-duration:0s!important}}
+/* 편집기: 피그마 UI3 처럼 호버 · 눌림 · 선택 색은 바로 바뀌어요(0s). 접기 · 토글 손잡이 · 화살표 회전 같은 움직임은 그대로 */
+.editor :is(.seg-item,.nav-item,.menu-item,.ib,.rail-btn,.act,.dd,.hov,.mini,.more,.chev),
+.editor :is(.sq,.ib,.seg-item,.rail-btn,.menu-item,.act,.dd)::before{transition-duration:0s}
+
+/* 편집기 드롭다운 메뉴 — 피그마 메뉴 규격(§7.1)을 Iris 흰 메뉴로: 안쪽 4 · 행 28 · 좌우 8 · 묶음 구분선 8
+   고르는 목록(.on 이 있는 메뉴)은 피그마처럼 왼쪽 ✓ 칸. 고른 행은 채우지 않고 ✓ + 굵기 500, 호버는 회색 */
+.editor .menu{padding:var(--ref-spacing-04);gap:0}
+.editor .menu-item{height:28px;flex:none;padding:0 var(--ref-spacing-06)}
+.editor .menu:not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item{padding-left:26px;background-repeat:no-repeat;background-position:8px center;background-size:12px}
+.editor .menu:not(.pop):has(>.menu-item.on)>.menu-item.on,
+.editor .esel-m>.menu-item.on{--sq-fill:transparent;color:var(--sys-color-neutral-800);font-weight:500}
+.editor .menu:not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' stroke='%23202837' stroke-width='1.3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.editor .menu>.menu-item.on:hover,.editor .esel-m>.menu-item.on:hover{--sq-fill:var(--sys-color-neutral-100)}
+.editor .msep{flex:none;height:1px;margin:var(--ref-spacing-04) calc(-1 * var(--ref-spacing-04));background:var(--iris-line)}
+:root[data-theme="dark"] .editor .menu:not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' stroke='%23E6E8EB' stroke-width='1.3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .editor .menu:not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' stroke='%23E6E8EB' stroke-width='1.3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}}
+/* 편집기 메뉴는 피그마 UI3 처럼 검은 메뉴 — 오른쪽 클릭 메뉴(ContextMenu)와 같은 규격: 바탕 #1E1E1E · 안쪽 8 · 행 24 · 행 모서리 4 ·
+   글자 흰색 · 단축키 · 보조 글자 흰 70% · 올리면(키보드 포함) 파랑 #0D99FF · 비활성 흰 40% · 구분선 흰 12%(끝에서 끝까지).
+   테마와 상관없이 같아요. 변수 · 텍스트 스타일 목록(.tp)은 흰 팝오버 양식 그대로(PRD/07 §18) */
+.editor .menu:not(.tp){--sq-fill:#1E1E1E !important;padding:var(--ref-spacing-06) !important;color:#FFFFFF}
+.editor .menu:not(.tp) .menu-item{height:24px !important;min-height:24px;border-radius:var(--ref-radius-02);color:#FFFFFF !important;font-weight:400 !important;--sq-fill:transparent !important;transition:none}
+.editor .menu:not(.tp) .menu-item:is(:hover,.kb,:focus-visible):not(:disabled),.editor .menu:not(.tp) .menu-item:is(:hover,.kb,:focus-visible).on:not(:disabled){--sq-fill:var(--iris-select,#0D99FF) !important;color:#FFFFFF !important}
+.editor .menu:not(.tp) .menu-item:focus-visible{outline:0}
+.editor .menu:not(.tp) .menu-item:disabled{color:rgb(255 255 255 / 40%) !important;opacity:1}
+.editor .menu:not(.tp) .menu-item.danger:is(:hover,:focus-visible):not(:disabled){--sq-fill:#E5484D !important}
+.editor .menu:not(.tp) .menu-item :is(svg,.eic){color:inherit !important}
+.editor .menu:not(.tp) :is(.tx-meta,.muted){color:rgb(255 255 255 / 70%) !important}
+.editor .menu:not(.tp) .menu-item:is(:hover,.kb,:focus-visible) :is(.tx-meta,.muted){color:#FFFFFF !important}
+.editor .menu:not(.tp) :is(.ck,.zck){color:#FFFFFF !important}
+/* 메뉴 안 테마 고르기(메인 메뉴): 검은 메뉴 위 세그먼트 — 바탕 흰 8%, 고른 칸 흰 16%, 글자 흰 70% → 고른 칸 흰색 */
+.editor .menu:not(.tp) .theme .seg{--sq-fill:rgb(255 255 255 / 8%) !important}
+.editor .menu:not(.tp) .theme .seg-item{color:rgb(255 255 255 / 70%) !important;filter:none !important}
+.editor .menu:not(.tp) .theme .seg-item:hover{color:#FFFFFF !important}
+.editor .menu:not(.tp) .theme .seg-item.on{--sq-fill:rgb(255 255 255 / 16%) !important;color:#FFFFFF !important}
+.editor .menu:not(.tp) .msep{margin:var(--ref-spacing-04) calc(-1 * var(--ref-spacing-06));background:rgb(255 255 255 / 12%)}
+.editor .menu:not(.tp):not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item.on,:root[data-theme] .editor .menu:not(.tp):not(.pop):not(.esel-m):has(>.menu-item.on)>.menu-item.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' stroke='%23FFFFFF' stroke-width='1.3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important}
+
+/* 인스펙터 격자 — 피그마 UI3 열 구성: [칸 | 칸 | 아이콘 24], 사이 8. 아이콘이 없는 줄도 오른쪽 24 를 비워 끝선을 맞춰요
+   .ig-l: 칸 위 보조 라벨(11/16 neutral-500), 라벨 → 칸 4 · 줄 → 줄 8 */
+.editor .ig{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 24px;gap:var(--ref-spacing-06);align-items:center;min-width:0}
+.editor .ig.w1{grid-template-columns:minmax(0,1fr) 24px}
+.editor .ig>.span2{grid-column:span 2;min-width:0}
+.editor .ig>*{min-width:0}
+/* 오른쪽 아이콘 열(24)은 아이콘이 없는 줄도 비워 둬요(빈 <span />) — 피그마와 같아요: 모든 줄의 칸 끝이 한 세로선에 맞아요 */
+.editor .ig .fld input{flex:1;width:auto;min-width:0}
+/* 격자 칸 안: 간격 4, 변수 연결 버튼(.reveal)은 칸에 올리거나 입력 중일 때만(피그마처럼 자리를 차지하지 않게) */
+.editor .ig .fld{gap:var(--ref-spacing-04)}
+.editor .ig .fld:not(:hover):not(:focus-within)>.reveal{display:none}
+/* 칸 안 드롭다운 메뉴가 열려 있으면 그 칸을 위로(칸이 isolation 으로 쌓임 맥락을 만들어서 뒤 요소에 가려지지 않게) */
+.editor .fld:has(.esel-m),.editor .esel:has(.esel-m){z-index:20}
+.editor .ig-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 24px;gap:0 var(--ref-spacing-06);margin-bottom:calc(-1 * var(--ref-spacing-04))}
+.editor .ig-l>span{font-size:11px;line-height:16px;color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 켜진 아이콘 토글(오토 레이아웃 · 비율 잠금 · 개별 모서리 · 절대 위치): 옅은 파랑 + 파란 아이콘(피그마 #E5F4FF) */
+.editor .ib.tog{color:var(--sys-color-neutral-700)}
+.editor .ib.s24{width:24px;height:24px}
+.editor .ib.tog.on{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
+
+/* ============================================================
+   편집기 아이콘 규칙 (PRD/08_EDITOR_ICONS.md §규칙)
+   크기: 20 툴바 도구(32 버튼) · 16 패널 아이콘 버튼(24·28) · 칸 앞 표시 · 레이어 행 · 메뉴 항목 · 12 ▾ ▸ ✓ 보조 표시
+   선: 화면에서 늘 1.25px — 그린 그리드(12 · 14 · 16)와 표시 크기가 달라도 굵기가 같아요(non-scaling-stroke)
+   색: 누르는 아이콘 neutral-700(호버 800) · 상태 표시(칸 앞 · 레이어 종류 · ▾ ▸) neutral-500 · 켜짐 brand · 비활성 neutral-400
+   예외(선 굵기 자체가 뜻인 아이콘: 선 두께 표시 등)는 svg 에 class="keep"
+   ============================================================ */
+.editor :is(.ib,.rail-btn,.fld,.menu-item,.dd,.inl,.chev,.mini,.more,.cb,.home,.fold,.zoom,.act,.seg-item,.sec-h,.row,.grp,.tools,.nav-item,.label)>svg:not(.keep) :is(path,line,polyline,polygon,rect,circle,ellipse)[stroke]{vector-effect:non-scaling-stroke;stroke-width:1.25px}
+.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom){color:var(--sys-color-neutral-700)}
+.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom):hover{color:var(--sys-color-neutral-800)}
+.editor :is(.ib,.rail-btn,.mini):disabled{color:var(--sys-color-neutral-400)}
+.editor .fld>svg:not(.keep),.editor .fld>.eic,.editor .dd>.eic,.editor .dd>svg{color:var(--sys-color-neutral-500)}
+.editor .rail-btn.on,.editor .rail-btn.on:hover{color:var(--sys-color-common-white-default)}
+.editor .ib.tog.on,.editor .ib.tog.on:hover{color:var(--sys-color-brand-primary-default)}
+
+/* 편집기 글자 대비(4.5:1 이상): 보조 글자 · 칸 위 라벨 · 꺼진 탭은 neutral-600(흰 바탕 약 6:1). neutral-500 은 3.2:1 이라 편집기에선 아이콘 · 자리표시에만 */
+.editor .tx-meta,.editor .ig-l>span,.editor .seg-item:not(.on){color:var(--sys-color-neutral-600)}
+.editor .seg-item:not(.on):hover{color:var(--sys-color-neutral-800)}
+/* 다크: neutral-100 이 패널보다 어두워서 호버 · 선택 행이 구멍처럼 보여요 → 흰 반투명 겹침으로 */
+:root[data-theme="dark"] .editor .nav-item:hover:not(.on):not(.under),:root[data-theme="dark"] .editor .seg-item.on{--sq-fill:var(--interaction-light-gray-hover)}
+:root[data-theme="dark"] .editor .nav-item.on:not(.lr){--sq-fill:var(--interaction-light-gray-pressed)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .editor .nav-item:hover:not(.on):not(.under),:root:not([data-theme="light"]) .editor .seg-item.on{--sq-fill:var(--interaction-light-gray-hover)}
+  :root:not([data-theme="light"]) .editor .nav-item.on:not(.lr){--sq-fill:var(--interaction-light-gray-pressed)}
+}
+
+/* 툴팁(plugins/tooltip.client.ts) — 피그마 UI3: 검은 말풍선 24h · 안쪽 4 8 · 단축키 옅은 흰색 · 화살표 12×6, 페이드 없음 */
+.iris-tip{position:fixed;left:0;top:0;z-index:1000;display:flex;align-items:center;gap:var(--ref-spacing-06);height:24px;box-sizing:border-box;padding:0 var(--ref-spacing-06);border-radius:var(--ref-radius-02);--sq-fill:#1E1E1E;color:#FFFFFF;font-family:var(--font-family-base);font-size:12px;line-height:16px;font-weight:500;white-space:nowrap;pointer-events:none;filter:drop-shadow(0 0 .5px rgb(0 0 0 / 15%)) drop-shadow(0 5px 12px rgb(0 0 0 / 13%))}
+.iris-tip[hidden]{display:none}
+.iris-tip-k{color:rgb(255 255 255 / 70%);font-weight:400}
+.iris-tip-a{position:absolute;width:12px;height:6px;background:#1E1E1E}
+.iris-tip[data-at=top] .iris-tip-a{top:100%;clip-path:polygon(0 0,100% 0,50% 100%)}
+.iris-tip[data-at=bottom] .iris-tip-a{bottom:100%;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.iris-tip[data-at=left] .iris-tip-a,.iris-tip[data-at=right] .iris-tip-a{width:6px;height:12px}
+.iris-tip[data-at=left] .iris-tip-a{left:100%;clip-path:polygon(0 0,100% 50%,0 100%)}
+.iris-tip[data-at=right] .iris-tip-a{right:100%;clip-path:polygon(100% 0,100% 100%,0 50%)}
 
 
 /* ============================================================
@@ -201,3 +300,9 @@ html,body{background:var(--iris-canvas)}
 .iris-fade-enter-from{opacity:0;transform:translateY(8px)}
 .iris-fade-leave-to{opacity:0}
 @media (prefers-reduced-motion:reduce){.iris-fade-enter-active,.iris-fade-leave-active{transition:opacity .2s linear}.iris-fade-enter-from{transform:none}}
+/* 수치 칸 앞쪽(아이콘 · 글자): 좌우로 끌어 값 바꾸기(useScrub) */
+.fld > [data-scrub]{cursor:ew-resize}
+.scrubbing, .scrubbing *{cursor:ew-resize !important;user-select:none !important}
+/* 캔버스 간격 · 여백 손잡이를 끄는 동안 커서 고정 */
+.band-ns, .band-ns *{cursor:ns-resize !important;user-select:none !important}
+.band-ew, .band-ew *{cursor:ew-resize !important;user-select:none !important}

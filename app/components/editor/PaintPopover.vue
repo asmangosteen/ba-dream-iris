@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { LayerStyle, Paint } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { paintLayer } from '~/canvas/paint'
@@ -7,6 +7,7 @@ import { useImageSrc, uploadImage } from '~/canvas/images'
 import { fromRgba, hexOf, alphaOf, toRgba, withAlpha } from '~/canvas/color'
 import { parseColor, useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
 import ColorPicker from '~/components/editor/ColorPicker.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
 
 /**
  * 칠 편집 창(피그마 색 선택기와 같아요). 오른쪽 패널 왼쪽에 떠요.
@@ -34,14 +35,14 @@ const catalog = useTokenCatalog()
 const tab = ref<'custom' | 'libraries'>('custom')
 const el = ref<HTMLElement | null>(null)
 const pos = ref<Record<string, string>>({ visibility: 'hidden' })
-const W = 256
+const W = 240
 
 function place() {
   const a = props.anchor
   if (!a) return
   const r = a.getBoundingClientRect()
-  // 오른쪽 패널 바로 왼쪽(패널이 없으면 기준 요소 왼쪽)
-  const panel = a.closest('aside, [data-inspector]')?.getBoundingClientRect() ?? r
+  // 오른쪽 패널 바로 왼쪽. 설정 창(효과 · 격자 팝오버) 안에서 열면 그 창 왼쪽에 붙여서 겹치지 않게
+  const panel = a.closest('[role="dialog"], aside, [data-inspector]')?.getBoundingClientRect() ?? r
   const vh = window.innerHeight
   const h = el.value?.offsetHeight ?? 520
   const left = Math.max(8, panel.left - W - 8)
@@ -59,7 +60,15 @@ function onDoc(e: PointerEvent) {
   if ((t as HTMLElement).closest?.('.tp, .paint-pop')) return
   emit('close')
 }
-function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { e.stopPropagation(); emit('close') } }
+/** Esc: 창 안에 열린 드롭다운(형식 · 맞춤)이 있으면 그것만 닫히게 넘기고, 아니면 창을 닫고 연 견본으로 포커스를 돌려줘요 */
+function onKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (el.value?.querySelector('.esel-m')) return
+  e.stopPropagation()
+  e.preventDefault()
+  props.anchor?.focus()
+  emit('close')
+}
 const onReflow = (e: Event) => { if (!(e.target instanceof Node && el.value?.contains(e.target))) place() }
 onMounted(() => {
   document.addEventListener('pointerdown', onDoc, true)
@@ -133,7 +142,7 @@ function onBar(e: PointerEvent, k?: number) {
   }
   stop.value = idx
   const target = e.currentTarget as HTMLElement
-  target.setPointerCapture?.(e.pointerId)
+  try { target.setPointerCapture?.(e.pointerId) } catch { /* 합성 이벤트 */ }
   const move = (ev: PointerEvent) => { const p = at(ev); setStops(stops.value.map((s, i) => (i === idx ? { ...s, pos: p } : s))) }
   const up = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', up); target.removeEventListener('pointercancel', up); release() }
   target.addEventListener('pointermove', move)
@@ -159,7 +168,7 @@ function setAngle(v: number) { if (isGrad(props.paint)) emit('update', { ...prop
 function flip() { setStops(stops.value.map((s) => ({ ...s, pos: Math.round((1 - s.pos) * 100) / 100 }))) }
 
 // --- 이미지 ---
-const FITS = [{ k: 'fill', label: 'Fill' }, { k: 'fit', label: 'Fit' }, { k: 'crop', label: 'Crop' }, { k: 'tile', label: 'Tile' }] as const
+const FITS = [{ value: 'fill', label: 'Fill' }, { value: 'fit', label: 'Fit' }, { value: 'crop', label: 'Crop' }, { value: 'tile', label: 'Tile' }]
 const fileEl = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const dropping = ref(false)
@@ -211,6 +220,16 @@ function pickSwatch(c: string) {
 
 // --- Libraries ---
 const q = ref('')
+/** 보기 방식: 견본 격자 / 이름 · 값 목록(피그마 Libraries 의 격자 ↔ 목록 전환). 기기에 기억해요 */
+const LIB_VIEW = 'iris-lib-view'
+const libView = ref<'grid' | 'list'>('grid')
+onMounted(() => { try { if (localStorage.getItem(LIB_VIEW) === 'list') libView.value = 'list' } catch {} })
+function toggleLibView() {
+  libView.value = libView.value === 'grid' ? 'list' : 'grid'
+  try { localStorage.setItem(LIB_VIEW, libView.value) } catch {}
+}
+/** 목록에 보일 이름: 묶음 이름은 위 머리에 있으니 마지막 조각만 */
+const shortName = (t: CatalogToken) => t.name.split('/').pop() ?? t.name
 const libs = computed(() => {
   if (tab.value !== 'libraries') return []
   const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
@@ -229,19 +248,22 @@ function pickToken(t: CatalogToken) {
   if (props.bindable && props.paint.type === 'solid') { emit('token', t); return }
   if (t.color) pickSwatch(t.color)
 }
+/** 묶음 이름은 문장형(첫 글자만 대문자) */
+const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 const swatchBg = (c: string) => ({ background: `linear-gradient(${c}, ${c}), repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px` })
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 </script>
 
 <template>
   <Teleport to="body">
-    <div ref="el" class="sq paint-pop" role="dialog" :aria-label="title" :style="pos">
+    <!-- body 로 옮겨져도 편집기 공통 규칙(메뉴 · 칸 · 즉시 호버)을 받도록 editor 클래스를 붙여요 -->
+    <div ref="el" class="sq paint-pop editor" role="dialog" :aria-label="title" :style="pos">
       <div class="pp-h">
         <div class="pp-tabs" role="tablist">
           <button role="tab" :aria-selected="tab === 'custom'" :class="['sq', 'pp-tab', { on: tab === 'custom' }]" @click="tab = 'custom'">Custom</button>
           <button role="tab" :aria-selected="tab === 'libraries'" :class="['sq', 'pp-tab', { on: tab === 'libraries' }]" @click="tab = 'libraries'">Libraries</button>
         </div>
-        <button class="ib s24" aria-label="Close" title="Close" @click="emit('close')"><Icon name="close" :size="14" /></button>
+        <button class="ib s24" aria-label="Close" data-tip="Close" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
       </div>
 
       <template v-if="tab === 'custom'">
@@ -272,13 +294,13 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
           <template v-else-if="paint.type === 'linear' || paint.type === 'radial' || paint.type === 'angular'">
             <div class="gr-tools">
               <label v-if="paint.type !== 'radial'" class="sq fld ang" title="Angle">
-                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 10.5h9M1.5 10.5L8 3" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" /></svg>
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10M3 12.5L10 4.5M7.2 7.7a4.5 4.5 0 0 1 1.3 4.8" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
                 <input :key="'g' + angle" :value="angle" inputmode="numeric" aria-label="Angle" @change="setAngle(Number(($event.target as HTMLInputElement).value) || 0)" @keydown="blur"><span>°</span>
               </label>
               <span class="grow" />
-              <button v-if="paint.type !== 'radial'" class="ib s24" aria-label="Rotate 90°" title="Rotate 90°" @click="setAngle(angle + 90)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M11.5 7a4.5 4.5 0 1 1-1.3-3.2M11.5 1.8v2.6H8.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-              <button class="ib s24" aria-label="Flip gradient" title="Flip gradient" @click="flip"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5h10L9.5 2.5M12 9H2l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-              <button class="ib s24" aria-label="Remove stop" title="Remove stop" :disabled="stops.length <= 2" @click="removeStop"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
+              <button v-if="paint.type !== 'radial'" class="ib s24" aria-label="Rotate 90°" title="Rotate 90°" @click="setAngle(angle + 90)"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M11.5 7a4.5 4.5 0 1 1-1.3-3.2M11.5 1.8v2.6H8.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <button class="ib s24" aria-label="Flip gradient" title="Flip gradient" @click="flip"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5h10L9.5 2.5M12 9H2l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <button class="ib s24" aria-label="Remove stop" title="Remove stop" :disabled="stops.length <= 2" @click="removeStop"><EditorIcon name="minus" :size="16" /></button>
             </div>
             <div ref="bar" class="gr-bar" title="Click to add a color stop" @pointerdown="onBar($event)">
               <span class="sq sq-clip gr-bg" :style="{ background: gradCss }" aria-hidden="true" />
@@ -308,9 +330,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
               <div class="img-prev" :style="imgCss" />
               <button class="sq img-choose" :disabled="uploading" @click="fileEl?.click()">{{ uploading ? 'Uploading…' : (paint as { src: string }).src ? 'Replace image' : 'Choose image' }}</button>
             </div>
-            <div class="sq seg" role="radiogroup" aria-label="Image fit">
-              <button v-for="f in FITS" :key="f.k" role="radio" :aria-checked="((paint as { fit?: string }).fit ?? 'fill') === f.k" :class="['sq', 'seg-b', { on: ((paint as { fit?: string }).fit ?? 'fill') === f.k }]" @click="emit('update', { ...paint, fit: f.k } as Paint)">{{ f.label }}</button>
-            </div>
+            <EditorSelect :model-value="(paint as { fit?: string }).fit ?? 'fill'" :options="FITS" ariaLabel="Image fit" @update:model-value="(v) => emit('update', { ...paint, fit: v } as Paint)" />
             <p class="tx-meta m0">Drop an image here or choose a file (PNG, JPG, GIF, WebP, SVG)</p>
             <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden @change="onFile">
           </template>
@@ -326,12 +346,21 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 
       <template v-else>
         <div class="lib">
-          <label class="sq fld lib-s"><Icon name="search" :size="14" /><input v-model="q" placeholder="Search colors" aria-label="Search library colors" spellcheck="false"></label>
+          <div class="lib-top">
+            <label class="sq fld lib-s"><EditorIcon name="search" :size="16" class="muted" /><input v-model="q" placeholder="Search colors" aria-label="Search library colors" spellcheck="false"></label>
+            <button type="button" class="ib s24" :aria-label="libView === 'grid' ? 'Show as list' : 'Show as grid'" :data-tip="libView === 'grid' ? 'Show as list' : 'Show as grid'" @click="toggleLibView"><EditorIcon :name="libView === 'grid' ? 'view_list' : 'view_grid'" /></button>
+          </div>
           <div class="lib-l">
             <div v-for="g in libs" :key="g.name" class="lib-g">
-              <div class="sw-h">{{ g.name }}</div>
-              <div class="sw-grid">
+              <div class="sw-h">{{ sentence(g.name) }}</div>
+              <div v-if="libView === 'grid'" class="sw-grid">
                 <button v-for="t in g.items" :key="t.id" class="sq sq-clip sw" :style="swatchBg(t.color ?? '#000')" :aria-label="t.name" :title="`${t.name} · ${t.value}`" @click="pickToken(t)" />
+              </div>
+              <div v-else class="lib-rows">
+                <button v-for="t in g.items" :key="t.id" type="button" class="sq lib-row" :aria-label="t.name" :title="t.name" @click="pickToken(t)">
+                  <span class="sqc sw sw-s" :style="swatchBg(t.color ?? '#000')" />
+                  <span class="lr-n">{{ shortName(t) }}</span>
+                </button>
               </div>
             </div>
             <p v-if="!libs.length" class="tx-meta m0 empty">No colors found</p>
@@ -343,22 +372,25 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 </template>
 
 <style scoped>
-.paint-pop { position: fixed; z-index: 60; width: 256px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; filter: drop-shadow(0 1px 2px rgb(3 9 26 / 6%)) drop-shadow(0 10px 24px rgb(3 9 26 / 14%)); font-size: 12px; }
-.pp-h { display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-05); box-shadow: 0 1px 0 var(--iris-line); }
+/* 피그마 칠 팝오버(§9.1 · §9.2): 폭 240 · 머리 40(아래 안쪽 선) · 안쪽 16 · 줄 사이 8 */
+.paint-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; }
+.pp-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--iris-line); }
 .pp-tabs { display: flex; gap: var(--ref-spacing-02); }
-.pp-tab { height: 26px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-500); }
+.pp-tab { height: 24px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-size: 12px; line-height: 24px; font-weight: 500; color: var(--sys-color-neutral-500); }
 .pp-tab:hover { color: var(--sys-color-neutral-800); }
-.pp-tab.on { --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); font-weight: 600; }
+.pp-tab.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); font-weight: 600; }
 .s24 { width: 24px; height: 24px; }
-.pp-types { display: flex; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04) var(--ref-spacing-05); box-shadow: 0 1px 0 var(--iris-line); }
-.pp-type { width: 28px; height: 28px; color: var(--sys-color-neutral-600); }
-.pp-type.on { --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); }
-.pp-body { padding: var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
+/* 칠 종류 줄: 24 버튼 · 16 아이콘 · 사이 4, 고른 것 neutral-100 */
+.pp-types { display: flex; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08) 0; }
+.pp-type { width: 24px; height: 24px; color: var(--sys-color-neutral-600); }
+.pp-type.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.pp-body { padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.pp-h + .pp-body { padding-top: var(--ref-spacing-08); }
 .grow { flex: 1; }
 .m0 { margin: 0; }
 .gr-tools { display: flex; align-items: center; gap: var(--ref-spacing-02); }
-.ang { width: 76px; flex: none; gap: var(--ref-spacing-03); }
-.gr-bar { position: relative; height: 20px; margin: 0 8px 14px; border-radius: 4px; cursor: copy; touch-action: none; }
+.ang { width: 80px; flex: none; }
+.gr-bar { position: relative; height: 20px; margin: 0 8px 18px; border-radius: 4px; cursor: copy; touch-action: none; }
 .gr-bg { position: absolute; inset: 0; border-radius: inherit; --sq-line: rgb(0 0 0 / 15%); --sq-line-w: 0.5px; pointer-events: none; }
 /* 정지점: 바깥 선(.gr-ring)과 흰 면(.gr-face)을 따로 squircle 로 — 바깥 선이 면 밖에 그려지도록. 위 꼭지는 ::before */
 .gr-stop { position: absolute; top: 100%; width: 16px; height: 16px; margin-top: 2px; transform: translateX(-50%); border-radius: 4px; cursor: ew-resize; padding: 0; isolation: isolate; }
@@ -368,28 +400,41 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .gr-face { position: absolute; inset: 0; box-sizing: border-box; padding: 2px; display: grid; border-radius: 4px; --sq-fill: #fff; filter: drop-shadow(0 1px 3px rgb(0 0 0 / 20%)); pointer-events: none; }
 .gr-face b { display: block; border-radius: 2px; }
 .gr-stop:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
-.gr-pos { margin-top: -2px; }
+.gr-pos { font-size: 11px; line-height: 16px; }
 .img-box { position: relative; height: 160px; border-radius: var(--ref-radius-03); overflow: hidden; background: repeating-conic-gradient(#e6e6e6 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; --sq-line: rgb(0 0 0 / 12%); --sq-line-w: 0.5px; display: grid; place-items: center; }
 .img-box.drop { --sq-line: var(--iris-select, #0D99FF); --sq-line-w: 2px; }
 .img-prev { position: absolute; inset: 0; }
-.img-choose { position: relative; height: 28px; padding: 0 var(--ref-spacing-07); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: #fff; --sq-fill: rgb(0 0 0 / 55%); opacity: 1; transition: opacity .12s; }
+.img-choose { position: relative; height: 28px; padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: #fff; --sq-fill: rgb(0 0 0 / 55%); opacity: 1; transition: opacity .12s; }
 .img-box:has(.img-prev[style*='url']) .img-choose { opacity: 0; }
 .img-box:hover .img-choose, .img-choose:focus-visible { opacity: 1; }
 .img-choose:hover { --sq-fill: rgb(0 0 0 / 70%); }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
-.seg-b { height: 24px; border-radius: var(--ref-radius-02); font-size: 11px; color: var(--sys-color-neutral-600); }
-.seg-b.on { --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 8%)); }
-.pp-sw { padding: var(--ref-spacing-05) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.sw-h { font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); }
-.sw-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-.sw { aspect-ratio: 1; border-radius: 4px; --sq-line: rgb(0 0 0 / 10%); --sq-line-w: 1px; cursor: pointer; }
+.pp-body > .tx-meta { font-size: 11px; line-height: 16px; }
+/* 견본 묶음: 라벨 11/16 neutral-500 → 견본 16×16 · r4 · 사이 8(208 폭에 9개, 줄마다 고르게) */
+.pp-sw { padding: var(--ref-spacing-08); box-shadow: inset 0 1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+/* 묶음 이름: Text styles 창과 같은 12 진하게 */
+.sw-h { font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); }
+.sw-grid { display: grid; grid-template-columns: repeat(auto-fill, 16px); justify-content: space-between; gap: var(--ref-spacing-06); }
+.sw { width: 16px; height: 16px; padding: 0; border-radius: var(--ref-radius-02); --sq-line: rgb(0 0 0 / 10%); --sq-line-w: 1px; cursor: pointer; }
 /* 요소가 squircle 로 잘려서 바깥 선 · outline 은 안 보여요 — hover · 포커스는 안쪽 선 색으로 */
-.sw:hover { --sq-line: var(--sys-color-neutral-400); }
-.sw:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
-.lib { display: flex; flex-direction: column; gap: var(--ref-spacing-05); padding: var(--ref-spacing-06); }
-.lib-s { gap: var(--ref-spacing-04); color: var(--sys-color-neutral-500); }
-.lib-l { max-height: 360px; overflow: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-07); margin-right: calc(-1 * var(--ref-spacing-04)); padding-right: var(--ref-spacing-04); }
+.sw:hover { --sq-line: var(--sys-color-neutral-500); }
+.sw:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
+/* Libraries: 검색 28 · 묶음 사이 12 · 좌우 16 */
+.lib { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) 0; min-height: 0; }
+.lib-top { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0 var(--ref-spacing-08); }
+.lib-s { flex: 1; min-width: 0; }
+/* 목록 보기: 행 28 · 견본 16 · 이름 12 · 값 11 오른쪽(고정폭 숫자), 호버 neutral-100 — 좌우는 칸 끝선에 맞춰 -8 */
+.lib-rows { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--ref-spacing-06)); }
+.lib-row { display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); }
+.lib-row:hover { --sq-fill: var(--sys-color-neutral-100); }
+.lib-row:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.sw-s { width: 16px; height: 16px; flex: none; border-radius: var(--ref-radius-01); box-shadow: inset 0 0 0 .5px rgb(3 9 26 / 20%); }
+.lr-n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muted { color: var(--sys-color-neutral-500); }
+.lib-l { max-height: 360px; overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-04) var(--ref-spacing-08) 0; }
 .lib-g { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.empty { padding: var(--ref-spacing-06) 0; text-align: center; }
-button:disabled { opacity: 0.35; pointer-events: none; }
+.empty { padding: var(--ref-spacing-06) 0; text-align: center; font-size: 12px; }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+/* 아이콘 버튼의 비활성은 공통 규칙(neutral-400)만 — 겹쳐 흐리게 하지 않아요 */
+button:disabled:not(.ib) { opacity: 0.35; pointer-events: none; }
+.ib:disabled { pointer-events: none; }
 </style>

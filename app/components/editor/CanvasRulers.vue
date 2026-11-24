@@ -44,6 +44,14 @@ function ticks(len: number, off: number) {
 const xt = computed(() => ticks(size.value.w, props.vp.x))
 const yt = computed(() => ticks(size.value.h, props.vp.y))
 const fmt = (v: number) => String(Math.round(v))
+/** 고른 것의 시작 · 끝 숫자와 겹치는 눈금 숫자는 숨겨요(피그마와 같아요) */
+const hideLb = (axis: 'x' | 'y', v: number) => {
+  const sl = props.sel
+  if (!sl) return false
+  const at = axis === 'x' ? sx(v) : sy(v)
+  const a = axis === 'x' ? sx(sl.x) : sy(sl.y), b = axis === 'x' ? sx(sl.x + sl.w) : sy(sl.y + sl.h)
+  return Math.abs(at - a) < 28 || Math.abs(at - b) < 28
+}
 
 // 끌기: 새 가이드 · 옮기기
 const drag = ref<{ axis: 'x' | 'y'; i: number | null; v: number; out: boolean; moved: boolean; v0: number } | null>(null)
@@ -116,12 +124,12 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
     <template v-if="rulers">
       <div class="bar top" @pointerdown="start('y', null, $event)">
         <div v-if="sel" class="band" :style="{ left: sx(sel.x) + 'px', width: sel.w * vp.zoom + 'px' }" />
-        <template v-for="v in xt" :key="'x' + v"><i class="tk" :style="{ left: sx(v) + 'px' }" /><span class="lb" :style="{ left: sx(v) + 3 + 'px' }">{{ fmt(v) }}</span></template>
+        <template v-for="v in xt" :key="'x' + v"><i class="tk" :style="{ left: sx(v) + 'px' }" /><span v-if="!hideLb('x', v)" class="lb" :style="{ left: sx(v) + 3 + 'px' }">{{ fmt(v) }}</span></template>
         <template v-if="sel"><span class="lb sv" :style="{ left: sx(sel.x) + 'px' }">{{ fmt(sel.x) }}</span><span class="lb sv end" :style="{ left: sx(sel.x + sel.w) + 'px' }">{{ fmt(sel.x + sel.w) }}</span></template>
       </div>
       <div class="bar left" :style="{ left: inset + 'px' }" @pointerdown="start('x', null, $event)">
         <div v-if="sel" class="band" :style="{ top: sy(sel.y) + 'px', height: sel.h * vp.zoom + 'px' }" />
-        <template v-for="v in yt" :key="'y' + v"><i class="tk" :style="{ top: sy(v) + 'px' }" /><span class="lb" :style="{ top: sy(v) + 3 + 'px' }">{{ fmt(v) }}</span></template>
+        <template v-for="v in yt" :key="'y' + v"><i class="tk" :style="{ top: sy(v) + 'px' }" /><span v-if="!hideLb('y', v)" class="lb" :style="{ top: sy(v) + 3 + 'px' }">{{ fmt(v) }}</span></template>
         <template v-if="sel"><span class="lb sv" :style="{ top: sy(sel.y) + 'px' }">{{ fmt(sel.y) }}</span><span class="lb sv end" :style="{ top: sy(sel.y + sel.h) + 'px' }">{{ fmt(sel.y + sel.h) }}</span></template>
       </div>
       <div class="corner" :style="{ left: inset + 'px' }" />
@@ -141,7 +149,7 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
 .guide.on::after { background: var(--iris-select, #0D99FF); }
 .guide.on .gv { background: var(--iris-select, #0D99FF); }
 .guide:hover::after { box-shadow: 0 0 0 0.5px #F24822; }
-.gv { position: absolute; left: 8px; top: 24px; padding: 0 4px; border-radius: 3px; background: #F24822; color: #FFF; font-size: 11px; line-height: 16px; font-family: var(--font-family-base); }
+.gv { position: absolute; left: 8px; top: 24px; padding: 0 4px; border-radius: 2px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; background: #F24822; color: #FFF; font-size: 11px; line-height: 16px; font-family: var(--font-family-base); }
 .gy .gv { top: 8px; left: 24px; }
 .bar { position: absolute; background: var(--sys-color-common-white-default); pointer-events: auto; font-family: var(--font-family-base); color: var(--sys-color-neutral-500); overflow: hidden; }
 .bar.top { left: 0; right: 0; top: 0; height: 18px; box-shadow: 0 1px 0 var(--iris-line); cursor: ns-resize; }
@@ -150,13 +158,13 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
 .tk { position: absolute; background: var(--sys-color-neutral-300); }
 .top .tk { bottom: 0; width: 1px; height: 6px; }
 .left .tk { right: 0; height: 1px; width: 6px; }
-.lb { position: absolute; font-size: 9px; line-height: 10px; white-space: nowrap; }
-.top .lb { top: 2px; }
-.left .lb { left: 2px; writing-mode: vertical-rl; transform: rotate(180deg); }
+.lb { position: absolute; font-size: 10px; line-height: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top .lb { top: 1px; }
+.left .lb { left: 1px; writing-mode: vertical-rl; transform: rotate(180deg); }
 .band { position: absolute; background: color-mix(in srgb, var(--iris-select, #0D99FF) 14%, transparent); }
 .top .band { top: 0; bottom: 0; }
 .left .band { left: 0; right: 0; }
-.lb.sv { color: var(--iris-select, #0D99FF); font-weight: 600; background: var(--sys-color-common-white-default); padding: 0 2px; }
+.lb.sv { color: var(--iris-select, #0D99FF); font-weight: 500; background: var(--sys-color-common-white-default); padding: 0 2px; }
 .top .lb.sv.end { transform: translateX(-100%); }
 .left .lb.sv.end { transform: rotate(180deg) translateY(100%); }
 </style>

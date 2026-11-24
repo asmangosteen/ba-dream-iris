@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import type { LayerStyle } from '~/canvas/schema'
 import { colorLabel, parseColor, type CatalogToken } from '~/canvas/tokens'
@@ -8,15 +8,18 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
 import InspectorPaints from '~/components/editor/InspectorPaints.vue'
 import ColorField from '~/components/editor/ColorField.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
+import InspectorEffects from '~/components/editor/InspectorEffects.vue'
+import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
 
 /** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기 · 모양(채우기 · 선 · 모서리 · 투명도 · 내용 자르기). 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
 const props = defineProps<{ screen: ScreenRow }>()
 const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: [] }>()
 
-const STATUS: { k: ScreenRow['status']; label: string }[] = [
-  { k: 'draft', label: 'In progress' },
-  { k: 'review', label: 'Ready for review' },
-  { k: 'approved', label: 'Approved' },
+const STATUS: { value: ScreenRow['status']; label: string }[] = [
+  { value: 'draft', label: 'In progress' },
+  { value: 'review', label: 'Ready for review' },
+  { value: 'approved', label: 'Approved' },
 ]
 const PRESETS = [
   { label: 'iPhone 14', w: 390, h: 844 },
@@ -26,6 +29,10 @@ const PRESETS = [
   { label: 'iPad mini', w: 768, h: 1024 },
   { label: 'Desktop', w: 1440, h: 900 },
 ]
+/** 크기 프리셋 ▾: 휴대폰 · 태블릿 · 데스크톱 묶음 사이에 구분선. 맞는 것이 없으면 'Custom' */
+const PRESET_OPTS = PRESETS.map((p) => ({ value: p.label, label: `${p.label} · ${p.w} × ${p.h}`, sep: p.label === 'iPad mini' || p.label === 'Desktop' }))
+const presetNow = computed(() => PRESETS.find((p) => p.w === props.screen.width && p.h === props.screen.height)?.label ?? null)
+function pickPreset(label: string) { const p = PRESETS.find((x) => x.label === label); if (p) emit('update', { width: p.w, height: p.h }) }
 
 function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const input = e.target as HTMLInputElement
@@ -56,8 +63,21 @@ const hasFill = computed(() => look.value.fill !== '')
 const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
 const hasStroke = computed(() => !!(look.value.stroke && look.value.strokeWidth))
 const hex = (v?: string) => parseColor(store.color(v))?.hex ?? '#000000'
-const colorText = (v?: string) => (!v ? 'None' : v.startsWith('token:') ? v.slice(6) : colorLabel(v))
+/** 색 값 글자: Fill 행(InspectorPaints)처럼 # 없이 'FFFFFF' */
+const colorText = (v?: string) => (!v ? 'None' : v.startsWith('token:') ? v.slice(6) : colorLabel(v).replace(/^#/, ''))
 const blurOnEnter = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
+/** 입력칸 공통: Esc 는 고치던 값을 버리고 칸에서 나가요(포커스할 때 값을 기억했다가 되돌리고, 그 사이 change 는 막아요) */
+function onFocusIn(e: FocusEvent) { const t = e.target as HTMLInputElement; if (t.tagName === 'INPUT') t.dataset.orig = t.value }
+function onEsc(e: KeyboardEvent) {
+  const t = e.target as HTMLInputElement
+  if (e.key !== 'Escape' || t.tagName !== 'INPUT') return
+  e.stopPropagation()
+  t.dataset.esc = '1'
+  t.value = t.dataset.orig ?? t.value
+  t.blur()
+  delete t.dataset.esc
+}
+function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.stopPropagation() }
 function setHex(key: 'fill' | 'stroke', e: Event) {
   const input = e.target as HTMLInputElement
   let v = input.value.trim()
@@ -88,129 +108,160 @@ function pickColor(key: 'fill' | 'stroke', t: CatalogToken) { fstyle({ [key]: t.
 function pickNum(key: 'radius' | 'strokeWidth' | 'opacity', t: CatalogToken) { fstyle({ [key]: t.num!, ...(key === 'radius' ? { radii: undefined } : {}) }, { [key]: t.id }) }
 function unbindKey(key: string) { fstyle({}, { [key]: null }) }
 
-const statusOpen = ref(false)
-const presetOpen = ref(false)
-const confirmDelete = ref(false)
-watch(() => props.screen.id, () => { confirmDelete.value = false; statusOpen.value = false; presetOpen.value = false })
-// 드롭다운: 바깥을 누르거나 Esc 로 닫기
-const root = ref<HTMLElement | null>(null)
-function onDocPointer(e: PointerEvent) {
-  const rel = (e.target as HTMLElement | null)?.closest('.rel')
-  if (!rel || !root.value?.contains(rel)) { statusOpen.value = false; presetOpen.value = false }
+// --- 모서리: 레이어와 같아요 — 하나로 · 모서리마다(Independent corners) · Corner smoothing ---
+const CORNER_KEYS = ['radii.0', 'radii.1', 'radii.2', 'radii.3'] as const
+const CORNER_LABEL = ['Top left radius', 'Top right radius', 'Bottom right radius', 'Bottom left radius']
+const separate = computed(() => !!look.value.radii)
+const radiiNow = computed<[number, number, number, number]>(() => { const r = look.value.radius ?? 0; return look.value.radii ?? [r, r, r, r] })
+const allCorners = computed(() => (radiiNow.value.every((v) => v === radiiNow.value[0]) ? radiiNow.value[0] : 'Mixed'))
+const vbCorners = computed(() => { const v = CORNER_KEYS.map((k) => vb(k)); return v.every((x) => x === v[0]) ? v[0]! : null })
+/** 다른 모서리 연결은 그대로 두고 i 번째만 id(없으면 풀기) */
+const cornerVars = (i: number | null, id: string | null) => Object.fromEntries(CORNER_KEYS.map((k, j) => [k, j === i ? id : i === null ? id : vb(k)]))
+function toggleCorners() {
+  if (!separate.value) {
+    const r = look.value.radius ?? 0
+    fstyle({ radii: [r, r, r, r] }, cornerVars(null, vb('radius')))
+  } else {
+    const r0 = radiiNow.value[0]
+    fstyle({ radii: undefined, radius: r0 }, { ...cornerVars(null, null), radius: vb('radii.0') })
+  }
 }
-function onDocKey(e: KeyboardEvent) { if (e.key === 'Escape') { statusOpen.value = false; presetOpen.value = false } }
-onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
-onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
+function setCorner(e: Event, i: number | null) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace(/[^\d.-]/g, ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = i === null ? (allCorners.value === 'Mixed' ? '' : String(allCorners.value)) : String(radiiNow.value[i]); return }
+  const n = Math.max(0, Math.round(v * 10) / 10)
+  const r = [...radiiNow.value] as [number, number, number, number]
+  if (i === null) r.fill(n); else r[i] = n
+  fstyle({ radii: r }, cornerVars(i, null))
+}
+function stepCorner(i: number | null, d: number) {
+  const r = radiiNow.value.map((v, j) => (i === null || j === i ? Math.max(0, v + d) : v)) as [number, number, number, number]
+  fstyle({ radii: r }, cornerVars(i, null))
+}
+function cornerKey(i: number | null, e: KeyboardEvent) {
+  blurOnEnter(e)
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  stepCorner(i, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1))
+}
+function pickCorner(i: number | null, t: CatalogToken) {
+  const r = [...radiiNow.value] as [number, number, number, number]
+  if (i === null) r.fill(t.num!); else r[i] = t.num!
+  fstyle({ radii: r }, cornerVars(i, t.id))
+}
+const smoothOpen = ref(false)
+const smoothBtn = ref<HTMLElement[] | HTMLElement | null>(null)
+const smoothBtnEl = computed(() => (Array.isArray(smoothBtn.value) ? smoothBtn.value[0] ?? null : smoothBtn.value))
+const smoothNow = computed(() => Math.round((look.value.smoothing ?? 0) * 100))
+const setSmoothing = (v: number) => fstyle({ smoothing: v > 0 ? v / 100 : undefined })
+watch(() => props.screen.id, () => { smoothOpen.value = false })
+
 </script>
 
 <template>
-  <div ref="root" class="design">
+  <div class="design" @focusin="onFocusIn" @keydown="onEsc" @change.capture="onChangeCap">
     <section class="s">
       <div class="sec-h h24"><span>Frame</span></div>
-      <label class="sq fld"><span>Name</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="Frame name" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-      <span class="sub">Status</span>
-      <div class="rel">
-        <button :class="['sq', 'dd', { open: statusOpen }]" :aria-expanded="statusOpen" @click="statusOpen = !statusOpen">
-          <span>{{ STATUS.find((s) => s.k === screen.status)?.label }}</span><Icon name="chevron_down" :size="12" class="muted" />
-        </button>
-        <div v-if="statusOpen" class="sq menu" role="listbox" aria-label="Status">
-          <button v-for="s in STATUS" :key="s.k" role="option" :aria-selected="screen.status === s.k" :class="['sq', 'menu-item', { on: screen.status === s.k }]" @click="emit('update', { status: s.k }); statusOpen = false">{{ s.label }}</button>
-        </div>
+      <div class="ig w1">
+        <label class="sq fld"><span>Name</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="Frame name" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <span />
+      </div>
+      <div class="ig-l"><span>Status</span></div>
+      <div class="ig w1">
+        <EditorSelect :model-value="screen.status" :options="STATUS" ariaLabel="Status" @update:model-value="(v) => emit('update', { status: v as ScreenRow['status'] })" />
+        <span />
       </div>
     </section>
 
     <section class="s">
       <div class="sec-h h24"><span>Position</span></div>
-      <div class="grid2">
+      <div class="ig">
         <label class="sq fld"><span>X</span><input :key="'x' + screen.x" :value="Math.round(screen.x)" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <label class="sq fld"><span>Y</span><input :key="'y' + screen.y" :value="Math.round(screen.y)" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <span />
       </div>
     </section>
 
     <section class="s">
       <div class="sec-h h24"><span>Layout</span></div>
-      <div class="rel">
-        <button :class="['sq', 'dd', { open: presetOpen }]" :aria-expanded="presetOpen" @click="presetOpen = !presetOpen">
-          <span>{{ PRESETS.find((p) => p.w === screen.width && p.h === screen.height)?.label ?? 'Custom' }}</span><Icon name="chevron_down" :size="12" class="muted" />
-        </button>
-        <div v-if="presetOpen" class="sq menu" role="listbox" aria-label="Size presets">
-          <button v-for="p in PRESETS" :key="p.label" role="option" :aria-selected="p.w === screen.width && p.h === screen.height" :class="['sq', 'menu-item', { on: p.w === screen.width && p.h === screen.height }]" @click="emit('update', { width: p.w, height: p.h }); presetOpen = false">
-            <span class="f1">{{ p.label }}</span><span class="tx-meta num">{{ p.w }} × {{ p.h }}</span>
-          </button>
-        </div>
+      <div class="ig w1">
+        <EditorSelect :model-value="presetNow" :options="PRESET_OPTS" ariaLabel="Size presets" placeholder="Custom" @update:model-value="pickPreset" />
+        <span />
       </div>
-      <div class="grid2">
+      <div class="ig-l"><span>Dimensions</span></div>
+      <div class="ig">
         <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" aria-label="Width" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" aria-label="Height" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <span />
       </div>
+      <button v-if="native" :class="['cb', { on: look.clip !== false }]" role="checkbox" :aria-checked="look.clip !== false" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />Clip content</button>
     </section>
 
     <template v-if="native">
       <section class="s">
         <div class="sec-h h24"><span>Appearance</span></div>
-        <div class="grid2"><span class="sub">Opacity</span><span class="sub">Corner radius</span></div>
-        <div class="grid2">
-          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="Frame opacity" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span>%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
-          <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="Frame corner radius" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+        <div class="ig-l"><span>Opacity</span><span>Corner radius</span></div>
+        <div class="ig">
+          <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="Frame opacity" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
+          <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="allCorners === 'Mixed' ? '' : allCorners" :placeholder="allCorners === 'Mixed' ? 'Mixed' : ''" inputmode="numeric" aria-label="Frame corner radius" @change="setCorner($event, null)" @keydown="cornerKey(null, $event)"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Frame corner radius" @pick="(t) => pickCorner(null, t)" @unbind="fstyle({}, cornerVars(null, null))" @step="(d) => stepCorner(null, d)" /></label>
+          <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="Frame corner radius" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" aria-label="Independent corners" title="Independent corners" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
         </div>
-        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />Clip content</button>
+        <template v-if="separate">
+          <!-- 피그마 순서: ┌ ┐ / └ ┘ -->
+          <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="CORNER_LABEL[i]"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="CORNER_LABEL[i]" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" aria-label="Corner smoothing" title="Corner smoothing" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
+        </template>
+        <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="store.hold(screen.id)" @end="store.release(screen.id)" @close="smoothOpen = false" />
       </section>
 
       <InspectorPaints :sid="screen.id" :ids="[]" kind="fill" title="Fill" frame />
 
       <section class="s">
-        <div class="sec-h h24"><span>Stroke</span><button v-if="!hasStroke" class="ib s24" aria-label="Add stroke" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><Icon name="plus" :size="14" /></button><button v-else class="ib s24" aria-label="Remove stroke" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button></div>
+        <div :class="['sec-h', 'h24', { empty: !hasStroke }]"><span>Stroke</span><button v-if="!hasStroke" class="ib s24" aria-label="Add stroke" title="Add stroke" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
         <template v-if="hasStroke">
-          <div class="color-row">
+          <!-- 피그마 Stroke 행: [견본 + 값] [변수 24] [− 24] -->
+          <div class="prow">
             <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="Frame stroke color value" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
             <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
+            <span v-else />
+            <button class="ib s24" aria-label="Remove stroke" title="Remove stroke" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><EditorIcon name="minus" :size="16" /></button>
           </div>
-          <div class="grid2">
-            <label class="sq fld" title="Stroke weight"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 3.5h10" stroke="currentColor" stroke-width="1" /><path d="M2 7h10" stroke="currentColor" stroke-width="1.6" /><path d="M2 10.5h10" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="Frame stroke weight" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span>px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+          <div class="ig-l"><span>Weight</span></div>
+          <div class="ig">
+            <label class="sq fld u" title="Stroke weight"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="Frame stroke weight" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+            <span /><span />
           </div>
         </template>
       </section>
 
+      <InspectorEffects :sid="screen.id" :ids="[]" frame />
+
       <InspectorGrids :grids="look.grids ?? []" @change="(g) => fstyle({ grids: g })" />
     </template>
 
-    <section class="s">
-      <div class="sec-h h24"><span>Layer</span></div>
-      <p class="tx-meta m0">Select a layer on the canvas or in the layers list to edit it here</p>
-      <dl class="sq keys"><dt>Rectangle</dt><dd>R</dd><dt>Text</dt><dd>T</dd><dt>Frame</dt><dd>F</dd></dl>
-    </section>
-
-    <section class="s">
-      <Button v-if="!confirmDelete" size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" class="full" @click="confirmDelete = true">Delete frame</Button>
-      <div v-else class="sq confirm" role="alertdialog" aria-label="Confirm delete frame">
-        <span class="tx-head">Delete '{{ screen.name }}'?</span>
-        <span class="tx-meta">Linked requirement statuses are deleted too, and this can't be undone</span>
-        <span class="row-end"><Button size="s" type="tertiary" @click="confirmDelete = false">Cancel</Button><Button size="s" type="destructed" @click="emit('remove')">Delete</Button></span>
-      </div>
-    </section>
   </div>
 </template>
 
 <style scoped>
 .design { padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column; }
-.s { padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
+/* 뒤에 Scale · Export 칸이 이어지면 아래 여백은 맨 끝 칸이 가져요(사이에 빈 공간이 생기지 않게) */
+.design:not(:last-child) { padding-bottom: 0; }
+/* 섹션: 위 12 · 옆 16 · 아래 16, 줄 사이 8 (PRD 07 §2.4) */
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:first-child { box-shadow: none; }
+.s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
 .h24 { height: 24px; padding: 0; }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
-.rel { position: relative; min-width: 0; }
-.muted { color: var(--sys-color-neutral-500); }
-.f1 { flex: 1; }
-.m0 { margin: 0; }
-.full { width: 100%; }
-.confirm { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
-.row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-04); }
-.keys { display: grid; grid-template-columns: repeat(3, auto minmax(0, 1fr)); gap: var(--ref-spacing-04); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
-.keys dt { color: var(--sys-color-neutral-500); }
-.keys dd { margin: 0; font-weight: 600; color: var(--sys-color-neutral-700); }
+.sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s24 { width: 24px; height: 24px; }
-.color-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center; }
-.cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+/* Stroke 행: Fill 행(InspectorPaints)과 같아요 — [견본 + 값 | 8 | 변수 24 | − 24] */
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow > .fld { margin-right: var(--ref-spacing-06); }
+/* 단위(% px)는 숫자 바로 뒤에 */
+.design .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }
+.fld.u > .unit { flex: 1 1 0; min-width: 0; margin-left: calc(var(--ref-spacing-03) * -1); color: var(--sys-color-neutral-500); }
 .cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
-.fld > svg { flex: none; color: var(--sys-color-neutral-600); }
-.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
+.cb:hover > i { --sq-line: var(--sys-color-neutral-600); }
+.cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 </style>

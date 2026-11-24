@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { BindKey, LayerNode, LayerStyle, Paint } from '~/canvas/schema'
 import { colorLabel, type CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
@@ -7,7 +7,6 @@ import { useImageSrc } from '~/canvas/images'
 import { paintLayer } from '~/canvas/paint'
 import { alphaOf, hexOf, normHex, withAlpha } from '~/canvas/color'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
-import StyleCreate from '~/components/editor/StyleCreate.vue'
 import PaintPopover from '~/components/editor/PaintPopover.vue'
 
 /**
@@ -182,42 +181,43 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 
 <template>
   <section class="s">
-    <div class="sec-h h24">
+    <div :class="['sec-h', 'h24', { empty: !rows.length && !mixed }]">
       <span>{{ title }}</span>
-      <button class="ib s24" :aria-label="`Add ${title.toLowerCase()}`" :title="`Add ${title.toLowerCase()}`" @click="add"><Icon name="plus" :size="14" /></button>
+      <span class="acts">
+        <!-- Create color style 은 뺐어요: 로컬 스타일은 고르는 목록에 나오지 않아요(디자인 시스템 변수만) -->
+        <button class="ib s24" :aria-label="`Add ${title.toLowerCase()}`" :data-tip="`Add ${title.toLowerCase()}`" @click="add"><EditorIcon name="plus" :size="16" /></button>
+      </span>
     </div>
     <p v-if="mixed" class="tx-meta m0">Click + to replace mixed content</p>
     <template v-for="i in rows" :key="i">
-      <!-- 바탕 칠 -->
-      <div v-if="i < 0" class="row">
-        <div class="sq fld grow" :class="{ act: open === -1 }">
+      <!-- 바탕 칠: [견본 + 값] · 👁 · − (피그마 Fill 행) -->
+      <div v-if="i < 0" class="prow">
+        <div :class="['sq', 'fld', 'pf', { open: open === -1, bound: !!bound }]">
           <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="`Edit ${title.toLowerCase()} color`" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
           <template v-if="!bound">
             <input :key="'h' + baseVal" class="hex" :value="colorLabel(store.color(baseVal) ?? '').split(' ')[0]!.replace('#', '')" :aria-label="`${title} hex`" spellcheck="false" @change="onBaseHex" @keydown="blur" @focus="sel">
+            <TokenPicker :kinds="['color']" reveal :label="`${title} color`" @pick="pick" />
             <span class="vsep" aria-hidden="true" />
-            <input :key="'a' + baseVal" class="pct" :value="Math.round(alphaOf(store.color(baseVal)) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onBaseAlpha" @keydown="blur" @focus="sel"><span class="unit">%</span>
+            <span class="op"><input :key="'a' + baseVal" class="pct" :value="Math.round(alphaOf(store.color(baseVal)) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onBaseAlpha" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
           </template>
           <TokenPicker v-else :kinds="['color']" :bound="bound" :label="`${title} color`" @pick="pick" @unbind="unbind" />
         </div>
-        <TokenPicker v-if="!bound" :kinds="['color']" :label="`${title} color`" @pick="pick" />
-        <StyleCreate v-if="!bound && baseVal" type="color" :value="store.color(baseVal) ?? baseVal" label="Create color style" @created="createdStyle" />
-        <button class="ib s24" :aria-label="`Hide ${title.toLowerCase()}`" title="Hide" @click="toggle(-1)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7S3.5 3 7 3s5.5 4 5.5 4-2 4-5.5 4S1.5 7 1.5 7z" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="7" cy="7" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2" /></svg></button>
-        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" title="Remove" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
+        <button class="ib s24" :aria-label="`Hide ${title.toLowerCase()}`" data-tip="Hide" @click="toggle(-1)"><EditorIcon name="eye" :size="16" /></button>
+        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" data-tip="Remove" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <!-- 덧붙인 칠 -->
-      <div v-else-if="extras[i]" class="row" :class="{ off: extras[i]!.visible === false }">
-        <div class="sq fld grow" :class="{ act: open === i }">
+      <div v-else-if="extras[i]" class="prow" :class="{ off: extras[i]!.visible === false }">
+        <div :class="['sq', 'fld', 'pf', { open: open === i }]">
           <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="`Edit ${title.toLowerCase()}`" :aria-expanded="open === i" @click="open = open === i ? null : i" />
           <input v-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="`${title} hex`" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
           <button v-else class="pname" @click="open = open === i ? null : i">{{ TYPE_NAME[extras[i]!.type] }}</button>
           <span class="vsep" aria-hidden="true" />
-          <input :key="'a' + i + extras[i]!.opacity" class="pct" :value="Math.round((extras[i]!.opacity ?? 1) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onExtraAlpha(i, $event)" @keydown="blur" @focus="sel"><span class="unit">%</span>
+          <span class="op"><input :key="'a' + i + extras[i]!.opacity" class="pct" :value="Math.round((extras[i]!.opacity ?? 1) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onExtraAlpha(i, $event)" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
         </div>
-        <button class="ib s24" :aria-label="extras[i]!.visible === false ? `Show ${title.toLowerCase()}` : `Hide ${title.toLowerCase()}`" :title="extras[i]!.visible === false ? 'Show' : 'Hide'" @click="toggle(i)">
-          <svg v-if="extras[i]!.visible !== false" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7S3.5 3 7 3s5.5 4 5.5 4-2 4-5.5 4S1.5 7 1.5 7z" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="7" cy="7" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
-          <svg v-else width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M5.2 3.3A6 6 0 0 1 7 3c3.5 0 5.5 4 5.5 4a9 9 0 0 1-1.6 2.1M8.8 10.7A6 6 0 0 1 7 11c-3.5 0-5.5-4-5.5-4a9 9 0 0 1 1.6-2.1" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
+        <button class="ib s24" :aria-label="extras[i]!.visible === false ? `Show ${title.toLowerCase()}` : `Hide ${title.toLowerCase()}`" :data-tip="extras[i]!.visible === false ? 'Show' : 'Hide'" @click="toggle(i)">
+          <EditorIcon :name="extras[i]!.visible === false ? 'eye_off' : 'eye'" :size="16" />
         </button>
-        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" title="Remove" @click="remove(i)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
+        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" data-tip="Remove" @click="remove(i)"><EditorIcon name="minus" :size="16" /></button>
       </div>
     </template>
     <PaintPopover
@@ -239,21 +239,32 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 </template>
 
 <style scoped>
-.s { padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .h24 { height: 24px; padding: 0; }
+/* 비어 있는 섹션: 머리 줄만, 제목은 보통 굵기(피그마 §2.4) */
+.sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
+.s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
+.acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .s24 { width: 24px; height: 24px; }
 .m0 { margin: 0; }
-.row { display: flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
-.row.off .fld { opacity: 0.45; }
-.grow { flex: 1; min-width: 0; }
-.fld { gap: var(--ref-spacing-04); padding-right: var(--ref-spacing-05); }
-.fld.act, .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
-.hex { flex: 1; min-width: 0; text-transform: uppercase; }
-.vsep { width: 1px; align-self: stretch; background: var(--sys-color-common-white-default); flex: none; }
-.pct { width: 28px !important; flex: none; text-align: right; }
-.unit { color: var(--sys-color-neutral-500) !important; margin-left: calc(-1 * var(--ref-spacing-04)); }
-.pname { flex: 1; min-width: 0; text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); cursor: pointer; }
-.swatch { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+/* 피그마 Fill · Stroke 행: [견본 16 · 값 | 불투명도 48 %] 8 [👁 24][− 24] */
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow > .fld { margin-right: var(--ref-spacing-06); }
+.prow.off .fld { opacity: 0.45; }
+/* 칸 하나: 왼쪽 [견본 + 이름 · hex](안쪽 8, 사이 8) · 1px 칸막이(패널 색) · 오른쪽 불투명도(48, 안쪽 8, 오른쪽 정렬). 열림 · 포커스는 칸 전체에 1px 파란 선만 */
+.pf { gap: var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); min-width: 0; }
+.pf.bound { padding-right: var(--ref-spacing-06); }
+/* 파란 선은 열림 · 입력 중일 때만(칩 · 버튼에 포커스가 남은 것만으로는 그리지 않아요 — 그건 각자 focus-visible 링) */
+.pf.open, .pf:has(input:focus) { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+.hex { flex: 1; min-width: 0; padding: 0; text-transform: uppercase; }
+/* 칸막이는 위아래 1px 비워서 열림 선을 가리지 않아요 */
+.vsep { width: 1px; align-self: stretch; margin: 1px 0; background: var(--sys-color-common-white-emphasis); flex: none; }
+.op { flex: none; width: 48px; height: 100%; box-sizing: border-box; margin-left: calc(-1 * var(--ref-spacing-06)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.op .pct { flex: 1; width: auto; min-width: 0; padding: 0; text-align: right; }
+.op .unit { flex: none; font-style: normal; color: var(--sys-color-neutral-500); }
+.pname { flex: 1; min-width: 0; text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.swatch { width: 16px; height: 16px; padding: 0; border: 0; border-radius: var(--ref-radius-02); flex: none; cursor: pointer; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .swatch:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
-button:disabled { opacity: 0.35; pointer-events: none; }
+button:disabled:not(.ib) { opacity: 0.35; pointer-events: none; }
+.ib:disabled { pointer-events: none; }
 </style>

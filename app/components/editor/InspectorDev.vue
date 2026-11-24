@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import { nameFromId, useTokenCatalog } from '~/canvas/tokens'
-import { Button, Icon, TextButton } from '@ba-dream/design-system'
+import { Button, TextButton } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
 import { useLayerStore } from '~/canvas/store'
 
@@ -99,12 +100,12 @@ async function copy() {
     <section class="s">
       <div class="sec-h h24"><span>Components</span><span class="meta5 num">{{ total ? `${matched.length} types · ${total} instances` : '' }}</span></div>
       <button v-for="m in matched" :key="m.id" class="sq hov comp" @click="emit('open-asset', m.comp.id)">
-        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="dia"><path d="M6 1l5 5-5 5-5-5z" fill="currentColor" /></svg>
+        <EditorIcon name="component" :size="16" class="dia" />
         <span class="col"><span class="cname">{{ m.comp.name }}</span><span class="tx-code">{{ m.comp.code_name ?? m.comp.name }}</span></span>
         <span class="cnt num">×{{ m.count }}</span>
       </button>
       <div v-if="unmatched.length" class="sq info">
-        <Icon name="info" :size="12" class="mt3" />
+        <EditorIcon name="info" :size="16" class="mt3" />
         <span>Not in design system ({{ unmatched.length }}): {{ unmatched.map((u) => u.detected_name).join(', ') }}</span>
       </div>
       <div v-if="usages.status.value === 'success' && !usages.data.value?.length" class="empty-col">
@@ -117,7 +118,7 @@ async function copy() {
       <div class="sec-h h24"><span>Variables</span></div>
       <div v-for="t in tokenUse.tokens" :key="t.name" class="tok"><span class="sq chip" :style="{ '--sq-fill': t.value ?? 'transparent' }" /><span class="tx-code f1">{{ t.name }}</span><span class="tx-meta num">{{ t.n }}</span></div>
       <div v-if="tokenUse.raw.length" class="sq info">
-        <Icon name="warning" :size="12" class="mt3" />
+        <EditorIcon name="warning" :size="16" class="mt3" />
         <span>Colors not from variables ({{ tokenUse.raw.length }}): {{ tokenUse.raw.slice(0, 6).join(', ') }}{{ tokenUse.raw.length > 6 ? ' …' : '' }}</span>
       </div>
       <p v-if="!tokenUse.tokens.length && !tokenUse.raw.length" class="tx-meta m0">No colors or variables used yet</p>
@@ -125,16 +126,20 @@ async function copy() {
 
     <section class="s">
       <div class="sec-h h24"><span>Properties</span></div>
-      <div class="grid2">
+      <div class="ig">
         <span class="sq fld"><span>X</span><span class="v num">{{ Math.round(screen.x) }}</span></span>
         <span class="sq fld"><span>Y</span><span class="v num">{{ Math.round(screen.y) }}</span></span>
+        <span />
+      </div>
+      <div class="ig">
         <span class="sq fld"><span>W</span><span class="v num">{{ Math.round(screen.width) }}</span></span>
         <span class="sq fld"><span>H</span><span class="v num">{{ Math.round(screen.height) }}</span></span>
+        <span />
       </div>
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>Code</span><button class="ib s24" aria-label="Copy code" title="Copy code" @click="copy"><Icon name="copy" :size="14" /></button></div>
+      <div class="sec-h h24"><span>Code</span><button class="ib s24" aria-label="Copy code" title="Copy code" @click="copy"><EditorIcon name="copy" :size="16" /></button></div>
       <pre class="sq tx-code pre">{{ code }}</pre>
     </section>
 
@@ -150,21 +155,22 @@ async function copy() {
 
 <style scoped>
 .dev { padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column; }
-.s { padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:first-child { box-shadow: none; }
 .h24 { height: 24px; padding: 0; }
 .s24 { width: 24px; height: 24px; }
 .meta5 { font-weight: 500; color: var(--sys-color-neutral-500); }
 .comp { display: flex; align-items: center; gap: var(--ref-spacing-06); margin: 0 calc(-1 * var(--ref-spacing-04)); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-04); text-align: left; }
-.dia { flex: none; color: var(--iris-component); }
+/* 아이콘은 이름(첫 줄)에 맞춰요 */
+.dia { flex: none; align-self: flex-start; margin-top: 1px; color: var(--iris-component); }
 .col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cname { font-weight: 500; color: var(--iris-component); }
 .cnt { font-weight: 600; color: var(--sys-color-neutral-700); }
 .info { display: flex; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
-.mt3 { margin-top: 3px; flex: none; }
+/* 16 아이콘을 18 줄 높이 첫 줄 가운데에 */
+.mt3 { margin-top: 1px; flex: none; }
 .m0 { margin: 0; }
 .empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
 .v { color: var(--sys-color-neutral-800) !important; }
 .pre { margin: 0; padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); white-space: pre-wrap; overflow-wrap: anywhere; }
 .tok { display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; }

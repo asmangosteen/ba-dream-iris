@@ -18,3 +18,6 @@ prototype/assets/bd-symbol.svg
 
 # 로고 3D 메시 (design/logo/export-3d.mjs 로 다시 생성, 용량이 커서 제외)
 design/logo/3d/
+
+# 데스크탑 앱 설치 파일 (desktop/ 에서 npm run dist 로 다시 생성)
+desktop/dist/

@@ -5,7 +5,9 @@ import type { LayerStore } from '~/canvas/store'
 import type { MenuItem } from './useContextMenu'
 
 /** 마지막에 복사한 것(레이어 · 화면) — 캔버스 단축키와 우클릭 메뉴가 함께 써요 */
-export const useLastCopy = () => useState<'layers' | 'screen' | null>('iris-last-copy', () => null)
+export const useLastCopy = () => useState<'layers' | 'screen' | 'mixed' | null>('iris-last-copy', () => null)
+/** 레이어와 함께 고른 화면들(피그마처럼 한 화면 안 자식 레이어 + 다른 화면을 같이 고를 때). 레이어 선택이 비거나 바뀌면 비워요 */
+export const useMixScreens = () => useState<string[]>('iris-mix-screens', () => [])
 
 /** 레이어 우클릭 메뉴 항목(피그마 순서). 캔버스 · 레이어 목록 공용 */
 /** 레이어 → CSS(피그마 'Copy as CSS') */
@@ -43,7 +45,7 @@ async function copyText(text: string, hint?: (t: string) => void) {
   try { await navigator.clipboard.writeText(text); hint?.('Copied to clipboard') } catch { hint?.('Couldn\'t copy to the clipboard') }
 }
 
-export function layerMenuItems(store: LayerStore, sid: string, ids: string[], opts: { lastCopy: Ref<'layers' | 'screen' | null>; paste: () => void; pasteHere?: () => void; fit?: () => void; hint?: (t: string) => void }): MenuItem[] {
+export function layerMenuItems(store: LayerStore, sid: string, ids: string[], opts: { lastCopy: Ref<'layers' | 'screen' | 'mixed' | null>; paste: () => void; pasteHere?: () => void; fit?: () => void; hint?: (t: string) => void }): MenuItem[] {
   const d = store.doc(sid)
   const nodes = ids.map((id) => d.nodes[id]).filter((n): n is NonNullable<typeof n> => !!n)
   if (!nodes.length) return []
@@ -61,6 +63,8 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     { label: 'Select parent', shortcut: '⇧↵', action: () => store.selectParent(sid), disabled: nodes.every((n) => !n.parentId) },
     ...(nodes.some((n) => isContainer(n) && n.children?.length) ? [{ label: 'Select children', shortcut: '↵', action: () => store.selectChildren(sid) }] : []),
     { label: 'Select all', shortcut: '⌘A', action: () => store.selectAll(sid) },
+    { label: 'Select inverse', shortcut: '⇧⌘A', action: () => store.selectInverse(sid) },
+    { label: 'Select all matching layers', shortcut: '⌥⌘A', action: () => store.selectMatching(sid) },
     'sep',
     { label: 'Bring to front', shortcut: '⌥⌘]', action: () => store.arrange(sid, ids, 'top') },
     { label: 'Bring forward', shortcut: '⌘]', action: () => store.arrange(sid, ids, 1) },
@@ -69,6 +73,8 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     'sep',
     { label: 'Group selection', shortcut: '⌘G', action: () => store.wrap(sid, ids, 'group') },
     { label: 'Frame selection', shortcut: '⌥⌘G', action: () => store.wrap(sid, ids, 'frame') },
+    // 섹션은 캔버스 맨 위에만(피그마와 같아요)
+    ...(sid.startsWith('page:') && nodes.every((n) => !n.parentId) ? [{ label: 'Section selection', shortcut: '⌥⌘S', action: () => store.wrap(sid, ids, 'section') }] : []),
     ...(nodes.some((n) => isContainer(n)) ? [{ label: 'Ungroup', shortcut: '⇧⌘G', action: () => store.unwrap(sid, ids) }] : []),
     hasLayout ? { label: 'Remove auto layout', shortcut: '⌥⇧A', action: () => store.removeAutoLayout(sid, ids) } : { label: 'Add auto layout', shortcut: '⇧A', action: () => store.addAutoLayout(sid, ids) },
     'sep',

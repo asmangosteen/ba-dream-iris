@@ -2,6 +2,7 @@
  * 캔버스 도형 계산: 회전 · 뒤집기 행렬, 정렬 · 균등 분배, 스냅 · 스마트 가이드, 간격 측정.
  * 좌표는 모두 같은 평면(화면 왼쪽 위 기준이나 캔버스 좌표) 위의 숫자입니다.
  */
+import { fmtNum } from './num'
 import type { LayerDoc, LayerNode } from './schema'
 
 // ---------------------------------------------------------------------------
@@ -135,7 +136,8 @@ export interface GuideLine { x1: number; y1: number; x2: number; y2: number; das
 export interface GuideLabel { x: number; y: number; text: string }
 export interface Guides { lines: GuideLine[]; labels: GuideLabel[] }
 export const noGuides = (): Guides => ({ lines: [], labels: [] })
-const fmt = (v: number) => String(Math.round(v * 10) / 10)
+// 간격 · 맞춤 숫자: 피그마처럼 정수로(app/canvas/num.ts)
+const fmt = fmtNum
 
 const edges = (r: Rect, a: Axis) => (a === 'x' ? [r.x, r.x + r.w / 2, r.x + r.w] : [r.y, r.y + r.h / 2, r.y + r.h])
 const cross = (a: Axis): Axis => (a === 'x' ? 'y' : 'x')
@@ -318,9 +320,39 @@ export function measureGuides(s: Rect, t: Rect): Guides {
 }
 
 /** 여러 상자(화면 등)를 한 번에: 정렬은 고른 범위 기준 */
-export type ArrangeOp = { kind: 'align'; k: AlignKind } | { kind: 'distribute'; axis: Axis } | { kind: 'space'; axis: Axis; gap: number }
+export type ArrangeOp = { kind: 'align'; k: AlignKind } | { kind: 'distribute'; axis: Axis } | { kind: 'space'; axis: Axis; gap: number } | { kind: 'tidy' }
 export function arrangeRects(rs: Rect[], op: ArrangeOp) {
+  if (op.kind === 'tidy') return tidyRects(rs)
   if (op.kind === 'align') return alignRects(rs, op.k)
   if (op.kind === 'distribute') return distributeRects(rs, op.axis)
   return spaceRects(rs, op.axis, op.gap)
+}
+
+/**
+ * 정리(Tidy up ⌃⌥T, 피그마와 같아요): 줄(행)로 나눠 같은 간격으로 가지런히.
+ * 간격은 지금 간격들의 평균(없으면 10), 왼쪽 위 자리는 그대로
+ */
+export function tidyRects(rs: Rect[]): { x: number; y: number }[] {
+  const order = rs.map((r, i) => i).sort((a, b) => rs[a]!.y - rs[b]!.y || rs[a]!.x - rs[b]!.x)
+  const rows: number[][] = []
+  let band: { top: number; bottom: number } | null = null
+  for (const i of order) {
+    const r = rs[i]!, cy = r.y + r.h / 2
+    if (band && cy <= band.bottom) { rows[rows.length - 1]!.push(i); band.bottom = Math.max(band.bottom, r.y + r.h) }
+    else { rows.push([i]); band = { top: r.y, bottom: r.y + r.h } }
+  }
+  rows.forEach((row) => row.sort((a, b) => rs[a]!.x - rs[b]!.x))
+  const gx: number[] = [], gy: number[] = []
+  rows.forEach((row) => row.slice(1).forEach((i, k) => { const p = rs[row[k]!]!; gx.push(rs[i]!.x - (p.x + p.w)) }))
+  rows.slice(1).forEach((row, k) => { const prev = rows[k]!; gy.push(Math.min(...row.map((i) => rs[i]!.y)) - Math.max(...prev.map((i) => rs[i]!.y + rs[i]!.h))) })
+  const avg = (v: number[]) => { const pos = v.filter((x) => x > 0); return pos.length ? Math.round(pos.reduce((a, b) => a + b, 0) / pos.length) : 10 }
+  const gapX = avg(gx), gapY = avg(gy.length ? gy : gx)
+  const x0 = Math.min(...rs.map((r) => r.x)), out = rs.map((r) => ({ x: r.x, y: r.y }))
+  let y = Math.min(...rs.map((r) => r.y))
+  for (const row of rows) {
+    let x = x0
+    for (const i of row) { out[i] = { x, y }; x += rs[i]!.w + gapX }
+    y += Math.max(...row.map((i) => rs[i]!.h)) + gapY
+  }
+  return out
 }

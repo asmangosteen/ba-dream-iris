@@ -1,0 +1,69 @@
+{
+  "name": "iris-desktop",
+  "productName": "Iris",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Iris desktop app by Ba-dream",
+  "author": "Ba-dream",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "IRIS_URL=http://localhost:3000 electron .",
+    "icons": "electron scripts/make-icons.cjs",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.ba-dream.iris",
+    "productName": "Iris",
+    "copyright": "© Ba-dream",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "artifactName": "Iris-${version}-${os}-${arch}.${ext}",
+    "publish": null,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.graphics-design",
+      "icon": "build/icon-mac.png",
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Iris"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon-win.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Iris"
+    }
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  }
+}

@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { Button, Icon, SearchField, TextButton } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
+import { Button, SearchField, TextButton } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
-import { LINK_STATUS, NEXT_STATUS, STATUS_ORDER, docIcon, DOC_CATEGORY_LABEL, type LinkStatus, type ReqRow } from '~/composables/useIrisData'
+import { NEXT_STATUS, STATUS_ORDER, docIcon, type DocCategory, type LinkStatus, type ReqRow } from '~/composables/useIrisData'
+/** 편집기 화면은 영어 라벨(LINK_STATUS · DOC_CATEGORY_LABEL 은 한국어 화면용) */
+const STATUS_EN: Record<LinkStatus, string> = { reflected: 'Reflected', partial: 'Partial', missing: 'Missing', na: 'Not applicable' }
+const CATEGORY_EN: Record<DocCategory, string> = { planning: 'Planning', dev: 'Development', design: 'Design', etc: 'Other' }
 
 /** 오른쪽 패널 · 기획 탭: 고른 화면의 요구사항 반영 현황 · 연결 · 관련 문서 */
 const props = defineProps<{ projectId: string; screen: ScreenRow }>()
@@ -23,7 +27,7 @@ const bar = (k: LinkStatus) => ({ flex: Math.max(count(k), 0), background: k ===
 const groups = computed(() =>
   STATUS_ORDER.map((k) => ({
     k,
-    label: LINK_STATUS[k].label,
+    label: STATUS_EN[k],
     items: mine.value
       .filter((x) => x.status === k)
       .map((x) => ({ link: x, req: reqById.value.get(x.requirement_id) }))
@@ -105,7 +109,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
     </section>
 
     <section class="sec2">
-      <div class="sec-h h24"><span>{{ mine.length ? `Requirements ${mine.length}` : 'Requirements' }}</span><button class="ib s24" aria-label="Link requirement" :aria-expanded="picking" @click="picking = !picking"><Icon name="plus" :size="14" /></button></div>
+      <div class="sec-h h24"><span>{{ mine.length ? `Requirements ${mine.length}` : 'Requirements' }}</span><button class="ib s24" aria-label="Link requirement" :aria-expanded="picking" @click="picking = !picking"><EditorIcon name="plus" :size="16" /></button></div>
 
       <div v-if="picking" class="sq picker">
         <SearchField v-model:value="q" type="contained" size="s" placeholder="Search by number or text" :input-props="{ 'aria-label': 'Search requirements', autofocus: true }" />
@@ -120,7 +124,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
         <span class="glabel"><StatusIcon :status="g.k" />{{ g.label }}<span class="sq count num">{{ g.items.length }}</span></span>
         <div v-for="{ link: lk, req } in g.items" :key="req.id" class="sq card">
           <div class="head">
-            <button class="sq st" :aria-label="`${req.code} ${LINK_STATUS[lk.status].label}, click to change status`" :title="`${LINK_STATUS[lk.status].label} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
+            <button class="sq stb" :aria-label="`${req.code} ${STATUS_EN[lk.status]}, click to change status`" :title="`${STATUS_EN[lk.status]} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
             <span class="tx-body w5">{{ req.title }}</span>
             <span />
             <span class="tx-meta ell"><span class="num">{{ req.code }}</span> · {{ anchorLabel(req) }}</span>
@@ -129,9 +133,9 @@ defineExpose({ openPicker: () => (picking.value = true) })
             <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" aria-label="Note" placeholder="Describe what is missing" @keydown.meta.enter="saveNote(lk)" /></div>
             <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">Cancel</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">Save</Button></span>
           </div>
-          <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><Icon name="warning" :size="12" class="mt3" /><span>{{ lk.note }}</span></button>
+          <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><EditorIcon name="warning" :size="16" class="mt3" /><span>{{ lk.note }}</span></button>
           <div class="foot">
-            <span class="src"><Icon name="document" :size="12" /><span class="ell">{{ docById.get(req.document_id)?.title ?? '' }}</span></span>
+            <span class="src"><EditorIcon name="document" :size="16" /><span class="ell">{{ docById.get(req.document_id)?.title ?? '' }}</span></span>
             <span class="acts">
               <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">Note</TextButton>
               <TextButton size="s" color="gray" :aria-label="`Unlink ${req.code}`" @click="unlink(req.id)">Unlink</TextButton>
@@ -148,9 +152,9 @@ defineExpose({ openPicker: () => (picking.value = true) })
     </section>
 
     <section class="sec2 tight">
-      <div class="sec-h h24"><span>Linked docs</span><button class="ib s24" aria-label="Add doc" @click="emit('add-doc')"><Icon name="plus" :size="14" /></button></div>
+      <div class="sec-h h24"><span>Linked docs</span><button class="ib s24" aria-label="Add doc" @click="emit('add-doc')"><EditorIcon name="plus" :size="16" /></button></div>
       <button v-for="d in relDocs" :key="d!.id" class="sq hov doc" @click="emit('open-doc', d!.id)">
-        <Icon :name="docIcon(d!)" :size="14" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ DOC_CATEGORY_LABEL[d!.category] }}</span>
+        <EditorIcon :name="docIcon(d!)" :size="16" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ CATEGORY_EN[d!.category] }}</span>
       </button>
       <p v-if="!relDocs.length" class="tx-meta m0 pb2">Docs appear here once you link requirements</p>
     </section>
@@ -178,10 +182,12 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .count { padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-12); --sq-fill: var(--sys-color-neutral-100); font-weight: 500; color: var(--sys-color-neutral-600); }
 .card { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-07) var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .head { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 0 var(--ref-spacing-04); }
-.st { width: 16px; height: 18px; display: grid; place-items: center; }
+/* 상태 버튼(.st 는 StatusIcon 의 뿌리 클래스라 이름이 겹치면 원이 네모로 바뀌어요) */
+.stb { width: 16px; height: 18px; display: grid; place-items: center; }
 .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .note { display: flex; gap: var(--ref-spacing-04); margin-left: var(--ref-spacing-10); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
-.mt3 { margin-top: 3px; flex: none; }
+/* 16 아이콘을 18 줄 높이 첫 줄 가운데에 */
+.mt3 { margin-top: 1px; flex: none; }
 .note-edit { margin-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .txt { width: 100%; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); display: block; background: transparent; font-size: 12px; line-height: 18px; }
 /* 메모 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선을 그려요 */
@@ -191,10 +197,10 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); margin-left: var(--ref-spacing-10); padding-top: var(--ref-spacing-04); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500); }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-06); flex: none; }
-.st { border-radius: var(--ref-radius-02); }
-.st:hover { --sq-fill: var(--interaction-light-gray-hover); }
-.st:active { --sq-fill: var(--interaction-light-gray-pressed); }
-.st:focus-visible, .note:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.stb { border-radius: var(--ref-radius-02); }
+.stb:hover { --sq-fill: var(--interaction-light-gray-hover); }
+.stb:active { --sq-fill: var(--interaction-light-gray-pressed); }
+.stb:focus-visible, .note:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .note { text-align: left; }
 .note:hover { --sq-overlay: var(--interaction-light-gray-hover); }
 .pb2 { padding-bottom: var(--ref-spacing-02); }

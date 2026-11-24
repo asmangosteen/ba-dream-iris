@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 // 피그마 화면 가져오기 — 시안: design/iris-canvas/FigmaLink.dc.html, 위계: PRD/05_UI_GUIDE.md
 // 프레임 링크 → 서버(/api/figma/frame)가 피그마에서 이름 · 크기 · 썸네일 · 컴포넌트 요약을 받아오고,
 // "화면 추가"를 누르면 screens · screen_component_usages 에 저장합니다. 미리보기 모드에서는 저장하지 않아요.
-import { Button, Icon, IconButton, TextButton, TextInput } from '@ba-dream/design-system'
+import { Button, TextButton, TextInput } from '@ba-dream/design-system'
 // Nuxt 내장 useDevPreview 와 이름이 겹쳐 자동 import 가 내장 쪽으로 잡히므로 직접 가져옵니다
 import { useDevPreview } from '~/composables/usePreview'
 
@@ -193,7 +194,7 @@ onBeforeUnmount(() => {
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog">
         <header class="head">
           <h2 id="figmaTitle" class="tx-title">Import from Figma</h2>
-          <IconButton size="s" type="ghost" icon-name="close" ariaLabel="Close" @click="close" />
+          <button type="button" class="ib s24" aria-label="Close" title="Close" @click="close"><EditorIcon name="close" /></button>
         </header>
 
         <div class="body">
@@ -218,7 +219,7 @@ onBeforeUnmount(() => {
         </div>
 
         <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
-          <Icon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
+          <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
           <span>{{ error.message }}</span>
         </p>
 
@@ -226,7 +227,7 @@ onBeforeUnmount(() => {
           <div class="sq card">
             <div class="sq thumb" data-preview>
               <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="`${result.name} thumbnail`" @error="thumbFailed = true">
-              <Icon v-else name="image" :size="20" class="dim" aria-label="No thumbnail" />
+              <EditorIcon v-else name="image" :size="20" class="dim" />
             </div>
             <div class="info">
               <div class="col">
@@ -242,7 +243,7 @@ onBeforeUnmount(() => {
               </div>
               <ul v-if="result.components.length" class="list">
                 <li v-for="c in result.components" :key="c.name" class="item">
-                  <Icon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" aria-label="Design system component" />
+                  <EditorIcon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" />
                   <span v-else class="dot" aria-hidden="true" />
                   <span class="tx-body ellipsis">{{ c.name }}</span>
                   <span class="tx-meta num">{{ c.count }}</span>
@@ -265,7 +266,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
+/* 모달 바탕: 사이드바(.float)와 같은 선 · 그림자 */
+.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); border-radius: var(--ref-radius-08); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-11) var(--ref-spacing-10) var(--ref-spacing-08) var(--ref-spacing-12); }
 .body { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); }
 .row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { LayoutGrid } from '~/canvas/schema'
 import { colorLabel, parseColor } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import ColorField from '~/components/editor/ColorField.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
 
 /** Layout grid (피그마와 같아요): Columns · Rows · Grid. ⌃G 로 모두 숨기기 · 보이기 */
 const props = defineProps<{ grids: LayoutGrid[] }>()
 const emit = defineEmits<{ change: [grids: LayoutGrid[] | undefined] }>()
 const open = ref<number | null>(null)
-const TYPES: { k: LayoutGrid['type']; label: string }[] = [{ k: 'columns', label: 'Columns' }, { k: 'rows', label: 'Rows' }, { k: 'grid', label: 'Grid' }]
+/** 피그마 순서: Grid · Columns · Rows */
+const TYPES: { value: LayoutGrid['type']; label: string }[] = [{ value: 'grid', label: 'Grid' }, { value: 'columns', label: 'Columns' }, { value: 'rows', label: 'Rows' }]
 const store = useLayerStore()
 const out = (l: LayoutGrid[]) => emit('change', l.length ? l : undefined)
 function add() { out([...props.grids, { type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }]); open.value = props.grids.length }
@@ -23,56 +25,127 @@ const hex = (c?: string) => parseColor(c)?.hex ?? '#FF0000'
 const alpha = (c?: string) => parseColor(c)?.a ?? 0.1
 const withA = (h: string, a: number) => (a >= 1 ? h : h + Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase())
 const label = (g: LayoutGrid) => (g.type === 'grid' ? `Grid (${g.size ?? 8}px)` : `${g.count ?? 4} ${g.type === 'columns' ? 'columns' : 'rows'}`)
+/* 설정 창: 피그마 팝오버(§9.1)처럼 오른쪽 패널 왼쪽에 붙고, 위쪽은 연 행에 맞춰요. 바깥 누르기 · Esc 로 닫기(Esc 는 설정 버튼으로 포커스) */
+const rowEls = new Map<number, HTMLElement>()
+const rowRef = (i: number) => (el: unknown) => { if (el) rowEls.set(i, el as HTMLElement); else rowEls.delete(i) }
+const pop = ref<HTMLElement | null>(null)
+const setPop = (el: unknown) => { pop.value = (el as HTMLElement | null) ?? null }
+const pos = ref<Record<string, string>>({ visibility: 'hidden' })
+function place() {
+  const row = open.value === null ? null : rowEls.get(open.value)
+  if (!row) return
+  const r = row.getBoundingClientRect()
+  const panel = row.closest('aside, [data-inspector]')?.getBoundingClientRect() ?? r
+  const h = pop.value?.offsetHeight ?? 240
+  pos.value = { left: Math.max(8, panel.left - 240 - 8) + 'px', top: Math.max(8, Math.min(window.innerHeight - h - 8, r.top - 8)) + 'px' }
+}
+watch(open, (v) => { pos.value = { visibility: 'hidden' }; if (v !== null) nextTick(() => { place(); nextTick(place) }) }, { flush: 'post' })
+watch(() => props.grids, () => { if (open.value !== null) { if (!props.grids[open.value]) open.value = null; else nextTick(place) } }, { deep: true })
+function closePop(refocus = false) {
+  const i = open.value
+  open.value = null
+  if (refocus && i !== null) rowEls.get(i)?.querySelector<HTMLElement>('.tog')?.focus()
+}
+function onDoc(e: PointerEvent) {
+  const t = e.target as HTMLElement | null
+  if (open.value === null || !t) return
+  if (pop.value?.contains(t) || rowEls.get(open.value)?.contains(t) || t.closest?.('.paint-pop, .tp, .esel-m')) return
+  closePop()
+}
+const onReflow = (e: Event) => { if (open.value !== null && !(e.target instanceof Node && pop.value?.contains(e.target))) place() }
+onMounted(() => { document.addEventListener('pointerdown', onDoc, true); window.addEventListener('resize', onReflow); window.addEventListener('scroll', onReflow, true) })
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true); window.removeEventListener('resize', onReflow); window.removeEventListener('scroll', onReflow, true) })
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 </script>
 
 <template>
   <section class="s">
-    <div class="sec-h h24"><span>Layout grid</span><button class="ib s24" aria-label="Add layout grid" title="Add layout grid" @click="add"><Icon name="plus" :size="14" /></button></div>
+    <div :class="['sec-h', 'h24', { empty: !grids.length }]"><span>Layout grid</span><button class="ib s24" aria-label="Add layout grid" data-tip="Add layout grid" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
     <div v-for="(g, i) in grids" :key="i">
-      <div class="row" :class="{ off: g.visible === false }">
-        <button class="ib s24" :class="{ on: open === i }" aria-label="Layout grid settings" title="Layout grid settings" @click="open = open === i ? null : i">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path :d="g.type === 'columns' ? 'M2.5 2v10M7 2v10M11.5 2v10' : g.type === 'rows' ? 'M2 2.5h10M2 7h10M2 11.5h10' : 'M2 4.5h10M2 9.5h10M4.5 2v10M9.5 2v10'" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
-        </button>
-        <span class="name" @click="open = open === i ? null : i">{{ label(g) }}</span>
-        <button class="ib s24" :aria-label="g.visible === false ? 'Show layout grid' : 'Hide layout grid'" :title="g.visible === false ? 'Show' : 'Hide'" @click="set(i, { visible: g.visible === false ? undefined : false })">
-          <svg v-if="g.visible !== false" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7S3.5 3 7 3s5.5 4 5.5 4-2 4-5.5 4S1.5 7 1.5 7z" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="7" cy="7" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
-          <svg v-else width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M5.2 3.3A6 6 0 0 1 7 3c3.5 0 5.5 4 5.5 4a9 9 0 0 1-1.6 2.1M8.8 10.7A6 6 0 0 1 7 11c-3.5 0-5.5-4-5.5-4a9 9 0 0 1 1.6-2.1" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
-        </button>
-        <button class="ib s24" aria-label="Remove layout grid" title="Remove" @click="out(grids.filter((_, k) => k !== i)); open = null"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
-      </div>
-      <div v-if="open === i" class="sq editor">
-        <div class="sq seg"><button v-for="t in TYPES" :key="t.k" :class="['sq', 'seg-b', { on: g.type === t.k }]" @click="setType(i, t.k)">{{ t.label }}</button></div>
-        <div v-if="g.type === 'grid'" class="grid2"><label class="sq fld"><span>Size</span><input :key="'s' + g.size" :value="g.size ?? 8" inputmode="numeric" aria-label="Grid size" @change="num(i, 'size', $event)" @keydown="blur"></label></div>
-        <div v-else class="grid2">
-          <label class="sq fld"><span>Count</span><input :key="'c' + g.count" :value="g.count ?? 4" inputmode="numeric" aria-label="Count" @change="num(i, 'count', $event)" @keydown="blur"></label>
-          <label class="sq fld"><span>Gutter</span><input :key="'g' + g.gutter" :value="g.gutter ?? 16" inputmode="numeric" aria-label="Gutter" @change="num(i, 'gutter', $event)" @keydown="blur"></label>
-          <label class="sq fld"><span>Margin</span><input :key="'m' + g.margin" :value="g.margin ?? 16" inputmode="numeric" aria-label="Margin" @change="num(i, 'margin', $event)" @keydown="blur"></label>
+      <!-- 피그마 Layout guide 행: [설정 + 이름] [👁 24] [− 24] -->
+      <div :ref="rowRef(i)" class="prow" :class="{ off: g.visible === false }">
+        <div class="ef">
+          <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" aria-label="Layout grid settings" data-tip="Layout grid settings" @click="open = open === i ? null : i">
+            <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path :d="g.type === 'columns' ? 'M2.5 2v10M7 2v10M11.5 2v10' : g.type === 'rows' ? 'M2 2.5h10M2 7h10M2 11.5h10' : 'M2 4.5h10M2 9.5h10M4.5 2v10M9.5 2v10'" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
+          </button>
+          <button class="name" @click="open = open === i ? null : i">{{ label(g) }}</button>
         </div>
-        <label class="sq fld">
-          <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" label="Grid color" @update:model-value="(v) => set(i, { color: v })" />
-          <span class="grow">{{ colorLabel(hex(g.color)) }}</span>
-          <input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100) + '%'" aria-label="Grid opacity" @change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur">
-        </label>
+        <button class="ib s24" :aria-label="g.visible === false ? 'Show layout grid' : 'Hide layout grid'" :data-tip="g.visible === false ? 'Show' : 'Hide'" @click="set(i, { visible: g.visible === false ? undefined : false })">
+          <EditorIcon :name="g.visible === false ? 'eye_off' : 'eye'" :size="16" />
+        </button>
+        <button class="ib s24" aria-label="Remove layout grid" data-tip="Remove" @click="out(grids.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
       </div>
+      <Teleport v-if="open === i" to="body">
+      <div :ref="setPop" class="sq fx-pop editor" role="dialog" aria-label="Layout grid settings" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
+        <div class="pop-h"><span class="pop-t">Layout grid</span><button type="button" class="ib s24" aria-label="Close" data-tip="Close" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
+        <div class="pop-b">
+        <div class="ig">
+          <EditorSelect class="span2" :model-value="g.type" :options="TYPES" ariaLabel="Layout grid type" @update:model-value="(v) => setType(i, v as LayoutGrid['type'])" />
+          <span />
+        </div>
+        <template v-if="g.type === 'grid'">
+          <div class="ig-l"><span>Size</span></div>
+          <div class="ig">
+            <label class="sq fld"><input :key="'s' + g.size" :value="g.size ?? 8" inputmode="numeric" aria-label="Grid size" @change="num(i, 'size', $event)" @keydown="blur"><span class="unit">px</span></label>
+            <span /><span />
+          </div>
+        </template>
+        <template v-else>
+          <div class="ig-l"><span>Count</span><span>Gutter</span></div>
+          <div class="ig">
+            <label class="sq fld"><input :key="'c' + g.count" :value="g.count ?? 4" inputmode="numeric" aria-label="Count" @change="num(i, 'count', $event)" @keydown="blur"></label>
+            <label class="sq fld"><input :key="'g' + g.gutter" :value="g.gutter ?? 16" inputmode="numeric" aria-label="Gutter" @change="num(i, 'gutter', $event)" @keydown="blur"></label>
+            <span />
+          </div>
+          <div class="ig-l"><span>Margin</span></div>
+          <div class="ig">
+            <label class="sq fld"><input :key="'m' + g.margin" :value="g.margin ?? 16" inputmode="numeric" aria-label="Margin" @change="num(i, 'margin', $event)" @keydown="blur"></label>
+            <span /><span />
+          </div>
+        </template>
+        <div class="ig-l"><span>Color</span></div>
+        <div class="ig">
+          <div class="sq fld pf span2">
+            <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" label="Grid color" @update:model-value="(v) => set(i, { color: v })" />
+            <input :key="'h' + g.color" class="hex" :value="colorLabel(hex(g.color)).replace('#', '')" aria-label="Grid hex" spellcheck="false" @change="(e) => { const v = (e.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(g.color)) }); else (e.target as HTMLInputElement).value = hex(g.color).slice(1) }" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
+            <span class="vsep" aria-hidden="true" />
+            <span class="op"><input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100)" inputmode="numeric" aria-label="Grid opacity" @change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
+          </div>
+          <span />
+        </div>
+        </div>
+      </div>
+      </Teleport>
     </div>
   </section>
 </template>
 
 <style scoped>
-.s { padding: var(--ref-spacing-07) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
+.s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
+.s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
 .h24 { height: 24px; padding: 0; }
+.sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s24 { width: 24px; height: 24px; }
-.row { display: flex; align-items: center; gap: var(--ref-spacing-02); }
-.row.off { opacity: 0.45; }
-.name { flex: 1; font-size: 12px; color: var(--sys-color-neutral-800); cursor: pointer; }
-.grow { flex: 1; font-size: 12px; color: var(--sys-color-neutral-800); }
-.ib.on { --sq-fill: var(--sys-color-neutral-200); }
-.editor { margin-top: var(--ref-spacing-04); padding: var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-04); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
-.seg-b { height: 24px; border-radius: var(--ref-radius-02); font-size: 11px; color: var(--sys-color-neutral-600); }
-.seg-b.on { --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 8%)); }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
-.pct { width: 40px !important; flex: none; text-align: right; color: var(--sys-color-neutral-600) !important; }
-.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
+/* 피그마 Layout guide 행: [설정 24 + 이름] 8 [👁 24][− 24] — Fill 행과 같은 열 */
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow > .ef { margin-right: var(--ref-spacing-06); }
+.prow.off .ef { opacity: 0.45; }
+.ef { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
+.name { flex: 1; min-width: 0; height: 24px; padding: 0 var(--ref-spacing-02); text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 설정 창(§9.1): 폭 240 · 머리 40(종류 ▾ + ✕, 아래 선) · 본문 안쪽 12 16 16 · 줄 사이 8 · 2칸 격자. 테두리 · 그림자는 사이드바(.float)와 같아요 */
+.fx-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; text-align: left; }
+.pop-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
+.pop-t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.pop-b { padding: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.pop-b > .ig, .pop-b > .ig-l { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pop-b > .ig > span:empty:last-child, .pop-b > .ig-l > span:empty:last-child { display: none; }
+.unit { color: var(--sys-color-neutral-500) !important; }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+/* 색 칸: [견본 16 · hex] | [불투명도 48 %] (Fill 행과 같아요) */
+.pf { gap: var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); }
+.hex { flex: 1; min-width: 0; padding: 0; text-transform: uppercase; }
+.vsep { width: 1px; align-self: stretch; margin: 1px 0; background: var(--sys-color-common-white-emphasis); flex: none; }
+.op { flex: none; width: 48px; height: 100%; box-sizing: border-box; margin-left: calc(-1 * var(--ref-spacing-06)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.op .pct { flex: 1; width: auto; min-width: 0; padding: 0; text-align: right; }
+.op .unit { flex: none; font-style: normal; }
 </style>

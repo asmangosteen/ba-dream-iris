@@ -2,7 +2,8 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-import { backgroundCss } from './paint'
+import { backgroundCss, effectCss, radiiOf, strokeColors, strokeShadows } from './paint'
+import { squirclePath } from './squircle'
 
 export const SCHEMA_VERSION = 7
 
@@ -64,6 +65,8 @@ export interface LayerStyle {
   fill?: string // '#RRGGBB' · 'rgb(…)'. 옛 문서는 'token:<DB 토큰 이름>' 일 수 있어요(연결된 것으로 봅니다)
   stroke?: string
   strokeWidth?: number
+  /** Corner smoothing 0~1(피그마와 같아요, 0.6 = iOS). 모서리가 있을 때 squircle 로 그려요 */
+  smoothing?: number
   radius?: number
   /** 모서리 따로 [왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래] — 있으면 radius 대신 씁니다 (v2) */
   radii?: [number, number, number, number]
@@ -75,7 +78,9 @@ export interface LayerStyle {
   lineHeight?: number
   /** 자간(px) (v3) */
   letterSpacing?: number
-  align?: 'left' | 'center' | 'right'
+  align?: 'left' | 'center' | 'right' | 'justify'
+  /** 세로 정렬(글자 상자가 내용보다 높을 때): 비어 있으면 위 */
+  valign?: 'top' | 'middle' | 'bottom'
   autoWidth?: boolean // 글자 길이에 맞춰 너비가 늘어남(직접 크기를 바꾸면 꺼짐)
   clip?: boolean // 프레임: 내용 자르기
   // --- v5 ---
@@ -107,6 +112,12 @@ export interface LayerStyle {
   textCase?: 'upper' | 'lower' | 'title'
   list?: 'bullet' | 'number'
   paraSpacing?: number
+  /** 넘치면 말줄임(…): 한 줄로 자르고 끝에 … */
+  truncate?: boolean
+  /** 줄바꿈 방식: 비어 있으면 Auto. balance = 줄 길이 고르게, pretty = 마지막 줄 한 단어 피하기 */
+  wrap?: 'balance' | 'pretty'
+  /** 숫자 모양: tabular = 고정폭 숫자(표 · 금액 정렬) */
+  numbers?: 'tabular'
   // --- v6 ---
   /** 오토 레이아웃(프레임) */
   layout?: AutoLayout
@@ -121,7 +132,7 @@ export interface LayerStyle {
 }
 
 /** 변수를 연결할 수 있는 속성 키 */
-export const BIND_KEYS = ['fill', 'stroke', 'color', 'strokeWidth', 'radius', 'radii.0', 'radii.1', 'radii.2', 'radii.3', 'opacity', 'fontSize', 'lineHeight', 'fontWeight', 'letterSpacing', 'textStyle', 'shadow', 'x', 'y', 'w', 'h'] as const
+export const BIND_KEYS = ['fill', 'stroke', 'color', 'strokeWidth', 'radius', 'radii.0', 'radii.1', 'radii.2', 'radii.3', 'opacity', 'fontSize', 'lineHeight', 'fontWeight', 'letterSpacing', 'textStyle', 'shadow', 'x', 'y', 'w', 'h', 'gap', 'padding.0', 'padding.1', 'padding.2', 'padding.3'] as const
 export type BindKey = (typeof BIND_KEYS)[number]
 
 /** 연결된 키의 지금 값(비교용 문자열). 연결은 그대로인데 이 값이 바뀌면 직접 고친 것으로 보고 연결을 풉니다 */
@@ -130,8 +141,11 @@ export function bindLiteral(n: LayerNode, key: BindKey): string {
   switch (key) {
     case 'x': case 'y': case 'w': case 'h': return String(n[key])
     case 'radii.0': case 'radii.1': case 'radii.2': case 'radii.3': return String(s.radii?.[Number(key.slice(6))])
-    case 'textStyle': return `${s.fontSize}/${s.lineHeight}/${s.letterSpacing}` // 굵기는 글자 스타일에 없을 수 있어서 빼요
+    case 'textStyle': return `${s.fontSize}/${s.lineHeight}/${s.letterSpacing}/${s.fontWeight}` // 굵기도 스타일에 들어요(옛 굵기 없는 스타일도 굵기를 바꾸면 풀려요 — 피그마와 같아요)
     case 'shadow': return ''
+    // 오토 레이아웃 간격 · 안쪽 여백(위 · 오른 · 아래 · 왼)
+    case 'gap': return String(s.layout?.gap)
+    case 'padding.0': case 'padding.1': case 'padding.2': case 'padding.3': return String(s.layout?.padding?.[Number(key.slice(8))])
     default: return String(s[key])
   }
 }
@@ -174,6 +188,10 @@ export interface LayerNode {
   /** 디자인 시스템 컴포넌트 인스턴스: 컴포넌트 이름 · 속성 값 */
   component?: string
   props?: Record<string, unknown>
+  /** 스케일(K)로 키운 배율(인스턴스): 디자인 시스템 컴포넌트를 이 배율로 확대해 그려요(안의 글자 · 아이콘까지 — 피그마와 같아요) */
+  instScale?: number
+  /** 레이어 내보내기 설정(피그마 Export) */
+  exports?: ExportSetting[]
   /** 마스크: 같은 부모 안에서 이 레이어 위에 있는 형제들을 이 모양으로 잘라요 */
   isMask?: boolean
   /** 불리언 그룹(살아 있는 결과): 합치기 · 빼기(맨 아래에서 나머지) · 교차 · 제외 */
@@ -188,7 +206,15 @@ export interface LayerDoc {
   schemaVersion: number
   /** v4: 화면(프레임) 자체의 모양 — 채우기 · 선 · 모서리 · 투명도 · 내용 자르기. 없으면 흰 바탕 · 선 없음 */
   frame?: LayerStyle
+  /** 화면(프레임) 내보내기 설정(피그마 Export) */
+  exports?: ExportSetting[]
 }
+
+/**
+ * 내보내기 설정 한 줄(피그마 Export 와 같아요).
+ * scale: '0.5x' · '1x' · '2x' … 배율, '512w' · '512h' 폭 · 높이 맞춤. format: PNG · JPG · SVG · PDF. suffix: 파일 이름 뒤에 붙는 글자
+ */
+export interface ExportSetting { scale: string; format: 'PNG' | 'JPG' | 'SVG' | 'PDF'; suffix?: string }
 
 export const emptyDoc = (): LayerDoc => ({ rootIds: [], nodes: {}, schemaVersion: SCHEMA_VERSION })
 
@@ -278,15 +304,66 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
 export const TYPE_LABEL: Record<LayerType, string> = { frame: 'Frame', rect: 'Rectangle', text: 'Text', image: 'Image', ellipse: 'Ellipse', line: 'Line', polygon: 'Polygon', star: 'Star', path: 'Vector', section: 'Section', vector: 'Vector', instance: 'Instance', boolean: 'Boolean' }
 
 /** 화면(프레임) 모양 → CSS. 선은 피그마 기본처럼 안쪽(inset). color: 'token:' 값 풀기, img: 'storage://' 이미지 주소 풀기 */
-export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined, img: (src?: string) => string | undefined = (s) => s): Record<string, string | number> {
+/** 화면 프레임 스트로크의 안쪽 부분: 자식 레이어 위에 얹는 층의 box-shadow (없으면 undefined) */
+/** 화면(프레임)의 Corner smoothing: 모서리가 있고 smoothing 이 0 보다 크면 squircle(레이어와 같아요) */
+export function frameSmooth(f: LayerStyle | undefined, w: number, h: number) {
+  const sm = f?.smoothing ?? 0
+  const r = f ? radiiOf(f) : null
+  if (!f || !r || !(sm > 0) || !r.some(Boolean) || !(w > 0 && h > 0)) return null
+  return { sm, r, path: squirclePath(w, h, r, sm) }
+}
+/**
+ * smoothing 화면을 그리는 층(LayerView 와 같은 방식): 바탕은 모양대로 자른 층, 그림자는 그 바깥(drop-shadow), 선은 같은 경로의 SVG(안쪽),
+ * 내용 자르기는 바깥 그림자가 없을 때만 squircle(있으면 둥근 모서리로 자르고 그림자는 살려요)
+ */
+export function frameSmoothLayers(f: LayerStyle | undefined, w: number, h: number, color: (v?: string) => string | undefined, img: (src?: string) => string | undefined = (s) => s) {
+  const sq = frameSmooth(f, w, h)
+  if (!f || !sq) return null
+  const e = effectCss(f.effects, color, false)
+  const shadow = e.filter.filter((x) => x.startsWith('drop-shadow')).join(' ')
+  const fill = f.fill === undefined ? '#FFFFFF' : f.fill ? (color(f.fill) ?? f.fill) : 'transparent'
+  const bg: Record<string, string | undefined> = { background: fill, ...backgroundCss({ fills: f.fills }, color, img), clipPath: `path('${sq.path}')`, boxShadow: e.inner.length ? e.inner.join(', ') : undefined, backdropFilter: e.backdrop, WebkitBackdropFilter: e.backdrop }
+  const cols = f.strokeWidth ? strokeColors(f, color) : []
+  const sw = f.strokeWidth ?? 0
+  const inset = (f.strokeAlign ?? 'inside') === 'inside' ? sw / 2 : f.strokeAlign === 'outside' ? -sw / 2 : 0
+  const stroke = cols.length ? { d: squirclePath(w, h, sq.r, sq.sm, inset), w: sw, colors: cols.reverse() } : null
+  return { bg, shadow, stroke, clip: f.clip !== false && !shadow ? `path('${sq.path}')` : null }
+}
+
+export function frameStroke(f: LayerStyle | undefined, color: (v?: string) => string | undefined, w = 0, h = 0): string | undefined {
+  if (!f || frameSmooth(f, w, h)) return undefined
+  const sk = strokeShadows(f, 'frame', color)
+  return sk.inner.length ? sk.inner.join(', ') : undefined
+}
+
+/** 화면(프레임) 모양. w · h 를 주면 Corner smoothing 도 따져요(그땐 바탕 · 그림자 · 선은 frameSmoothLayers 가 그려요) */
+export function frameCss(f: LayerStyle | undefined, color: (v?: string) => string | undefined, img: (src?: string) => string | undefined = (s) => s, w = 0, h = 0): Record<string, string | number> {
   if (!f) return {}
   const css: Record<string, string | number> = {}
+  const sq = frameSmooth(f, w, h)
+  if (f.radii) css.borderRadius = f.radii.map((r) => r + 'px').join(' ')
+  else if (f.radius) css.borderRadius = f.radius + 'px'
+  const e = effectCss(f.effects, color, true)
+  if (sq) {
+    css.background = 'transparent'
+    const sl = frameSmoothLayers(f, w, h, color, img)
+    if (sl?.clip) css.clipPath = sl.clip
+    // 그림자(drop-shadow)는 화면 요소 자체에 — 내용 자르기(overflow)는 자기 filter 를 자르지 않아요
+    const ef = effectCss(f.effects, color, false).filter
+    if (ef.length) css.filter = ef.join(' ')
+    if (f.opacity !== undefined && f.opacity < 1) css.opacity = f.opacity
+    if (f.clip === false || !sl?.clip) css.overflow = f.clip === false ? 'visible' : 'hidden'
+    return css
+  }
   if (f.fill !== undefined) css.background = f.fill ? (color(f.fill) ?? f.fill) : 'transparent'
   // 덧붙인 칠(그라디언트 · 이미지): 바탕 칠 위로
   if (f.fills?.length) Object.assign(css, backgroundCss({ fills: f.fills }, color, img))
-  if (f.radii) css.borderRadius = f.radii.map((r) => r + 'px').join(' ')
-  else if (f.radius) css.borderRadius = f.radius + 'px'
-  if (f.stroke && f.strokeWidth) css.boxShadow = `inset 0 0 0 ${f.strokeWidth}px ${color(f.stroke) ?? f.stroke}`
+  // 스트로크: 바깥쪽만 여기(바탕 그림자). 안쪽 · 가운데 스트로크의 안쪽 반은 자식 위에 그려야 해서 frameStroke() 로 따로 — 피그마처럼 스트로크가 자식을 덮어요
+  const sk = strokeShadows(f, 'frame', color)
+  const shadows = [...sk.outer, ...e.outer, ...e.inner]
+  if (shadows.length) css.boxShadow = shadows.join(', ')
+  if (e.filter.length) css.filter = e.filter.join(' ')
+  if (e.backdrop) { css.backdropFilter = e.backdrop; css.WebkitBackdropFilter = e.backdrop }
   if (f.opacity !== undefined && f.opacity < 1) css.opacity = f.opacity
   if (f.clip === false) css.overflow = 'visible'
   return css
