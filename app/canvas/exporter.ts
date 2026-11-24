@@ -1,12 +1,13 @@
 import { toCanvas, toSvg } from 'html-to-image'
 import type { ExportSetting } from './schema'
+import { vectorPdf } from './vectorPdf'
 
 /**
  * 내보내기(피그마 Export): 캔버스에 그려진 화면 · 레이어를 PNG · JPG · SVG · PDF 로.
  * - 배율: '2x' 배율, '512w' · '512h' 폭 · 높이 맞춤 (SVG · PDF 는 피그마처럼 1x 크기 그대로)
  * - 파일 이름: 이름 + suffix(비우면 1x 가 아닐 때 '@2x' 처럼) + 확장자
  * - SVG 는 그려진 화면을 그대로 담은 SVG(foreignObject)라 브라우저에서 똑같이 보여요. 도형만이면 우클릭 'Copy as SVG' 가 순수 벡터예요
- * - PDF 는 2배 해상도 이미지를 담은 한 쪽(1px = 1pt)
+ * - PDF 는 벡터(도형 · 선 · 글자 외곽선, 사진만 그림) 한 쪽(1px = 1pt) — vectorPdf.ts
  */
 export const EXPORT_SCALES = ['0.5x', '0.75x', '1x', '1.5x', '2x', '3x', '4x', '512w', '512h'] as const
 export const EXPORT_FORMATS: ExportSetting['format'][] = ['PNG', 'JPG', 'SVG', 'PDF']
@@ -63,6 +64,8 @@ export async function renderExport(el: HTMLElement, e: ExportSetting): Promise<B
     return new Blob([decodeURIComponent(url.slice(url.indexOf(',') + 1))], { type: 'image/svg+xml' })
   }
   if (e.format === 'PDF') {
+    // 벡터 PDF(도형 · 선 · 글자 외곽선). 못 만들면 예전처럼 그림 PDF 로
+    try { return await vectorPdf(el, w, h) } catch (err) { console.warn('[export] vector PDF failed, falling back to image', err) }
     const c = await canvasOf(el, 2, '#FFFFFF')
     const jpg = new Uint8Array(await (await blobOf(c, 'image/jpeg', 0.95)).arrayBuffer())
     return pdfWithJpeg(jpg, c.width, c.height, w, h)

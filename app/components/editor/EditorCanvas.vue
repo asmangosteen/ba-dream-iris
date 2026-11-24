@@ -1509,6 +1509,14 @@ function pickLayer(sid: string, deepId: string | undefined, deep = false): strin
     if (open.has(chain[i - 1]!) || parent?.type === 'section') target = chain[i]
     else break
   }
+  // 부모 → 자식(피그마와 같아요): 화면을 통째로 덮는 레이어(프레임보다 큰 사진 등)는 화면을 먼저 골라요.
+  // 화면을 고른 뒤 다시 누르면 그 레이어가 골라져요
+  if (target === chain[0]) {
+    const scr = props.screens.find((v) => v.id === sid)
+    const screenSelected = store.screenId.value === sid && !store.layerIds.value.length
+    const b = scr && !isCanvas(scr) && !screenSelected ? layerWorld(scr, target!) : null
+    if (scr && b && b.x <= scr.x + 0.5 && b.y <= scr.y + 0.5 && b.x + b.w >= scr.x + scr.width - 0.5 && b.y + b.h >= scr.y + scr.height - 0.5) return undefined
+  }
   return target
 }
 function trackHover(e: PointerEvent) {
