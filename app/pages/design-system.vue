@@ -4,7 +4,7 @@ import DsPreview from '~/components/ds/DsPreview.vue'
 import DsRegisterModal, { type RegisterTab } from '~/components/ds/DsRegisterModal.vue'
 import { TOKEN_TYPE_LABEL, type ComponentRow, type TokenRow, type TokenType, type UsageRow } from '~/composables/useIrisData'
 
-useHead({ title: '디자인 시스템 · Iris' })
+useHead({ title: () => `${tr('Design system')} · Iris` })
 
 // ---------------------------------------------------------------------------
 // 데이터
@@ -82,7 +82,7 @@ const matchQ = (...xs: (string | null | undefined)[]) => {
   const q = query.value.trim().toLowerCase()
   return !q || xs.some((x) => x?.toLowerCase().includes(q))
 }
-const searched = computed(() => compList.value.filter((c) => matchQ(c.name, c.code_name, c.category, ...(c.match_aliases ?? []))))
+const searched = computed(() => compList.value.filter((c) => matchQ(c.name, c.code_name, c.category, tr(c.category), ...(c.match_aliases ?? []))))
 const navGroups = computed(() => categories.value
   .map((cat) => ({ cat, items: searched.value.filter((c) => c.category === cat) }))
   .filter((g) => g.items.length))
@@ -93,8 +93,8 @@ const tokenGroups = computed(() => (Object.keys(TOKEN_TYPE_LABEL) as TokenType[]
 const unmatchedShown = computed(() => unmatched.value.filter((u) => matchQ(u.name)))
 
 const chips = computed(() => [
-  { key: '', label: '전체', n: compList.value.length },
-  ...categories.value.map((c) => ({ key: c, label: c, n: compList.value.filter((x) => x.category === c).length })),
+  { key: '', label: tr('All'), n: compList.value.length },
+  ...categories.value.map((c) => ({ key: c, label: tr(c), n: compList.value.filter((x) => x.category === c).length })),
 ])
 
 
@@ -105,6 +105,9 @@ const curUses = computed<Use[]>(() => (curComp.value ? usesByComponent.value.get
 const curTotal = computed(() => curUses.value.reduce((s, u) => s + u.n, 0))
 
 function pickComponent(c: ComponentRow) { picked.value = { kind: 'component', id: c.id }; view.value = 'components' }
+// ⌘K 검색에서 컴포넌트를 고르면 /design-system?c=<id> 로 와요 → 그 컴포넌트를 골라 보여 줘요
+const route = useRoute()
+watch(() => route.query.c, (c) => { if (typeof c === 'string' && c) { picked.value = { kind: 'component', id: c }; view.value = 'components'; category.value = ''; query.value = '' } }, { immediate: true })
 function pickCategory(key: string) { category.value = key; view.value = 'components' }
 function clearFilters() { category.value = ''; query.value = '' }
 function pickToken(t: TokenRow) { picked.value = { kind: 'token', id: t.id } }
@@ -119,7 +122,7 @@ async function showTokens(type?: TokenType) {
 function codeOf(c: ComponentRow): string {
   const tag = (c.code_name || c.name).replace(/[^A-Za-z0-9]/g, '') || 'Component'
   const attrs = Object.entries(c.props_schema ?? {}).map(([k, v]) =>
-    v === 'boolean' ? `:${k}="false"` : v === 'text' ? `${k}="텍스트"` : `${k}="${v[0] ?? ''}"`)
+    v === 'boolean' ? `:${k}="false"` : v === 'text' ? `${k}="${tr('Text')}"` : `${k}="${v[0] ?? ''}"`)
   if (!attrs.length) return `<${tag} />`
   return attrs.length <= 2 ? `<${tag} ${attrs.join(' ')} />` : `<${tag}\n  ${attrs.join('\n  ')} />`
 }
@@ -130,10 +133,10 @@ async function copyCode() {
     await navigator.clipboard.writeText(curCode.value)
     copied.value = true
     setTimeout(() => (copied.value = false), 1200)
-  } catch { notify('복사하지 못했어요') }
+  } catch { notify(tr("Couldn't copy")) }
 }
 
-const screenOf = (id: string): ScreenInfo => screens.data.value?.[id] ?? { id, name: '알 수 없는 화면', page: '', project: '', projectId: null }
+const screenOf = (id: string): ScreenInfo => screens.data.value?.[id] ?? { id, name: tr('Unknown screen'), page: '', project: '', projectId: null }
 
 // 토큰 미리보기 값
 function typoStyle(v: string) {
@@ -163,13 +166,13 @@ async function onSaved(msg: string) {
 
 <template>
   <!-- 등록 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
+  <AppShell>
   <div class="shell" :aria-hidden="modal.open ? 'true' : undefined">
-    <AppTopBar />
 
     <!-- 왼쪽: 컴포넌트 · 토큰 목록 (에디터 왼쪽 패널과 같은 모양) -->
-    <aside aria-label="디자인 시스템 목록" class="sq float side">
+    <aside :aria-label="tr('Design system list')" class="sq float side">
       <div class="search-row">
-        <SearchField v-model:value="query" type="contained" size="s" placeholder="이름 · 별칭 찾기" :input-props="{ 'aria-label': '컴포넌트 · 토큰 찾기' }" />
+        <SearchField v-model:value="query" type="contained" size="s" :placeholder="tr('Search by name or alias')" :input-props="{ 'aria-label': tr('Search components and tokens') }" />
       </div>
       <div class="side-scroll">
         <template v-if="loading">
@@ -177,27 +180,27 @@ async function onSaved(msg: string) {
         </template>
         <template v-else-if="!loadError">
           <section v-for="g in navGroups" :key="g.cat" class="sec">
-            <div class="sec-h"><span>{{ g.cat }}</span></div>
+            <div class="sec-h"><span>{{ tr(g.cat) }}</span></div>
             <button v-for="c in g.items" :key="c.id" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'component' && sel.id === c.id }]" :aria-current="sel?.kind === 'component' && sel.id === c.id ? 'true' : undefined" :title="c.name" @click="pickComponent(c)">
               <span class="ell">{{ c.name }}</span><span class="cnt num">{{ screenCount(c.id) || '' }}</span>
             </button>
           </section>
           <section class="sec">
-            <div class="sec-h"><span>토큰</span></div>
+            <div class="sec-h"><span>{{ tr('Tokens') }}</span></div>
             <button v-for="(label, type) in TOKEN_TYPE_LABEL" :key="type" type="button" class="sq nav-item s" @click="showTokens(type)">
-              <span class="ell">{{ label }}</span><span class="cnt num">{{ tokenList.filter((t) => t.type === type).length }}</span>
+              <span class="ell">{{ tr(label) }}</span><span class="cnt num">{{ tokenList.filter((t) => t.type === type).length }}</span>
             </button>
           </section>
           <section v-if="unmatchedShown.length" class="sec">
-            <div class="sec-h"><span>디자인 시스템에 없는 이름</span></div>
+            <div class="sec-h"><span>{{ tr('Not in the design system') }}</span></div>
             <button v-for="u in unmatchedShown" :key="u.name" type="button" :class="['sq', 'nav-item', 's', { on: sel?.kind === 'unmatched' && sel.name === u.name }]" :aria-current="sel?.kind === 'unmatched' && sel.name === u.name ? 'true' : undefined" :title="u.name" @click="picked = { kind: 'unmatched', name: u.name }">
               <Icon name="warning" :size="12" class="warn-ic" />
               <span class="ell">{{ u.name }}</span><span class="cnt num">{{ u.uses.length }}</span>
             </button>
           </section>
           <div v-if="query && !navGroups.length && !unmatchedShown.length" class="side-empty">
-            <p class="tx-meta">'{{ query }}'에 맞는 이름이 없어요</p>
-            <TextButton size="s" color="blue" @click="query = ''">찾는 말 지우기</TextButton>
+            <p class="tx-meta">{{ tr('No names match “{q}”', { q: query }) }}</p>
+            <TextButton size="s" color="blue" @click="query = ''">{{ tr('Clear search') }}</TextButton>
           </div>
         </template>
       </div>
@@ -206,18 +209,18 @@ async function onSaved(msg: string) {
     <!-- 가운데: 카드 목록 -->
     <main class="sq float body"><div class="scroller">
       <div class="head">
-        <h1 class="tx-title">디자인 시스템</h1>
+        <h1 class="tx-title">{{ tr('Design system') }}</h1>
         <div class="head-act">
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
-          <Button size="s" type="primary" contents="icon-text" icon-name="plus" @click="openRegister(view === 'tokens' ? 'token' : 'component')">등록</Button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">{{ tr('Bulk import') }}</Button>
+          <Button size="s" type="primary" contents="icon-text" icon-name="plus" @click="openRegister(view === 'tokens' ? 'token' : 'component')">{{ tr('New') }}</Button>
         </div>
       </div>
-      <div class="seg chips" role="tablist" aria-label="분류">
+      <div class="seg chips" role="tablist" :aria-label="tr('Category')">
         <button v-for="c in chips" :key="c.key || 'all'" type="button" role="tab" :aria-selected="view === 'components' && category === c.key" :class="['sq', 'seg-item', { on: view === 'components' && category === c.key }]" @click="pickCategory(c.key)">
           {{ c.label }} <span class="n num">{{ c.n }}</span>
         </button>
         <button type="button" role="tab" :aria-selected="view === 'tokens'" :class="['sq', 'seg-item', { on: view === 'tokens' }]" @click="showTokens()">
-          토큰 <span class="n num">{{ tokenList.length }}</span>
+          {{ tr('Tokens') }} <span class="n num">{{ tokenList.length }}</span>
         </button>
       </div>
 
@@ -225,22 +228,22 @@ async function onSaved(msg: string) {
         <div v-for="i in 6" :key="i" class="card"><Skeleton shape="rectangle" height="168px" /><Skeleton shape="text" width="50%" /></div>
       </div>
       <div v-else-if="loadError" class="state" role="alert">
-        <span class="tx-head">디자인 시스템을 불러오지 못했어요</span>
-        <span class="tx-meta">잠시 뒤 다시 시도해 주세요</span>
-        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload">다시 불러오기</Button>
+        <span class="tx-head">{{ tr("Couldn't load the design system") }}</span>
+        <span class="tx-meta">{{ tr('Try again in a moment') }}</span>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload">{{ tr('Reload') }}</Button>
       </div>
 
       <!-- 컴포넌트 -->
       <template v-else-if="view === 'components'">
         <div v-if="!compList.length" class="state">
-          <span class="tx-head">아직 등록한 컴포넌트가 없어요</span>
-          <span class="tx-meta">하나씩 등록하거나 CSV · JSON 으로 한꺼번에 가져와 주세요</span>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
+          <span class="tx-head">{{ tr('No components yet') }}</span>
+          <span class="tx-meta">{{ tr('Add them one by one, or bulk import from CSV or JSON') }}</span>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">{{ tr('Bulk import') }}</Button>
         </div>
         <div v-else-if="!cards.length" class="state">
-          <span class="tx-head">맞는 컴포넌트가 없어요</span>
-          <span class="tx-meta">찾는 말이나 분류를 바꿔 보세요</span>
-          <Button size="s" type="tertiary" stroke @click="clearFilters">거르기 지우기</Button>
+          <span class="tx-head">{{ tr('No matching components') }}</span>
+          <span class="tx-meta">{{ tr('Try a different search or category') }}</span>
+          <Button size="s" type="tertiary" stroke @click="clearFilters">{{ tr('Clear filters') }}</Button>
         </div>
         <div v-else class="grid">
           <div v-for="c in cards" :key="c.id" class="card">
@@ -249,7 +252,7 @@ async function onSaved(msg: string) {
             </span>
             <button type="button" class="card-btn" :aria-pressed="curComp?.id === c.id" @click="pickComponent(c)">
               <span class="tx-body name ell" :title="c.name">{{ c.name }}</span>
-              <span class="tx-meta num">화면 {{ screenCount(c.id) }}</span>
+              <span class="tx-meta num">{{ screenCount(c.id) === 1 ? tr('1 screen') : tr('{n} screens', { n: screenCount(c.id) }) }}</span>
             </button>
           </div>
         </div>
@@ -258,13 +261,13 @@ async function onSaved(msg: string) {
       <!-- 토큰 -->
       <template v-else>
         <div v-if="!tokenGroups.length" class="state">
-          <span class="tx-head">{{ tokenList.length ? '맞는 토큰이 없어요' : '아직 등록한 토큰이 없어요' }}</span>
-          <span class="tx-meta">{{ tokenList.length ? '찾는 말을 바꿔 보세요' : '색 · 글자 · 간격 · 모서리 · 그림자 값을 등록해 주세요' }}</span>
-          <Button v-if="!tokenList.length" size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">한꺼번에 가져오기</Button>
-          <Button v-else size="s" type="tertiary" stroke @click="query = ''">찾는 말 지우기</Button>
+          <span class="tx-head">{{ tokenList.length ? tr('No matching tokens') : tr('No tokens yet') }}</span>
+          <span class="tx-meta">{{ tokenList.length ? tr('Try a different search') : tr('Add color, typography, spacing, radius and shadow values') }}</span>
+          <Button v-if="!tokenList.length" size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="openRegister('bulk')">{{ tr('Bulk import') }}</Button>
+          <Button v-else size="s" type="tertiary" stroke @click="query = ''">{{ tr('Clear search') }}</Button>
         </div>
         <section v-for="g in tokenGroups" :id="`ds-tok-${g.type}`" :key="g.type" class="tok-sec">
-          <h2 class="tx-head">{{ TOKEN_TYPE_LABEL[g.type] }} <span class="tx-meta num">{{ g.items.length }}</span></h2>
+          <h2 class="tx-head">{{ tr(TOKEN_TYPE_LABEL[g.type]) }} <span class="tx-meta num">{{ g.items.length }}</span></h2>
           <div v-if="g.type === 'color'" class="swatches">
             <button v-for="t in g.items" :key="t.id" type="button" :class="['sq', 'tok-card', { on: curToken?.id === t.id }]" :aria-pressed="curToken?.id === t.id" @click="pickToken(t)">
               <span class="swatch" :style="{ background: t.value }" aria-hidden="true" />
@@ -289,7 +292,7 @@ async function onSaved(msg: string) {
     </div></main>
 
     <!-- 오른쪽: 상세 · 사용 화면 역추적 -->
-    <aside aria-label="상세" class="sq float detail"><div class="scroller">
+    <aside :aria-label="tr('Details')" class="sq float detail"><div class="scroller">
       <template v-if="loading">
         <Skeleton shape="text" width="50%" />
         <Skeleton shape="rectangle" height="72px" />
@@ -300,30 +303,30 @@ async function onSaved(msg: string) {
         <section class="d-sec">
           <h2 class="tx-head">{{ curComp?.name ?? curUnmatched?.name }}</h2>
           <template v-if="curComp">
-            <span class="tx-meta">{{ curComp.category }}<template v-if="curComp.description"> · {{ curComp.description }}</template></span>
+            <span class="tx-meta">{{ tr(curComp.category) }}<template v-if="curComp.description"> · {{ tr(curComp.description) }}</template></span>
             <div class="sq code">
               <pre class="tx-code">{{ curCode }}</pre>
-              <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '코드 복사'" :title="copied ? '복사했어요' : '코드 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
+              <button type="button" class="ib copy" :aria-label="copied ? tr('Copied') : tr('Copy code')" :title="copied ? tr('Copied') : tr('Copy code')" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
             </div>
-            <span v-if="curComp.match_aliases?.length" class="tx-meta">매칭 별칭 · {{ curComp.match_aliases.join(', ') }}</span>
+            <span v-if="curComp.match_aliases?.length" class="tx-meta">{{ tr('Match aliases · {list}', { list: curComp.match_aliases.join(', ') }) }}</span>
           </template>
           <template v-else>
-            <span class="tx-meta">화면에서 찾은 레이어 이름인데, 디자인 시스템에 같은 이름이 없어요. 새 컴포넌트로 등록하거나 기존 컴포넌트의 별칭으로 넣어 주세요</span>
-            <Button class="self-start" size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="openRegister('component', curUnmatched?.name)">컴포넌트로 등록</Button>
+            <span class="tx-meta">{{ tr('This layer name was found on a screen, but the design system has no component with that name. Add it as a new component, or as an alias of an existing one') }}</span>
+            <Button class="self-start" size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="openRegister('component', curUnmatched?.name)">{{ tr('Add as component') }}</Button>
           </template>
         </section>
 
         <section class="d-sec uses">
           <div class="uses-h">
-            <h3 class="tx-head">쓰는 화면</h3>
-            <span v-if="curUses.length" class="tx-meta num">{{ curUses.length }}곳 · {{ curTotal }}번</span>
+            <h3 class="tx-head">{{ tr('Used in') }}</h3>
+            <span v-if="curUses.length" class="tx-meta num">{{ tr('{screens} screens · {uses} uses', { screens: curUses.length, uses: curTotal }) }}</span>
           </div>
-          <div class="tbl-h tx-meta"><span>화면</span><span class="r">개수</span></div>
+          <div class="tbl-h tx-meta"><span>{{ tr('Screens') }}</span><span class="r">{{ tr('Count') }}</span></div>
           <template v-if="screens.status.value === 'pending'">
             <div v-for="i in 3" :key="i" class="sk-use"><Skeleton shape="text" /></div>
           </template>
-          <p v-else-if="usages.error.value" class="tx-meta empty">사용 화면을 불러오지 못했어요 <TextButton size="s" color="blue" @click="usages.refresh()">다시 불러오기</TextButton></p>
-          <p v-else-if="!curUses.length" class="tx-meta empty">아직 이 컴포넌트를 쓰는 화면이 없어요</p>
+          <p v-else-if="usages.error.value" class="tx-meta empty">{{ tr("Couldn't load screens using this") }} <TextButton size="s" color="blue" @click="usages.refresh()">{{ tr('Reload') }}</TextButton></p>
+          <p v-else-if="!curUses.length" class="tx-meta empty">{{ tr('No screens use this component yet') }}</p>
           <template v-else>
             <template v-for="u in curUses" :key="u.screenId">
               <NuxtLink v-if="screenOf(u.screenId).projectId" :to="`/p/${screenOf(u.screenId).projectId}?screen=${u.screenId}`" class="use">
@@ -348,7 +351,7 @@ async function onSaved(msg: string) {
       <template v-else-if="curToken">
         <section class="d-sec">
           <h2 class="tx-head">{{ curToken.name }}</h2>
-          <span class="tx-meta">{{ TOKEN_TYPE_LABEL[curToken.type] }}<template v-if="curToken.description"> · {{ curToken.description }}</template></span>
+          <span class="tx-meta">{{ tr(TOKEN_TYPE_LABEL[curToken.type]) }}<template v-if="curToken.description"> · {{ curToken.description }}</template></span>
           <span data-preview class="sq big-pv" aria-hidden="true">
             <span v-if="curToken.type === 'color'" class="big-swatch" :style="{ background: curToken.value }" />
             <span v-else-if="curToken.type === 'typography'" :style="typoStyle(curToken.value)">가나다라 Aa</span>
@@ -358,12 +361,12 @@ async function onSaved(msg: string) {
           </span>
           <div class="sq code">
             <pre class="tx-code">{{ curCode }}</pre>
-            <button type="button" class="ib copy" :aria-label="copied ? '복사했어요' : '값 복사'" :title="copied ? '복사했어요' : '값 복사'" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
+            <button type="button" class="ib copy" :aria-label="copied ? tr('Copied') : tr('Copy value')" :title="copied ? tr('Copied') : tr('Copy value')" @click="copyCode"><Icon :name="copied ? 'check' : 'copy'" :size="14" /></button>
           </div>
         </section>
       </template>
 
-      <p v-else class="tx-meta">{{ view === 'tokens' ? '토큰을 골라주세요' : '컴포넌트를 골라주세요' }}</p>
+      <p v-else class="tx-meta">{{ view === 'tokens' ? tr('Select a token') : tr('Select a component') }}</p>
     </div></aside>
 
     <DsRegisterModal
@@ -380,10 +383,12 @@ async function onSaved(msg: string) {
       <div v-if="toast" class="sq float s toast tx-body"><Icon name="check" :size="14" />{{ toast }}</div>
     </div>
   </div>
+  </AppShell>
 </template>
 
 <style scoped>
-.shell { height: 100vh; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
+/* 홈 틀(AppShell) 본문 안: 떠 있는 카드 없이 흰 면 하나 — 목록 · 본문 · 상세는 세로 선 1px 로 나눠요 */
+.shell { flex: 1; min-height: 0; position: relative; overflow: hidden; box-sizing: border-box; display: flex; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
 .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* 왼쪽 패널 — 에디터 panel-left 와 같은 폭 · 섹션 */
@@ -467,4 +472,6 @@ a.use:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default);
 
 .toast-wrap { position: fixed; left: 50%; bottom: var(--ref-spacing-14); transform: translateX(-50%); z-index: 60; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-05) var(--ref-spacing-08); }
+.shell > .float { --sq-fill: transparent; --sq-line: transparent; --sq-line-w: 0px; filter: none; border-radius: 0; }
+.shell > .float + .float { border-left: 1px solid var(--iris-line); }
 </style>

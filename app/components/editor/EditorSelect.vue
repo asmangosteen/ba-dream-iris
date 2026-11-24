@@ -4,9 +4,13 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 /** 편집기 기본 드롭다운 — 브라우저 <select> 대신 써요(PRD/07 §7.1 메뉴 규격을 Iris 흰 메뉴로).
     버튼은 .dd(28h · neutral-200), 메뉴는 아래(자리가 없으면 위)에 4px 띄워서. 고른 항목은 ✓ 칸, 묶음 사이는 구분선.
     키보드: ↑ ↓ 로 옮기고 Enter · Space 로 고르기, Esc 로 닫기. 열고 닫을 때 애니메이션 없음(피그마와 같아요) */
-export interface SelectOption { value: string; label: string; short?: string; sep?: boolean; disabled?: boolean }
+/** raw = 이 항목 글자는 번역하지 않기(글꼴 굵기 이름 · 이미 번역한 글자 등) */
+export interface SelectOption { value: string; label: string; short?: string; sep?: boolean; disabled?: boolean; raw?: boolean }
 /** variant: field = 칸 모양 드롭다운(기본) · inline = 입력칸 안의 작은 글자 버튼(W 칸의 Hug ▾) · icon = 24 아이콘 버튼(슬롯) */
-const props = withDefaults(defineProps<{ modelValue: string | null | undefined; options: readonly SelectOption[]; ariaLabel?: string; placeholder?: string; variant?: 'field' | 'inline' | 'icon' }>(), { variant: 'field', placeholder: undefined, ariaLabel: '' })
+/** 글자(label · short · placeholder · ariaLabel)는 부모가 영어 원문으로 넘기고 여기서 지금 언어로 바꿔요. raw = 사용자 · 컴포넌트 값이라 번역하지 않기 */
+const props = withDefaults(defineProps<{ modelValue: string | null | undefined; options: readonly SelectOption[]; ariaLabel?: string; placeholder?: string; variant?: 'field' | 'inline' | 'icon'; raw?: boolean }>(), { variant: 'field', placeholder: undefined, ariaLabel: '', raw: false })
+const L = (s: string | undefined, raw = false) => (s && !props.raw && !raw ? tr(s) : s)
+const aria = computed(() => L(props.ariaLabel) ?? '')
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
 const open = ref(false)
@@ -98,17 +102,17 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 
 <template>
   <div ref="root" :class="['esel', { 'is-inl': variant === 'inline' }]" @keydown="onKey">
-    <button v-if="variant === 'field'" type="button" :class="['sq', 'dd', { open }]" :aria-label="ariaLabel" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle">
+    <button v-if="variant === 'field'" type="button" :class="['sq', 'dd', { open }]" :aria-label="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle">
       <slot name="lead" />
-      <span :class="['v', { ph: !current }]">{{ current?.label ?? placeholder ?? '' }}</span>
+      <span :class="['v', { ph: !current }]">{{ L(current?.label ?? placeholder, current?.raw) ?? '' }}</span>
       <EditorIcon name="chevron_down" :size="12" class="cv" />
     </button>
-    <button v-else-if="variant === 'inline'" type="button" :class="['sq', 'inl', { open, empty: !(current?.short ?? current?.label ?? placeholder) }]" :aria-label="ariaLabel" :data-tip="ariaLabel" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click.stop.prevent="toggle">
-      <span class="v">{{ current ? (current.short ?? current.label) : placeholder ?? '' }}</span>
+    <button v-else-if="variant === 'inline'" type="button" :class="['sq', 'inl', { open, empty: !(current?.short ?? current?.label ?? placeholder) }]" :aria-label="aria" :data-tip="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click.stop.prevent="toggle">
+      <span class="v">{{ L(current ? (current.short ?? current.label) : placeholder, current?.raw) ?? '' }}</span>
       <EditorIcon name="chevron_down" :size="12" class="cv" />
     </button>
-    <button v-else type="button" :class="['ib', 's24', { on: open }]" :aria-label="ariaLabel" :data-tip="ariaLabel" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle"><slot /></button>
-    <div v-if="open" :id="uid" ref="list" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline' }]" :style="shift" role="listbox" :aria-label="ariaLabel">
+    <button v-else type="button" :class="['ib', 's24', { on: open }]" :aria-label="aria" :data-tip="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle"><slot /></button>
+    <div v-if="open" :id="uid" ref="list" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline' }]" :style="shift" role="listbox" :aria-label="aria">
       <template v-for="(o, i) in options" :key="o.value">
         <div v-if="o.sep && i > 0" class="msep" role="separator" />
         <button
@@ -123,7 +127,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
           @click="pick(o)"
         >
           <span class="ck" aria-hidden="true"><EditorIcon v-if="o.value === modelValue" name="check" :size="12" /></span>
-          <span class="l">{{ o.label }}</span>
+          <span class="l">{{ L(o.label, o.raw) }}</span>
         </button>
       </template>
     </div>

@@ -60,18 +60,18 @@ function key(e: KeyboardEvent, axis?: 'w' | 'h') {
 
 <template>
   <section v-if="nodes.length || screen" class="s scale-s">
-    <div class="sec-h h24"><span>Scale</span></div>
-    <div class="ig-l"><span>Dimensions</span></div>
+    <div class="sec-h h24"><span>{{ tr('Scale') }}</span></div>
+    <div class="ig-l"><span>{{ tr('Dimensions') }}</span></div>
     <div class="ig">
-      <label class="sq fld"><span>W</span><input :key="'w' + factorKey + box.w" :value="fmtNum(box.w)" inputmode="decimal" aria-label="Scaled width" @change="setSize('w', $event)" @keydown="key($event, 'w')"></label>
-      <label class="sq fld"><span>H</span><input :key="'h' + factorKey + box.h" :value="fmtNum(box.h)" inputmode="decimal" aria-label="Scaled height" @change="setSize('h', $event)" @keydown="key($event, 'h')"></label>
+      <label class="sq fld"><span>W</span><input :key="'w' + factorKey + box.w" :value="fmtNum(box.w)" inputmode="decimal" :aria-label="tr('Scaled width')"@change="setSize('w', $event)" @keydown="key($event, 'w')"></label>
+      <label class="sq fld"><span>H</span><input :key="'h' + factorKey + box.h" :value="fmtNum(box.h)" inputmode="decimal" :aria-label="tr('Scaled height')"@change="setSize('h', $event)" @keydown="key($event, 'h')"></label>
       <span />
     </div>
-    <div class="ig-l"><span>Scale factor</span><span>Anchor</span></div>
+    <div class="ig-l"><span>{{ tr('Scale factor') }}</span><span>{{ tr('Anchor') }}</span></div>
     <div class="ig">
-      <label class="sq fld"><input :key="'f' + factorKey" value="1x" inputmode="decimal" aria-label="Scale factor" @focus="($event.target as HTMLInputElement).select()" @change="setFactor" @keydown="key($event)"></label>
-      <div class="sq anchor" role="radiogroup" aria-label="Anchor">
-        <button v-for="(a, i) in ANCHORS" :key="i" type="button" role="radio" :aria-checked="a[0] === anchor[0] && a[1] === anchor[1]" :aria-label="NAMES[i]" :title="NAMES[i]" :class="['dot', { on: a[0] === anchor[0] && a[1] === anchor[1] }]" @click="anchor = a"><i /></button>
+      <label class="sq fld"><input :key="'f' + factorKey" value="1x" inputmode="decimal" :aria-label="tr('Scale factor')"@focus="($event.target as HTMLInputElement).select()" @change="setFactor" @keydown="key($event)"></label>
+      <div class="sq anchor" role="radiogroup" :aria-label="tr('Anchor')">
+        <button v-for="(a, i) in ANCHORS" :key="i" type="button" role="radio" :aria-checked="a[0] === anchor[0] && a[1] === anchor[1]" :aria-label="tr(NAMES[i]!)" :title="tr(NAMES[i]!)" :class="['dot', { on: a[0] === anchor[0] && a[1] === anchor[1] }]" @click="anchor = a"><i /></button>
       </div>
       <span />
     </div>

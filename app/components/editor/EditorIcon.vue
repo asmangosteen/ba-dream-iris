@@ -55,6 +55,8 @@ const P: Record<string, string> = {
   align_center: 'M2.5 4h11M4.5 8h7M3.5 12h9',
   align_right: 'M2.5 4h11M6.5 8h7M4.5 12h9',
   align_justify: 'M2.5 4h11M2.5 8h11M2.5 12h11',
+  folder: 'M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z',
+  home: 'M2.5 7.3L8 2.8l5.5 4.5M4 6.2v6.3a1 1 0 0 0 1 1h2v-3.5h2v3.5h2a1 1 0 0 0 1-1V6.2',
   refresh: 'M12.5 6A5 5 0 0 0 3.6 5.2M3.5 2.5v2.8h2.8M3.5 10a5 5 0 0 0 8.9.8M12.5 13.5v-2.8H9.7',
 }
 

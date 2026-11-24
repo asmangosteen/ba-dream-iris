@@ -12,12 +12,12 @@ onMounted(() => setTimeout(() => { if (!user.value) failed.value = true }, 8000)
   <div class="page">
     <div class="sq float card">
       <template v-if="!failed">
-        <span class="tx-head">로그인하는 중이에요</span>
+        <span class="tx-head">{{ tr('Signing you in…') }}</span>
         <Skeleton shape="text" width="100%" />
       </template>
       <template v-else>
-        <span class="tx-head">링크가 만료됐어요</span>
-        <NuxtLink to="/login" class="link">다시 로그인하기</NuxtLink>
+        <span class="tx-head">{{ tr('This link has expired') }}</span>
+        <NuxtLink to="/login" class="link">{{ tr('Sign in again') }}</NuxtLink>
       </template>
     </div>
   </div>

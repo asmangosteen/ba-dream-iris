@@ -128,8 +128,8 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       class="cp-sv"
       role="slider"
       tabindex="0"
-      aria-label="Saturation and brightness"
-      :aria-valuetext="`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`"
+      :aria-label="tr('Saturation and brightness')"
+      :aria-valuetext="tr('Saturation {s}%, brightness {v}%', { s: Math.round(hsv.s * 100), v: Math.round(hsv.v * 100) })"
       @pointerdown.prevent="drag($event, 'sv')"
       @keydown="key($event, 'sv')"
     >
@@ -137,14 +137,14 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       <i class="knob" :style="{ left: at(hsv.s), top: at(1 - hsv.v), background: solid }" />
     </div>
     <div class="cp-row">
-      <button v-if="canPick" class="ib s24" aria-label="Pick color from screen" data-tip="Pick color from screen" @click="eyedrop">
+      <button v-if="canPick" class="ib s24" :aria-label="tr('Pick color from screen')" :data-tip="tr('Pick color from screen')" @click="eyedrop">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.2 2.6a1.9 1.9 0 0 1 2.7 2.7l-1.4 1.4.6.6-1 1-.6-.6-4.8 4.8H3.6v-2.1l4.8-4.8-.6-.6 1-1 .6.6z" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linejoin="round" /></svg>
       </button>
       <div class="cp-bars">
-        <div class="bar hue" :style="{ backgroundImage: HUE_BG }" role="slider" tabindex="0" aria-label="Hue" :aria-valuenow="Math.round(hsv.h)" aria-valuemin="0" aria-valuemax="360" @pointerdown.prevent="drag($event, 'hue')" @keydown="key($event, 'hue')">
+        <div class="bar hue" :style="{ backgroundImage: HUE_BG }" role="slider" tabindex="0" :aria-label="tr('Hue')" :aria-valuenow="Math.round(hsv.h)" aria-valuemin="0" aria-valuemax="360" @pointerdown.prevent="drag($event, 'hue')" @keydown="key($event, 'hue')">
           <i class="knob" :style="{ left: at(hsv.h / 360), background: pure }" />
         </div>
-        <div class="bar alpha" role="slider" tabindex="0" aria-label="Opacity" :aria-valuenow="Math.round(hsv.a * 100)" aria-valuemin="0" aria-valuemax="100" @pointerdown.prevent="drag($event, 'alpha')" @keydown="key($event, 'alpha')">
+        <div class="bar alpha" role="slider" tabindex="0" :aria-label="tr('Opacity')" :aria-valuenow="Math.round(hsv.a * 100)" aria-valuemin="0" aria-valuemax="100" @pointerdown.prevent="drag($event, 'alpha')" @keydown="key($event, 'alpha')">
           <span class="fill" :style="{ backgroundImage: alphaBg }" />
           <i class="knob" :style="{ left: at(hsv.a) }"><b :style="{ background: out }" /></i>
         </div>
@@ -156,11 +156,11 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       <div :class="['sq', 'fld', 'vals', { parts: fmt !== 'hex' }]">
         <input v-if="fmt === 'hex'" :key="'h' + solid" class="hex" :value="solid.slice(1)" aria-label="Hex" spellcheck="false" @change="onHex" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
         <template v-else>
-          <input v-for="(p, i) in parts" :key="fmt + i + p" class="part" :value="p" inputmode="numeric" :aria-label="(fmt === 'rgb' ? ['Red', 'Green', 'Blue'] : fmt === 'hsl' ? ['Hue', 'Saturation', 'Lightness'] : ['Hue', 'Saturation', 'Brightness'])[i]" @change="onPart(i, $event)" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
+          <input v-for="(p, i) in parts" :key="fmt + i + p" class="part" :value="p" inputmode="numeric" :aria-label="tr((fmt === 'rgb' ? ['Red', 'Green', 'Blue'] : fmt === 'hsl' ? ['Hue', 'Saturation', 'Lightness'] : ['Hue', 'Saturation', 'Brightness'])[i]!)" @change="onPart(i, $event)" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
         </template>
       </div>
       <label class="sq fld op">
-        <input :key="'a' + hsv.a" class="pct" :value="Math.round(hsv.a * 100)" inputmode="numeric" aria-label="Opacity" @change="onAlpha" @keydown="blur" @focus="($event.target as HTMLInputElement).select()"><span class="unit">%</span>
+        <input :key="'a' + hsv.a" class="pct" :value="Math.round(hsv.a * 100)" inputmode="numeric" :aria-label="tr('Opacity')" @change="onAlpha" @keydown="blur" @focus="($event.target as HTMLInputElement).select()"><span class="unit">%</span>
       </label>
     </div>
   </div>

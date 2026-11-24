@@ -5,7 +5,7 @@ import { useLayerStore } from '~/canvas/store'
 import { paintLayer } from '~/canvas/paint'
 import { useImageSrc, uploadImage } from '~/canvas/images'
 import { fromRgba, hexOf, alphaOf, toRgba, withAlpha } from '~/canvas/color'
-import { parseColor, useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
+import { groupLabel, parseColor, useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
 import ColorPicker from '~/components/editor/ColorPicker.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 
@@ -257,24 +257,24 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 <template>
   <Teleport to="body">
     <!-- body 로 옮겨져도 편집기 공통 규칙(메뉴 · 칸 · 즉시 호버)을 받도록 editor 클래스를 붙여요 -->
-    <div ref="el" class="sq paint-pop editor" role="dialog" :aria-label="title" :style="pos">
+    <div ref="el" class="sq paint-pop editor" role="dialog" :aria-label="tr(title)" :style="pos">
       <div class="pp-h">
         <div class="pp-tabs" role="tablist">
-          <button role="tab" :aria-selected="tab === 'custom'" :class="['sq', 'pp-tab', { on: tab === 'custom' }]" @click="tab = 'custom'">Custom</button>
-          <button role="tab" :aria-selected="tab === 'libraries'" :class="['sq', 'pp-tab', { on: tab === 'libraries' }]" @click="tab = 'libraries'">Libraries</button>
+          <button role="tab" :aria-selected="tab === 'custom'" :class="['sq', 'pp-tab', { on: tab === 'custom' }]" @click="tab = 'custom'">{{ tr('Custom') }}</button>
+          <button role="tab" :aria-selected="tab === 'libraries'" :class="['sq', 'pp-tab', { on: tab === 'libraries' }]" @click="tab = 'libraries'">{{ tr('Libraries') }}</button>
         </div>
-        <button class="ib s24" aria-label="Close" data-tip="Close" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
       </div>
 
       <template v-if="tab === 'custom'">
-        <div v-if="types.length > 1" class="pp-types" role="radiogroup" aria-label="Paint type">
+        <div v-if="types.length > 1" class="pp-types" role="radiogroup" :aria-label="tr('Paint type')">
           <button
             v-for="t in types"
             :key="t"
             role="radio"
             :aria-checked="paint.type === t"
-            :aria-label="TYPES[t].label"
-            :title="TYPES[t].label"
+            :aria-label="tr(TYPES[t].label)"
+            :title="tr(TYPES[t].label)"
             :class="['sq', 'ib', 'pp-type', { on: paint.type === t }]"
             @click="paint.type !== t && emit('type', t)"
           >
@@ -293,28 +293,28 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
           <!-- 그라디언트 -->
           <template v-else-if="paint.type === 'linear' || paint.type === 'radial' || paint.type === 'angular'">
             <div class="gr-tools">
-              <label v-if="paint.type !== 'radial'" class="sq fld ang" title="Angle">
+              <label v-if="paint.type !== 'radial'" class="sq fld ang" :title="tr('Angle')">
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10M3 12.5L10 4.5M7.2 7.7a4.5 4.5 0 0 1 1.3 4.8" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                <input :key="'g' + angle" :value="angle" inputmode="numeric" aria-label="Angle" @change="setAngle(Number(($event.target as HTMLInputElement).value) || 0)" @keydown="blur"><span>°</span>
+                <input :key="'g' + angle" :value="angle" inputmode="numeric" :aria-label="tr('Angle')" @change="setAngle(Number(($event.target as HTMLInputElement).value) || 0)" @keydown="blur"><span>°</span>
               </label>
               <span class="grow" />
-              <button v-if="paint.type !== 'radial'" class="ib s24" aria-label="Rotate 90°" title="Rotate 90°" @click="setAngle(angle + 90)"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M11.5 7a4.5 4.5 0 1 1-1.3-3.2M11.5 1.8v2.6H8.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-              <button class="ib s24" aria-label="Flip gradient" title="Flip gradient" @click="flip"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5h10L9.5 2.5M12 9H2l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-              <button class="ib s24" aria-label="Remove stop" title="Remove stop" :disabled="stops.length <= 2" @click="removeStop"><EditorIcon name="minus" :size="16" /></button>
+              <button v-if="paint.type !== 'radial'" class="ib s24" :aria-label="tr('Rotate 90°')" :title="tr('Rotate 90°')" @click="setAngle(angle + 90)"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M11.5 7a4.5 4.5 0 1 1-1.3-3.2M11.5 1.8v2.6H8.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <button class="ib s24" :aria-label="tr('Flip gradient')" :title="tr('Flip gradient')" @click="flip"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5h10L9.5 2.5M12 9H2l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <button class="ib s24" :aria-label="tr('Remove stop')" :title="tr('Remove stop')" :disabled="stops.length <= 2" @click="removeStop"><EditorIcon name="minus" :size="16" /></button>
             </div>
-            <div ref="bar" class="gr-bar" title="Click to add a color stop" @pointerdown="onBar($event)">
+            <div ref="bar" class="gr-bar" :title="tr('Click to add a color stop')" @pointerdown="onBar($event)">
               <span class="sq sq-clip gr-bg" :style="{ background: gradCss }" aria-hidden="true" />
               <button
                 v-for="(s, k) in stops"
                 :key="k"
                 :class="['gr-stop', { on: k === stop }]"
                 :style="{ left: s.pos * 100 + '%' }"
-                :aria-label="`Color stop ${k + 1} at ${Math.round(s.pos * 100)}%`"
+                :aria-label="tr('Color stop {n} at {pos}%', { n: k + 1, pos: Math.round(s.pos * 100) })"
                 @pointerdown.stop="onBar($event, k)"
                 @keydown="onStopKey($event, k)"
               ><span class="sq gr-ring" /><span class="sq gr-face"><b class="sqc" :style="swatchBg(store.color(s.color) ?? s.color)" /></span></button>
             </div>
-            <div class="gr-pos tx-meta">Stop {{ stop + 1 }} · {{ Math.round((stops[stop]?.pos ?? 0) * 100) }}%</div>
+            <div class="gr-pos tx-meta">{{ tr('Stop {n}', { n: stop + 1 }) }} · {{ Math.round((stops[stop]?.pos ?? 0) * 100) }}%</div>
             <ColorPicker :model-value="stopColor" @update:model-value="setStopColor" @start="hold" @end="release" />
           </template>
 
@@ -328,16 +328,16 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
               @drop.prevent="onDrop"
             >
               <div class="img-prev" :style="imgCss" />
-              <button class="sq img-choose" :disabled="uploading" @click="fileEl?.click()">{{ uploading ? 'Uploading…' : (paint as { src: string }).src ? 'Replace image' : 'Choose image' }}</button>
+              <button class="sq img-choose" :disabled="uploading" @click="fileEl?.click()">{{ uploading ? tr('Uploading…') : (paint as { src: string }).src ? tr('Replace image') : tr('Choose image') }}</button>
             </div>
             <EditorSelect :model-value="(paint as { fit?: string }).fit ?? 'fill'" :options="FITS" ariaLabel="Image fit" @update:model-value="(v) => emit('update', { ...paint, fit: v } as Paint)" />
-            <p class="tx-meta m0">Drop an image here or choose a file (PNG, JPG, GIF, WebP, SVG)</p>
+            <p class="tx-meta m0">{{ tr('Drop an image here or choose a file (PNG, JPG, GIF, WebP, SVG)') }}</p>
             <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden @change="onFile">
           </template>
         </div>
 
         <div v-if="paint.type !== 'image' && pageColors.length" class="pp-sw">
-          <div class="sw-h">On this page</div>
+          <div class="sw-h">{{ tr('On this page') }}</div>
           <div class="sw-grid">
             <button v-for="c in pageColors" :key="c" class="sq sq-clip sw" :style="swatchBg(c)" :aria-label="c" :title="c" @click="pickSwatch(c)" />
           </div>
@@ -347,12 +347,12 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       <template v-else>
         <div class="lib">
           <div class="lib-top">
-            <label class="sq fld lib-s"><EditorIcon name="search" :size="16" class="muted" /><input v-model="q" placeholder="Search colors" aria-label="Search library colors" spellcheck="false"></label>
-            <button type="button" class="ib s24" :aria-label="libView === 'grid' ? 'Show as list' : 'Show as grid'" :data-tip="libView === 'grid' ? 'Show as list' : 'Show as grid'" @click="toggleLibView"><EditorIcon :name="libView === 'grid' ? 'view_list' : 'view_grid'" /></button>
+            <label class="sq fld lib-s"><EditorIcon name="search" :size="16" class="muted" /><input v-model="q" :placeholder="tr('Search colors')" :aria-label="tr('Search library colors')" spellcheck="false"></label>
+            <button type="button" class="ib s24" :aria-label="libView === 'grid' ? tr('Show as list') : tr('Show as grid')" :data-tip="libView === 'grid' ? tr('Show as list') : tr('Show as grid')" @click="toggleLibView"><EditorIcon :name="libView === 'grid' ? 'view_list' : 'view_grid'" /></button>
           </div>
           <div class="lib-l">
             <div v-for="g in libs" :key="g.name" class="lib-g">
-              <div class="sw-h">{{ sentence(g.name) }}</div>
+              <div class="sw-h">{{ sentence(groupLabel(g.name)) }}</div>
               <div v-if="libView === 'grid'" class="sw-grid">
                 <button v-for="t in g.items" :key="t.id" class="sq sq-clip sw" :style="swatchBg(t.color ?? '#000')" :aria-label="t.name" :title="`${t.name} · ${t.value}`" @click="pickToken(t)" />
               </div>
@@ -363,7 +363,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
                 </button>
               </div>
             </div>
-            <p v-if="!libs.length" class="tx-meta m0 empty">No colors found</p>
+            <p v-if="!libs.length" class="tx-meta m0 empty">{{ tr('No colors found') }}</p>
           </div>
         </div>
       </template>

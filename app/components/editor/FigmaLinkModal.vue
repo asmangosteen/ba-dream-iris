@@ -23,6 +23,17 @@ const loading = ref(false)
 const saving = ref(false)
 const result = ref<FrameResult | null>(null)
 const error = ref<{ code: string; message: string } | null>(null)
+/** /api/figma/frame 오류 코드 → 영어 원문(사전 열쇠). 화면에는 tr(error.message) 로 */
+const FIGMA_ERROR: Record<string, string> = {
+  forbidden: 'You don\'t have access to this file. Check the file\'s sharing settings or the Figma token',
+  not_found: 'Couldn\'t find the Figma file or frame. Check the link again',
+  rate_limited: 'Too many Figma requests. Try again in about a minute',
+  figma_error: 'Couldn\'t import the frame from Figma. Try again in a moment',
+  unauthorized: 'You need to log in. Please log in again',
+  invalid_url: 'That isn\'t a Figma link. Paste a URL that starts with figma.com/design/…',
+  no_node: 'That isn\'t a frame link. Select a frame in Figma, copy its link and paste it here',
+  no_token: 'The Figma token isn\'t set up yet. Let an admin know',
+}
 const catalog = ref<ComponentRef[]>([])
 const thumbFailed = ref(false)
 
@@ -70,7 +81,7 @@ async function load() {
   result.value = null
   thumbFailed.value = false
   if (!/figma\.com\//i.test(raw)) {
-    error.value = { code: 'invalid_url', message: "That isn't a Figma link. Paste a URL that starts with figma.com/design/…" }
+    error.value = { code: 'invalid_url', message: FIGMA_ERROR.invalid_url! }
     focusInput()
     return
   }
@@ -84,9 +95,11 @@ async function load() {
     result.value = frame
   } catch (e) {
     const body = (e as { data?: { message?: string; data?: { code?: string; message?: string } } }).data
+    const code = body?.data?.code ?? 'figma_error'
+    // 서버 문구 대신 코드별 영어 원문(보여 줄 때 tr). 모르는 코드면 서버 문구 그대로
     error.value = {
-      code: body?.data?.code ?? 'figma_error',
-      message: body?.data?.message ?? "Couldn't import the frame from Figma. Try again in a moment",
+      code,
+      message: FIGMA_ERROR[code] ?? body?.data?.message ?? FIGMA_ERROR.figma_error!,
     }
   } finally {
     loading.value = false
@@ -193,8 +206,8 @@ onBeforeUnmount(() => {
     <div v-if="open" class="backdrop" @mousedown.self="close">
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog">
         <header class="head">
-          <h2 id="figmaTitle" class="tx-title">Import from Figma</h2>
-          <button type="button" class="ib s24" aria-label="Close" title="Close" @click="close"><EditorIcon name="close" /></button>
+          <h2 id="figmaTitle" class="tx-title">{{ tr('Import from Figma') }}</h2>
+          <button type="button" class="ib s24" :aria-label="tr('Close')" :title="tr('Close')" @click="close"><EditorIcon name="close" /></button>
         </header>
 
         <div class="body">
@@ -202,7 +215,7 @@ onBeforeUnmount(() => {
             <TextInput
               v-model:value="url"
               size="s"
-              label="Figma link"
+              :label="tr('Figma link')"
               :label-props="{ htmlFor: 'figmaUrl' }"
               placeholder="figma.com/design/…?node-id=…"
               :show-left-icon="false"
@@ -213,20 +226,20 @@ onBeforeUnmount(() => {
               :input-props="{ id: 'figmaUrl', type: 'text', inputmode: 'url', autocomplete: 'off', 'aria-describedby': 'figmaHint', 'aria-invalid': error?.code === 'invalid_url' || error?.code === 'no_node', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); load() } } }"
               class="grow"
             />
-            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">Import</Button>
+            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">{{ tr('Import') }}</Button>
           </div>
-          <p id="figmaHint" class="tx-meta">Select a frame in Figma, choose Copy link to selection, and paste the URL here</p>
+          <p id="figmaHint" class="tx-meta">{{ tr('Select a frame in Figma, choose Copy link to selection, and paste the URL here') }}</p>
         </div>
 
         <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
           <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
-          <span>{{ error.message }}</span>
+          <span>{{ tr(error.message) }}</span>
         </p>
 
         <div v-if="result" class="result" aria-live="polite">
           <div class="sq card">
             <div class="sq thumb" data-preview>
-              <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="`${result.name} thumbnail`" @error="thumbFailed = true">
+              <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="tr('{name} thumbnail', { name: result.name })" @error="thumbFailed = true">
               <EditorIcon v-else name="image" :size="20" class="dim" />
             </div>
             <div class="info">
@@ -234,12 +247,12 @@ onBeforeUnmount(() => {
                 <span class="tx-body name">{{ result.name }}</span>
                 <span class="tx-meta num">{{ result.width }} × {{ result.height }}</span>
               </div>
-              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">Open in Figma</TextButton>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">{{ tr('Open in Figma') }}</TextButton>
 
               <div class="divider" />
               <div class="sum-h">
-                <span class="tx-head">Components found</span>
-                <span class="tx-meta num">{{ result.components.length }} types · {{ total }} instances<template v-if="!preview && result.components.length"> · {{ matched }} in design system</template></span>
+                <span class="tx-head">{{ tr('Components found') }}</span>
+                <span class="tx-meta num">{{ tr('{n} types · {m} instances', { n: result.components.length, m: total }) }}<template v-if="!preview && result.components.length"> · {{ tr('{n} in design system', { n: matched }) }}</template></span>
               </div>
               <ul v-if="result.components.length" class="list">
                 <li v-for="c in result.components" :key="c.name" class="item">
@@ -249,15 +262,15 @@ onBeforeUnmount(() => {
                   <span class="tx-meta num">{{ c.count }}</span>
                 </li>
               </ul>
-              <p v-else class="tx-meta">This frame has no component instances</p>
+              <p v-else class="tx-meta">{{ tr('This frame has no component instances') }}</p>
             </div>
           </div>
-          <p v-if="preview" class="tx-meta">Preview mode: nothing is saved when you close</p>
+          <p v-if="preview" class="tx-meta">{{ tr('Preview mode: nothing is saved when you close') }}</p>
         </div>
 
         <footer class="foot">
-          <Button size="m" type="tertiary" :disabled="saving" @click="close">Cancel</Button>
-          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">Add frame</Button>
+          <Button size="m" type="tertiary" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
+          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">{{ tr('Add frame') }}</Button>
         </footer>
       </section>
     </div>

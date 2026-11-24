@@ -246,7 +246,7 @@ async function save() {
     }
   } catch {
     saving.value = false
-    error.value = '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요'
+    error.value = tr("Couldn't save. Try again in a moment.")
     return
   }
 
@@ -283,18 +283,18 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 <template>
   <form ref="root" class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save">
     <header class="head">
-      <h1 class="tx-title">문서 고치기</h1>
-      <span class="tx-meta">{{ native ? '직접 쓴 문서' : doc.source_type === 'upload' ? '올린 파일 · 원본 파일은 그대로 두고 본문 글만 고쳐요' : '링크 · 원본 페이지는 그대로 두고 본문 글만 고쳐요' }}</span>
+      <h1 class="tx-title">{{ tr('Edit document') }}</h1>
+      <span class="tx-meta">{{ native ? tr('Written in Iris') : doc.source_type === 'upload' ? tr('Uploaded file · Only the text changes. The original file stays as is.') : tr('Link · Only the text changes. The original page stays as is.') }}</span>
     </header>
 
     <TextInput
       v-model:value="form.title"
       v-bind="TI"
-      label="문서 이름"
+      :label="tr('Document name')"
       essential
-      placeholder="문서 이름"
+      :placeholder="tr('Document name')"
       :show-supporting-text="!form.title.trim()"
-      supporting-text="문서 이름을 적어 주세요"
+      :supporting-text="tr('Enter a document name')"
       supporting-theme="destructed"
       :input-props="{ id: `edTitle-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
       :label-props="{ htmlFor: `edTitle-${doc.id}` }"
@@ -302,7 +302,7 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 
     <div class="row">
       <div class="col6">
-        <span :id="`edCat-${doc.id}`" class="tx-head">분류</span>
+        <span :id="`edCat-${doc.id}`" class="tx-head">{{ tr('Category') }}</span>
         <div class="seg cats" role="radiogroup" :aria-labelledby="`edCat-${doc.id}`">
           <button
             v-for="c in CATS"
@@ -312,15 +312,15 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
             :aria-checked="form.category === c[0]"
             :class="['sq', 'seg-item', { on: form.category === c[0] }]"
             @click="form.category = c[0]"
-          >{{ c[1] }}</button>
+          >{{ tr(c[1]) }}</button>
         </div>
       </div>
       <TextInput
         v-model:value="form.version"
         v-bind="TI"
         class="ver"
-        label="버전"
-        placeholder="예: v1.3"
+        :label="tr('Version')"
+        :placeholder="tr('e.g. v1.3')"
         :show-supporting-text="false"
         :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
         :label-props="{ htmlFor: `edVer-${doc.id}` }"
@@ -331,25 +331,25 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
     <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><Icon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
 
     <div class="col6 grow">
-      <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? '내용' : '본문' }}</label>
+      <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? tr('Content') : tr('Body text') }}</label>
       <div class="sq area-box">
       <textarea
         :id="`edBody-${doc.id}`"
         v-model="form.body"
         class="area"
         rows="16"
-        :placeholder="native ? `'# ' 제목, '## ' 소제목, '- ' 목록. 빈 줄로 문단을 나눠요.` : '원본의 글을 붙여넣거나 고쳐 주세요'"
+        :placeholder="native ? tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`) : tr('Paste or edit the original text')"
       />
       </div>
       <span class="tx-meta num">
-        <template v-if="native">'# ' 제목, '## ' 소제목, '- ' 목록, 빈 줄은 새 문단이에요. </template>요구사항 번호(REQ-001 등)로 시작하는 줄은 요구사항으로 등록돼요{{ found ? ` · 지금 ${found}개` : '' }}
+        <template v-if="native">{{ tr(`'# ' heading, '## ' subheading, '- ' list, blank line for a new paragraph.`) }} </template>{{ tr('Lines starting with a requirement number (like REQ-001) become requirements') }}{{ found ? ' · ' + tr('{n} found', { n: found }) : '' }}
       </span>
     </div>
 
     <div class="foot">
       <span v-if="error" class="tx-meta warn" role="alert"><Icon name="warning" :size="12" />{{ error }}</span>
-      <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">취소</Button>
-      <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">저장하기</Button>
+      <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">{{ tr('Cancel') }}</Button>
+      <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Save') }}</Button>
     </div>
   </form>
 </template>

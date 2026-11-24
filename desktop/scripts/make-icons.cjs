@@ -1,6 +1,7 @@
 // 앱 아이콘 PNG 를 파비콘(public/favicon.svg)에서 만듭니다. 실행: npm run icons (desktop/ 에서)
 // - build/icon-mac.png : 1024 캔버스 가운데 824 타일 + 옅은 그림자 (macOS 아이콘 격자와 같은 여백)
 // - build/icon-win.png : 1024 꽉 찬 타일 (윈도우는 여백 없이 씀)
+// - 타일 색은 파비콘(gray-800 #202837)보다 진한 black-default(#03091A) 로 바꿔 씁니다
 // .icns · .ico 변환은 electron-builder 가 빌드할 때 이 PNG 로 알아서 합니다.
 const { app, BrowserWindow } = require('electron')
 const fs = require('node:fs')
@@ -8,7 +9,9 @@ const path = require('node:path')
 
 const ROOT = path.join(__dirname, '..', '..')
 const OUT = path.join(__dirname, '..', 'build')
-const svg = fs.readFileSync(path.join(ROOT, 'public', 'favicon.svg'), 'utf8')
+const TILE = { favicon: '#202837', app: '#03091A' } // gray-800 → black-default
+const svg = fs.readFileSync(path.join(ROOT, 'public', 'favicon.svg'), 'utf8').replaceAll(TILE.favicon, TILE.app)
+if (!svg.includes(TILE.app)) throw new Error('favicon.svg 의 타일 색(' + TILE.favicon + ')을 찾지 못했어요')
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } })

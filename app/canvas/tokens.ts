@@ -34,6 +34,14 @@ export const KIND_LABEL: Record<TokenKind, string> = {
   textStyle: 'Text style', fontWeight: 'Font weight', fontSize: 'Font size', lineHeight: 'Line height', letterSpacing: 'Letter spacing',
 }
 
+/** 목록 묶음 이름(group)을 지금 언어로 — 묶음 이름은 영어로 저장하고 보여 줄 때만 바꿔요. 글자 스타일 묶음('Body 1')은 이름이라 그대로 */
+const UI_GROUPS = new Set(['Interaction', 'Spacing', 'Corner radius', 'Corner radius · Semantic', 'Stroke weight', 'Opacity', 'Shadow', 'Font weight', 'Font size', 'Line height', 'Letter spacing', 'Local styles'])
+export function groupLabel(g: string): string {
+  const m = /^(System|Palette) · (.+)$/.exec(g)
+  if (m) return m[1] === 'System' ? tr('System · {name}', { name: m[2]! }) : tr('Palette · {name}', { name: m[2]! })
+  return UI_GROUPS.has(g) ? tr(g) : g
+}
+
 const WEIGHT_NAME: Record<string, string> = { thin: 'Thin', extralight: 'ExtraLight', light: 'Light', regular: 'Regular', medium: 'Medium', semibold: 'SemiBold', bold: 'Bold', extrabold: 'ExtraBold', black: 'Black' }
 /** 글자 스타일 이름의 굵기 줄임(피그마 라이브러리: 16 B · 16 SB · 16 M · 16 R) */
 export const WEIGHT_ABBR = (w: number) => ({ 100: 'T', 200: 'EL', 300: 'L', 400: 'R', 500: 'M', 600: 'SB', 700: 'B', 800: 'EB', 900: 'BL' } as Record<number, string>)[w] ?? String(w)

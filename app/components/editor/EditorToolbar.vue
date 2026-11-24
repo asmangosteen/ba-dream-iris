@@ -36,8 +36,8 @@ const GROUPS: { id: string; tools: Tool[] }[] = [
 const last = reactive<Record<string, Tool>>({ move: 'move', frame: 'frame', shape: 'rect', draw: 'pen', text: 'text' })
 watch(tool, (t) => { const g = GROUPS.find((x) => x.tools.includes(t)); if (g && t !== 'image') last[g.id] = t })
 const open = ref<string | null>(null)
-const GROUP_LABEL: Record<string, string> = { move: 'Move', frame: 'Region', shape: 'Shape', draw: 'Creation', text: 'Type' }
-const tip = (it: Item) => (it.key2 ? `${it.label} (${it.key2})` : it.label)
+const GROUP_LABEL: Record<string, string> = { move: 'Move tools', frame: 'Region tools', shape: 'Shape tools', draw: 'Creation tools', text: 'Type tools' }
+const tip = (it: Item) => (it.key2 ? `${tr(it.label)} (${it.key2})` : tr(it.label))
 /** 묶음 버튼에 보이는 도구: 지금 고른 도구가 이 묶음이면 그것, 아니면 마지막에 쓴 것(Image 는 한 번 쓰고 돌아와서 제외) */
 const shown = (g: { id: string; tools: Tool[] }) => ITEMS[g.tools.includes(tool.value) && tool.value !== 'image' ? tool.value : last[g.id]!]
 function pick(t: Tool) { tool.value = t; open.value = null }
@@ -85,11 +85,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
 </script>
 
 <template>
-  <div ref="root" role="toolbar" aria-label="Tools" aria-orientation="horizontal" class="sq float s bar">
+  <div ref="root" role="toolbar" :aria-label="tr('Tools')" aria-orientation="horizontal" class="sq float s bar">
     <div v-for="g in GROUPS" :key="g.id" class="grp-wrap">
       <button
         :aria-label="tip(shown(g))"
-        :data-tip="shown(g).label"
+        :data-tip="tr(shown(g).label)"
         :data-tip-key="shown(g).key2"
         data-tip-at="top"
         :aria-pressed="g.tools.includes(tool)"
@@ -102,29 +102,30 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
           <EditorIcon v-else :name="it.icon!" :size="20" />
         </template>
       </button>
-      <button v-if="g.tools.length > 1" type="button" class="sq more" :class="{ open: open === g.id }" :data-grp="g.id" :aria-label="`${GROUP_LABEL[g.id]} tools`" :data-tip="`${GROUP_LABEL[g.id]} tools`" data-tip-at="top" aria-haspopup="menu" :aria-expanded="open === g.id" @click="toggle(g.id, $event.detail === 0)" @keydown="onChevKey($event, g.id)">
+      <button v-if="g.tools.length > 1" type="button" class="sq more" :class="{ open: open === g.id }" :data-grp="g.id" :aria-label="tr(GROUP_LABEL[g.id]!)" :data-tip="tr(GROUP_LABEL[g.id]!)" data-tip-at="top" aria-haspopup="menu" :aria-expanded="open === g.id" @click="toggle(g.id, $event.detail === 0)" @keydown="onChevKey($event, g.id)">
         <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.75 3l2.25 2.25L6.25 3" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </button>
-      <div v-if="open === g.id" class="sq menu pop" role="menu" :aria-label="`${GROUP_LABEL[g.id]} tools`" @keydown="onMenuKey($event, g.id)">
+      <div v-if="open === g.id" class="sq menu pop" role="menu" :aria-label="tr(GROUP_LABEL[g.id]!)" @keydown="onMenuKey($event, g.id)">
         <button v-for="t in g.tools" :key="t" type="button" role="menuitemradio" :aria-checked="tool === t" :class="['sq', 'menu-item', { on: tool === t }]" @click="pick(t)">
           <svg class="ck" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path v-if="t === shown(g).key" d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
           <svg v-if="ITEMS[t].d" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="ITEMS[t].d" :fill="ITEMS[t].fill ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.33" stroke-linejoin="round" stroke-linecap="round" /></svg>
           <EditorIcon v-else :name="ITEMS[t].icon!" :size="16" />
-          <span class="grow">{{ ITEMS[t].label }}</span><span v-if="ITEMS[t].key2" class="key">{{ ITEMS[t].key2 }}</span>
+          <span class="grow">{{ tr(ITEMS[t].label) }}</span><span v-if="ITEMS[t].key2" class="key">{{ ITEMS[t].key2 }}</span>
         </button>
       </div>
     </div>
     <span class="div" aria-hidden="true" />
-    <button type="button" aria-label="Assets" data-tip="Assets" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
-    <button type="button" aria-label="Link requirement" data-tip="Link requirement" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
-    <button type="button" aria-label="Import from Figma" data-tip="Import from Figma" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
-    <button type="button" aria-label="Comments (coming soon)" aria-disabled="true" data-tip="Comments" data-tip-key="Soon" data-tip-at="top" class="rail-btn soon" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /></button>
+    <button type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
+    <button type="button" :aria-label="tr('Link requirement')" :data-tip="tr('Link requirement')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
+    <button type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
+    <button type="button" :aria-label="tr('Comments (coming soon)')" aria-disabled="true" :data-tip="tr('Comments')" :data-tip-key="tr('Soon')" data-tip-at="top" class="rail-btn soon" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /></button>
   </div>
 </template>
 
 <style scoped>
-/* 도구 막대: 높이 44 · 모서리 14(= 도구 8 + 안쪽 6, 안팎 곡선이 나란해요) · 안쪽 6(도구 32 둘레가 위아래 · 좌우 모두 6) · 묶음 사이 6 · 도구 32 + ▾ 16(붙어 있음 1px) · 칸막이는 위아래 끝까지 */
-.bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 44px; box-sizing: border-box; border-radius: 14px; padding: 0 var(--ref-spacing-05); display: flex; align-items: center; gap: var(--ref-spacing-05); z-index: 3; }
+/* 도구 막대는 늘 맨 앞(z 8): 캔버스 · 좌우 패널(4 · 3) 위, 팝오버 · 메뉴 · 변수 화면(20~) 아래 */
+/* 도구 막대: 바닥에서 16 띄움 · 높이 44 · 모서리 14(= 도구 8 + 안쪽 6, 안팎 곡선이 나란해요) · 안쪽 6(도구 32 둘레가 위아래 · 좌우 모두 6) · 묶음 사이 6 · 도구 32 + ▾ 16(붙어 있음 1px) · 칸막이는 위아래 끝까지 */
+.bar { position: absolute; bottom: var(--ref-spacing-10); left: 50%; transform: translateX(-50%); height: 44px; box-sizing: border-box; border-radius: 14px; padding: 0 var(--ref-spacing-05); display: flex; align-items: center; gap: var(--ref-spacing-05); z-index: 8; }
 .grp-wrap { position: relative; display: flex; align-items: center; gap: 1px; }
 .more { width: 16px; height: 32px; display: grid; place-items: center; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-02); }
 .more:hover, .more.open { color: var(--sys-color-neutral-800); --sq-fill: var(--interaction-light-gray-hover); }

@@ -82,11 +82,11 @@ const aliases = (v: unknown): string[] | null => {
 
 function toComponent(o: Record<string, unknown>, where: string, errors: string[]): NewComponent | null {
   const name = str(pick(o, 'name', 'Name', '이름', 'title'))
-  if (!name) { errors.push(`${where}: 이름이 없어서 건너뛰었어요`); return null }
+  if (!name) { errors.push(tr('{where}: skipped, no name', { where })); return null }
   return {
     name,
     code_name: str(pick(o, 'code_name', 'codeName', 'code', '코드 이름', '코드이름')) || null,
-    category: str(pick(o, 'category', 'group', '분류')) || '기타',
+    category: str(pick(o, 'category', 'group', '분류')) || 'Other',
     description: str(pick(o, 'description', 'desc', '설명')) || null,
     match_aliases: aliases(pick(o, 'match_aliases', 'aliases', 'alias', '별칭')),
     props_schema: propsFrom(pick(o, 'props_schema', 'props', 'propsSchema', '속성')),
@@ -96,10 +96,10 @@ function toComponent(o: Record<string, unknown>, where: string, errors: string[]
 function toToken(o: Record<string, unknown>, where: string, errors: string[], fallbackName = '', fallbackType: TokenType | null = null): NewToken | null {
   const name = str(pick(o, 'name', 'Name', '이름')) || fallbackName
   const value = stringValue(pick(o, 'value', '$value', '값'))
-  if (!name || !value) { errors.push(`${where}: 이름이나 값이 없어서 건너뛰었어요`); return null }
+  if (!name || !value) { errors.push(tr('{where}: skipped, missing name or value', { where })); return null }
   const rawType = pick(o, 'type', '$type', '종류')
   const type = tokenType(rawType) ?? fallbackType ?? guessType(name, value)
-  if (!type) { errors.push(`${where} (${name}): 종류를 알 수 없어요 — ${TOKEN_TYPES.join(' · ')} 중 하나를 적어주세요`); return null }
+  if (!type) { errors.push(tr('{where} ({name}): unknown type. Use one of {types}', { where, name, types: TOKEN_TYPES.join(' · ') })); return null }
   return { type, name, value, description: str(pick(o, 'description', '$description', 'desc', '설명')) || null }
 }
 
@@ -123,22 +123,22 @@ function parseJson(text: string): BulkResult {
   const out: BulkResult = { components: [], tokens: [], errors: [] }
   let data: unknown
   try { data = JSON.parse(text) } catch (e) {
-    out.errors.push(`JSON 을 읽지 못했어요 — ${(e as Error).message}`)
+    out.errors.push(tr("Couldn't read the JSON: {message}", { message: (e as Error).message }))
     return out
   }
   const classify = (list: unknown[], kind: 'auto' | 'component' | 'token', label: string) => list.forEach((item, i) => {
-    const where = `${label} ${i + 1}번째`
-    if (!isObj(item)) { out.errors.push(`${where}: 객체가 아니어서 건너뛰었어요`); return }
+    const where = tr(label, { n: i + 1 })
+    if (!isObj(item)) { out.errors.push(tr('{where}: skipped, not an object', { where })); return }
     if (kind === 'token' || (kind === 'auto' && isTokenLike(item))) { const t = toToken(item, where, out.errors); if (t) out.tokens.push(t) }
     else { const c = toComponent(item, where, out.errors); if (c) out.components.push(c) }
   })
-  if (Array.isArray(data)) classify(data, 'auto', '항목')
+  if (Array.isArray(data)) classify(data, 'auto', 'Item {n}')
   else if (isObj(data) && (Array.isArray(data.components) || Array.isArray(data.tokens))) {
-    if (Array.isArray(data.components)) classify(data.components, 'component', '컴포넌트')
-    if (Array.isArray(data.tokens)) classify(data.tokens, 'token', '토큰')
+    if (Array.isArray(data.components)) classify(data.components, 'component', 'Component {n}')
+    if (Array.isArray(data.tokens)) classify(data.tokens, 'token', 'Token {n}')
     else if (isObj(data.tokens)) walkTree(data.tokens, [], null, out)
   } else if (isObj(data)) walkTree(data, [], null, out)
-  else out.errors.push('배열이나 객체 형식이어야 해요')
+  else out.errors.push(tr('Must be an array or an object'))
   return out
 }
 
@@ -176,14 +176,14 @@ function parseCsv(text: string): BulkResult {
   const out: BulkResult = { components: [], tokens: [], errors: [] }
   const first = text.split(/\r?\n/)[0] ?? ''
   const rows = splitRows(text, first.includes('\t') ? '\t' : ',')
-  if (rows.length < 2) { out.errors.push('첫 줄은 머리(name, value …), 둘째 줄부터 내용이어야 해요'); return out }
+  if (rows.length < 2) { out.errors.push(tr('The first line must be a header (name, value …), with content from the second line')); return out }
   const head = rows[0]!.map((h) => HEADER[normKey(h)] ?? normKey(h))
-  if (!head.includes('name')) { out.errors.push('머리 줄에 name(이름) 칸이 있어야 해요'); return out }
+  if (!head.includes('name')) { out.errors.push(tr('The header line needs a name column')); return out }
   const isToken = head.includes('value')
   rows.slice(1).forEach((r, i) => {
     const o: Record<string, unknown> = {}
     head.forEach((h, j) => { o[h] = (r[j] ?? '').trim() })
-    const where = `${i + 2}번째 줄`
+    const where = tr('Line {n}', { n: i + 2 })
     if (isToken) { const t = toToken(o, where, out.errors); if (t) out.tokens.push(t) }
     else { const c = toComponent(o, where, out.errors); if (c) out.components.push(c) }
   })
@@ -198,17 +198,17 @@ export function parseBulk(text: string): BulkResult {
 
 export function registerErrorMessage(e: unknown): string {
   const o = (e ?? {}) as { code?: string; message?: string; status?: number }
-  if (o.code === '42501' || o.status === 401 || o.status === 403 || /row-level security|permission denied|not authorized|unauthorized/i.test(o.message ?? '')) return '관리자만 등록할 수 있어요'
-  if (o.code === '23505') return '같은 이름이 이미 있어요. 이름을 바꿔 주세요'
-  return '등록하지 못했어요. 잠시 뒤 다시 시도해 주세요'
+  if (o.code === '42501' || o.status === 401 || o.status === 403 || /row-level security|permission denied|not authorized|unauthorized/i.test(o.message ?? '')) return tr('Only admins can add items')
+  if (o.code === '23505') return tr('That name already exists. Choose a different name')
+  return tr("Couldn't add. Try again in a moment")
 }
 
 const SAMPLE = `{
   "components": [
-    { "name": "Chip", "code_name": "Chip", "category": "입력", "description": "거르기 · 선택 칩", "aliases": ["chip", "칩"], "props": { "selected": "boolean", "label": "text" } }
+    { "name": "Chip", "code_name": "Chip", "category": "Inputs", "description": "Filter or selection chip", "aliases": ["chip", "칩"], "props": { "selected": "boolean", "label": "text" } }
   ],
   "tokens": [
-    { "type": "color", "name": "brand/secondary-default", "value": "#00C2A8", "description": "보조 강조" },
+    { "type": "color", "name": "brand/secondary-default", "value": "#00C2A8", "description": "Secondary accent" },
     { "type": "radius", "name": "radius/08", "value": "20px" }
   ]
 }`
@@ -234,9 +234,9 @@ const bulk = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const tabs = [
-  { key: 'component', label: '컴포넌트' },
-  { key: 'token', label: '토큰' },
-  { key: 'bulk', label: '한꺼번에 가져오기' },
+  { key: 'component', label: 'Component' },
+  { key: 'token', label: 'Token' },
+  { key: 'bulk', label: 'Bulk import' },
 ] as const
 
 const existing = computed(() => new Set(props.existingNames.map((n) => n.toLowerCase())))
@@ -255,8 +255,28 @@ const parsed = computed(() => {
   return { components, tokens, errors: r.errors, skipped }
 })
 const bulkCount = computed(() => parsed.value.components.length + parsed.value.tokens.length)
+
+/** 받는 형식 도움말 — 문장 속 {이름} 자리에 <code> 조각을 끼워 넣어요 */
+const HELP_CODE: Record<string, string> = {
+  value: 'value',
+  pipe: '|',
+  props: 'type:primary|secondary; disabled:boolean',
+  shape: '{ "components": [...], "tokens": [...] }',
+  tree: '{ "color": { "brand": { "$value": "#2C7BE2" } } }',
+}
+const HELP = [
+  'CSV, or a table copied from a sheet (tabs): the first line is the header. With a {value} column, rows are read as tokens (type, name, value, description); otherwise as components (name, code_name, category, description, aliases, props). Separate aliases with {pipe}, and write props like {props}.',
+  'JSON: {shape}, an array of objects (tokens if they have {value}), or a token tree ({tree}; names join the path with /).',
+  'Token types: color · typography · spacing · radius · shadow (if left empty, guessed from the name and value). Tokens with the same name overwrite the value, and existing component names are skipped.',
+]
+function helpParts(en: string): { text?: string; code?: string }[] {
+  return tr(en).split(/(\{\w+\})/).filter(Boolean).map((s) => {
+    const k = s.match(/^\{(\w+)\}$/)?.[1]
+    return k && k in HELP_CODE ? { code: HELP_CODE[k] } : { text: s }
+  })
+}
 const preview = computed(() => [
-  ...parsed.value.components.map((c) => ({ key: 'c' + c.name, kind: '컴포넌트', name: c.name, meta: c.category, swatch: null as string | null })),
+  ...parsed.value.components.map((c) => ({ key: 'c' + c.name, kind: 'Component', name: c.name, meta: c.category, swatch: null as string | null })),
   ...parsed.value.tokens.map((t) => ({ key: 't' + t.name, kind: TOKEN_TYPE_LABEL[t.type], name: t.name, meta: t.value, swatch: t.type === 'color' ? t.value : null })),
 ])
 
@@ -266,7 +286,7 @@ const canSave = computed(() => {
   if (cur.value === 'token') return !!tok.name.trim() && !!tok.value.trim()
   return bulkCount.value > 0
 })
-const saveLabel = computed(() => (cur.value === 'bulk' && bulkCount.value ? `${bulkCount.value}개 등록` : '등록'))
+const saveLabel = computed(() => (cur.value === 'bulk' && bulkCount.value ? tr('Add {n}', { n: bulkCount.value }) : tr('Add')))
 
 watch(() => props.open, async (open) => {
   if (!open) { lastFocus?.focus?.(); return }
@@ -325,21 +345,21 @@ async function save() {
       await addComponent({
         name: comp.name.trim(),
         code_name: comp.code_name.trim() || null,
-        category: comp.category.trim() || '기타',
+        category: comp.category.trim() || 'Other',
         description: comp.description.trim() || null,
         match_aliases: aliases(comp.aliases),
         props_schema: parseProps(comp.props),
       })
-      emit('saved', `${comp.name.trim()} 컴포넌트를 등록했어요`)
+      emit('saved', tr('Added component {name}', { name: comp.name.trim() }))
     } else if (cur.value === 'token') {
       await addTokens([{ type: tok.type, name: tok.name.trim(), value: tok.value.trim(), description: tok.description.trim() || null }])
-      emit('saved', `${tok.name.trim()} 토큰을 등록했어요`)
+      emit('saved', tr('Added token {name}', { name: tok.name.trim() }))
     } else {
       const { components, tokens } = parsed.value
       let done = 0
       for (const c of components) { await addComponent(c); done++ }
       if (tokens.length) await addTokens(tokens)
-      emit('saved', `컴포넌트 ${done}개 · 토큰 ${tokens.length}개를 등록했어요`)
+      emit('saved', tr('Added {c} components and {t} tokens', { c: done, t: tokens.length }))
     }
   } catch (e) {
     error.value = registerErrorMessage(e)
@@ -354,11 +374,11 @@ async function save() {
     <div v-if="open" class="backdrop" @mousedown.self="emit('close')">
       <div ref="dialog" class="sq float dialog" role="dialog" aria-modal="true" aria-labelledby="ds-reg-title" @keydown="onKey">
         <div class="top">
-          <h2 id="ds-reg-title" class="tx-title">디자인 시스템에 등록</h2>
-          <IconButton icon-name="close" size="s" type="ghost" ariaLabel="닫기" @click="emit('close')" />
+          <h2 id="ds-reg-title" class="tx-title">{{ tr('Add to design system') }}</h2>
+          <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close')" @click="emit('close')" />
         </div>
-        <div class="seg tabs" role="tablist" aria-label="등록 방법">
-          <button v-for="t in tabs" :key="t.key" type="button" role="tab" :aria-selected="cur === t.key" :class="['sq', 'seg-item', { on: cur === t.key }]" @click="cur = t.key">{{ t.label }}</button>
+        <div class="seg tabs" role="tablist" :aria-label="tr('Ways to add')">
+          <button v-for="t in tabs" :key="t.key" type="button" role="tab" :aria-selected="cur === t.key" :class="['sq', 'seg-item', { on: cur === t.key }]" @click="cur = t.key">{{ tr(t.label) }}</button>
         </div>
 
         <form class="body" @submit.prevent="save" @keydown.enter="onEnter">
@@ -367,51 +387,51 @@ async function save() {
               v-model:value="comp.name"
               v-bind="TI"
               data-first
-              label="이름"
+              :label="tr('Name')"
               essential
-              placeholder="예: Button"
+              :placeholder="tr('e.g. {example}', { example: 'Button' })"
               :destructed="compDup"
               :show-supporting-text="compDup"
-              supporting-text="이미 있는 이름이에요"
+              :supporting-text="tr('This name already exists')"
               supporting-theme="destructed"
               :input-props="{ id: 'ds-c-name', required: true, 'aria-invalid': compDup }"
               :label-props="{ htmlFor: 'ds-c-name' }"
             />
             <div class="two">
-              <TextInput v-model:value="comp.code_name" v-bind="TI" label="코드 이름" placeholder="예: Button" :input-props="{ id: 'ds-c-code' }" :label-props="{ htmlFor: 'ds-c-code' }" />
-              <TextInput v-model:value="comp.category" v-bind="TI" label="분류" placeholder="예: 입력" :input-props="{ id: 'ds-c-cat', list: 'ds-cat-list' }" :label-props="{ htmlFor: 'ds-c-cat' }" />
+              <TextInput v-model:value="comp.code_name" v-bind="TI" :label="tr('Code name')" :placeholder="tr('e.g. {example}', { example: 'Button' })" :input-props="{ id: 'ds-c-code' }" :label-props="{ htmlFor: 'ds-c-code' }" />
+              <TextInput v-model:value="comp.category" v-bind="TI" :label="tr('Category')" :placeholder="tr('e.g. {example}', { example: 'Inputs' })" :input-props="{ id: 'ds-c-cat', list: 'ds-cat-list' }" :label-props="{ htmlFor: 'ds-c-cat' }" />
               <datalist id="ds-cat-list"><option v-for="c in categories" :key="c" :value="c" /></datalist>
             </div>
-            <TextInput v-model:value="comp.description" v-bind="TI" label="설명" placeholder="언제 쓰는지 한 줄로 적어 주세요" :input-props="{ id: 'ds-c-desc' }" :label-props="{ htmlFor: 'ds-c-desc' }" />
+            <TextInput v-model:value="comp.description" v-bind="TI" :label="tr('Description')" :placeholder="tr('One line on when to use it')" :input-props="{ id: 'ds-c-desc' }" :label-props="{ htmlFor: 'ds-c-desc' }" />
             <TextInput
               v-model:value="comp.aliases"
               v-bind="TI"
-              label="매칭 별칭"
-              placeholder="예: btn, 버튼 (쉼표로 나눠요)"
+              :label="tr('Match aliases')"
+              :placeholder="tr('e.g. btn, button (comma-separated)')"
               show-supporting-text
-              supporting-text="피그마 레이어 이름이 별칭과 같으면 이 컴포넌트로 셉니다"
+              :supporting-text="tr('Figma layers whose name matches an alias count as this component')"
               :input-props="{ id: 'ds-c-alias' }"
               :label-props="{ htmlFor: 'ds-c-alias' }"
             />
             <div class="row">
-              <label for="ds-c-props" class="tx-head">속성</label>
+              <label for="ds-c-props" class="tx-head">{{ tr('Properties') }}</label>
               <div class="sq area-box"><textarea id="ds-c-props" v-model="comp.props" rows="3" class="area tx-code" placeholder="type: primary, secondary&#10;label: text&#10;disabled: boolean" /></div>
             </div>
           </template>
 
           <template v-else-if="cur === 'token'">
             <div class="row">
-              <span id="ds-tok-type" class="tx-head">종류</span>
+              <span id="ds-tok-type" class="tx-head">{{ tr('Type') }}</span>
               <div class="seg types" role="radiogroup" aria-labelledby="ds-tok-type">
-                <button v-for="t in Object.keys(TOKEN_TYPE_LABEL) as TokenType[]" :key="t" type="button" role="radio" :aria-checked="tok.type === t" :class="['sq', 'seg-item', { on: tok.type === t }]" @click="tok.type = t">{{ TOKEN_TYPE_LABEL[t] }}</button>
+                <button v-for="t in Object.keys(TOKEN_TYPE_LABEL) as TokenType[]" :key="t" type="button" role="radio" :aria-checked="tok.type === t" :class="['sq', 'seg-item', { on: tok.type === t }]" @click="tok.type = t">{{ tr(TOKEN_TYPE_LABEL[t]) }}</button>
               </div>
             </div>
-            <TextInput v-model:value="tok.name" v-bind="TI" data-first label="이름" essential placeholder="예: brand/primary-default" :input-props="{ id: 'ds-t-name', required: true }" :label-props="{ htmlFor: 'ds-t-name' }" />
+            <TextInput v-model:value="tok.name" v-bind="TI" data-first :label="tr('Name')" essential :placeholder="tr('e.g. {example}', { example: 'brand/primary-default' })" :input-props="{ id: 'ds-t-name', required: true }" :label-props="{ htmlFor: 'ds-t-name' }" />
             <div class="val">
               <TextInput
                 v-model:value="tok.value"
                 v-bind="TI"
-                label="값"
+                :label="tr('Value')"
                 essential
                 :placeholder="{ color: '#2C7BE2', typography: '16 / 24 · 500', spacing: '16px', radius: '12px', shadow: '0 1px 2px rgb(3 9 26 / 8%)' }[tok.type]"
                 :input-props="{ id: 'ds-t-value', required: true }"
@@ -419,51 +439,49 @@ async function save() {
               />
               <span v-if="tok.type === 'color' && tok.value" class="sq sq-clip sw val-sw" :style="{ background: tok.value }" aria-hidden="true" />
             </div>
-            <TextInput v-model:value="tok.description" v-bind="TI" label="설명" placeholder="어디에 쓰는지 적어 주세요" :input-props="{ id: 'ds-t-desc' }" :label-props="{ htmlFor: 'ds-t-desc' }" />
+            <TextInput v-model:value="tok.description" v-bind="TI" :label="tr('Description')" :placeholder="tr('Where it’s used')" :input-props="{ id: 'ds-t-desc' }" :label-props="{ htmlFor: 'ds-t-desc' }" />
           </template>
 
           <template v-else>
             <div class="row">
               <div class="bulk-h">
-                <label for="ds-bulk" class="tx-head">CSV 또는 JSON 붙여넣기</label>
+                <label for="ds-bulk" class="tx-head">{{ tr('Paste CSV or JSON') }}</label>
                 <span class="bulk-act">
-                  <TextButton size="s" color="gray" @click="bulk = SAMPLE">예시 넣기</TextButton>
-                  <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="fileInput?.click()">파일 고르기</Button>
+                  <TextButton size="s" color="gray" @click="bulk = SAMPLE">{{ tr('Insert example') }}</TextButton>
+                  <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="upload" @click="fileInput?.click()">{{ tr('Choose file') }}</Button>
                   <input ref="fileInput" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
                 </span>
               </div>
-              <div class="sq area-box"><textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="area tx-code" spellcheck="false" placeholder="name,code_name,category,description,aliases&#10;Button,Button,입력,주요 동작 버튼,btn|버튼" /></div>
+              <div class="sq area-box"><textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="area tx-code" spellcheck="false" :placeholder="tr('name,code_name,category,description,aliases\nButton,Button,Inputs,Main action button,btn')" /></div>
               <details class="help">
-                <summary class="tx-meta">받는 형식 보기</summary>
+                <summary class="tx-meta">{{ tr('Supported formats') }}</summary>
                 <ul class="tx-meta">
-                  <li>CSV · 시트에서 복사한 표(탭): 첫 줄은 머리. <code class="sq tx-code">value</code> 칸이 있으면 토큰(type, name, value, description), 없으면 컴포넌트(name, code_name, category, description, aliases, props)로 읽어요. 별칭은 <code class="sq tx-code">|</code>, 속성은 <code class="sq tx-code">type:primary|secondary; disabled:boolean</code> 처럼 적어요.</li>
-                  <li>JSON: <code class="sq tx-code">{ "components": [...], "tokens": [...] }</code>, 객체 배열(<code class="sq tx-code">value</code> 가 있으면 토큰), 또는 토큰 트리(<code class="sq tx-code">{ "color": { "brand": { "$value": "#2C7BE2" } } }</code>, 이름은 경로를 / 로 이어요).</li>
-                  <li>토큰 종류: color · typography · spacing · radius · shadow (비우면 이름 · 값으로 짐작해요). 같은 이름 토큰은 값을 덮어쓰고, 이미 있는 컴포넌트 이름은 건너뛰어요.</li>
+                  <li v-for="(h, hi) in HELP" :key="hi"><template v-for="(p, i) in helpParts(h)" :key="i"><code v-if="p.code" class="sq tx-code">{{ p.code }}</code><template v-else>{{ p.text }}</template></template></li>
                 </ul>
               </details>
             </div>
             <div v-if="bulk.trim()" class="sq result" aria-live="polite">
-              <span class="tx-head">컴포넌트 {{ parsed.components.length }}개 · 토큰 {{ parsed.tokens.length }}개를 찾았어요</span>
+              <span class="tx-head">{{ tr('Found {c} components and {t} tokens', { c: parsed.components.length, t: parsed.tokens.length }) }}</span>
               <ul v-if="preview.length" class="plist">
                 <li v-for="p in preview.slice(0, 8)" :key="p.key" class="prow">
-                  <span class="tx-meta kind">{{ p.kind }}</span>
+                  <span class="tx-meta kind">{{ tr(p.kind) }}</span>
                   <span v-if="p.swatch" class="sq sq-clip sw" :style="{ background: p.swatch }" aria-hidden="true" />
                   <span class="tx-body pname" :title="p.name">{{ p.name }}</span>
                   <span class="tx-meta pmeta num" :title="p.meta">{{ p.meta }}</span>
                 </li>
-                <li v-if="preview.length > 8" class="tx-meta">외 {{ preview.length - 8 }}개</li>
+                <li v-if="preview.length > 8" class="tx-meta">{{ tr('+{n} more', { n: preview.length - 8 }) }}</li>
               </ul>
-              <p v-if="parsed.skipped.length" class="tx-meta">이미 있는 이름이라 건너뛰어요: {{ parsed.skipped.join(', ') }}</p>
+              <p v-if="parsed.skipped.length" class="tx-meta">{{ tr('Skipping existing names: {list}', { list: parsed.skipped.join(', ') }) }}</p>
               <ul v-if="parsed.errors.length" class="errs">
                 <li v-for="(er, i) in parsed.errors.slice(0, 5)" :key="i" class="tx-meta warn"><Icon name="warning" :size="12" /> {{ er }}</li>
-                <li v-if="parsed.errors.length > 5" class="tx-meta warn">외 {{ parsed.errors.length - 5 }}건</li>
+                <li v-if="parsed.errors.length > 5" class="tx-meta warn">{{ tr('+{n} more issues', { n: parsed.errors.length - 5 }) }}</li>
               </ul>
             </div>
           </template>
 
           <p v-if="error" class="tx-body warn err" role="alert"><Icon name="warning" :size="14" /> {{ error }}</p>
           <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" @click="emit('close')">취소</Button>
+            <Button size="m" type="tertiary" class="grow1" @click="emit('close')">{{ tr('Cancel') }}</Button>
             <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave" @click="save">{{ saveLabel }}</Button>
           </div>
         </form>

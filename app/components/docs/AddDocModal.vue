@@ -12,7 +12,8 @@ const { addDocument, addRequirement } = useIrisMutations()
 const cachedReqs = useNuxtData<ReqRow[]>(`reqs-${props.projectId}`).data
 
 type Mode = 'file' | 'link' | 'write'
-const MODES: [Mode, string][] = [['file', '파일 올리기'], ['link', '링크 붙여넣기'], ['write', '직접 쓰기']]
+// 라벨은 영어 원문 — 그릴 때 tr() 로 감싸요
+const MODES: [Mode, string][] = [['file', 'Upload file'], ['link', 'Paste link'], ['write', 'Write']]
 const CATS = Object.entries(DOC_CATEGORY_LABEL) as [DocCategory, string][]
 const MAX_FILE = 50 * 1024 * 1024
 
@@ -26,15 +27,17 @@ const done = ref<{ docId: string; found: number } | null>(null)
 const title = ref('')
 const body = ref('')
 const TEMPLATES: { key: string; label: string; cat: DocCategory; text: string }[] = [
-  { key: 'plan', label: '기획서', cat: 'planning', text: '# 배경\n왜 이 작업을 하는지 적어주세요.\n\n# 요구사항\n- REQ-001 \n- REQ-002 \n\n# 예외 상황\n' },
-  { key: 'dev', label: '개발 메모', cat: 'dev', text: '# 개요\n\n## API\n- \n\n## 확인할 것\n- \n' },
-  { key: 'blank', label: '빈 문서', cat: 'etc', text: '' },
+  { key: 'plan', label: 'Spec', cat: 'planning', text: '# Background\nWhy are we doing this?\n\n# Requirements\n- REQ-001 \n- REQ-002 \n\n# Edge cases\n' },
+  { key: 'dev', label: 'Dev notes', cat: 'dev', text: '# Overview\n\n## API\n- \n\n## To check\n- \n' },
+  { key: 'blank', label: 'Blank', cat: 'etc', text: '' },
 ]
+/** 틀 본문도 지금 언어로(넣을 때 정해져서 그다음부터는 사용자 글) */
+const tplText = (t: (typeof TEMPLATES)[number] | undefined) => (t?.text ? tr(t.text) : '')
 const template = ref('blank')
 function pickTemplate(t: (typeof TEMPLATES)[number]) {
   const cur = TEMPLATES.find((x) => x.key === template.value)
   // 이미 쓴 내용이 있으면 덮어쓰지 않습니다
-  if (!body.value.trim() || body.value === cur?.text) body.value = t.text
+  if (!body.value.trim() || body.value === tplText(cur)) body.value = tplText(t)
   template.value = t.key
   category.value = t.cat
 }
@@ -67,8 +70,8 @@ async function setFile(f: File | null | undefined) {
   error.value = ''
   if (!f) return
   const ext = (f.name.split('.').pop() ?? '').toLowerCase()
-  if (!['pdf', 'docx', 'md'].includes(ext)) { error.value = 'PDF · Word(docx) · Markdown 파일만 올릴 수 있어요'; return }
-  if (f.size > MAX_FILE) { error.value = '50MB까지 올릴 수 있어요'; return }
+  if (!['pdf', 'docx', 'md'].includes(ext)) { error.value = tr('Only PDF, Word (docx) and Markdown files are supported'); return }
+  if (f.size > MAX_FILE) { error.value = tr('Files can be up to 50 MB'); return }
   file.value = f
   fileText.value = ext === 'md' ? await f.text() : null
 }
@@ -96,7 +99,7 @@ async function fetchLink() {
     fetched.value = { url: u, ...r }
   } catch (e) {
     const msg = (e as { data?: { statusMessage?: string }; statusMessage?: string })
-    fetchFailed.value = msg?.data?.statusMessage || msg?.statusMessage || '본문을 불러오지 못했어요'
+    fetchFailed.value = msg?.data?.statusMessage || msg?.statusMessage || tr("Couldn't load the page content")
   } finally {
     fetching.value = false
   }
@@ -140,7 +143,7 @@ async function save() {
       if (!preview) {
         path = `${props.projectId}/${globalThis.crypto.randomUUID()}.${ext}`
         const { error: upErr } = await supabase.storage.from('documents').upload(path, f, { contentType: f.type || undefined, upsert: false })
-        if (upErr) throw new Error('파일을 올리지 못했어요')
+        if (upErr) throw new Error(tr("Couldn't upload the file"))
       }
       doc = { title: f.name.replace(/\.[^.]+$/, ''), category: category.value, source_type: 'upload', file_path: path, file_type: ext, plain_text: fileText.value }
     } else {
@@ -169,7 +172,7 @@ async function save() {
     done.value = { docId, found }
     emit('created', docId)
   } catch (e) {
-    error.value = (e as Error)?.message && !(e as Error).message.startsWith('{') ? (e as Error).message : '문서를 추가하지 못했어요. 잠시 뒤 다시 시도해 주세요'
+    error.value = (e as Error)?.message && !(e as Error).message.startsWith('{') ? (e as Error).message : tr("Couldn't add the document. Try again in a moment.")
   } finally {
     saving.value = false
   }
@@ -236,25 +239,25 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
         @keydown="onKeydown"
       >
         <div class="top">
-          <h1 id="addDocTitle" class="tx-title">문서 추가</h1>
-          <IconButton icon-name="close" size="s" type="ghost" ariaLabel="닫기" @click="close" />
+          <h1 id="addDocTitle" class="tx-title">{{ tr('Add document') }}</h1>
+          <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close')" @click="close" />
         </div>
 
         <!-- 다 넣은 뒤 -->
         <template v-if="done">
           <div class="content success" role="status">
             <span class="badge-ok"><Icon name="check" :size="20" /></span>
-            <span class="tx-head">문서를 추가했어요</span>
-            <span class="tx-meta">{{ done.found ? `요구사항 ${done.found}개를 찾았어요` : '번호(REQ-001 등)가 붙은 요구사항은 찾지 못했어요' }}</span>
+            <span class="tx-head">{{ tr('Document added') }}</span>
+            <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 requirement') : done.found ? tr('Found {n} requirements', { n: done.found }) : tr('No numbered requirements (like REQ-001) found') }}</span>
           </div>
           <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" @click="close">닫기</Button>
-            <Button size="m" type="primary" class="grow2" data-autofocus @click="openDoc(done.docId)">문서 보기</Button>
+            <Button size="m" type="tertiary" class="grow1" @click="close">{{ tr('Close') }}</Button>
+            <Button size="m" type="primary" class="grow2" data-autofocus @click="openDoc(done.docId)">{{ tr('Open document') }}</Button>
           </div>
         </template>
 
         <template v-else>
-          <div role="tablist" aria-label="문서를 넣는 방법" class="seg tabs">
+          <div role="tablist" :aria-label="tr('How to add')" class="seg tabs">
             <button
               v-for="m in MODES"
               :key="m[0]"
@@ -263,7 +266,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               :aria-selected="mode === m[0]"
               :class="['sq', 'seg-item', { on: mode === m[0] }]"
               @click="mode = m[0]"
-            >{{ m[1] }}</button>
+            >{{ tr(m[1]) }}</button>
           </div>
 
           <div class="content">
@@ -277,19 +280,19 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 @drop.prevent="onDrop"
               >
                 <span class="up"><Icon name="upload" :size="20" /></span>
-                <span class="tx-head">파일을 끌어다 놓거나 눌러서 골라주세요</span>
-                <span class="tx-meta">PDF · Word · Markdown, 50MB까지</span>
+                <span class="tx-head">{{ tr('Drag a file here or click to choose') }}</span>
+                <span class="tx-meta">{{ tr('PDF, Word or Markdown, up to 50 MB') }}</span>
                 <input type="file" class="sr" accept=".pdf,.docx,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown" data-autofocus @change="setFile(($event.target as HTMLInputElement).files?.[0])">
               </label>
               <div v-else class="sq card">
                 <span class="sq chip num">{{ fileExt.toUpperCase() }}</span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="file.name">{{ file.name }}</span>
-                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · 요구사항 {{ foundCount }}개</template><template v-else> · 본문은 파일로만 보관해요</template></span>
+                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · {{ tr('Requirements: {n}', { n: foundCount }) }}</template><template v-else> · {{ tr('Content is kept as a file only') }}</template></span>
                 </span>
-                <IconButton icon-name="close" size="s" type="ghost" ariaLabel="파일 빼기" data-autofocus @click="clearFile" />
+                <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Remove file')" data-autofocus @click="clearFile" />
               </div>
-              <p v-if="preview && file" class="tx-meta">미리보기에서는 파일을 올리지 않고 이름만 저장해요</p>
+              <p v-if="preview && file" class="tx-meta">{{ tr('In preview, only the file name is saved. The file isn’t uploaded.') }}</p>
             </div>
 
             <!-- 링크 -->
@@ -299,36 +302,36 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                   v-model:value="url"
                   v-bind="TI"
                   class="url-in"
-                  label="문서 주소"
+                  :label="tr('Document URL')"
                   placeholder="https://"
                   show-left-icon
                   left-icon-name="link"
                   :input-props="{ id: 'docUrl', type: 'url', inputmode: 'url', autocomplete: 'off', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); fetchLink() } }, onBlur: fetchLink }"
                   :label-props="{ htmlFor: 'docUrl' }"
                 />
-                <Button size="m" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">불러오기</Button>
+                <Button size="m" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">{{ tr('Fetch') }}</Button>
               </div>
               <div v-if="fetched" class="sq card">
                 <span class="sq chip"><Icon name="document" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
-                  <span class="tx-meta num">{{ linkHost }} · 요구사항 {{ foundCount }}개</span>
+                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Requirements: {n}', { n: foundCount }) }}</span>
                 </span>
               </div>
               <div v-else-if="fetchFailed" class="sq card">
                 <span class="sq chip"><Icon name="warning" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name">{{ fetchFailed }}</span>
-                  <span class="tx-meta">그대로 추가하고 문서에서 본문을 붙여넣을 수 있어요</span>
+                  <span class="tx-meta">{{ tr('You can add it anyway and paste the content into the document') }}</span>
                 </span>
               </div>
             </div>
 
             <!-- 직접 쓰기 -->
             <div v-else class="col10">
-              <TextInput v-model:value="title" v-bind="TI" data-autofocus label="문서 이름" essential placeholder="예: 신청 플로우 개발 메모" :input-props="{ id: 'docName', autocomplete: 'off' }" :label-props="{ htmlFor: 'docName' }" />
+              <TextInput v-model:value="title" v-bind="TI" data-autofocus :label="tr('Document name')" essential :placeholder="tr('e.g. Sign-up flow dev notes')" :input-props="{ id: 'docName', autocomplete: 'off' }" :label-props="{ htmlFor: 'docName' }" />
               <div class="col6">
-                <span id="tplLabel" class="tx-head">어떤 틀로 시작할까요?</span>
+                <span id="tplLabel" class="tx-head">{{ tr('Start from a template') }}</span>
                 <div class="tpl" role="radiogroup" aria-labelledby="tplLabel">
                   <button
                     v-for="t in TEMPLATES"
@@ -338,19 +341,19 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                     :aria-checked="template === t.key"
                     :class="['sq', 'tpl-item', { on: template === t.key }]"
                     @click="pickTemplate(t)"
-                  >{{ t.label }}</button>
+                  >{{ tr(t.label) }}</button>
                 </div>
               </div>
               <div class="col6">
-                <label for="docBody" class="tx-head">내용</label>
-                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" placeholder="'# ' 제목, '## ' 소제목, '- ' 목록. 빈 줄로 문단을 나눠요." /></div>
-                <span class="tx-meta num">요구사항 번호(REQ-001 등)로 시작하는 줄은 요구사항으로 등록돼요{{ foundCount ? ` · 지금 ${foundCount}개` : '' }}</span>
+                <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
+                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
+                <span class="tx-meta num">{{ tr('Lines starting with a requirement number (like REQ-001) become requirements') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
               </div>
             </div>
 
             <!-- 분류 -->
             <div class="col6">
-              <span id="catLabel" class="tx-head">분류</span>
+              <span id="catLabel" class="tx-head">{{ tr('Category') }}</span>
               <div class="seg cats" role="radiogroup" aria-labelledby="catLabel">
                 <button
                   v-for="c in CATS"
@@ -360,7 +363,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                   :aria-checked="category === c[0]"
                   :class="['sq', 'seg-item', { on: category === c[0] }]"
                   @click="category = c[0]"
-                >{{ c[1] }}</button>
+                >{{ tr(c[1]) }}</button>
               </div>
             </div>
 
@@ -368,8 +371,8 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
           </div>
 
           <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" :disabled="saving" @click="close">취소</Button>
-            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave && !saving" @click="save">추가하기</Button>
+            <Button size="m" type="tertiary" class="grow1" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
+            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Add') }}</Button>
           </div>
         </template>
       </section>

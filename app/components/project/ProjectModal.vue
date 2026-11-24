@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button, Icon, TextInput } from '@ba-dream/design-system'
 import { KIND_INFO, type ProjectKind } from '~/composables/useProjectActions'
-import { STATUS_LABEL, type ProjectStatus } from '~/composables/useProjects'
+import { statusLabel, type ProjectStatus } from '~/composables/useProjects'
 
 /** 새 프로젝트 만들기(projectId 없음) · 프로젝트 설정(projectId 있음): 이름 · 설명 · 종류 · 단계 · 지우기 */
 const props = defineProps<{ projectId?: string | null }>()
@@ -10,6 +10,8 @@ const emit = defineEmits<{ created: [id: string]; removed: [] }>()
 const actions = useProjectActions()
 
 const editing = computed(() => !!props.projectId)
+/** 종류 카드 둘째 줄: 기기 이름(위) · 크기(아래) — 두 줄로 */
+const KIND_DEVICE: Record<ProjectKind, string> = { app: 'Mobile', web: 'Desktop', detail_page: 'Long page' }
 const name = ref('')
 const description = ref('')
 const kind = ref<ProjectKind>('app')
@@ -30,7 +32,7 @@ watch(open, async (on) => {
       try {
         const d = await actions.detail(props.projectId)
         name.value = d.name; description.value = d.description ?? ''; kind.value = d.kind; status.value = d.status
-      } catch { err.value = '프로젝트 정보를 불러오지 못했어요.' }
+      } catch { err.value = tr("Couldn't load the project.") }
     } else { name.value = ''; description.value = ''; kind.value = 'app'; status.value = 'planning' }
     await nextTick()
     dialog.value?.querySelector<HTMLInputElement>('input')?.focus()
@@ -50,7 +52,7 @@ function onKeydown(e: KeyboardEvent) {
 
 async function submit() {
   const n = name.value.trim()
-  if (!n) { err.value = '프로젝트 이름을 적어주세요.'; return }
+  if (!n) { err.value = tr('Enter a project name.'); return }
   busy.value = true
   err.value = ''
   try {
@@ -62,7 +64,7 @@ async function submit() {
       open.value = false
       emit('created', id)
     }
-  } catch { err.value = editing.value ? '저장하지 못했어요. 잠시 뒤 다시 시도해주세요.' : '프로젝트를 만들지 못했어요. 잠시 뒤 다시 시도해주세요.' }
+  } catch { err.value = editing.value ? tr("Couldn't save. Try again in a moment.") : tr("Couldn't create the project. Try again in a moment.") }
   busy.value = false
 }
 
@@ -74,7 +76,7 @@ async function remove() {
     busy.value = false
     open.value = false
     emit('removed')
-  } catch { err.value = '지우지 못했어요. 잠시 뒤 다시 시도해주세요.'; busy.value = false }
+  } catch { err.value = tr("Couldn't delete. Try again in a moment."); busy.value = false }
 }
 const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done']
 </script>
@@ -84,52 +86,51 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
     <div v-if="open" class="backdrop" @mousedown.self="close">
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="projTitle" class="sq dialog" @keydown="onKeydown">
         <header class="head">
-          <h2 id="projTitle" class="tx-title">{{ editing ? '프로젝트 설정' : '새 프로젝트' }}</h2>
-          <button type="button" class="ib" aria-label="닫기" @click="close"><Icon name="close" :size="20" /></button>
+          <h2 id="projTitle" class="ttl">{{ editing ? tr('Project settings') : tr('New project') }}</h2>
+          <button type="button" class="sq ib" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
         </header>
 
         <form class="body" @submit.prevent="submit">
-          <TextInput v-model:value="name" size="s" label="이름" placeholder="예: 착한구독 신청 플로우 개편" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projName', maxlength: 60 }" :label-props="{ htmlFor: 'projName' }" />
+          <TextInput v-model:value="name" size="s" :label="tr('Name')" :placeholder="tr('e.g. Subscription sign-up flow redesign')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projName', maxlength: 60 }" :label-props="{ htmlFor: 'projName' }" />
 
           <template v-if="editing">
-            <TextInput v-model:value="description" class="mt" size="s" label="설명" placeholder="무엇을 바꾸는 프로젝트인지 한 줄로" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projDesc', maxlength: 120 }" :label-props="{ htmlFor: 'projDesc' }" />
+            <TextInput v-model:value="description" class="mt" size="s" :label="tr('Description')" :placeholder="tr('One line on what this project changes')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projDesc', maxlength: 120 }" :label-props="{ htmlFor: 'projDesc' }" />
           </template>
 
-          <span class="tx-head mt">종류</span>
-          <div class="kinds" role="radiogroup" aria-label="프로젝트 종류">
+          <span class="tx-head mt">{{ tr('Type') }}</span>
+          <div class="kinds" role="radiogroup" :aria-label="tr('Project type')">
             <button v-for="(k, key) in KIND_INFO" :key="key" type="button" role="radio" :aria-checked="kind === key" :class="['sq', 'kind', { on: kind === key }]" @click="kind = key">
               <span class="sh-box" aria-hidden="true"><span class="sq shape" :class="key" /></span>
-              <span class="tx-head">{{ k.label }}</span>
-              <span class="tx-meta">{{ editing ? k.label + ' 화면' : k.desc }}</span>
+              <span class="tx-head">{{ tr(k.label) }}</span>
+              <span class="tx-meta kd">{{ tr(KIND_DEVICE[key]) }}<br><span class="num">{{ k.w }} × {{ k.h }}</span></span>
             </button>
           </div>
-          <span v-if="!editing" class="tx-meta">첫 페이지에 이 크기의 빈 화면을 하나 만들어 둘게요.</span>
 
           <template v-if="editing">
-            <span class="tx-head mt">단계</span>
-            <div class="seg" role="radiogroup" aria-label="단계">
-              <button v-for="s in STATUSES" :key="s" type="button" role="radio" :aria-checked="status === s" :class="['sq', 'seg-item', { on: status === s }]" @click="status = s">{{ STATUS_LABEL[s] }}</button>
+            <span class="tx-head mt">{{ tr('Stage') }}</span>
+            <div class="seg" role="radiogroup" :aria-label="tr('Stage')">
+              <button v-for="s in STATUSES" :key="s" type="button" role="radio" :aria-checked="status === s" :class="['sq', 'seg-item', { on: status === s }]" @click="status = s">{{ statusLabel(s) }}</button>
             </div>
           </template>
 
           <p v-if="err" class="tx-meta err" role="alert">{{ err }}</p>
-          <button type="submit" class="sr" tabindex="-1">저장</button>
+          <button type="submit" class="sr" tabindex="-1">{{ tr('Save') }}</button>
         </form>
 
         <div v-if="editing" class="sq danger-zone">
           <template v-if="!confirmDelete">
-            <span class="tx-meta">프로젝트를 지우면 페이지 · 화면 · 문서 · 요구사항이 모두 함께 지워져요.</span>
-            <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">지우기</Button>
+            <span class="tx-meta">{{ tr('Deleting a project also deletes all its pages, frames, docs and requirements.') }}</span>
+            <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">{{ tr('Delete') }}</Button>
           </template>
           <template v-else>
-            <span class="tx-meta red">정말 지울까요? 되돌릴 수 없어요.</span>
-            <span class="row"><Button size="s" type="tertiary" @click="confirmDelete = false">취소</Button><Button size="s" type="destructed" :loading="busy" @click="remove">지우기</Button></span>
+            <span class="tx-meta red">{{ tr("Delete this project? You can't undo this.") }}</span>
+            <span class="row"><Button size="s" type="tertiary" @click="confirmDelete = false">{{ tr('Cancel') }}</Button><Button size="s" type="destructed" :loading="busy" @click="remove">{{ tr('Delete') }}</Button></span>
           </template>
         </div>
 
         <footer class="foot">
-          <Button size="m" type="tertiary" class="w" @click="close">취소</Button>
-          <Button size="m" type="primary" class="w" :loading="busy" :disabled="!name.trim()" @click="submit">{{ editing ? '저장' : '만들기' }}</Button>
+          <Button size="s" type="tertiary" @click="close">{{ tr('Cancel') }}</Button>
+          <Button size="s" type="primary" :loading="busy" :disabled="!name.trim()" @click="submit">{{ editing ? tr('Save') : tr('Create') }}</Button>
         </footer>
       </section>
     </div>
@@ -138,25 +139,29 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 
 <style scoped>
 .backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 480px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
-.head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-10); }
-.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); }
+.dialog { width: 100%; max-width: 440px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
+/* 프로필 창과 같은 양식: 머리 48(제목 14/600 · 닫기 28) · 안쪽 16 · 버튼은 오른쪽 아래 작게(s) */
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); height: 48px; box-sizing: border-box; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); flex: none; }
+.ttl { margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; }
+.head .ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
+.head .ib:hover { --sq-fill: var(--sys-color-neutral-100); }
+.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); }
 .mt { margin-top: var(--ref-spacing-06); }
-.kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
-.kind { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }
+.kind { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); text-align: left; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .kind:hover { --sq-overlay: var(--interaction-light-gray-hover); }
 .kind.on { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); }
-.sh-box { height: 40px; display: flex; align-items: flex-end; margin-bottom: var(--ref-spacing-04); }
+.sh-box { height: 40px; align-self: stretch; display: flex; align-items: flex-end; margin-bottom: var(--ref-spacing-04); }
 .shape { border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 1px; }
 .shape.app { width: 18px; height: 36px; }
 .shape.web { width: 56px; height: 34px; }
 .shape.detail_page { width: 14px; height: 40px; }
 .err { color: var(--sys-color-theme-error-default); margin: var(--ref-spacing-04) 0 0; }
-.danger-zone { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: 0 var(--ref-spacing-12) var(--ref-spacing-10); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
+.danger-zone { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: 0 var(--ref-spacing-10) var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
 .row { display: flex; gap: var(--ref-spacing-04); flex: none; }
 .red { color: var(--sys-color-theme-error-default); }
-.foot { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
-.w { width: 100%; }
+.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); }
+.kd { white-space: nowrap; }
 .kind:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .mt { margin-top: var(--ref-spacing-06); }
 </style>

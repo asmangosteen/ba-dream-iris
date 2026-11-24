@@ -270,7 +270,7 @@ function onKey(e: KeyboardEvent) {
     <i v-if="smoothBg" class="smw" :style="{ filter: (!clipsContent && smoothShadow) || undefined }"><i class="smb" :style="smoothBg" /></i>
     <span v-if="n.type === 'section'" class="sec-name" :data-sec="n.id">
       <!-- 섹션 이름 두 번 누르기: 그 자리에서 고치기(화면 이름표 · 레이어 목록과 같아요 — Enter 저장 · Esc 취소 · 바깥 누르면 저장) -->
-      <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" aria-label="Section name" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
+      <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
       <template v-else>{{ n.name }}</template>
     </span>
     <BooleanView v-if="n.type === 'boolean'" :doc="doc" :node="n" />

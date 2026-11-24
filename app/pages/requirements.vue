@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button, Icon, SearchField, Skeleton, TextButton } from '@ba-dream/design-system'
 import type { LinkRow, LinkStatus, ReqRow } from '~/composables/useIrisData'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * 요구사항 보드 — 프로젝트 전체 요구사항을 반영 상태로 거르고, 하나를 누르면 연결된 화면과 상태를 봅니다.
@@ -24,7 +25,7 @@ const STATUS_TEXT: Record<ReqStatus, string> = {
   partial: LINK_STATUS.partial.label,
   reflected: LINK_STATUS.reflected.label,
   na: LINK_STATUS.na.label,
-  none: '연결 안 됨',
+  none: 'Not linked',
 }
 const TODO: ReqStatus[] = ['missing', 'none', 'partial']
 
@@ -46,6 +47,13 @@ const projectId = (typeof route.query.p === 'string' && route.query.p) || projec
 const project = computed(() => projects.value?.find((p) => p.id === projectId) ?? null)
 const activeProjects = computed(() => (projects.value ?? []).filter((p) => p.status !== 'done'))
 const doneProjects = computed(() => (projects.value ?? []).filter((p) => p.status === 'done'))
+// 제목 옆 프로젝트 고르기 메뉴
+const pickOpen = ref(false)
+const pickRef = ref<HTMLElement | null>(null)
+function onPickDown(e: MouseEvent) { if (pickOpen.value && pickRef.value && !pickRef.value.contains(e.target as Node)) pickOpen.value = false }
+function onPickKey(e: KeyboardEvent) { if (e.key === 'Escape' && pickOpen.value) pickOpen.value = false }
+onMounted(() => { document.addEventListener('mousedown', onPickDown); document.addEventListener('keydown', onPickKey) })
+onBeforeUnmount(() => { document.removeEventListener('mousedown', onPickDown); document.removeEventListener('keydown', onPickKey) })
 
 // ---------------------------------------------------------------------------
 // 데이터 (프로젝트가 있을 때만 읽습니다)
@@ -86,14 +94,14 @@ const rows = computed<BoardRow[]>(() =>
   (board?.reqs.data.value ?? []).map((req) => {
     const links = linksByReq.value.get(req.id) ?? []
     const doc = docById.value.get(req.document_id)
-    const names = links.map((l) => screenById.value.get(l.screen_id)?.name ?? '이름 없는 화면')
+    const names = links.map((l) => screenById.value.get(l.screen_id)?.name ?? tr('Untitled screen'))
     return {
       req,
       status: deriveStatus(links),
       links,
-      doc: doc?.title ?? '문서 없음',
+      doc: doc?.title ?? tr('No document'),
       docVersion: doc?.version_label ?? '',
-      screen: names.length ? names[0] + (names.length > 1 ? ` 외 ${names.length - 1}` : '') : '',
+      screen: names.length ? (names.length > 1 ? tr('{name} +{n} more', { name: names[0]!, n: names.length - 1 }) : names[0]!) : '',
     }
   }),
 )
@@ -104,7 +112,7 @@ const rows = computed<BoardRow[]>(() =>
 const filter = ref<FilterKey>('all')
 const query = ref('')
 const filters: { key: 'all' | ReqStatus; label: string }[] = [
-  { key: 'all', label: '전체' },
+  { key: 'all', label: 'All' },
   { key: 'missing', label: STATUS_TEXT.missing },
   { key: 'partial', label: STATUS_TEXT.partial },
   { key: 'reflected', label: STATUS_TEXT.reflected },
@@ -123,9 +131,9 @@ const shown = computed(() => {
   return list
 })
 const emptyText = computed(() => {
-  if (query.value.trim()) return '찾는 요구사항이 없어요'
-  if (filter.value === 'todo') return '손볼 요구사항이 없어요. 모두 반영됐어요'
-  return '이 상태의 요구사항이 없어요'
+  if (query.value.trim()) return tr('No matching requirements')
+  if (filter.value === 'todo') return tr('Nothing to fix. Everything is reflected')
+  return tr('No requirements with this status')
 })
 function toggleTodo() {
   filter.value = filter.value === 'todo' ? 'all' : 'todo'
@@ -216,74 +224,67 @@ onBeforeUnmount(() => {
 // ---------------------------------------------------------------------------
 function exportCsv() {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const head = ['번호', '요구사항', '문서', '화면', '중요도', '상태']
+  const head = [tr('ID'), tr('Requirement'), tr('Document'), tr('Screens'), tr('Priority'), tr('Status')]
   const body = shown.value.map((r) => [
     r.req.code,
     r.req.title,
     r.doc + (r.docVersion ? ` ${r.docVersion}` : ''),
-    r.links.map((l) => `${screenById.value.get(l.screen_id)?.name ?? ''}(${LINK_STATUS[l.status].label})`).join(', '),
-    r.req.priority ? PRIORITY_LABEL[r.req.priority] : '',
-    STATUS_TEXT[r.status],
+    r.links.map((l) => `${screenById.value.get(l.screen_id)?.name ?? ''}(${tr(LINK_STATUS[l.status].label)})`).join(', '),
+    r.req.priority ? tr(PRIORITY_LABEL[r.req.priority]) : '',
+    tr(STATUS_TEXT[r.status]),
   ])
   const csv = '﻿' + [head, ...body].map((line) => line.map(esc).join(',')).join('\r\n')
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = `요구사항-${project.value?.name ?? projectId}.csv`
+  a.download = tr('Requirements-{name}.csv', { name: project.value?.name ?? projectId })
   a.click()
   URL.revokeObjectURL(url)
 }
 </script>
 
 <template>
+  <AppShell>
   <div class="shell">
-    <AppTopBar />
-
-    <!-- 왼쪽: 프로젝트 고르기 -->
-    <aside aria-label="프로젝트" class="sq float side">
-      <div v-if="projectsStatus === 'pending'" class="side-sk">
-        <Skeleton v-for="i in 4" :key="i" shape="text" />
-      </div>
-      <p v-else-if="projectsError" class="tx-meta side-empty">프로젝트를 불러오지 못했어요</p>
-      <p v-else-if="!projects?.length" class="tx-meta side-empty">아직 프로젝트가 없어요</p>
-      <template v-else>
-        <template v-if="activeProjects.length">
-          <span class="nav-label">진행 중</span>
-          <NuxtLink v-for="p in activeProjects" :key="p.id" :to="{ query: { p: p.id } }" :class="['sq', 'nav-item', 's', { on: p.id === projectId }]" :aria-current="p.id === projectId ? 'page' : undefined">
-            <span class="ellipsis">{{ p.name }}</span>
-          </NuxtLink>
-        </template>
-        <template v-if="doneProjects.length">
-          <span class="nav-label" :class="{ gap: activeProjects.length }">완료</span>
-          <NuxtLink v-for="p in doneProjects" :key="p.id" :to="{ query: { p: p.id } }" :class="['sq', 'nav-item', 's', { on: p.id === projectId }]" :aria-current="p.id === projectId ? 'page' : undefined">
-            <span class="ellipsis">{{ p.name }}</span>
-          </NuxtLink>
-        </template>
-      </template>
-    </aside>
 
     <!-- 가운데: 요구사항 표 -->
     <main class="sq float body"><div class="scroller">
       <div class="head">
         <div class="title-col">
-          <h1 class="tx-title">요구사항</h1>
-          <span v-if="project" class="tx-meta">{{ project.name }}</span>
+          <h1 class="ttl">{{ tr('Requirements') }}</h1>
+          <!-- 프로젝트 고르기: 따로 있던 프로젝트 목록 칸 대신 제목 옆 메뉴(검은 메뉴) -->
+          <div v-if="projects?.length" ref="pickRef" class="pick">
+            <button type="button" class="sq pick-btn" aria-haspopup="menu" :aria-expanded="pickOpen" @click="pickOpen = !pickOpen">
+              <span class="ellipsis">{{ project?.name ?? tr('Choose a project') }}</span><EditorIcon name="chevron_down" :size="12" />
+            </button>
+            <div v-if="pickOpen" class="sq menu pick-menu" role="menu" @click="pickOpen = false">
+              <template v-if="activeProjects.length">
+                <span class="menu-lbl">{{ tr('Active') }}</span>
+                <NuxtLink v-for="p in activeProjects" :key="p.id" :to="{ query: { p: p.id } }" role="menuitemradio" :aria-checked="p.id === projectId" :class="['sq', 'menu-item', { on: p.id === projectId }]"><span class="ellipsis">{{ p.name }}</span></NuxtLink>
+              </template>
+              <template v-if="doneProjects.length">
+                <div v-if="activeProjects.length" class="msep" role="separator" />
+                <span class="menu-lbl">{{ tr('Completed') }}</span>
+                <NuxtLink v-for="p in doneProjects" :key="p.id" :to="{ query: { p: p.id } }" role="menuitemradio" :aria-checked="p.id === projectId" :class="['sq', 'menu-item', { on: p.id === projectId }]"><span class="ellipsis">{{ p.name }}</span></NuxtLink>
+              </template>
+            </div>
+          </div>
         </div>
         <div class="actions">
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="download" :disabled="!shown.length" @click="exportCsv">내보내기</Button>
-          <Button v-if="projectId" size="s" type="primary" contents="icon-text" icon-name="plus" @click="navigateTo(`/p/${projectId}`)">요구사항 추가</Button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="download" :disabled="!shown.length" @click="exportCsv">{{ tr('Export') }}</Button>
+          <Button v-if="projectId" size="s" type="primary" contents="icon-text" icon-name="plus" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add requirement') }}</Button>
         </div>
       </div>
 
       <div v-if="!projectId" class="empty">
-        <p class="tx-meta">{{ projectsError ? '프로젝트를 불러오지 못했어요' : '프로젝트를 먼저 만들어 주세요' }}</p>
-        <Button v-if="projectsError" size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">다시 불러오기</Button>
-        <Button v-else size="s" type="tertiary" stroke @click="navigateTo('/')">프로젝트로 가기</Button>
+        <p class="tx-meta">{{ projectsError ? tr("Couldn't load projects") : tr('Create a project first') }}</p>
+        <Button v-if="projectsError" size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">{{ tr('Reload') }}</Button>
+        <Button v-else size="s" type="tertiary" stroke @click="navigateTo('/')">{{ tr('Go to projects') }}</Button>
       </div>
 
       <template v-else>
         <div class="tools">
-          <div class="seg filters" role="tablist" aria-label="상태 거르기">
+          <div class="seg filters" role="tablist" :aria-label="tr('Filter by status')">
             <button
               v-for="f in filters"
               :key="f.key"
@@ -293,38 +294,38 @@ function exportCsv() {
               :class="['sq', 'seg-item', { on: filter === f.key }]"
               @click="filter = f.key"
             >
-              {{ f.label }} <span class="n num">{{ count(f.key) }}</span>
+              {{ tr(f.label) }} <span class="n num">{{ count(f.key) }}</span>
             </button>
           </div>
           <div class="tools-right">
             <Button size="s" type="tertiary" :stroke="filter !== 'todo'" contents="icon-text" :icon-name="filter === 'todo' ? 'check' : 'warning'" :aria-pressed="filter === 'todo'" @click="toggleTodo">
-              미반영 모아보기 <span class="num">{{ count('todo') }}</span>
+              {{ tr('Needs work') }} <span class="num">{{ count('todo') }}</span>
             </Button>
-            <SearchField v-model:value="query" class="search" type="contained" size="s" placeholder="번호나 내용으로 찾기" :input-props="{ 'aria-label': '요구사항 검색' }" />
+            <SearchField v-model:value="query" class="search" type="contained" size="s" :placeholder="tr('Search by ID or text')" :input-props="{ 'aria-label': tr('Search requirements') }" />
           </div>
         </div>
 
         <div v-if="failed" class="empty">
-          <p class="tx-meta">요구사항을 불러오지 못했어요</p>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">다시 불러오기</Button>
+          <p class="tx-meta">{{ tr("Couldn't load requirements") }}</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">{{ tr('Reload') }}</Button>
         </div>
 
-        <table v-else class="grid">
+        <div v-else class="table-wrap"><table class="grid">
           <thead>
             <tr>
-              <th scope="col" class="tx-meta c-code">번호</th>
-              <th scope="col" class="tx-meta">요구사항</th>
-              <th scope="col" class="tx-meta c-doc">문서</th>
-              <th scope="col" class="tx-meta c-screen">화면</th>
-              <th scope="col" class="tx-meta c-pri">중요도</th>
-              <th scope="col" class="tx-meta c-status">상태</th>
+              <th scope="col" class="tx-meta c-code">{{ tr('ID') }}</th>
+              <th scope="col" class="tx-meta">{{ tr('Requirement') }}</th>
+              <th scope="col" class="tx-meta c-doc">{{ tr('Document') }}</th>
+              <th scope="col" class="tx-meta c-screen">{{ tr('Screens') }}</th>
+              <th scope="col" class="tx-meta c-pri">{{ tr('Priority') }}</th>
+              <th scope="col" class="tx-meta c-status">{{ tr('Status') }}</th>
             </tr>
           </thead>
           <tbody v-if="loading">
             <tr v-for="i in 8" :key="i" class="sk">
               <td><Skeleton shape="text" width="48px" /></td>
               <td><Skeleton shape="text" width="70%" /></td>
-              <td><Skeleton shape="text" width="80%" /></td>
+              <td class="c-doc"><Skeleton shape="text" width="80%" /></td>
               <td><Skeleton shape="text" width="80%" /></td>
               <td><Skeleton shape="text" width="32px" /></td>
               <td><Skeleton shape="text" width="56px" /></td>
@@ -343,61 +344,61 @@ function exportCsv() {
             >
               <td class="tx-head nowrap num">{{ r.req.code }}</td>
               <td class="tx-body t-title">{{ r.req.title }}</td>
-              <td class="tx-meta"><span class="ellipsis" :title="r.doc + (r.docVersion ? ` · ${r.docVersion}` : '')">{{ r.doc }}<template v-if="r.docVersion"> · {{ r.docVersion }}</template></span></td>
-              <td class="tx-body"><span :class="['ellipsis', r.screen ? 'linked' : 'unlinked']" :title="r.screen || undefined">{{ r.screen || STATUS_TEXT.none }}</span></td>
-              <td class="tx-meta">{{ r.req.priority ? PRIORITY_LABEL[r.req.priority] : '—' }}</td>
+              <td class="tx-meta c-doc"><span class="ellipsis" :title="r.doc + (r.docVersion ? ` · ${r.docVersion}` : '')">{{ r.doc }}<template v-if="r.docVersion"> · {{ r.docVersion }}</template></span></td>
+              <td class="tx-body"><span :class="['ellipsis', r.screen ? 'linked' : 'unlinked']" :title="r.screen || undefined">{{ r.screen || tr(STATUS_TEXT.none) }}</span></td>
+              <td class="tx-meta">{{ r.req.priority ? tr(PRIORITY_LABEL[r.req.priority]) : '—' }}</td>
               <td class="tx-body">
                 <span class="status">
                   <StatusIcon v-if="r.status !== 'none'" :status="r.status" :size="12" />
                   <span v-else class="st-none" aria-hidden="true" />
-                  {{ STATUS_TEXT[r.status] }}
+                  {{ tr(STATUS_TEXT[r.status]) }}
                 </span>
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
 
         <div v-if="!loading && !failed && !rows.length" class="empty">
-          <p class="tx-meta">아직 요구사항이 없어요. 문서에 REQ-001 같은 번호를 적으면 자동으로 모아요</p>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="document" @click="navigateTo(`/p/${projectId}`)">문서 추가하러 가기</Button>
+          <p class="tx-meta">{{ tr('No requirements yet. Write IDs like REQ-001 in a document and they’re collected automatically') }}</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="document" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add a document') }}</Button>
         </div>
         <div v-else-if="!loading && !failed && !shown.length" class="empty">
           <p class="tx-meta">{{ emptyText }}</p>
-          <TextButton size="s" color="blue" @click="clearFilters">거르기 지우기</TextButton>
+          <TextButton size="s" color="blue" @click="clearFilters">{{ tr('Clear filters') }}</TextButton>
         </div>
       </template>
     </div></main>
 
     <!-- 오른쪽: 선택한 요구사항 -->
-    <aside v-if="selected" aria-label="요구사항 상세" class="sq float detail"><div class="scroller">
+    <aside v-if="selected" :aria-label="tr('Requirement details')" class="sq float detail"><div class="scroller">
       <div class="sec-h d-top">
         <span class="num">{{ selected.req.code }}</span>
-        <button type="button" class="ib s" aria-label="닫기" @click="selectedId = null"><Icon name="close" :size="14" /></button>
+        <button type="button" class="ib s" :aria-label="tr('Close')" @click="selectedId = null"><Icon name="close" :size="14" /></button>
       </div>
       <div class="d-pad">
         <p class="tx-body d-title">{{ selected.req.title }}</p>
         <p v-if="selected.req.body" class="tx-read">{{ selected.req.body }}</p>
         <div class="sq summary">
-          <div class="kv"><span class="tx-meta">상태</span>
+          <div class="kv"><span class="tx-meta">{{ tr('Status') }}</span>
             <span class="status tx-body">
               <StatusIcon v-if="selected.status !== 'none'" :status="selected.status" :size="12" />
               <span v-else class="st-none" aria-hidden="true" />
-              {{ STATUS_TEXT[selected.status] }}
+              {{ tr(STATUS_TEXT[selected.status]) }}
             </span>
           </div>
-          <div class="kv"><span class="tx-meta">중요도</span><span class="tx-body">{{ selected.req.priority ? PRIORITY_LABEL[selected.req.priority] : '정하지 않음' }}</span></div>
-          <div class="kv"><span class="tx-meta">문서</span><span class="tx-body ellipsis" :title="selected.doc + (selected.docVersion ? ` · ${selected.docVersion}` : '')">{{ selected.doc }}<template v-if="selected.docVersion"> · {{ selected.docVersion }}</template></span></div>
+          <div class="kv"><span class="tx-meta">{{ tr('Priority') }}</span><span class="tx-body">{{ selected.req.priority ? tr(PRIORITY_LABEL[selected.req.priority]) : tr('Not set') }}</span></div>
+          <div class="kv"><span class="tx-meta">{{ tr('Document') }}</span><span class="tx-body ellipsis" :title="selected.doc + (selected.docVersion ? ` · ${selected.docVersion}` : '')">{{ selected.doc }}<template v-if="selected.docVersion"> · {{ selected.docVersion }}</template></span></div>
         </div>
-        <TextButton class="src" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" @click="navigateTo(sourceHref(selected.req))">원문 보기</TextButton>
+        <TextButton class="src" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" @click="navigateTo(sourceHref(selected.req))">{{ tr('View source') }}</TextButton>
       </div>
 
       <section class="sec">
         <div class="sec-h">
-          <span>연결된 화면 <span class="tx-meta num">{{ selected.links.length }}</span></span>
+          <span>{{ tr('Linked screens') }} <span class="tx-meta num">{{ selected.links.length }}</span></span>
           <div ref="addRef" class="add">
-            <button type="button" class="ib s" aria-label="화면 연결" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><Icon name="plus" :size="14" /></button>
+            <button type="button" class="ib s" :aria-label="tr('Link a screen')" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><Icon name="plus" :size="14" /></button>
             <div v-if="addOpen" class="sq menu" role="menu">
-              <p v-if="!linkable.length" class="tx-meta menu-empty">더 연결할 화면이 없어요</p>
+              <p v-if="!linkable.length" class="tx-meta menu-empty">{{ tr('No more screens to link') }}</p>
               <button v-for="s in linkable" :key="s.id" type="button" role="menuitem" class="sq menu-item" :title="s.name" @click="link(s.id)">
                 <span class="ellipsis">{{ s.name }}</span><span class="tx-meta menu-page">{{ s.page }}</span>
               </button>
@@ -406,57 +407,67 @@ function exportCsv() {
         </div>
         <div class="d-pad cards">
           <div v-if="!selectedLinks.length" class="no-link">
-            <p class="tx-meta">아직 연결된 화면이 없어요</p>
-            <TextButton size="s" color="blue" contents="icon-text" icon-name="plus" :disabled="saving" @click.stop="addOpen = true">화면 연결</TextButton>
+            <p class="tx-meta">{{ tr('No linked screens yet') }}</p>
+            <TextButton size="s" color="blue" contents="icon-text" icon-name="plus" :disabled="saving" @click.stop="addOpen = true">{{ tr('Link a screen') }}</TextButton>
           </div>
           <div v-for="{ link: l, screen } in selectedLinks" :key="l.screen_id" class="sq card">
             <div class="card-row">
-              <button type="button" class="sq st-btn" :disabled="saving" :aria-label="`상태 바꾸기: 지금 ${LINK_STATUS[l.status].label}`" :title="`눌러서 ${LINK_STATUS[NEXT_STATUS[l.status]].label}(으)로 바꿔요`" @click="cycle(l)">
+              <button type="button" class="sq st-btn" :disabled="saving" :aria-label="tr('Change status: currently {status}', { status: tr(LINK_STATUS[l.status].label) })" :title="tr('Click to change to {status}', { status: tr(LINK_STATUS[NEXT_STATUS[l.status]].label) })" @click="cycle(l)">
                 <StatusIcon :status="l.status" :size="12" />
               </button>
               <div class="card-col">
-                <NuxtLink :to="`/p/${projectId}?screen=${l.screen_id}`" class="tx-body card-name ellipsis" :title="screen?.name ?? undefined">{{ screen?.name ?? '이름 없는 화면' }}</NuxtLink>
-                <span class="tx-meta ellipsis">{{ LINK_STATUS[l.status].label }}<template v-if="screen?.page"> · {{ screen.page }}</template></span>
+                <NuxtLink :to="`/p/${projectId}?screen=${l.screen_id}`" class="tx-body card-name ellipsis" :title="screen?.name ?? undefined">{{ screen?.name ?? tr('Untitled screen') }}</NuxtLink>
+                <span class="tx-meta ellipsis">{{ tr(LINK_STATUS[l.status].label) }}<template v-if="screen?.page"> · {{ screen.page }}</template></span>
               </div>
-              <button type="button" class="ib s" :disabled="saving" aria-label="연결 끊기" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><Icon name="trashbin" :size="14" /></button>
+              <button type="button" class="ib s" :disabled="saving" :aria-label="tr('Unlink')" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><Icon name="trashbin" :size="14" /></button>
             </div>
             <p v-if="l.note" class="sq tx-body note">{{ l.note }}</p>
-            <div v-if="unlinking === l.screen_id" class="unlink" role="alertdialog" :aria-label="`${screen?.name ?? '화면'} 연결 끊기`">
-              <span class="tx-meta">이 화면과의 연결을 끊을까요?</span>
-              <Button size="s" type="tertiary" @click="unlinking = null">취소</Button>
-              <Button size="s" type="destructed" :loading="saving" @click="unlink(l)">끊기</Button>
+            <div v-if="unlinking === l.screen_id" class="unlink" role="alertdialog" :aria-label="tr('Unlink {name}', { name: screen?.name ?? tr('Untitled screen') })">
+              <span class="tx-meta">{{ tr('Unlink this screen?') }}</span>
+              <Button size="s" type="tertiary" @click="unlinking = null">{{ tr('Cancel') }}</Button>
+              <Button size="s" type="destructed" :loading="saving" @click="unlink(l)">{{ tr('Unlink') }}</Button>
             </div>
           </div>
-          <p v-if="saveError" class="tx-meta err" role="alert">바꾸지 못했어요. 잠시 뒤 다시 해 주세요</p>
+          <p v-if="saveError" class="tx-meta err" role="alert">{{ tr("Couldn't save the change. Try again in a moment") }}</p>
         </div>
       </section>
     </div></aside>
   </div>
+  </AppShell>
 </template>
 
 <style scoped>
-.shell { height: 100vh; position: relative; overflow: hidden; box-sizing: border-box; padding: 56px var(--iris-gap) var(--iris-gap); display: flex; gap: var(--iris-gap); background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
-
-/* 왼쪽 프로젝트 */
-.side { flex: 0 0 264px; box-sizing: border-box; padding: var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-02); overflow: auto; }
-.side .nav-label.gap { margin-top: var(--ref-spacing-10); }
-.side-empty { margin: 0; padding: 0 var(--ref-spacing-08); }
-.side-sk { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-08); }
+/* 홈 틀(AppShell) 본문 안: 떠 있는 카드 없이 흰 면 하나 — 목록 · 본문 · 상세는 세로 선 1px 로 나눠요 */
+.shell { flex: 1; min-height: 0; position: relative; overflow: hidden; box-sizing: border-box; display: flex; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
 
 /* 가운데 표 */
 .body { flex: 1; min-width: 0;   box-sizing: border-box;  overflow: hidden; display: flex; flex-direction: column; }
-.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-14) var(--ref-spacing-14) var(--ref-spacing-19); }
-.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-10); }
-.title-col { display: flex; align-items: baseline; gap: var(--ref-spacing-06); min-width: 0; }
+.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19); }
+/* 제목 줄: 프로젝트 목록과 같은 제목 20/600 + 프로젝트 고르기(글자 버튼 ▾) */
+.ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; }
+.pick { position: relative; min-width: 0; }
+.pick-btn { display: flex; align-items: center; gap: var(--ref-spacing-03); max-width: 320px; height: 28px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-03); font-size: 13px; line-height: 20px; color: var(--sys-color-neutral-600); }
+.pick-btn:hover, .pick-btn[aria-expanded='true'] { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.pick-btn :deep(.eic) { flex: none; color: var(--sys-color-neutral-500); }
+.pick-menu { left: 0; right: auto; top: calc(100% + 4px); width: 240px; max-height: 360px; overflow: auto; }
+/* 고른 프로젝트는 왼쪽 ✓ 칸(편집기 고르는 목록과 같아요) */
+.pick-menu .menu-item { padding-left: 26px; background-repeat: no-repeat; background-position: 8px center; background-size: 12px; }
+.menu-lbl { padding-left: 26px !important; }
+.menu-lbl { display: block; padding: var(--ref-spacing-02) var(--ref-spacing-06); font-size: 11px; line-height: 16px; color: rgb(255 255 255 / 50%); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-10); min-height: 32px; }
+.title-col { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .actions { display: flex; gap: var(--ref-spacing-04); }
-.tools { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-12) 0 var(--ref-spacing-08); }
-.filters { margin-left: calc(-1 * var(--ref-spacing-06)); flex-wrap: wrap; }
+/* 거르기 줄: 왼쪽 상태 세그먼트(한 줄, 넘치면 가로로) · 오른쪽 손볼 것 + 검색 */
+.tools { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-08) 0 var(--ref-spacing-08); flex-wrap: wrap; }
+.filters { margin-left: calc(-1 * var(--ref-spacing-06)); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .tools-right { display: flex; align-items: center; gap: var(--ref-spacing-04); flex: none; }
-.search { width: 220px; }
+.search { width: 200px; }
 
-.grid { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
-.grid th { padding: var(--ref-spacing-06) var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--sys-color-neutral-800); }
-.grid td { padding: var(--ref-spacing-08) var(--ref-spacing-04); vertical-align: top; }
+/* 표: 좁으면 가로로 밀려요(요구사항 칸이 한 글자 폭으로 눌리지 않게 최소 560). 머리 줄은 옅은 선 */
+.table-wrap { overflow-x: auto; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-04); }
+.grid { width: 100%; min-width: 560px; border-collapse: collapse; text-align: left; table-layout: fixed; }
+.grid th { padding: var(--ref-spacing-06) var(--ref-spacing-06); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: inset 0 -1px 0 var(--iris-line); }
+.grid td { padding: var(--ref-spacing-07, 10px) var(--ref-spacing-06); vertical-align: top; }
 .grid tbody tr { box-shadow: inset 0 -1px 0 var(--iris-line); }
 .grid tbody tr:not(.sk) { cursor: pointer; }
 .grid td { transition: background-color .12s ease; }
@@ -465,11 +476,14 @@ function exportCsv() {
 .grid tbody tr.on td, .grid tbody tr.on:hover td { background: var(--sys-color-neutral-100); }
 .grid tbody tr.on .t-title { font-weight: 500; }
 .grid tbody tr:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+/* 본문이 좁으면(상세 패널을 열었을 때 등) 문서 칸은 숨겨요 — 상세 패널에 문서가 나와요 */
+.body { container-type: inline-size; }
+@container (max-width: 860px) { .c-doc { display: none; } }
 .c-code { width: 84px; }
-.c-doc { width: 170px; }
-.c-screen { width: 150px; }
-.c-pri { width: 64px; }
-.c-status { width: 96px; }
+.c-doc { width: 180px; }
+.c-screen { width: 132px; }
+.c-pri { width: 72px; }
+.c-status { width: 116px; }
 .nowrap { white-space: nowrap; }
 .ellipsis { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .linked { color: var(--sys-color-brand-primary-default); font-weight: 500; }
@@ -480,17 +494,17 @@ function exportCsv() {
 .empty p { margin: 0; }
 
 /* 오른쪽 상세 */
-.detail { flex: 0 0 320px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+.detail { flex: 0 0 340px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
 .detail > .scroller { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding-bottom: var(--ref-spacing-10); }
-.d-top { height: 40px; }
+.d-top { height: 48px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10) !important; }
 .ib.s { width: 24px; height: 24px; }
 .ib:disabled { opacity: .5; cursor: default; }
 .ib:disabled:hover { --sq-overlay: transparent; }
-.d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-08) var(--ref-spacing-10); }
+.d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-10) var(--ref-spacing-10); }
 .d-pad p { margin: 0; }
-.d-title { font-weight: 500; }
-.summary { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
-.kv { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-06); }
+.d-title { font-size: 14px; line-height: 22px; font-weight: 600; }
+.summary { display: flex; flex-direction: column; gap: var(--ref-spacing-05); padding: var(--ref-spacing-08) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
+.kv { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-06); }
 .src { align-self: flex-start; }
 .no-link { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); }
 .add { position: relative; }
@@ -515,4 +529,6 @@ function exportCsv() {
 .unlink > span { flex: 1; min-width: 0; }
 .note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .err { color: var(--sys-color-theme-destructed-default); }
+.shell > .float { --sq-fill: transparent; --sq-line: transparent; --sq-line-w: 0px; filter: none; border-radius: 0; }
+.shell > .float + .float { border-left: 1px solid var(--iris-line); }
 </style>

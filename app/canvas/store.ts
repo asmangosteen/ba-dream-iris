@@ -1,10 +1,10 @@
 import type { InjectionKey, Ref } from 'vue'
 import { relayout as layoutDoc, constrain, boxes0 } from './layout'
-import { guessAxis, currentGap } from './geom'
+import { guessAxis, currentGap, rowsOf } from './geom'
 import { shapeVnet } from './vector'
 import { scaledStyle } from './scale'
 import { newSmoothing } from './prefs'
-import { absPos, bindLiteral, descendants, isContainer, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type ExportSetting, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
+import { absPos, bindLiteral, descendants, isContainer, isGroupNode, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type ExportSetting, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, tidyRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
 
@@ -25,6 +25,9 @@ export function createLayerStore(opts: {
   const docs = reactive<Record<string, LayerDoc>>({})
   const screenId = ref<string | null>(null) // 고른 화면
   const layerIds = ref<string[]>([]) // 고른 레이어(같은 화면 안)
+  /** 픽셀에 맞추기: 켜져 있으면(픽셀 그리드 켬) 옮기기 · 크기가 정수, 끄면 소수 둘째 자리까지(페이지 설정 Pixel grid 와 함께 바뀌어요) */
+  const pixelSnap = ref(true)
+  const snapPx = (v: number) => (pixelSnap.value ? Math.round(v) : Math.round(v * 100) / 100)
   const editing = ref<string | null>(null) // 글자를 고치는 중인 텍스트 레이어
   const saveState = reactive<SaveState>({ state: 'idle' })
   const undoStack: Entry[] = []
@@ -320,6 +323,8 @@ export function createLayerStore(opts: {
     const cb = clipboard
     mutate(sid, (d) => {
       const map = new Map(cb.nodes.map((n) => [n.id, newId()]))
+      /** 원본 id → 방금 붙인 복제본 id(같은 원본을 여러 번 붙이면 그 뒤에 이어서) */
+      const lastAfter = new Map<string, string>()
       const sel = layerIds.value.length === 1 ? d.nodes[layerIds.value[0]!] : undefined
       const into = sel && isContainer(sel) && !cb.rootIds.includes(sel.id) ? sel.id : null
       const fresh: string[] = []
@@ -341,8 +346,17 @@ export function createLayerStore(opts: {
         const keep = !into && !!n.parentId && !!d.nodes[n.parentId]
         const parentId = root ? (into ?? (keep ? n.parentId : null)) : map.get(n.parentId!)!
         let x = n.x, y = n.y
-        if (root) {
-          if (same || keep) { x = n.x + offset; y = n.y + offset }
+        if (root && into) {
+          // 고른 프레임 안으로(피그마와 같아요): 원래 화면 위 자리가 프레임 안에 들어오면 그 자리, 아니면 프레임 가운데
+          const a = same ? cb.abs[n.id] ?? { x: n.x, y: n.y } : spot(n)
+          const pa = absPos(d, into), f = d.nodes[into]!
+          const lx = a.x - pa.x, ly = a.y - pa.y
+          const fits = lx >= 0 && ly >= 0 && lx + n.w <= f.w && ly + n.h <= f.h
+          x = (fits ? lx : Math.round((f.w - n.w) / 2)) + offset
+          y = (fits ? ly : Math.round((f.h - n.h) / 2)) + offset
+        } else if (root) {
+          if (keep) { x = n.x + offset; y = n.y + offset }
+          else if (same) { const a = cb.abs[n.id] ?? { x: n.x, y: n.y }; x = a.x + offset; y = a.y + offset } // 원래 부모가 없어졌으면 화면 위 같은 자리
           else {
             const p = spot(n)
             const pa = parentId ? absPos(d, parentId) : { x: 0, y: 0 }
@@ -350,15 +364,59 @@ export function createLayerStore(opts: {
           }
         }
         d.nodes[id] = { ...n, id, parentId, children: n.children?.map((c) => map.get(c)!), x, y }
-        if (root) { siblings(d, parentId).push(id); fresh.push(id) }
+        if (root) {
+          const sib = siblings(d, parentId)
+          // 오토 레이아웃 안 같은 부모로 붙일 때는 원본 바로 다음에(피그마와 같아요) — 맨 끝이 아니라
+          const flowParent = parentId && !into && d.nodes[parentId]?.style.layout
+          // 기준: 이번에 방금 붙인 것 → 지금 고른 것(같은 부모) 중 마지막 → 원본
+          let at = -1
+          if (flowParent) {
+            const selIdx = layerIds.value.filter((k) => d.nodes[k]?.parentId === parentId).map((k) => sib.indexOf(k)).filter((i) => i >= 0)
+            at = lastAfter.has('') ? sib.indexOf(lastAfter.get('')!) : selIdx.length ? Math.max(...selIdx) : sib.indexOf(n.id)
+          }
+          if (at >= 0) sib.splice(at + 1, 0, id); else sib.push(id)
+          lastAfter.set('', id)
+          fresh.push(id)
+        }
       }
       layerIds.value = fresh
       screenId.value = sid
     })
   }
-  function duplicate() { if (copy()) paste() }
-  /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름 */
-  function duplicateInPlace() { const keep = clipboard; if (copy()) paste(undefined, 0); clipboard = keep }
+  /**
+   * 스마트 복제(피그마와 같아요): ⌘D 로 복제한 복제본을 옮긴 뒤(또는 ⌥ 끌기 복제 뒤) 다시 ⌘D 를 누르면
+   * 원본 → 복제본 만큼 같은 간격으로 계속 복제해요. 복사해 둔 클립보드는 건드리지 않아요
+   */
+  let dupMemo: { sid: string; src: string[]; copies: string[] } | null = null
+  const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x))
+  function dupBase(): { sid: string; src: string[]; copies: string[] } | null {
+    const sid = screenId.value
+    if (!sid || !layerIds.value.length) return null
+    const src = topIds(sid, layerIds.value)
+    const keep = clipboard
+    if (!copy()) return null
+    paste(undefined, 0)
+    clipboard = keep
+    return { sid, src, copies: [...layerIds.value] }
+  }
+  function duplicate() {
+    const sid = screenId.value
+    if (!sid) return
+    const d = doc(sid)
+    const cur = topIds(sid, layerIds.value)
+    let dx = 0, dy = 0
+    if (dupMemo && dupMemo.sid === sid && sameSet(dupMemo.copies, cur)) {
+      const a = d.nodes[dupMemo.src[0]!], b = d.nodes[dupMemo.copies[0]!]
+      if (a && b && a.parentId === b.parentId) { dx = b.x - a.x; dy = b.y - a.y }
+    }
+    hold(sid)
+    const r = dupBase()
+    if (r && (dx || dy)) update(sid, r.copies, (n) => ({ x: Math.round((n.x + dx) * 100) / 100, y: Math.round((n.y + dy) * 100) / 100 }))
+    release(sid)
+    dupMemo = r
+  }
+  /** ⌥ 끌기 복제: 같은 자리에 복제하고 복제본을 고름(옮긴 뒤 ⌘D 면 같은 간격으로 이어서) */
+  function duplicateInPlace() { dupMemo = dupBase() }
 
   /** 여러 레이어를 한 번에(실행취소 한 번): 부모 하나 + 그 안 자식들. SVG 가져오기가 써요 */
   function insertTree(sid: string, parentId: string | null, root: Partial<LayerNode> & { type: LayerType }, kids: (Partial<LayerNode> & { type: LayerType })[]): string {
@@ -429,7 +487,9 @@ export function createLayerStore(opts: {
   /** ⌃⌘M 마스크로 쓰기: 고른 것 중 맨 아래가 마스크, 모두 'Mask group' 으로. 마스크 하나만 고르고 다시 누르면 풀어요 */
   function toggleMask(sid: string, ids: string[]) {
     const d0 = doc(sid)
-    if (ids.length === 1 && d0.nodes[ids[0]!]?.isMask) { update(sid, ids, { isMask: undefined }); return }
+    if (ids.length >= 1 && ids.every((id) => d0.nodes[id]?.isMask)) { update(sid, ids, { isMask: undefined }); return }
+    // 하나만: 그 자리에서 마스크로 — 같은 부모 안 위쪽 레이어들을 그 모양으로 가려요(피그마와 같아요)
+    if (ids.length === 1) { update(sid, ids, { isMask: true }); return }
     const list = orderedSiblings(d0, ids)
     if (!list.length) return
     wrap(sid, list, 'group')
@@ -445,12 +505,18 @@ export function createLayerStore(opts: {
   }
 
   /**
-   * ⇧A 오토 레이아웃 더하기(피그마와 같아요): 프레임 하나면 그 프레임에, 아니면 고른 것들을 새 프레임으로 감싸서.
+   * ⇧A 오토 레이아웃 더하기(피그마와 같아요): 프레임 하나면 그 프레임에, 그룹 하나면 그 안의 레이어에, 아니면 고른 것들을 새 프레임으로 감싸서.
    * 방향 · 간격은 지금 놓인 모양에서 짐작하고, 크기는 내용에 맞춤(Hug)
    */
   function addAutoLayout(sid: string, ids: string[]) {
     const d0 = doc(sid)
     const one = ids.length === 1 ? d0.nodes[ids[0]!] : undefined
+    // 그룹 하나를 고르면: 그룹은 그대로 두고 그 안의 레이어에 오토 레이아웃을 넣어요(안 레이어들을 오토 레이아웃 프레임으로 감싸기 —
+    // 안에 프레임 하나뿐이면 그 프레임에) — 사용자 요청 2026-11-24
+    if (one && isGroupNode(one) && one.children?.length) {
+      addAutoLayout(sid, [...one.children])
+      return
+    }
     let fid = one && one.type === 'frame' && !one.style.layout ? one.id : null
     if (!fid) {
       if (one?.style.layout) return
@@ -463,6 +529,19 @@ export function createLayerStore(opts: {
       const f = d.nodes[target]!
       const kids = (f.children ?? []).map((c) => d.nodes[c]!).filter(Boolean)
       const rs = kids.map((k) => ({ x: k.x, y: k.y, w: k.w, h: k.h }))
+      // 여러 줄로 놓여 있으면(격자) 처음부터 가로 + 줄바꿈: 줄 순서대로, 간격 · 줄 간격 · 폭은 지금 배치에서(피그마와 같아요)
+      const grid = rs.length >= 3 ? rowsOf(rs) : null
+      if (grid && grid.rows.length >= 2 && grid.rows.some((r) => r.length >= 2)) {
+        const minX = Math.min(...rs.map((r) => r.x)), minY = Math.min(...rs.map((r) => r.y))
+        const pad = one?.type === 'frame' ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
+        const rowW = Math.max(...grid.rows.map((row) => row.reduce((a, i) => a + rs[i]!.w, 0) + grid.gapX * (row.length - 1)))
+        f.children = grid.rows.flat().map((i) => kids[i]!.id)
+        f.style = { ...f.style, layout: { mode: 'horizontal', wrap: true, gap: grid.gapX, rowGap: grid.gapY, padding: [pad, pad, pad, pad], align: 'start', cross: 'start' } }
+        f.sizeH = 'fixed'; f.sizeV = 'hug'
+        f.w = Math.round((rowW + pad * 2) * 100) / 100
+        if (!one || one.type !== 'frame') f.style.fill = undefined
+        return
+      }
       const axis = rs.length >= 2 ? guessAxis(rs) : 'y'
       const gap = rs.length >= 2 ? Math.max(0, currentGap(rs, axis) ?? 10) : 10
       const minX = Math.min(...rs.map((r) => r.x), f.w), minY = Math.min(...rs.map((r) => r.y), f.h)
@@ -475,8 +554,32 @@ export function createLayerStore(opts: {
     })
     layerIds.value = [target]
   }
+  /**
+   * 줄바꿈 켜고 끄기(Flow 의 Grid · ↩): 켜면 가로 + 줄바꿈, 폭이 Hug 면 고정으로 바꾸고 대략 정사각 격자가 되는 폭으로(한 줄에 √n 개).
+   * 줄바꿈은 폭이 정해져 있어야 줄이 나뉘어요(피그마와 같아요)
+   */
+  function setWrap(sid: string, ids: string[], on: boolean) {
+    mutate(sid, (d) => {
+      for (const id of ids) {
+        const n = d.nodes[id]
+        const l = n?.style.layout
+        if (!n || !l) continue
+        if (!on) { n.style = { ...n.style, layout: { ...l, wrap: undefined } }; continue }
+        n.style = { ...n.style, layout: { ...l, mode: 'horizontal', wrap: true } }
+        if (n.sizeH === 'hug' || n.sizeH === undefined) {
+          const kids = (n.children ?? []).map((c) => d.nodes[c]!).filter((k) => k && !k.hidden && !k.absolute)
+          const cols = Math.max(1, Math.ceil(Math.sqrt(kids.length)))
+          const gap = l.gap === 'auto' ? 0 : l.gap
+          const widest = kids.length ? Math.max(...kids.map((k) => k.w)) : 100
+          n.sizeH = 'fixed'
+          n.w = Math.round((l.padding[1] + l.padding[3] + widest * cols + gap * (cols - 1)) * 100) / 100
+        }
+        if (n.sizeV === 'fixed' || n.sizeV === undefined) n.sizeV = 'hug'
+      }
+    })
+  }
   function removeAutoLayout(sid: string, ids: string[]) {
-    mutate(sid, (d) => { for (const id of ids) { const n = d.nodes[id]; if (n?.style.layout) { const s2 = { ...n.style }; delete s2.layout; n.style = s2; delete n.sizeH; delete n.sizeV } } })
+    mutate(sid, (d) => { for (const id of ids) { const n = d.nodes[id]; if (n?.style.layout) { const s2 = { ...n.style }; delete s2.layout; n.style = s2; delete n.sizeH; delete n.sizeV; if (n.type === 'frame') n.group = false } } }) // 오토 레이아웃을 풀면 늘 프레임으로 남아요(그룹으로 보이지 않게)
   }
   /** 크기 바꾸기(제약 적용): 오토 레이아웃이 아닌 프레임이면 자식이 제약대로 따라와요 */
   function sizeTo(sid: string, ids: string[], fn: (n: LayerNode) => Partial<LayerNode>) {
@@ -595,7 +698,7 @@ export function createLayerStore(opts: {
       const id = newId()
       const sib = siblings(d, parentId)
       const at = Math.max(...same.map((k) => sib.indexOf(k)))
-      d.nodes[id] = { id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? `Group ${Object.values(d.nodes).filter((v) => v.name.startsWith('Group ')).length + 1}` : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { fill: '#FFFFFF', clip: true } }
+      d.nodes[id] = { ...(kind === 'group' ? { group: true } : {}), id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? `Group ${Object.values(d.nodes).filter((v) => v.name.startsWith('Group ')).length + 1}` : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { fill: '#FFFFFF', clip: true } }
       sib.splice(at + 1, 0, id)
       for (const b of boxes.sort((a, c) => sib.indexOf(a.id) - sib.indexOf(c.id))) {
         sib.splice(sib.indexOf(b.id), 1)
@@ -695,6 +798,42 @@ export function createLayerStore(opts: {
   // --- 정렬 · 균등 분배 · 간격 맞추기 (돌린 레이어는 감싸는 상자 기준) ---
   /** 화면 기준 감싸는 상자 */
   function box(d: LayerDoc, id: string): Rect { const n = d.nodes[id]!; return aabb(layerMatrix(d, id), n.w, n.h) }
+  /**
+   * 오토 레이아웃 안에서 방향키로 순서 바꾸기(피그마와 같아요). 고른 것이 모두 같은 오토 레이아웃 부모의 흐름 안 자식일 때만 — 아니면 false(보통 옮기기).
+   * 세로: ↑← 앞 · ↓→ 뒤, 가로: ←↑ 앞 · →↓ 뒤, 줄바꿈(Grid): ←→ 한 칸(줄 끝에서 다음 줄 맨 앞으로), ↑↓ 한 줄
+   */
+  function moveInFlow(sid: string, ids: string[], dir: 'left' | 'right' | 'up' | 'down'): boolean {
+    const d0 = doc(sid)
+    const list = topIds(sid, ids).map((id) => d0.nodes[id]).filter((n): n is LayerNode => !!n)
+    const pid = list[0]?.parentId
+    const p = pid ? d0.nodes[pid] : undefined
+    const l = p?.style.layout
+    if (!p || !l || list.some((n) => n.parentId !== pid || n.absolute)) return false
+    const flow = (p.children ?? []).filter((c) => d0.nodes[c] && !d0.nodes[c]!.hidden && !d0.nodes[c]!.absolute)
+    let step = dir === 'left' || dir === 'up' ? -1 : 1
+    if (l.wrap && (dir === 'up' || dir === 'down')) {
+      // 한 줄에 몇 개: 첫 줄(맨 위 y 가 같은 것)
+      const y0 = d0.nodes[flow[0]!]!.y
+      const cols = Math.max(1, flow.filter((c) => Math.abs(d0.nodes[c]!.y - y0) < 0.5).length)
+      step *= cols
+    }
+    const idx = list.map((n) => flow.indexOf(n.id)).filter((i) => i >= 0).sort((a, b) => a - b)
+    if (!idx.length) return false
+    const first = idx[0]!, last = idx[idx.length - 1]!
+    if (first + step < 0 || last + step > flow.length - 1) return true // 끝이면 그대로(옮기지도 않아요)
+    mutate(sid, (d) => {
+      const pp = d.nodes[pid!]!
+      const order = [...flow]
+      const moving = idx.map((i) => order[i]!)
+      const rest = order.filter((c) => !moving.includes(c))
+      const insertAt = Math.max(0, Math.min(rest.length, first + step))
+      rest.splice(insertAt, 0, ...moving)
+      // 흐름 밖(숨김 · 위치 무시) 자식은 제자리 칸 그대로
+      let k = 0
+      pp.children = (pp.children ?? []).map((c) => (flow.includes(c) ? rest[k++]! : c))
+    })
+    return true
+  }
   /** 내용에 맞추기(피그마 Resize to fit): 프레임 크기를 안쪽 레이어들을 딱 감싸게 — 화면에서 보이는 자리는 그대로 */
   function resizeToFit(sid: string, ids: string[]) {
     mutate(sid, (d) => {
@@ -717,7 +856,7 @@ export function createLayerStore(opts: {
   function shiftBy(d: LayerDoc, id: string, dx: number, dy: number) {
     const n = d.nodes[id]!
     const v = applyVec(invert(parentMatrix(d, id)), dx, dy)
-    n.x = Math.round(n.x + v.x); n.y = Math.round(n.y + v.y)
+    n.x = snapPx(n.x + v.x); n.y = snapPx(n.y + v.y)
   }
   function place(sid: string, ids: string[], next: (rs: Rect[]) => { x: number; y: number }[]) {
     const d0 = doc(sid)
@@ -786,9 +925,10 @@ export function createLayerStore(opts: {
   }
 
   return {
+    pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
-    hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, clipSid: () => clipboard?.sid ?? null,
+    hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     selectScreen, selectLayer, add, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,

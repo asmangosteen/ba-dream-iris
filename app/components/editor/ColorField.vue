@@ -8,6 +8,7 @@ import PaintPopover from '~/components/editor/PaintPopover.vue'
  * 색 견본 버튼 → 피그마 같은 색 편집 창(단색). 브라우저 기본 색 고르기 대신 써요.
  * v-model 은 '#RRGGBB' · '#RRGGBBAA'. sid 가 있으면 끄는 동안 실행취소를 한 번으로 묶어요.
  * bindable 이면 Libraries 탭에서 고른 토큰을 token 으로 알려요(연결)
+ * label 은 영어 원문(사전 열쇠)으로 받아서 보여 줄 때 tr 해요(PaintPopover title 도 같아요)
  */
 const props = withDefaults(defineProps<{ modelValue?: string | null; label: string; sid?: string | null; bindable?: boolean }>(), { modelValue: '#000000', sid: null, bindable: false })
 const emit = defineEmits<{ 'update:modelValue': [v: string]; token: [t: CatalogToken]; close: [] }>()
@@ -27,8 +28,8 @@ defineExpose({ open: () => (open.value = true) })
     class="sq sq-clip cf-sw"
     :class="{ on: open }"
     :style="{ background: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px` }"
-    :aria-label="label"
-    :title="label"
+    :aria-label="tr(label)"
+    :title="tr(label)"
     :aria-expanded="open"
     @click="open ? close() : (open = true)"
   />

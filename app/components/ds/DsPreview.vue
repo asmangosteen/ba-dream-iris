@@ -33,80 +33,107 @@ export function previewKind(names: (string | null | undefined)[]): PreviewKind |
 <script setup lang="ts">
 import { Avatar, Badge, Button, Checkbox, Chip, Divider, Icon, IconButton, Label, NumericBadge, PageControl, Pagination, ProgressBar, RadioButton, SearchField, Skeleton, Slider, Spinner, Stepper, TextArea, TextButton, TextInput, Toast, Toggle, Tooltip } from '@ba-dream/design-system'
 
+import { INSERT_SIZE, dsComponent, instanceProps, slotFallback } from '~/components/editor/InstanceView.vue'
+
 const props = defineProps<{ names: (string | null | undefined)[]; label: string }>()
 const kind = computed(() => previewKind(props.names))
 const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').slice(0, 2) || '?')
+
+// 손으로 만든 미리보기가 없는 컴포넌트: 캔버스에 넣었을 때와 같은 실제 컴포넌트(같은 기본 속성)를 칸에 맞게 줄여서.
+// 이니셜(Se · Dr …) 자리 표시는 디자인 시스템에 없는 이름일 때만
+const realName = computed(() => [props.label === 'Calendar' ? 'DatePicker' : null, ...props.names].find((n): n is string => !!n && !!dsComponent(n)) ?? null)
+const real = computed(() => (realName.value ? dsComponent(realName.value) : null))
+const realProps = computed(() => { const p = instanceProps(realName.value ?? undefined); if (p.position === 'fixed') p.position = 'absolute'; return p })
+const realText = computed(() => (realName.value ? slotFallback(realName.value) : undefined))
+// 스토리북 기준 크기(고정 폭 · 정해진 높이) 그대로 그려서 칸에 맞게 줄여요 — 캔버스에 넣을 때와 같은 모습
+const realSize = computed(() => { const z = realName.value ? INSERT_SIZE[realName.value] : undefined; return z ? { width: z.w + 'px', maxWidth: 'none', ...(z.h ? { height: z.h + 'px' } : {}) } : undefined })
+const host = ref<HTMLElement | null>(null)
+const inner = ref<HTMLElement | null>(null)
+const fit = ref(1)
+let ro: ResizeObserver | undefined
+function measure() {
+  const h = host.value, i = inner.value
+  if (!h || !i) return
+  const w = i.scrollWidth, ht = i.scrollHeight
+  if (!w || !ht) return
+  fit.value = Math.min(1, (h.clientWidth - 24) / w, (h.clientHeight - 16) / ht)
+}
+onMounted(() => { if (inner.value) { ro = new ResizeObserver(measure); ro.observe(inner.value); if (host.value) ro.observe(host.value); measure() } })
+onBeforeUnmount(() => ro?.disconnect())
 </script>
 
 <template>
   <!-- 컴포넌트 미리보기: 위계 가이드 예외 영역(data-preview) — 실제 크기로 보여 줍니다. 누르거나 고를 수 없게 inert -->
   <span data-preview inert :class="['pv', kind ?? 'unknown']" aria-hidden="true">
     <template v-if="kind === 'button'">
-      <Button type="primary" size="l">신청하기</Button>
+      <Button type="primary" size="l">{{ tr('Apply') }}</Button>
     </template>
     <template v-else-if="kind === 'textfield'">
-      <span class="pad-x"><TextInput label="이름" placeholder="이름을 적어주세요" size="m" /></span>
+      <span class="pad-x"><TextInput :label="tr('Name')" :placeholder="tr('Enter your name')" size="m" /></span>
     </template>
     <template v-else-if="kind === 'badge'">
-      <Badge theme="brand" type="alpha">추천</Badge>
-      <Badge theme="gray" type="alpha">쿠폰</Badge>
+      <Badge theme="brand" type="alpha">{{ tr('Featured') }}</Badge>
+      <Badge theme="gray" type="alpha">{{ tr('Coupon') }}</Badge>
       <Badge theme="destructed" type="alpha">20%</Badge>
     </template>
     <template v-else-if="kind === 'tab'">
-      <span class="tab on">전체</span><span class="tab">진행 중</span><span class="tab">완료</span>
+      <span class="tab on">{{ tr('Everything') }}</span><span class="tab">{{ tr('Ongoing') }}</span><span class="tab">{{ tr('Completed') }}</span>
     </template>
     <template v-else-if="kind === 'toggle'">
-      <Toggle size="l" :checked="true" aria-label="켜짐" />
-      <Toggle size="l" :checked="false" aria-label="꺼짐" />
+      <Toggle size="l" :checked="true" :aria-label="tr('On')" />
+      <Toggle size="l" :checked="false" :aria-label="tr('Off')" />
     </template>
     <template v-else-if="kind === 'checkbox'">
-      <Checkbox :size="24" :checked="true" aria-label="선택됨" />
-      <Checkbox :size="24" :checked="false" aria-label="선택 안 됨" />
+      <Checkbox :size="24" :checked="true" :aria-label="tr('Selected')" />
+      <Checkbox :size="24" :checked="false" :aria-label="tr('Not selected')" />
     </template>
     <template v-else-if="kind === 'radio'">
-      <RadioButton size="l" :checked="true" aria-label="선택됨" />
-      <RadioButton size="l" :checked="false" aria-label="선택 안 됨" />
+      <RadioButton size="l" :checked="true" :aria-label="tr('Selected')" />
+      <RadioButton size="l" :checked="false" :aria-label="tr('Not selected')" />
     </template>
     <template v-else-if="kind === 'listitem'">
-      <span class="li"><i class="sqc lead" /><span class="li-t">알림 설정</span><Icon name="chevron_right" :size="16" /></span>
-      <span class="li"><i class="sqc lead" /><span class="li-t">계정 관리</span><Icon name="chevron_right" :size="16" /></span>
+      <span class="li"><i class="sqc lead" /><span class="li-t">{{ tr('Notification settings') }}</span><Icon name="chevron_right" :size="16" /></span>
+      <span class="li"><i class="sqc lead" /><span class="li-t">{{ tr('Manage account') }}</span><Icon name="chevron_right" :size="16" /></span>
     </template>
     <template v-else-if="kind === 'card'">
-      <span class="sq card"><span class="sqc card-img" /><span class="card-col"><span class="card-t">모델 A</span><span class="card-s">월 89,000원부터</span></span></span>
+      <span class="sq card"><span class="sqc card-img" /><span class="card-col"><span class="card-t">{{ tr('Model A') }}</span><span class="card-s">{{ tr('From ₩89,000/mo') }}</span></span></span>
     </template>
     <template v-else-if="kind === 'bottomsheet'">
-      <span class="sq sheet"><span class="grab" /><span class="sheet-t">요금제를 골라주세요</span><span class="sqc sheet-btn">선택하기</span></span>
+      <span class="sq sheet"><span class="grab" /><span class="sheet-t">{{ tr('Choose a plan') }}</span><span class="sqc sheet-btn">{{ tr('Select') }}</span></span>
     </template>
     <template v-else-if="kind === 'toast'">
-      <span class="pad-x"><Toast type="success" message="저장했어요" /></span>
+      <span class="pad-x"><Toast type="success" :message="tr('Saved')" /></span>
     </template>
     <template v-else-if="kind === 'navigationbar'">
-      <span class="nav"><Icon name="chevron_left" :size="20" /><span class="nav-t">신청하기</span><Icon name="close" :size="20" /></span>
+      <span class="nav"><Icon name="chevron_left" :size="20" /><span class="nav-t">{{ tr('Apply') }}</span><Icon name="close" :size="20" /></span>
     </template>
     <template v-else-if="kind === 'bottomnavigation'">
       <span class="bnav">
-        <span v-for="(t, i) in ['홈', '내 차고', '커뮤니티', '마이']" :key="t" :class="['bn', { on: i === 0 }]"><i class="sqc" /><span>{{ t }}</span></span>
+        <span v-for="(t, i) in ['Home', 'My garage', 'Community', 'My page']" :key="t" :class="['bn', { on: i === 0 }]"><i class="sqc" /><span>{{ tr(t) }}</span></span>
       </span>
     </template>
     <!-- 기본 탑재 목록(dsCatalog)의 나머지 컴포넌트: 실제 컴포넌트를 기본 속성으로 -->
-    <template v-else-if="label === 'IconButton'"><IconButton icon-name="search" size="l" type="tertiary" ariaLabel="검색" /><IconButton icon-name="plus" size="l" type="primary" ariaLabel="추가" /></template>
-    <template v-else-if="label === 'TextButton'"><TextButton size="l" color="blue">더 보기</TextButton><TextButton size="l" color="gray">취소</TextButton></template>
-    <template v-else-if="label === 'ButtonGroup'"><Button type="tertiary" size="l">이전</Button><Button type="primary" size="l">다음</Button></template>
-    <template v-else-if="label === 'SearchField'"><span class="pad-x"><SearchField size="m" type="contained" placeholder="차종 · 모델 검색" /></span></template>
-    <template v-else-if="label === 'TextArea'"><span class="pad-x"><TextArea label="메모" placeholder="내용을 적어주세요" /></span></template>
-    <template v-else-if="label === 'Chip'"><Chip :selected="true">전체</Chip><Chip>스쿠터</Chip><Chip>바이크</Chip></template>
-    <template v-else-if="label === 'Slider'"><span class="pad-x"><Slider :default-value="40" aria-label="범위" /></span></template>
+    <template v-else-if="label === 'IconButton'"><IconButton icon-name="search" size="l" type="tertiary" :ariaLabel="tr('Search')" /><IconButton icon-name="plus" size="l" type="primary" :ariaLabel="tr('Add')" /></template>
+    <template v-else-if="label === 'TextButton'"><TextButton size="l" color="blue">{{ tr('See more') }}</TextButton><TextButton size="l" color="gray">{{ tr('Cancel') }}</TextButton></template>
+    <template v-else-if="label === 'ButtonGroup'"><Button type="tertiary" size="l">{{ tr('Previous') }}</Button><Button type="primary" size="l">{{ tr('Next') }}</Button></template>
+    <template v-else-if="label === 'SearchField'"><span class="pad-x"><SearchField size="m" type="contained" :placeholder="tr('Search vehicles and models')" /></span></template>
+    <template v-else-if="label === 'TextArea'"><span class="pad-x"><TextArea :label="tr('Memo')" :placeholder="tr('Write something')" /></span></template>
+    <template v-else-if="label === 'Chip'"><Chip :selected="true">{{ tr('Everything') }}</Chip><Chip>{{ tr('Scooter') }}</Chip><Chip>{{ tr('Motorcycle') }}</Chip></template>
+    <template v-else-if="label === 'Slider'"><span class="pad-x"><Slider :default-value="40" :aria-label="tr('Range')" /></span></template>
     <template v-else-if="label === 'Stepper'"><Stepper :default-value="2" :min="0" :max="9" /></template>
-    <template v-else-if="label === 'ProgressBar'"><span class="pad-x"><ProgressBar :value="60" aria-label="진행률" /></span></template>
+    <template v-else-if="label === 'ProgressBar'"><span class="pad-x"><ProgressBar :value="60" :aria-label="tr('Progress')" /></span></template>
     <template v-else-if="label === 'NumericBadge'"><NumericBadge :count="3" theme="destructed" /><NumericBadge :count="128" theme="brand" /></template>
     <template v-else-if="label === 'Avatar'"><Avatar alt="바드림" :size="40" /><Avatar alt="이리스" :size="32" /></template>
     <template v-else-if="label === 'Divider'"><span class="pad-x"><Divider /></span></template>
     <template v-else-if="label === 'Spinner' || label === 'Loading'"><Spinner size="l" /></template>
     <template v-else-if="label === 'Skeleton'"><span class="pad-x col"><Skeleton shape="text" width="70%" /><Skeleton shape="text" width="45%" /></span></template>
-    <template v-else-if="label === 'Label'"><Label essential>이름</Label></template>
+    <template v-else-if="label === 'Label'"><Label essential>{{ tr('Name') }}</Label></template>
     <template v-else-if="label === 'PageControl'"><PageControl :selection="1" /></template>
     <template v-else-if="label === 'Pagination'"><Pagination :current="2" :total="5" /></template>
-    <template v-else-if="label === 'Tooltip'"><Tooltip>여기를 눌러 보세요</Tooltip></template>
+    <template v-else-if="label === 'Tooltip'"><Tooltip>{{ tr('Tap here') }}</Tooltip></template>
+    <template v-else-if="real">
+      <span ref="host" class="real-host"><span ref="inner" class="real" :style="{ transform: `scale(${fit})`, ...realSize }"><component :is="real" v-bind="realProps"><template v-if="realText !== undefined" #default>{{ realText }}</template></component></span></span>
+    </template>
     <template v-else>
       <span class="sq ph">{{ initials }}</span>
     </template>
@@ -150,6 +177,9 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
 .bn.on { color: var(--sys-color-neutral-800); font-weight: 600; }
 .bn.on i { background: var(--sys-color-neutral-800); }
 
+.real-host { position: relative; width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; }
+.real { display: inline-flex; flex-direction: column; width: max-content; max-width: 375px; transform-origin: center; contain: layout; }
+.real > :deep(*) { min-width: 0; }
 .ph { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--ref-color-gray-900-5); --sq-line-w: 1px; color: var(--sys-color-neutral-500); font-size: 14px; font-weight: 600; }
 .col { display: flex; flex-direction: column; gap: 8px; }
 </style>

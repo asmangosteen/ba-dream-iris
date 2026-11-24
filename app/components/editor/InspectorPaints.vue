@@ -182,42 +182,42 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 <template>
   <section class="s">
     <div :class="['sec-h', 'h24', { empty: !rows.length && !mixed }]">
-      <span>{{ title }}</span>
+      <span>{{ tr(title) }}</span>
       <span class="acts">
         <!-- Create color style 은 뺐어요: 로컬 스타일은 고르는 목록에 나오지 않아요(디자인 시스템 변수만) -->
-        <button class="ib s24" :aria-label="`Add ${title.toLowerCase()}`" :data-tip="`Add ${title.toLowerCase()}`" @click="add"><EditorIcon name="plus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr(`Add ${title.toLowerCase()}`)" :data-tip="tr(`Add ${title.toLowerCase()}`)" @click="add"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
-    <p v-if="mixed" class="tx-meta m0">Click + to replace mixed content</p>
+    <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
     <template v-for="i in rows" :key="i">
       <!-- 바탕 칠: [견본 + 값] · 👁 · − (피그마 Fill 행) -->
       <div v-if="i < 0" class="prow">
         <div :class="['sq', 'fld', 'pf', { open: open === -1, bound: !!bound }]">
-          <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="`Edit ${title.toLowerCase()} color`" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
+          <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="tr(`Edit ${title.toLowerCase()} color`)" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
           <template v-if="!bound">
-            <input :key="'h' + baseVal" class="hex" :value="colorLabel(store.color(baseVal) ?? '').split(' ')[0]!.replace('#', '')" :aria-label="`${title} hex`" spellcheck="false" @change="onBaseHex" @keydown="blur" @focus="sel">
+            <input :key="'h' + baseVal" class="hex" :value="colorLabel(store.color(baseVal) ?? '').split(' ')[0]!.replace('#', '')" :aria-label="tr(`${title} hex`)" spellcheck="false" @change="onBaseHex" @keydown="blur" @focus="sel">
             <TokenPicker :kinds="['color']" reveal :label="`${title} color`" @pick="pick" />
             <span class="vsep" aria-hidden="true" />
-            <span class="op"><input :key="'a' + baseVal" class="pct" :value="Math.round(alphaOf(store.color(baseVal)) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onBaseAlpha" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
+            <span class="op"><input :key="'a' + baseVal" class="pct" :value="Math.round(alphaOf(store.color(baseVal)) * 100)" inputmode="numeric" :aria-label="tr(`${title} opacity`)" @change="onBaseAlpha" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
           </template>
           <TokenPicker v-else :kinds="['color']" :bound="bound" :label="`${title} color`" @pick="pick" @unbind="unbind" />
         </div>
-        <button class="ib s24" :aria-label="`Hide ${title.toLowerCase()}`" data-tip="Hide" @click="toggle(-1)"><EditorIcon name="eye" :size="16" /></button>
-        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" data-tip="Remove" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr(`Hide ${title.toLowerCase()}`)" :data-tip="tr('Hide')" @click="toggle(-1)"><EditorIcon name="eye" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <!-- 덧붙인 칠 -->
       <div v-else-if="extras[i]" class="prow" :class="{ off: extras[i]!.visible === false }">
         <div :class="['sq', 'fld', 'pf', { open: open === i }]">
-          <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="`Edit ${title.toLowerCase()}`" :aria-expanded="open === i" @click="open = open === i ? null : i" />
-          <input v-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="`${title} hex`" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
-          <button v-else class="pname" @click="open = open === i ? null : i">{{ TYPE_NAME[extras[i]!.type] }}</button>
+          <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="tr(`Edit ${title.toLowerCase()}`)" :aria-expanded="open === i" @click="open = open === i ? null : i" />
+          <input v-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="tr(`${title} hex`)" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
+          <button v-else class="pname" @click="open = open === i ? null : i">{{ tr(TYPE_NAME[extras[i]!.type]) }}</button>
           <span class="vsep" aria-hidden="true" />
-          <span class="op"><input :key="'a' + i + extras[i]!.opacity" class="pct" :value="Math.round((extras[i]!.opacity ?? 1) * 100)" inputmode="numeric" :aria-label="`${title} opacity`" @change="onExtraAlpha(i, $event)" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
+          <span class="op"><input :key="'a' + i + extras[i]!.opacity" class="pct" :value="Math.round((extras[i]!.opacity ?? 1) * 100)" inputmode="numeric" :aria-label="tr(`${title} opacity`)" @change="onExtraAlpha(i, $event)" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
         </div>
-        <button class="ib s24" :aria-label="extras[i]!.visible === false ? `Show ${title.toLowerCase()}` : `Hide ${title.toLowerCase()}`" :data-tip="extras[i]!.visible === false ? 'Show' : 'Hide'" @click="toggle(i)">
+        <button class="ib s24" :aria-label="extras[i]!.visible === false ? tr(`Show ${title.toLowerCase()}`) : tr(`Hide ${title.toLowerCase()}`)" :data-tip="extras[i]!.visible === false ? tr('Show') : tr('Hide')" @click="toggle(i)">
           <EditorIcon :name="extras[i]!.visible === false ? 'eye_off' : 'eye'" :size="16" />
         </button>
-        <button class="ib s24" :aria-label="`Remove ${title.toLowerCase()}`" data-tip="Remove" @click="remove(i)"><EditorIcon name="minus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" @click="remove(i)"><EditorIcon name="minus" :size="16" /></button>
       </div>
     </template>
     <PaintPopover

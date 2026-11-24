@@ -94,9 +94,9 @@ async function createReq({ text, block }: { text: string; block: string | null }
     await reqs.refresh()
     activeScreen.value = null
     activeReq.value = id
-    say(`${code} 요구사항을 만들었어요`)
+    say(tr('Created requirement {code}', { code }))
   } catch {
-    say('요구사항을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요')
+    say(tr("Couldn't create the requirement. Try again in a moment."))
   }
 }
 
@@ -141,7 +141,7 @@ function onSaved({ found, gone: codes }: { found: number; gone: string[] }) {
   stopEdit()
   closeBars()
   gone.value = codes
-  say(found > 0 ? `요구사항 ${found}개를 새로 찾았어요` : '문서를 저장했어요')
+  say(found === 1 ? tr('Found 1 new requirement') : found > 0 ? tr('Found {n} new requirements', { n: found }) : tr('Document saved'))
 }
 
 // 다른 문서 · 다른 화면으로 갈 때
@@ -205,7 +205,7 @@ async function removeDoc() {
     }
   } catch {
     deleting.value = false
-    say('문서를 지우지 못했어요. 잠시 뒤 다시 시도해 주세요')
+    say(tr("Couldn't delete the document. Try again in a moment."))
     return
   }
   stopEdit()
@@ -221,16 +221,16 @@ async function removeDoc() {
   <div class="split" :aria-hidden="addOpen ? 'true' : undefined">
     <!-- 왼쪽 위: 돌아가기 알약 -->
     <div class="sq float s pill">
-      <NuxtLink :to="`/p/${projectId}`" class="ib" aria-label="에디터로 돌아가기"><Icon name="chevron_left" :size="16" /></NuxtLink>
-      <NuxtLink :to="`/p/${projectId}`" class="tx-meta crumb ellipsis">{{ projectName || '프로젝트' }}</NuxtLink>
+      <NuxtLink :to="`/p/${projectId}`" class="ib" :aria-label="tr('Back to editor')"><Icon name="chevron_left" :size="16" /></NuxtLink>
+      <NuxtLink :to="`/p/${projectId}`" class="tx-meta crumb ellipsis">{{ projectName || tr('Project') }}</NuxtLink>
       <Icon name="chevron_right" :size="12" color="var(--sys-color-neutral-400)" />
-      <span class="tx-head">문서 함께 보기</span>
+      <span class="tx-head">{{ tr('Split view') }}</span>
     </div>
 
     <!-- 캔버스: 연결된 화면 -->
-    <main ref="canvas" aria-label="캔버스" class="canvas-dots canvas">
-      <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">이 문서와 연결된 화면이 아직 없어요</p>
-      <p v-else-if="frames.length" class="tx-meta hint">{{ activeReq ? '강조된 화면이 이 요구사항과 연결돼 있어요' : '요구사항을 누르면 연결된 화면이 강조돼요' }}</p>
+    <main ref="canvas" :aria-label="tr('Canvas')" class="canvas-dots canvas">
+      <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
+      <p v-else-if="frames.length" class="tx-meta hint">{{ activeReq ? tr('Highlighted screens are linked to this requirement') : tr('Click a requirement to highlight its linked screens') }}</p>
       <div class="frames">
         <button
           v-for="s in frames"
@@ -239,7 +239,7 @@ async function removeDoc() {
           :data-screen="s.id"
           :class="['frame-col', { lit: isLit(s.id), dim: isDim(s.id) }]"
           :aria-pressed="isLit(s.id)"
-          :aria-label="`${s.name} 화면 · 요구사항 ${reqCount(s.id)}개`"
+          :aria-label="tr('{name} · Requirements: {n}', { name: s.name, n: reqCount(s.id) })"
           @click="pickScreen(s.id)"
         >
           <span class="frame-label">
@@ -263,9 +263,9 @@ async function removeDoc() {
     </main>
 
     <!-- 오른쪽: 문서 -->
-    <aside aria-label="문서" class="sq float doc">
+    <aside :aria-label="tr('Document')" class="sq float doc">
       <div class="doc-tabs">
-        <nav class="seg tabs" aria-label="문서 고르기">
+        <nav class="seg tabs" :aria-label="tr('Choose a document')">
           <NuxtLink
             v-for="d in docs.data.value ?? []"
             :key="d.id"
@@ -279,8 +279,8 @@ async function removeDoc() {
             <span class="ellipsis">{{ d.title }}</span>
           </NuxtLink>
         </nav>
-        <IconButton icon-name="plus" size="s" type="ghost" ariaLabel="문서 추가" title="문서 추가" @click="addOpen = true" />
-        <IconButton icon-name="close" size="s" type="ghost" ariaLabel="문서 닫기" title="문서 닫기" @click="navigateTo(`/p/${projectId}`)" />
+        <IconButton icon-name="plus" size="s" type="ghost" :ariaLabel="tr('Add document')" :title="tr('Add document')" @click="addOpen = true" />
+        <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close document')" :title="tr('Close document')" @click="navigateTo(`/p/${projectId}`)" />
       </div>
 
       <div class="doc-body">
@@ -290,9 +290,9 @@ async function removeDoc() {
           <Skeleton shape="text" width="80%" />
         </div>
         <div v-else-if="!doc" class="missing">
-          <h1 class="tx-title">문서를 찾지 못했어요</h1>
-          <p class="tx-meta">지워졌거나 주소가 바뀌었을 수 있어요</p>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="chevron_left" @click="navigateTo(`/p/${projectId}`)">에디터로 돌아가기</Button>
+          <h1 class="tx-title">{{ tr('Document not found') }}</h1>
+          <p class="tx-meta">{{ tr('It may have been deleted, or its address changed') }}</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="chevron_left" @click="navigateTo(`/p/${projectId}`)">{{ tr('Back to editor') }}</Button>
         </div>
         <DocEditor
           v-else-if="editing"
@@ -307,12 +307,12 @@ async function removeDoc() {
           <div v-if="goneReqs.length" class="sq gone" role="status">
             <span class="gone-col">
               <span class="tx-body gone-t">
-                문서에서 사라진 요구사항:
+                {{ tr('No longer in the document:') }}
                 <button v-for="r in goneReqs" :key="r.id" type="button" class="sq code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
-              <span class="tx-meta">요구사항과 화면 연결은 그대로 남겨 뒀어요. 필요 없으면 <NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">요구사항</NuxtLink>에서 정리해 주세요</span>
+              <span class="tx-meta">{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Requirements') }}</NuxtLink>{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
             </span>
-            <button type="button" class="ib s" aria-label="알림 닫기" @click="gone = []"><Icon name="close" :size="14" /></button>
+            <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><Icon name="close" :size="14" /></button>
           </div>
           <DocReader
             ref="reader"
@@ -324,20 +324,20 @@ async function removeDoc() {
             @edit="startEdit"
           >
             <template #actions>
-              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">고치기</Button>
+              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">{{ tr('Edit') }}</Button>
               <div ref="moreEl" class="more">
                 <IconButton
                   icon-name="menu_kebab"
                   size="s"
                   type="ghost"
-                  ariaLabel="문서 메뉴"
+                  :ariaLabel="tr('Document menu')"
                   aria-haspopup="menu"
                   :aria-expanded="menuOpen"
                   @click="menuOpen = !menuOpen"
                   @keydown.esc="menuOpen = false"
                 />
                 <div v-if="menuOpen" class="sq menu" role="menu" @keydown.esc="menuOpen = false">
-                  <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />문서 지우기</button>
+                  <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />{{ tr('Delete document') }}</button>
                 </div>
               </div>
             </template>
@@ -347,17 +347,17 @@ async function removeDoc() {
 
       <!-- 확인 줄 -->
       <div v-if="bar === 'leave'" class="confirm" role="alertdialog" aria-labelledby="leaveMsg">
-        <span id="leaveMsg" class="tx-body confirm-t">저장하지 않은 내용이 있어요. 버리고 나갈까요?</span>
-        <Button size="s" type="tertiary" @click="closeBars">계속 고치기</Button>
-        <Button size="s" type="destructed" stroke @click="discard">버리기</Button>
+        <span id="leaveMsg" class="tx-body confirm-t">{{ tr('You have unsaved changes. Discard them and leave?') }}</span>
+        <Button size="s" type="tertiary" @click="closeBars">{{ tr('Keep editing') }}</Button>
+        <Button size="s" type="destructed" stroke @click="discard">{{ tr('Discard') }}</Button>
       </div>
       <div v-else-if="bar === 'delete' && doc" class="confirm" role="alertdialog" aria-labelledby="delMsg" aria-describedby="delSub">
         <span class="confirm-col">
-          <span id="delMsg" class="tx-head">‘{{ doc.title }}’ 문서를 지울까요?</span>
-          <span id="delSub" class="tx-meta">요구사항과 화면 연결도 함께 지워져요. 되돌릴 수 없어요</span>
+          <span id="delMsg" class="tx-head">{{ tr('Delete “{name}”?', { name: doc.title }) }}</span>
+          <span id="delSub" class="tx-meta">{{ tr('Its requirements and screen links will be deleted too. This can’t be undone.') }}</span>
         </span>
-        <Button size="s" type="tertiary" :disabled="deleting" @click="closeBars">취소</Button>
-        <Button size="s" type="destructed" :loading="deleting" @click="removeDoc">지우기</Button>
+        <Button size="s" type="tertiary" :disabled="deleting" @click="closeBars">{{ tr('Cancel') }}</Button>
+        <Button size="s" type="destructed" :loading="deleting" @click="removeDoc">{{ tr('Delete') }}</Button>
       </div>
 
       <p class="sr" role="status" aria-live="polite">{{ notice }}</p>
@@ -371,7 +371,7 @@ async function removeDoc() {
 </template>
 
 <style scoped>
-.split { position: relative; height: 100vh; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.split { position: relative; height: calc(100vh - var(--iris-tabs-h, 0px)); overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .pill { position: absolute; left: var(--iris-gap); top: var(--iris-gap); z-index: 3; height: 40px; max-width: calc(100% - 640px); box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-04); }

@@ -20,7 +20,7 @@ function fieldOf(t: EventTarget | null): HTMLElement | null {
 /** 값을 받는 요소: 숫자 입력칸, 없으면 토큰 칩 */
 function targetOf(fld: HTMLElement): HTMLElement | null {
   const input = fld.querySelector<HTMLInputElement>('input:not([disabled]):not([readonly]):not(.tchip-caret)')
-  if (input && input.type !== 'search' && (input.inputMode === 'numeric' || input.inputMode === 'decimal' || FULL.test(input.value) || input.placeholder === 'Mixed')) return input
+  if (input && input.type !== 'search' && (input.inputMode === 'numeric' || input.inputMode === 'decimal' || FULL.test(input.value) || input.placeholder === 'Mixed' || input.placeholder === tr('Mixed'))) return input
   return fld.querySelector<HTMLElement>('.tchip')
 }
 

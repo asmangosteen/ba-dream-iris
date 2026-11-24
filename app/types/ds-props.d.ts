@@ -15,3 +15,9 @@ declare module 'virtual:iris-ds-props' {
   const meta: Record<string, DsPropMeta[]>
   export default meta
 }
+
+/** build/ds-props-plugin.ts 가 만들어 주는 디자인 시스템 아이콘 이름 목록 — { 종류(outlined · solid · colored …): 이름[] } */
+declare module 'virtual:iris-ds-icons' {
+  const icons: Record<string, string[]>
+  export default icons
+}

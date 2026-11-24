@@ -49,7 +49,7 @@ function onDoc(e: PointerEvent) {
 const onReflow = (e: Event) => { if (open.value !== null && !(e.target instanceof Node && pop.value?.contains(e.target))) place() }
 onMounted(() => { document.addEventListener('pointerdown', onDoc, true); window.addEventListener('resize', onReflow); window.addEventListener('scroll', onReflow, true) })
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true); window.removeEventListener('resize', onReflow); window.removeEventListener('scroll', onReflow, true) })
-const typeLabel = (t: Effect['type']) => TYPES.find((x) => x.value === t)?.label ?? 'Effect'
+const typeLabel = (t: Effect['type']) => tr(TYPES.find((x) => x.value === t)?.label ?? 'Effect')
 
 function setList(fn: (l: Effect[]) => Effect[]) {
   if (props.frame) { const next = fn([...(store.doc(props.sid).frame?.effects ?? [])]); store.frameStyle(props.sid, { effects: next.length ? next : undefined }); return }
@@ -80,53 +80,53 @@ const shadow = (e: Effect): e is Extract<Effect, { type: 'drop' | 'inner' }> => 
 
 <template>
   <section class="s">
-    <div :class="['sec-h', 'h24', { empty: !list.length }]"><span>Effects</span><button class="ib s24" aria-label="Add effect" data-tip="Add effect" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
+    <div :class="['sec-h', 'h24', { empty: !list.length }]"><span>{{ tr('Effects') }}</span><button class="ib s24" :aria-label="tr('Add effect')" :data-tip="tr('Add effect')" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
     <div v-for="(e, i) in list" :key="i" class="item">
       <!-- 피그마 Effects 행: [설정 · 종류 ▾] [👁 24] [− 24] -->
       <div :ref="rowRef(i)" class="prow" :class="{ off: e.visible === false }">
         <div class="ef">
-          <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" aria-label="Effect settings" data-tip="Effect settings" @click="open = open === i ? null : i">
+          <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" :aria-label="tr('Effect settings')" :data-tip="tr('Effect settings')" @click="open = open === i ? null : i">
             <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path v-if="e.type === 'drop'" d="M3 3h6v6H3z M5 11h6V5" fill="none" stroke="currentColor" stroke-width="1.2" /><path v-else-if="e.type === 'inner'" d="M2.5 2.5h9v9h-9z M4.5 4.5h5" fill="none" stroke="currentColor" stroke-width="1.2" /><path v-else d="M7 2a5 5 0 1 0 0 10A5 5 0 1 0 7 2z M7 4.5v5 M4.5 7h5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" /></svg>
           </button>
           <EditorSelect class="grow" :model-value="e.type" :options="TYPES" ariaLabel="Effect type" @update:model-value="(v) => setType(i, v as Effect['type'])" />
         </div>
-        <button class="ib s24" :aria-label="e.visible === false ? 'Show effect' : 'Hide effect'" :data-tip="e.visible === false ? 'Show' : 'Hide'" @click="set(i, { visible: e.visible === false ? undefined : false })">
+        <button class="ib s24" :aria-label="e.visible === false ? tr('Show effect') : tr('Hide effect')" :data-tip="e.visible === false ? tr('Show') : tr('Hide')" @click="set(i, { visible: e.visible === false ? undefined : false })">
           <EditorIcon :name="e.visible === false ? 'eye_off' : 'eye'" :size="16" />
         </button>
-        <button class="ib s24" aria-label="Remove effect" data-tip="Remove" @click="setList((l) => l.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr('Remove effect')" :data-tip="tr('Remove')" @click="setList((l) => l.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <Teleport v-if="open === i" to="body">
-      <div :ref="setPop" class="sq fx-pop editor" role="dialog" :aria-label="`${typeLabel(e.type)} settings`" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
-        <div class="pop-h"><span class="pop-t">{{ typeLabel(e.type) }}</span><button type="button" class="ib s24" aria-label="Close" data-tip="Close" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
+      <div :ref="setPop" class="sq fx-pop editor" role="dialog" :aria-label="tr('{name} settings', { name: typeLabel(e.type) })" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
+        <div class="pop-h"><span class="pop-t">{{ typeLabel(e.type) }}</span><button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
         <div class="pop-b">
         <template v-if="shadow(e)">
-          <div class="ig-l"><span>Position</span><span /></div>
+          <div class="ig-l"><span>{{ tr('Position') }}</span><span /></div>
           <div class="ig">
             <label class="sq fld"><span>X</span><input :key="'x' + e.x" :value="e.x" inputmode="numeric" aria-label="X" @change="num(i, 'x', $event)" @keydown="blur"></label>
             <label class="sq fld"><span>Y</span><input :key="'y' + e.y" :value="e.y" inputmode="numeric" aria-label="Y" @change="num(i, 'y', $event)" @keydown="blur"></label>
             <span />
           </div>
-          <div class="ig-l"><span>Blur</span><span>Spread</span></div>
+          <div class="ig-l"><span>{{ tr('Blur') }}</span><span>{{ tr('Spread') }}</span></div>
           <div class="ig">
-            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" /></svg><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" aria-label="Blur" @change="num(i, 'blur', $event)" @keydown="blur"></label>
-            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M2 2h2M10 2h2M2 12h2M10 12h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" aria-label="Spread" @change="num(i, 'spread', $event)" @keydown="blur"></label>
+            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" /></svg><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="blur"></label>
+            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M2 2h2M10 2h2M2 12h2M10 12h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" :aria-label="tr('Spread')" @change="num(i, 'spread', $event)" @keydown="blur"></label>
             <span />
           </div>
-          <div class="ig-l"><span>Color</span></div>
+          <div class="ig-l"><span>{{ tr('Color') }}</span></div>
           <div class="ig">
             <div class="sq fld pf span2">
               <ColorField :model-value="e.color" :sid="sid" label="Shadow color" @update:model-value="(v) => set(i, { color: v })" />
-              <input :key="'c' + e.color" class="hex" :value="colorLabel(e.color).split(' ')[0]!.replace('#', '')" aria-label="Shadow hex" spellcheck="false" @change="(ev) => { const v = (ev.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(e.color)) }); else (ev.target as HTMLInputElement).value = hex(e.color).slice(1) }" @keydown="blur" @focus="(ev) => (ev.target as HTMLInputElement).select()">
+              <input :key="'c' + e.color" class="hex" :value="colorLabel(e.color).split(' ')[0]!.replace('#', '')" :aria-label="tr('Shadow hex')"spellcheck="false" @change="(ev) => { const v = (ev.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(e.color)) }); else (ev.target as HTMLInputElement).value = hex(e.color).slice(1) }" @keydown="blur" @focus="(ev) => (ev.target as HTMLInputElement).select()">
               <span class="vsep" aria-hidden="true" />
-              <span class="op"><input :key="'a' + e.color" class="pct" :value="Math.round(alpha(e.color) * 100)" inputmode="numeric" aria-label="Shadow opacity" @change="(ev) => { const a = Number((ev.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(e.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
+              <span class="op"><input :key="'a' + e.color" class="pct" :value="Math.round(alpha(e.color) * 100)" inputmode="numeric" :aria-label="tr('Shadow opacity')"@change="(ev) => { const a = Number((ev.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(e.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
             </div>
             <span />
           </div>
         </template>
         <template v-else>
-          <div class="ig-l"><span>Blur</span></div>
+          <div class="ig-l"><span>{{ tr('Blur') }}</span></div>
           <div class="ig">
-            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" /></svg><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" aria-label="Blur" @change="num(i, 'blur', $event)" @keydown="blur"></label>
+            <label class="sq fld"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.6 1.4" /></svg><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="blur"></label>
             <span /><span />
           </div>
         </template>

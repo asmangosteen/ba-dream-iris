@@ -8,7 +8,6 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
 import InspectorPaints from '~/components/editor/InspectorPaints.vue'
 import ColorField from '~/components/editor/ColorField.vue'
-import EditorSelect from '~/components/editor/EditorSelect.vue'
 import InspectorEffects from '~/components/editor/InspectorEffects.vue'
 import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
 
@@ -16,34 +15,12 @@ import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
 const props = defineProps<{ screen: ScreenRow }>()
 const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: [] }>()
 
-const STATUS: { value: ScreenRow['status']; label: string }[] = [
-  { value: 'draft', label: 'In progress' },
-  { value: 'review', label: 'Ready for review' },
-  { value: 'approved', label: 'Approved' },
-]
-const PRESETS = [
-  { label: 'iPhone 14', w: 390, h: 844 },
-  { label: 'iPhone 14 Pro Max', w: 430, h: 932 },
-  { label: 'iPhone 13 mini', w: 375, h: 812 },
-  { label: 'Android Small', w: 360, h: 800 },
-  { label: 'iPad mini', w: 768, h: 1024 },
-  { label: 'Desktop', w: 1440, h: 900 },
-]
-/** 크기 프리셋 ▾: 휴대폰 · 태블릿 · 데스크톱 묶음 사이에 구분선. 맞는 것이 없으면 'Custom' */
-const PRESET_OPTS = PRESETS.map((p) => ({ value: p.label, label: `${p.label} · ${p.w} × ${p.h}`, sep: p.label === 'iPad mini' || p.label === 'Desktop' }))
-const presetNow = computed(() => PRESETS.find((p) => p.w === props.screen.width && p.h === props.screen.height)?.label ?? null)
-function pickPreset(label: string) { const p = PRESETS.find((x) => x.label === label); if (p) emit('update', { width: p.w, height: p.h }) }
 
 function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
   if (!Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = String(Math.round(props.screen[key])); return }
   if (Math.round(v) !== Math.round(props.screen[key])) emit('update', { [key]: Math.round(v) })
-}
-function rename(e: Event) {
-  const v = (e.target as HTMLInputElement).value.trim()
-  if (v && v !== props.screen.name) emit('update', { name: v })
-  else (e.target as HTMLInputElement).value = props.screen.name
 }
 /** 화살표 키로 1씩(Shift 는 10씩) 바꾸기 */
 function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
@@ -64,7 +41,7 @@ const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
 const hasStroke = computed(() => !!(look.value.stroke && look.value.strokeWidth))
 const hex = (v?: string) => parseColor(store.color(v))?.hex ?? '#000000'
 /** 색 값 글자: Fill 행(InspectorPaints)처럼 # 없이 'FFFFFF' */
-const colorText = (v?: string) => (!v ? 'None' : v.startsWith('token:') ? v.slice(6) : colorLabel(v).replace(/^#/, ''))
+const colorText = (v?: string) => (!v ? tr('None') : v.startsWith('token:') ? v.slice(6) : colorLabel(v).replace(/^#/, ''))
 const blurOnEnter = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 /** 입력칸 공통: Esc 는 고치던 값을 버리고 칸에서 나가요(포커스할 때 값을 기억했다가 되돌리고, 그 사이 change 는 막아요) */
 function onFocusIn(e: FocusEvent) { const t = e.target as HTMLInputElement; if (t.tagName === 'INPUT') t.dataset.orig = t.value }
@@ -161,21 +138,11 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 
 <template>
   <div class="design" @focusin="onFocusIn" @keydown="onEsc" @change.capture="onChangeCap">
-    <section class="s">
-      <div class="sec-h h24"><span>Frame</span></div>
-      <div class="ig w1">
-        <label class="sq fld"><span>Name</span><input :key="screen.id + screen.name" :value="screen.name" aria-label="Frame name" @change="rename" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <span />
-      </div>
-      <div class="ig-l"><span>Status</span></div>
-      <div class="ig w1">
-        <EditorSelect :model-value="screen.status" :options="STATUS" ariaLabel="Status" @update:model-value="(v) => emit('update', { status: v as ScreenRow['status'] })" />
-        <span />
-      </div>
-    </section>
+    <!-- 머리(피그마 UI3): 종류 이름만 — 이름은 레이어 목록 · 캔버스 이름표에서, 상태 · 크기 프리셋은 빼요 -->
+    <section class="s first"><div class="head"><span class="ttl">{{ tr('Frame') }}</span></div></section>
 
     <section class="s">
-      <div class="sec-h h24"><span>Position</span></div>
+      <div class="sec-h h24"><span>{{ tr('Position') }}</span></div>
       <div class="ig">
         <label class="sq fld"><span>X</span><input :key="'x' + screen.x" :value="Math.round(screen.x)" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <label class="sq fld"><span>Y</span><input :key="'y' + screen.y" :value="Math.round(screen.y)" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
@@ -184,33 +151,29 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
     </section>
 
     <section class="s">
-      <div class="sec-h h24"><span>Layout</span></div>
-      <div class="ig w1">
-        <EditorSelect :model-value="presetNow" :options="PRESET_OPTS" ariaLabel="Size presets" placeholder="Custom" @update:model-value="pickPreset" />
-        <span />
-      </div>
-      <div class="ig-l"><span>Dimensions</span></div>
+      <div class="sec-h h24"><span>{{ tr('Layout') }}</span></div>
+      <div class="ig-l"><span>{{ tr('Dimensions') }}</span></div>
       <div class="ig">
-        <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" aria-label="Width" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" aria-label="Height" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <span />
       </div>
-      <button v-if="native" :class="['cb', { on: look.clip !== false }]" role="checkbox" :aria-checked="look.clip !== false" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />Clip content</button>
+      <button v-if="native" :class="['cb', { on: look.clip !== false }]" role="checkbox" :aria-checked="look.clip !== false" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />{{ tr('Clip content') }}</button>
     </section>
 
     <template v-if="native">
       <section class="s">
-        <div class="sec-h h24"><span>Appearance</span></div>
-        <div class="ig-l"><span>Opacity</span><span>Corner radius</span></div>
+        <div class="sec-h h24"><span>{{ tr('Appearance') }}</span></div>
+        <div class="ig-l"><span>{{ tr('Opacity') }}</span><span>{{ tr('Corner radius') }}</span></div>
         <div class="ig">
-          <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="Frame opacity" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
-          <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="allCorners === 'Mixed' ? '' : allCorners" :placeholder="allCorners === 'Mixed' ? 'Mixed' : ''" inputmode="numeric" aria-label="Frame corner radius" @change="setCorner($event, null)" @keydown="cornerKey(null, $event)"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Frame corner radius" @pick="(t) => pickCorner(null, t)" @unbind="fstyle({}, cornerVars(null, null))" @step="(d) => stepCorner(null, d)" /></label>
-          <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="Frame corner radius" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
-          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" aria-label="Independent corners" title="Independent corners" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+          <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" :aria-label="tr('Frame opacity')" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
+          <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="allCorners === 'Mixed' ? '' : allCorners" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setCorner($event, null)" @keydown="cornerKey(null, $event)"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Frame corner radius" @pick="(t) => pickCorner(null, t)" @unbind="fstyle({}, cornerVars(null, null))" @step="(d) => stepCorner(null, d)" /></label>
+          <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
         </div>
         <template v-if="separate">
           <!-- 피그마 순서: ┌ ┐ / └ ┘ -->
-          <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="CORNER_LABEL[i]"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="CORNER_LABEL[i]" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" aria-label="Corner smoothing" title="Corner smoothing" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
+          <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
         </template>
         <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="store.hold(screen.id)" @end="store.release(screen.id)" @close="smoothOpen = false" />
       </section>
@@ -218,18 +181,18 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <InspectorPaints :sid="screen.id" :ids="[]" kind="fill" title="Fill" frame />
 
       <section class="s">
-        <div :class="['sec-h', 'h24', { empty: !hasStroke }]"><span>Stroke</span><button v-if="!hasStroke" class="ib s24" aria-label="Add stroke" title="Add stroke" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
+        <div :class="['sec-h', 'h24', { empty: !hasStroke }]"><span>{{ tr('Stroke') }}</span><button v-if="!hasStroke" class="ib s24" :aria-label="tr('Add stroke')" :title="tr('Add stroke')" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
         <template v-if="hasStroke">
           <!-- 피그마 Stroke 행: [견본 + 값] [변수 24] [− 24] -->
           <div class="prow">
-            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" aria-label="Frame stroke color value" @change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
+            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" :aria-label="tr('Frame stroke color value')"@change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
             <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
             <span v-else />
-            <button class="ib s24" aria-label="Remove stroke" title="Remove stroke" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><EditorIcon name="minus" :size="16" /></button>
+            <button class="ib s24" :aria-label="tr('Remove stroke')" :title="tr('Remove stroke')" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><EditorIcon name="minus" :size="16" /></button>
           </div>
-          <div class="ig-l"><span>Weight</span></div>
+          <div class="ig-l"><span>{{ tr('Weight') }}</span></div>
           <div class="ig">
-            <label class="sq fld u" title="Stroke weight"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" aria-label="Frame stroke weight" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+            <label class="sq fld u" :title="tr('Stroke weight')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" :aria-label="tr('Frame stroke weight')" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
             <span /><span />
           </div>
         </template>
@@ -245,6 +208,10 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 
 <style scoped>
 .design { padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column; }
+.s.first { padding-bottom: var(--ref-spacing-08); }
+.head { display: flex; align-items: center; justify-content: space-between; height: 28px; min-width: 0; }
+/* 제목: 컴포넌트 이름 · 레이어 머리와 같은 14 / 22 */
+.ttl { font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); }
 /* 뒤에 Scale · Export 칸이 이어지면 아래 여백은 맨 끝 칸이 가져요(사이에 빈 공간이 생기지 않게) */
 .design:not(:last-child) { padding-bottom: 0; }
 /* 섹션: 위 12 · 옆 16 · 아래 16, 줄 사이 8 (PRD 07 §2.4) */

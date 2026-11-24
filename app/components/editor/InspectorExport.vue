@@ -58,7 +58,7 @@ function targets(): { el: HTMLElement; name: string }[] {
   }
   return nodes.value.map((n) => ({ el: world.querySelector<HTMLElement>(`[data-screen="${props.sid}"] [data-layer="${n.id}"]`), name: n.name })).filter((t): t is { el: HTMLElement; name: string } => !!t.el)
 }
-const label = computed(() => (props.screen ? props.screen.name : nodes.value.length > 1 ? `${nodes.value.length} layers` : nodes.value[0]?.name ?? ''))
+const label = computed(() => (props.screen ? props.screen.name : nodes.value.length > 1 ? tr('{n} layers', { n: nodes.value.length }) : nodes.value[0]?.name ?? ''))
 const busy = ref(false)
 async function run() {
   if (busy.value || !list.value.length) return
@@ -66,10 +66,10 @@ async function run() {
   try {
     const ts = targets()
     for (const t of ts) for (const e of list.value) download(await renderExport(t.el, e), fileNameOf(t.name, e))
-    if (!ts.length) toast('Nothing to export')
+    if (!ts.length) toast(tr('Nothing to export'))
   } catch (err) {
     console.error(err)
-    toast('Couldn’t export. Try again')
+    toast(tr('Couldn’t export. Try again'))
   } finally { busy.value = false }
 }
 
@@ -88,33 +88,33 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 <template>
   <section class="s ex">
     <div :class="['sec-h', 'h24', { empty: !list.length }]">
-      <span>Export</span>
-      <button class="ib s24" aria-label="Add export setting" title="Add export setting" @click="add"><EditorIcon name="plus" :size="16" /></button>
+      <span>{{ tr('Export') }}</span>
+      <button class="ib s24" :aria-label="tr('Add export setting')" :title="tr('Add export setting')" @click="add"><EditorIcon name="plus" :size="16" /></button>
     </div>
     <template v-if="list.length">
       <div v-for="(e, i) in list" :key="i" class="erow">
         <!-- 배율: 직접 입력 + ▾ 고르기. SVG · PDF 는 피그마처럼 배율 없음 -->
         <label :class="['sq', 'fld', 'esc', { off: isVectorFormat(e.format) }]">
-          <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" aria-label="Export scale" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
+          <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" :aria-label="tr('Export scale')" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
           <EditorSelect v-if="!isVectorFormat(e.format)" variant="inline" :model-value="e.scale" :options="SCALE_OPTS" aria-label="Export scale presets" @update:model-value="(v) => setAt(i, { scale: v })" />
         </label>
         <EditorSelect :model-value="e.format" :options="FORMAT_OPTS" aria-label="Export format" @update:model-value="(v) => setAt(i, { format: v as ExportSetting['format'] })" />
-        <button :class="['ib', 's24', { on: menu === i }]" aria-label="Export settings" title="Export settings" @click="menu = menu === i ? null : i">
+        <button :class="['ib', 's24', { on: menu === i }]" :aria-label="tr('Export settings')" :title="tr('Export settings')" @click="menu = menu === i ? null : i">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="12.5" cy="8" r="1.2" fill="currentColor" /></svg>
         </button>
-        <button class="ib s24" aria-label="Remove export setting" title="Remove export setting" @click="removeAt(i)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
-        <div v-if="menu === i" class="sq float emenu" role="dialog" aria-label="Export settings">
-          <div class="em-h"><span>Export</span><button class="ib s24" aria-label="Close" @click="menu = null"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button></div>
-          <div class="em-r"><span class="tx-meta">Suffix</span><label class="sq fld"><input :value="e.suffix ?? ''" :placeholder="fileNameOf('', e).replace(/^Untitled|\.\w+$/g, '') || 'None'" aria-label="Suffix" @change="setSuffix(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label></div>
-          <div class="em-r"><span class="tx-meta">Color profile</span><span class="sq fld ro">sRGB</span></div>
-          <button class="cb on dis" disabled title="Only this layer is exported — layers on top aren't included"><i class="sq" />Ignore overlapping layers</button>
+        <button class="ib s24" :aria-label="tr('Remove export setting')" :title="tr('Remove export setting')" @click="removeAt(i)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+        <div v-if="menu === i" class="sq float emenu" role="dialog" :aria-label="tr('Export settings')">
+          <div class="em-h"><span>{{ tr('Export') }}</span><button class="ib s24" :aria-label="tr('Close')" @click="menu = null"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button></div>
+          <div class="em-r"><span class="tx-meta">{{ tr('Suffix') }}</span><label class="sq fld"><input :value="e.suffix ?? ''" :placeholder="fileNameOf('', e).replace(/^Untitled|\.\w+$/g, '') || tr('None')" :aria-label="tr('Suffix')" @change="setSuffix(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label></div>
+          <div class="em-r"><span class="tx-meta">{{ tr('Color profile') }}</span><span class="sq fld ro">sRGB</span></div>
+          <button class="cb on dis" disabled :title="tr('Only this layer is exported — layers on top aren\'t included')"><i class="sq" />{{ tr('Ignore overlapping layers') }}</button>
         </div>
       </div>
-      <button class="sq exbtn" :disabled="busy" @click="run"><span class="exl">{{ busy ? 'Exporting…' : `Export ${label}` }}</span></button>
-      <button class="pvt" :aria-expanded="pvOpen" @click="pvOpen = !pvOpen"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !pvOpen }" />Preview</button>
+      <button class="sq exbtn" :disabled="busy" @click="run"><span class="exl">{{ busy ? tr('Exporting…') : tr('Export {name}', { name: label }) }}</span></button>
+      <button class="pvt" :aria-expanded="pvOpen" @click="pvOpen = !pvOpen"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !pvOpen }" />{{ tr('Preview') }}</button>
       <div v-if="pvOpen" class="sq sq-clip pv">
-        <img v-if="pvSrc" :src="pvSrc" alt="Export preview">
-        <span v-else class="tx-meta">Rendering…</span>
+        <img v-if="pvSrc" :src="pvSrc" :alt="tr('Export preview')">
+        <span v-else class="tx-meta">{{ tr('Rendering…') }}</span>
       </div>
     </template>
   </section>

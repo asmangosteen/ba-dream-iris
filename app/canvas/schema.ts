@@ -132,7 +132,7 @@ export interface LayerStyle {
 }
 
 /** 변수를 연결할 수 있는 속성 키 */
-export const BIND_KEYS = ['fill', 'stroke', 'color', 'strokeWidth', 'radius', 'radii.0', 'radii.1', 'radii.2', 'radii.3', 'opacity', 'fontSize', 'lineHeight', 'fontWeight', 'letterSpacing', 'textStyle', 'shadow', 'x', 'y', 'w', 'h', 'gap', 'padding.0', 'padding.1', 'padding.2', 'padding.3'] as const
+export const BIND_KEYS = ['fill', 'stroke', 'color', 'strokeWidth', 'radius', 'radii.0', 'radii.1', 'radii.2', 'radii.3', 'opacity', 'fontSize', 'lineHeight', 'fontWeight', 'letterSpacing', 'textStyle', 'shadow', 'x', 'y', 'w', 'h', 'gap', 'rowGap', 'padding.0', 'padding.1', 'padding.2', 'padding.3'] as const
 export type BindKey = (typeof BIND_KEYS)[number]
 
 /** 연결된 키의 지금 값(비교용 문자열). 연결은 그대로인데 이 값이 바뀌면 직접 고친 것으로 보고 연결을 풉니다 */
@@ -145,6 +145,7 @@ export function bindLiteral(n: LayerNode, key: BindKey): string {
     case 'shadow': return ''
     // 오토 레이아웃 간격 · 안쪽 여백(위 · 오른 · 아래 · 왼)
     case 'gap': return String(s.layout?.gap)
+    case 'rowGap': return String(s.layout?.rowGap ?? s.layout?.gap)
     case 'padding.0': case 'padding.1': case 'padding.2': case 'padding.3': return String(s.layout?.padding?.[Number(key.slice(8))])
     default: return String(s[key])
   }
@@ -169,6 +170,8 @@ export interface LayerNode {
   lockRatio?: boolean
   hidden?: boolean
   locked?: boolean
+  /** 그룹(⌘G): true 면 그룹, false 면 프레임(오토 레이아웃을 풀어 프레임이 된 것). 비어 있으면 모양으로 짐작(채우기 · 자르기 · 오토 레이아웃 없는 프레임) */
+  group?: boolean
   text?: string
   /** 선 · 연필: 상자 안 점 [x0, y0, x1, y1, …], 0~1 비율 (v5) */
   pts?: number[]
@@ -367,4 +370,11 @@ export function frameCss(f: LayerStyle | undefined, color: (v?: string) => strin
   if (f.opacity !== undefined && f.opacity < 1) css.opacity = f.opacity
   if (f.clip === false) css.overflow = 'visible'
   return css
+}
+
+/** 그룹인지: group 표시가 있으면 그대로, 없으면(예전 문서) 채우기 · 자르기 · 오토 레이아웃 없는 프레임을 그룹으로 봐요 */
+export function isGroupNode(n: LayerNode | undefined | null): boolean {
+  if (!n || n.type !== 'frame' || n.style.layout) return false
+  if (n.group !== undefined) return n.group
+  return n.style.clip === false && !n.style.fill && !n.style.fills?.length
 }

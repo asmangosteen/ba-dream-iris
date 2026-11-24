@@ -65,24 +65,24 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true)
 
 <template>
   <Teleport to="body">
-    <div ref="root" class="sq float cs" role="dialog" aria-label="Corner smoothing" :style="pos">
+    <div ref="root" class="sq float cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
       <div class="cs-h">
-        <span>Corner smoothing</span>
-        <button class="ib s24" aria-label="Close" @click="emit('close')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+        <span>{{ tr('Corner smoothing') }}</span>
+        <button class="ib s24" :aria-label="tr('Close')" @click="emit('close')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
       </div>
       <div class="cs-b">
         <div class="cs-row">
           <div class="cs-slide">
-            <div ref="track" class="cs-track" role="slider" tabindex="0" aria-label="Corner smoothing" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="v" :aria-valuetext="`${v}%`" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" @keydown="key">
+            <div ref="track" class="cs-track" role="slider" tabindex="0" :aria-label="tr('Corner smoothing')" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="v" :aria-valuetext="`${v}%`" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" @keydown="key">
               <i class="cs-fill" :style="{ width: `calc(16px + (100% - 16px) * ${v / 100})` }" />
               <i :class="['cs-tick', { past: v >= 60 }]" />
               <i class="cs-knob" :style="{ left: `calc(2px + (100% - 16px) * ${v / 100})` }" />
             </div>
             <div class="cs-marks" aria-hidden="true"><span class="cs-ios">iOS</span></div>
           </div>
-          <label class="sq fld cs-num"><input :key="'v' + value" :value="value === 'Mixed' ? '' : `${v}%`" :placeholder="value === 'Mixed' ? 'Mixed' : ''" inputmode="numeric" aria-label="Corner smoothing percent" @focus="($event.target as HTMLInputElement).select()" @change="typed" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+          <label class="sq fld cs-num"><input :key="'v' + value" :value="value === 'Mixed' ? '' : `${v}%`" :placeholder="value === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner smoothing percent')" @focus="($event.target as HTMLInputElement).select()" @change="typed" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         </div>
-        <button :class="['cb', { on: smoothDefault }]" role="checkbox" :aria-checked="smoothDefault" title="New rectangles, frames and images start with 60% corner smoothing" @click="setSmoothDefault(!smoothDefault)"><i class="sq" />Always 60% for new layers</button>
+        <button :class="['cb', { on: smoothDefault }]" role="checkbox" :aria-checked="smoothDefault" :title="tr('New rectangles, frames and images start with 60% corner smoothing')" @click="setSmoothDefault(!smoothDefault)"><i class="sq" />{{ tr('Always 60% for new layers') }}</button>
       </div>
     </div>
   </Teleport>

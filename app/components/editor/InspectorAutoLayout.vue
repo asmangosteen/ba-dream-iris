@@ -30,7 +30,7 @@ const flowNow = computed<Flow>(() => (!l.value ? 'free' : l.value.wrap ? 'grid' 
 function setFlow(f: Flow) {
   if (f === 'free') { if (l.value) store.removeAutoLayout(props.sid, props.ids); return }
   if (!l.value) store.addAutoLayout(props.sid, props.ids)
-  if (f === 'grid') set({ mode: 'horizontal', wrap: true })
+  if (f === 'grid') store.setWrap(props.sid, props.ids, true)
   else set({ mode: f, wrap: undefined })
 }
 const FLOW: { k: Flow; label: string; d: string }[] = [
@@ -73,6 +73,10 @@ function vb(keys: BindKey[]): string | null {
 function pickGap(t: CatalogToken) {
   if (t.num === undefined) return
   store.bind(props.sid, props.ids, 'gap', t.id, (n) => ({ style: n.style.layout ? { layout: { ...n.style.layout, gap: t.num! } } : {} }))
+}
+function pickRowGap(t: CatalogToken) {
+  if (t.num === undefined) return
+  store.bind(props.sid, props.ids, 'rowGap', t.id, (n) => ({ style: n.style.layout ? { layout: { ...n.style.layout, rowGap: t.num! } } : {} }))
 }
 function pickPad(idx: number[], t: CatalogToken) {
   if (t.num === undefined) return
@@ -127,63 +131,65 @@ const isOn = (col: number, row: number) => {
 <template>
   <section class="s" @focusin="onFocusIn" @keydown="onEsc" @change.capture="onChangeCap">
     <div class="sec-h h24">
-      <span>{{ l ? 'Auto layout' : 'Layout' }}</span>
+      <span>{{ l ? tr('Auto layout') : tr('Layout') }}</span>
       <span class="hacts">
-        <button v-if="fitOk" class="ib s24" aria-label="Resize to fit" title="Resize to fit" @click="store.resizeToFit(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5L6 6M6 3.5V6H3.5M13.5 2.5L10 6M10 3.5V6h2.5M2.5 13.5L6 10M6 12.5V10H3.5M13.5 13.5L10 10M10 12.5V10h2.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-        <button v-if="addOk" :class="['ib', 's24', 'tog', { on: !!l }]" :aria-pressed="!!l" :aria-label="l ? 'Remove auto layout (⌥⇧A)' : 'Add auto layout (⇧A)'" :title="l ? 'Remove auto layout ⌥⇧A' : 'Add auto layout ⇧A'" @click="l ? store.removeAutoLayout(sid, ids) : store.addAutoLayout(sid, ids)">
+        <button v-if="fitOk" class="ib s24" :aria-label="tr('Resize to fit')" :title="tr('Resize to fit')" @click="store.resizeToFit(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5L6 6M6 3.5V6H3.5M13.5 2.5L10 6M10 3.5V6h2.5M2.5 13.5L6 10M6 12.5V10H3.5M13.5 13.5L10 10M10 12.5V10h2.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button v-if="addOk" :class="['ib', 's24', 'tog', { on: !!l }]" :aria-pressed="!!l" :aria-label="l ? tr('Remove auto layout') + ' (⌥⇧A)' : tr('Add auto layout') + ' (⇧A)'" :title="l ? tr('Remove auto layout') + ' ⌥⇧A' : tr('Add auto layout') + ' ⇧A'" @click="l ? store.removeAutoLayout(sid, ids) : store.addAutoLayout(sid, ids)">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h4v11h-4zM9.5 2.5h4v4.5h-4z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /><path v-if="!l" d="M11.5 9.5v4M9.5 11.5h4" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path v-else d="M9.5 11.5l1.5 1.5 2.5-3" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
       </span>
     </div>
     <!-- Flow: Freeform · 세로 · 가로 · Grid(가로 줄바꿈) + 오토 레이아웃이면 줄바꿈 토글 -->
     <template v-if="flowOk">
-      <div class="ig-l"><span>Flow</span></div>
+      <div class="ig-l"><span>{{ tr('Flow') }}</span></div>
       <div class="ig">
-        <div class="grp span2 flow" role="radiogroup" aria-label="Flow">
-          <button v-for="f in FLOW" :key="f.k" role="radio" :aria-checked="flowNow === f.k" :class="['ib', { on: flowNow === f.k }]" :aria-label="f.label" :title="f.label" @click="setFlow(f.k)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="f.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <div class="grp span2 flow" role="radiogroup" :aria-label="tr('Flow')">
+          <button v-for="f in FLOW" :key="f.k" role="radio" :aria-checked="flowNow === f.k" :class="['ib', { on: flowNow === f.k }]" :aria-label="tr(f.label)" :title="tr(f.label)" @click="setFlow(f.k)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="f.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
         </div>
-        <button v-if="l" :class="['ib', 's24', 'tog', { on: !!l.wrap }]" :aria-pressed="!!l.wrap" aria-label="Wrap" title="Wrap" @click="set(l.wrap ? { wrap: undefined } : { mode: 'horizontal', wrap: true })"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h8.5a2.75 2.75 0 0 1 0 5.5H5.5M8 7.5L5.5 10 8 12.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button v-if="l" :class="['ib', 's24', 'tog', { on: !!l.wrap }]" :aria-pressed="!!l.wrap" :aria-label="tr('Wrap')" :title="tr('Wrap')" @click="store.setWrap(sid, ids, !l.wrap)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h8.5a2.75 2.75 0 0 1 0 5.5H5.5M8 7.5L5.5 10 8 12.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
         <span v-else />
       </div>
     </template>
     <slot name="dims" />
     <template v-if="l">
       <!-- Alignment | Gap -->
-      <div class="ig-l"><span>Alignment</span><span>Gap</span></div>
+      <div class="ig-l"><span>{{ tr('Alignment') }}</span><span>{{ tr('Gap') }}</span></div>
       <div class="ig top">
-        <div :class="['sq', 'align', { spread: l.gap === 'auto' }]" role="group" aria-label="Alignment" title="Double-click for auto spacing" @dblclick="toggleAuto">
+        <div :class="['sq', 'align', { spread: l.gap === 'auto' }]" role="group" :aria-label="tr('Alignment')" :title="tr('Double-click for auto spacing')" @dblclick="toggleAuto">
           <template v-for="row in 3" :key="row">
-            <button v-for="col in 3" :key="col" :class="['dot', l.mode === 'horizontal' ? 'hz' : 'vt', ['c0', 'c1', 'c2'][col - 1], ['r0', 'r1', 'r2'][row - 1], { on: isOn(col - 1, row - 1) }]" :aria-pressed="isOn(col - 1, row - 1)" :aria-label="`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`" :title="`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`" @click="pick(col - 1, row - 1)"><i class="pt" /><span class="bars" aria-hidden="true"><i /><i /><i /></span></button>
+            <button v-for="col in 3" :key="col" :class="['dot', l.mode === 'horizontal' ? 'hz' : 'vt', ['c0', 'c1', 'c2'][col - 1], ['r0', 'r1', 'r2'][row - 1], { on: isOn(col - 1, row - 1) }]" :aria-pressed="isOn(col - 1, row - 1)" :aria-label="tr(`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`)" :title="tr(`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`)" @click="pick(col - 1, row - 1)"><i class="pt" /><span class="bars" aria-hidden="true"><i /><i /><i /></span></button>
           </template>
         </div>
         <div class="side">
-          <label class="sq fld" title="Gap between items">
+          <label class="sq fld" :title="tr('Gap between items')">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="l.mode === 'horizontal' ? GAP_ICON.h : GAP_ICON.v" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <template v-if="l.gap !== 'auto'">
-              <input v-if="!vb(['gap'])" :key="'g' + l.gap" :value="l.gap" inputmode="decimal" aria-label="Gap between items" @change="num($event, (v) => set({ gap: v }))" @keydown="blur($event); step($event, (d) => set({ gap: Math.max(0, (l!.gap === 'auto' ? 0 : l!.gap) + d) }))">
+              <input v-if="!vb(['gap'])" :key="'g' + l.gap" :value="l.gap" inputmode="decimal" :aria-label="tr('Gap between items')" @change="num($event, (v) => set({ gap: v }))" @keydown="blur($event); step($event, (d) => set({ gap: Math.max(0, (l!.gap === 'auto' ? 0 : l!.gap) + d) }))">
               <TokenPicker :kinds="['spacing']" :bound="vb(['gap'])" reveal short label="Gap between items" @pick="pickGap" @unbind="unbind(['gap'])" @step="(d) => set({ gap: Math.max(0, (l!.gap === 'auto' ? 0 : l!.gap) + d) })" />
             </template>
-            <span v-else class="auto">Auto</span>
+            <span v-else class="auto">{{ tr('Auto') }}</span>
             <EditorSelect variant="inline" :model-value="l.gap === 'auto' ? 'auto' : 'fixed'" :options="GAP_OPTS" ariaLabel="Gap mode" @update:model-value="setGapMode" />
           </label>
-          <label v-if="l.wrap" class="sq fld" title="Gap between rows">
+          <label v-if="l.wrap" class="sq fld" :title="tr('Gap between rows')">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="GAP_ICON.v" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-            <input :key="'rg' + l.rowGap" :value="l.rowGap ?? (l.gap === 'auto' ? 0 : l.gap)" inputmode="decimal" aria-label="Gap between rows" @change="num($event, (v) => set({ rowGap: v }))" @keydown="blur($event); step($event, (d) => set({ rowGap: Math.max(0, (l!.rowGap ?? (l!.gap === 'auto' ? 0 : l!.gap)) + d) }))">
+            <input v-if="!vb(['rowGap'])" :key="'rg' + l.rowGap" :value="l.rowGap ?? (l.gap === 'auto' ? 0 : l.gap)" inputmode="decimal" :aria-label="tr('Gap between rows')" @change="num($event, (v) => set({ rowGap: v }))" @keydown="blur($event); step($event, (d) => set({ rowGap: Math.max(0, (l!.rowGap ?? (l!.gap === 'auto' ? 0 : l!.gap)) + d) }))">
+            <!-- 줄 간격도 간격 · 패딩처럼 spacing 토큰(칩을 누르면 커서, 다시 누르면 토큰 창) -->
+            <TokenPicker :kinds="['spacing']" :bound="vb(['rowGap'])" reveal short label="Gap between rows" @pick="pickRowGap" @unbind="unbind(['rowGap'])" @step="(d) => set({ rowGap: Math.max(0, (l!.rowGap ?? (l!.gap === 'auto' ? 0 : l!.gap)) + d) })" />
           </label>
         </div>
         <span />
       </div>
       <!-- Padding: 가로 | 세로 + 개별 패딩 토글, 켜면 왼 · 위 / 오른 · 아래 -->
-      <div class="ig-l"><span>Padding</span></div>
+      <div class="ig-l"><span>{{ tr('Padding') }}</span></div>
       <div v-if="!sepPad" class="ig">
-        <label class="sq fld" title="Horizontal padding"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3v10M13.5 3v10M6 5.5h4v5H6z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([1, 3]))" :key="'ph' + l.padding[3]" :value="l.padding[3] === l.padding[1] ? l.padding[3] : ''" :placeholder="l.padding[3] === l.padding[1] ? '' : 'Mixed'" inputmode="decimal" aria-label="Horizontal padding" @change="num($event, (v) => padHV('h', v))" @keydown="blur($event); step($event, (d) => padHV('h', Math.max(0, l!.padding[3] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([1, 3]))" reveal short label="Horizontal padding" @pick="(t) => pickPad([1, 3], t)" @unbind="unbind(padKeys([1, 3]))" @step="(d) => padHV('h', Math.max(0, l!.padding[3] + d))" /></label>
-        <label class="sq fld" title="Vertical padding"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10M3 13.5h10M5.5 6h5v4h-5z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([0, 2]))" :key="'pv' + l.padding[0]" :value="l.padding[0] === l.padding[2] ? l.padding[0] : ''" :placeholder="l.padding[0] === l.padding[2] ? '' : 'Mixed'" inputmode="decimal" aria-label="Vertical padding" @change="num($event, (v) => padHV('v', v))" @keydown="blur($event); step($event, (d) => padHV('v', Math.max(0, l!.padding[0] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([0, 2]))" reveal short label="Vertical padding" @pick="(t) => pickPad([0, 2], t)" @unbind="unbind(padKeys([0, 2]))" @step="(d) => padHV('v', Math.max(0, l!.padding[0] + d))" /></label>
-        <button class="ib s24 tog" :aria-pressed="false" aria-label="Individual padding" title="Individual padding" @click="sepPad = true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <label class="sq fld" :title="tr('Horizontal padding')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3v10M13.5 3v10M6 5.5h4v5H6z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([1, 3]))" :key="'ph' + l.padding[3]" :value="l.padding[3] === l.padding[1] ? l.padding[3] : ''" :placeholder="l.padding[3] === l.padding[1] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Horizontal padding')" @change="num($event, (v) => padHV('h', v))" @keydown="blur($event); step($event, (d) => padHV('h', Math.max(0, l!.padding[3] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([1, 3]))" reveal short label="Horizontal padding" @pick="(t) => pickPad([1, 3], t)" @unbind="unbind(padKeys([1, 3]))" @step="(d) => padHV('h', Math.max(0, l!.padding[3] + d))" /></label>
+        <label class="sq fld" :title="tr('Vertical padding')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10M3 13.5h10M5.5 6h5v4h-5z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([0, 2]))" :key="'pv' + l.padding[0]" :value="l.padding[0] === l.padding[2] ? l.padding[0] : ''" :placeholder="l.padding[0] === l.padding[2] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Vertical padding')" @change="num($event, (v) => padHV('v', v))" @keydown="blur($event); step($event, (d) => padHV('v', Math.max(0, l!.padding[0] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([0, 2]))" reveal short label="Vertical padding" @pick="(t) => pickPad([0, 2], t)" @unbind="unbind(padKeys([0, 2]))" @step="(d) => padHV('v', Math.max(0, l!.padding[0] + d))" /></label>
+        <button class="ib s24 tog" :aria-pressed="false" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
       </div>
       <template v-else>
         <div v-for="(pair, r) in PAD4" :key="r" class="ig">
-          <label v-for="p in pair" :key="p.nm" class="sq fld" :title="`${p.nm} padding`"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="PAD_ICON[p.i]" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([p.i]))" :key="p.nm + l.padding[p.i]" :value="l.padding[p.i]" inputmode="decimal" :aria-label="`${p.nm} padding`" @change="num($event, (v) => pad(p.i, v))" @keydown="blur($event); step($event, (d) => pad(p.i, Math.max(0, l!.padding[p.i] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([p.i]))" reveal short :label="`${p.nm} padding`" @pick="(t) => pickPad([p.i], t)" @unbind="unbind(padKeys([p.i]))" @step="(d) => pad(p.i, Math.max(0, l!.padding[p.i] + d))" /></label>
-          <button v-if="r === 0" class="ib s24 tog on" :aria-pressed="true" aria-label="Individual padding" title="Individual padding" @click="sepPad = false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <label v-for="p in pair" :key="p.nm" class="sq fld" :title="tr(`${p.nm} padding`)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="PAD_ICON[p.i]" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([p.i]))" :key="p.nm + l.padding[p.i]" :value="l.padding[p.i]" inputmode="decimal" :aria-label="tr(`${p.nm} padding`)" @change="num($event, (v) => pad(p.i, v))" @keydown="blur($event); step($event, (d) => pad(p.i, Math.max(0, l!.padding[p.i] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([p.i]))" reveal short :label="`${p.nm} padding`" @pick="(t) => pickPad([p.i], t)" @unbind="unbind(padKeys([p.i]))" @step="(d) => pad(p.i, Math.max(0, l!.padding[p.i] + d))" /></label>
+          <button v-if="r === 0" class="ib s24 tog on" :aria-pressed="true" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
           <span v-else />
         </div>
       </template>

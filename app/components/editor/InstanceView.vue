@@ -31,6 +31,67 @@ export function dsDefault(name: string | undefined, key: string): unknown {
   return typeof d === 'function' ? undefined : d
 }
 
+/**
+ * 넣을 때 · 그릴 때 기본 속성(Iris 가 채우는 값): 필수 값이 없으면 그리지 못하거나(목록 items · 대체 글자 alt) 비어 보이는(아이콘 · 숫자) 컴포넌트.
+ * 노드에 저장하지 않고 그릴 때 합쳐요 — 속성 패널은 이 값을 '기본값'으로 보여 주고, 고치면 그 값만 저장돼요
+ */
+export const INSERT_PROPS: Record<string, Record<string, unknown>> = {
+  SegmentedControl: { items: [{ label: 'Day' }, { label: 'Week' }, { label: 'Month' }] },
+  Tab: { items: [{ label: 'Tab 1' }, { label: 'Tab 2' }, { label: 'Tab 3' }] },
+  Avatar: { alt: 'User', size: 40 },
+  NumericBadge: { count: 3 },
+  IconButton: { iconName: 'plus', ariaLabel: 'Add' },
+  ProgressBar: { value: 40 },
+  Slider: { defaultValue: 40 },
+  MapCluster: { count: 12 },
+  MapPin: { label: 'Place' },
+  ToastCard: { message: 'Saved' },
+  PopUpCard: { buttonCount: 1, content: 'title-caption', title: 'Title', caption: 'A short caption goes here.', primaryLabel: 'OK' },
+  FileRow: { fileName: 'document.pdf', meta: '1.2 MB' },
+  ListSort: { label: 'Label', default: 'Value' },
+  ListSelect: { default: 'Option' },
+  MapPill: { default: 'Place' },
+}
+/**
+ * 넣을 때 크기 — 디자인 시스템 스토리북(ba-dream/design-system, 각 컴포넌트 Playground)의 기준 크기 그대로(2026-11-24 전수 조사).
+ * fixed: 그 폭(w)으로 고정, h 가 있으면 높이도 고정(없으면 세로는 Hug) / hug: 내용 크기(Hug)
+ * 폭이 100% 인 컴포넌트는 스토리가 감싼 폭(340 · 350 · 390 — 입력칸 TextInput · Dropdown · Select 는 피그마 기준 350 으로 통일), 자체 폭이 있는 것(DatePicker 352 · Toast 350 · PopUp 310)은 그 폭
+ */
+export const STORY_SIZE: Record<string, { w?: number; h?: number; mode: 'fixed' | 'hug' }> = {
+  Button: { mode: 'hug' }, IconButton: { mode: 'hug' }, TextButton: { mode: 'hug' },
+  ButtonGroup: { mode: 'fixed', w: 350 }, TextInput: { mode: 'fixed', w: 350 }, TextArea: { mode: 'fixed', w: 350 },
+  SearchField: { mode: 'fixed', w: 350 }, Select: { mode: 'fixed', w: 350 }, Dropdown: { mode: 'fixed', w: 350 },
+  Checkbox: { mode: 'hug' }, CheckboxCard: { mode: 'fixed', w: 350 }, RadioButton: { mode: 'hug' }, Toggle: { mode: 'hug' },
+  Chip: { mode: 'hug' }, FilterChip: { mode: 'hug' }, SegmentedControl: { mode: 'fixed', w: 340 },
+  Slider: { mode: 'fixed', w: 350, h: 20 }, Stepper: { mode: 'hug' }, DatePicker: { mode: 'fixed', w: 352 }, TimePicker: { mode: 'hug' },
+  SignField: { mode: 'fixed', w: 350 }, UploadField: { mode: 'fixed', w: 350 }, AddMedia: { mode: 'hug' }, FileRow: { mode: 'fixed', w: 350 },
+  InputBar: { mode: 'fixed', w: 390 }, ListSelect: { mode: 'fixed', w: 350 },
+  TopBar: { mode: 'fixed', w: 390 }, NavBarTop: { mode: 'fixed', w: 390 }, BottomBar: { mode: 'fixed', w: 390 }, Tab: { mode: 'fixed', w: 390 },
+  PageControl: { mode: 'hug' }, Pagination: { mode: 'hug' }, StepIndicator: { mode: 'fixed', w: 350 }, Menu: { mode: 'fixed', w: 350, h: 32 },
+  Badge: { mode: 'hug' }, NumericBadge: { mode: 'hug' }, Avatar: { mode: 'hug' }, Label: { mode: 'hug' }, Title: { mode: 'fixed', w: 350 },
+  ListCommon: { mode: 'fixed', w: 350 }, ListSort: { mode: 'fixed', w: 350 }, ProductCardGrid: { mode: 'fixed', w: 169 }, ProductCardList: { mode: 'fixed', w: 350 },
+  PostListItem: { mode: 'fixed', w: 350 }, PostComment: { mode: 'fixed', w: 350 }, PostReply: { mode: 'fixed', w: 350 }, Media: { mode: 'hug' },
+  Timeline: { mode: 'fixed', w: 350 }, ProgressBar: { mode: 'fixed', w: 390, h: 2 }, Divider: { mode: 'fixed', w: 320, h: 1 }, Tooltip: { mode: 'hug' },
+  NoticeBox: { mode: 'fixed', w: 350 }, Gradient: { mode: 'fixed', w: 390, h: 40 }, ScrollBar: { mode: 'fixed', w: 6, h: 180 }, Footer: { mode: 'fixed', w: 390 },
+  MapPin: { mode: 'hug' }, MapPill: { mode: 'hug' }, MapCluster: { mode: 'hug' }, MapMyLocation: { mode: 'hug' },
+  MapBottomBar: { mode: 'fixed', w: 350 }, MapBottomGuide: { mode: 'hug' },
+  Toast: { mode: 'fixed', w: 350 }, PopUp: { mode: 'fixed', w: 310 }, PopUpCard: { mode: 'fixed', w: 310 }, ToastCard: { mode: 'fixed', w: 350 },
+  BottomSheet: { mode: 'fixed', w: 390 }, Dimmed: { mode: 'fixed', w: 390, h: 520 }, Loading: { mode: 'fixed', w: 390 },
+  Spinner: { mode: 'hug' }, Skeleton: { mode: 'fixed', w: 200, h: 16 }, EmptyState: { mode: 'fixed', w: 390 }, DoneState: { mode: 'fixed', w: 390 },
+}
+/** 고정 크기로 넣는 것만(에셋 미리보기 · 캔버스 넣기가 같은 크기로) */
+export const INSERT_SIZE: Record<string, { w: number; h?: number }> = Object.fromEntries(
+  Object.entries(STORY_SIZE).filter(([, v]) => v.mode === 'fixed' && v.w).map(([k, v]) => [k, { w: v.w!, h: v.h }]),
+)
+/** Iris 가 채우는 기본 속성 + 고친 값(슬롯 글자 키 제외) — 캔버스 · 에셋 미리보기 · 끄는 모습이 모두 같게 그려요 */
+export function instanceProps(name: string | undefined, set?: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(name ? INSERT_PROPS[name] : undefined) }
+  for (const [k, v] of Object.entries(set ?? {})) if (k !== SLOT_KEY && v !== undefined) out[k] = v
+  return out
+}
+/** 속성의 기본값: Iris 기본(INSERT_PROPS) → 컴포넌트 기본 */
+export const instDefault = (name: string | undefined, key: string): unknown => (name && INSERT_PROPS[name]?.[key] !== undefined ? INSERT_PROPS[name]![key] : dsDefault(name, key))
+
 const SLOT_COPY: Record<string, string> = { DateCell: '1', TabItem: 'Tab', SegmentedControlItem: 'Segment', Timeline: 'Text' }
 /** 슬롯이 비면 아무것도 안 보이는 컴포넌트(버튼 · 배지 등)에 넣을 기본 글자. 스스로 Figma 문구를 보여 주는 컴포넌트('비우면 …')는 undefined */
 export function slotFallback(name: string | undefined): string | undefined {
@@ -58,12 +119,8 @@ const hugH = computed(() => props.node.sizeH === 'hug')
 const hugV = computed(() => props.node.sizeV === 'hug')
 
 const bound = computed(() => {
-  const out: Record<string, unknown> = {}
+  const out = instanceProps(props.node.component, props.node.props)
   const list = dsProps(props.node.component)
-  for (const [k, v] of Object.entries(props.node.props ?? {})) {
-    if (k === SLOT_KEY || v === undefined) continue
-    out[k] = v
-  }
   // 띄우는 컴포넌트(PopUp · BottomSheet · Toast)가 body 로 빠져나가지 않게 — 캔버스에서는 상자 안 기준(absolute)으로
   const pos = list.find((p) => p.name === 'position')
   const posNow = out.position ?? dsDefault(props.node.component, 'position')
@@ -117,7 +174,7 @@ watch([hugH, hugV, scale], () => nextTick(() => { if (box.value) { const cs = ge
         <template v-if="slotText !== undefined" #default>{{ slotText }}</template>
       </component>
     </div>
-    <div v-else class="missing"><span>{{ node.component || 'Instance' }}</span><span class="sub">{{ comp ? 'Can’t render with these properties' : 'Component not found' }}</span></div>
+    <div v-else class="missing"><span>{{ node.component || tr('Instance') }}</span><span class="sub">{{ comp ? tr('Can’t render with these properties') : tr('Component not found') }}</span></div>
   </div>
 </template>
 

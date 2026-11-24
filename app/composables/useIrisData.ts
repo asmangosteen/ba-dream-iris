@@ -52,20 +52,21 @@ export type TokenType = 'color' | 'typography' | 'spacing' | 'radius' | 'shadow'
 export interface TokenRow { id: string; type: TokenType; name: string; value: string; description: string | null }
 export interface UsageRow { id: string; screen_id: string; component_id: string | null; detected_name: string; count: number }
 
-export const DOC_CATEGORY_LABEL: Record<DocCategory, string> = { planning: '기획', dev: '개발', design: '디자인', etc: '기타' }
-export const DOC_SOURCE_LABEL: Record<DocSource, string> = { native: '작성', upload: '파일', link: '링크' }
-export const PRIORITY_LABEL: Record<ReqPriority, string> = { must: '필수', should: '권장', could: '선택' }
+// 라벨은 영어 원문(사전 열쇠)이에요. 보여 줄 때 tr(DOC_CATEGORY_LABEL[k]) 처럼 감싸 주세요(한국어는 app/i18n/ko/docs.ts)
+export const DOC_CATEGORY_LABEL: Record<DocCategory, string> = { planning: 'Planning', dev: 'Development', design: 'Design', etc: 'Other' }
+export const DOC_SOURCE_LABEL: Record<DocSource, string> = { native: 'Written', upload: 'File', link: 'Link' }
+export const PRIORITY_LABEL: Record<ReqPriority, string> = { must: 'Must', should: 'Should', could: 'Could' }
 export const LINK_STATUS: Record<LinkStatus, { label: string }> = {
-  reflected: { label: '반영됨' },
-  partial: { label: '일부 반영' },
-  missing: { label: '미반영' },
-  na: { label: '해당 없음' },
+  reflected: { label: 'Reflected' },
+  partial: { label: 'Partial' },
+  missing: { label: 'Missing' },
+  na: { label: 'Not applicable' },
 }
 /** 반영 상태 순환(상태 아이콘을 누를 때) — 시안과 같은 순서 */
 export const NEXT_STATUS: Record<LinkStatus, LinkStatus> = { reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' }
 /** 목록에서 보여 줄 순서: 손볼 것부터 */
 export const STATUS_ORDER: LinkStatus[] = ['missing', 'partial', 'reflected', 'na']
-export const TOKEN_TYPE_LABEL: Record<TokenType, string> = { color: '색', typography: '글자', spacing: '간격', radius: '모서리', shadow: '그림자' }
+export const TOKEN_TYPE_LABEL: Record<TokenType, string> = { color: 'Color', typography: 'Typography', spacing: 'Spacing', radius: 'Radius', shadow: 'Shadow' }
 
 /** 문서 아이콘 이름(디자인 시스템 Icon) */
 export function docIcon(d: Pick<DocRow, 'source_type'>): string {
@@ -287,6 +288,30 @@ export function useUsages(key: string, screenIds?: () => string[]) {
     if (error) throw error
     return link((data ?? []) as UsageRow[])
   }, screenIds ? { watch: [screenIds], deep: true } : { deep: true })
+}
+
+/** 사용 기록에 나온 화면들의 이름 · 페이지 · 프로젝트(에셋 상세 '다른 프로젝트에서') */
+export interface UsageScreen { id: string; name: string; page: string; project: string; projectId: string | null }
+export function useUsageScreens(key: string, ids: () => string[]) {
+  const supabase = useSupabaseClient()
+  const preview = useDevPreview()
+  return useAsyncData(`usage-screens-${key}`, async (): Promise<Record<string, UsageScreen>> => {
+    const list = ids()
+    if (!list.length) return {}
+    if (preview) {
+      const project = PREVIEW_PROJECTS[0]!
+      const out: Record<string, UsageScreen> = {}
+      for (const [pageId, rows] of Object.entries(PREVIEW_SCREENS)) {
+        const page = PREVIEW_PAGES.find((p) => p.id === pageId)?.name ?? ''
+        for (const s of rows) if (list.includes(s.id)) out[s.id] = { id: s.id, name: s.name, page, project: project.name, projectId: project.id }
+      }
+      return out
+    }
+    const { data, error } = await supabase.from('screens').select('id, name, page_id, pages(name, project_id, projects(name))').in('id', list)
+    if (error) throw error
+    type Row = { id: string; name: string; pages: { name: string; project_id: string; projects: { name: string } | null } | null }
+    return Object.fromEntries(((data ?? []) as unknown as Row[]).map((s) => [s.id, { id: s.id, name: s.name, page: s.pages?.name ?? '', project: s.pages?.projects?.name ?? '', projectId: s.pages?.project_id ?? null }]))
+  }, { watch: [ids], default: (): Record<string, UsageScreen> => ({}) })
 }
 
 // ---------------------------------------------------------------------------

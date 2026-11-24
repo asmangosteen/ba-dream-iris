@@ -49,44 +49,44 @@ function onKey(e: KeyboardEvent) {
 
 <template>
   <!-- 피그마 UI3: [가로 정렬 3 | 세로 정렬 3 | ☰ 더보기(균등 분배)] · 여러 개 고르면 아래에 간격 칸 -->
-  <div class="ig-l"><span>Alignment</span></div>
+  <div class="ig-l"><span>{{ tr('Alignment') }}</span></div>
   <div ref="root" class="ig">
-    <div class="grp" role="group" aria-label="Horizontal alignment">
-      <button v-for="a in ALIGN.slice(0, 3)" :key="a.k" class="ib" :aria-label="`${a.label} (${a.key})`" :title="`${a.label} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
+    <div class="grp" role="group" :aria-label="tr('Horizontal alignment')">
+      <button v-for="a in ALIGN.slice(0, 3)" :key="a.k" class="ib" :aria-label="`${tr(a.label)} (${a.key})`" :title="`${tr(a.label)} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="a.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg>
       </button>
     </div>
-    <div class="grp" role="group" aria-label="Vertical alignment">
-      <button v-for="a in ALIGN.slice(3)" :key="a.k" class="ib" :aria-label="`${a.label} (${a.key})`" :title="`${a.label} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
+    <div class="grp" role="group" :aria-label="tr('Vertical alignment')">
+      <button v-for="a in ALIGN.slice(3)" :key="a.k" class="ib" :aria-label="`${tr(a.label)} (${a.key})`" :title="`${tr(a.label)} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="a.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg>
       </button>
     </div>
     <div class="more" @keydown="onMenuKey">
-      <button ref="btn" :class="['ib', 's24', { on: open }]" aria-label="More alignment options" title="More alignment options" aria-haspopup="menu" :aria-expanded="open" @click="open = !open">
+      <button ref="btn" :class="['ib', 's24', { on: open }]" :aria-label="tr('More alignment options')" :title="tr('More alignment options')" aria-haspopup="menu" :aria-expanded="open" @click="open = !open">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M5 8h6M3 12h10" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg>
       </button>
       <div v-if="open" class="sq menu more-m" role="menu">
         <button class="sq menu-item" role="menuitem" :disabled="count < 3" @click="open = false; emit('op', { kind: 'distribute', axis: 'y' })">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h11M2.5 13.5h11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><rect x="5" y="6" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
-          <span class="grow">Distribute vertical spacing</span><span class="key">⌃⌥V</span>
+          <span class="grow">{{ tr('Distribute vertical spacing') }}</span><span class="key">⌃⌥V</span>
         </button>
         <button class="sq menu-item" role="menuitem" :disabled="count < 3" @click="open = false; emit('op', { kind: 'distribute', axis: 'x' })">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5v11M13.5 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><rect x="6" y="5" width="4" height="6" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
-          <span class="grow">Distribute horizontal spacing</span><span class="key">⌃⌥H</span>
+          <span class="grow">{{ tr('Distribute horizontal spacing') }}</span><span class="key">⌃⌥H</span>
         </button>
         <button class="sq menu-item" role="menuitem" :disabled="count < 2" @click="open = false; emit('op', { kind: 'tidy' })">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
-          <span class="grow">Tidy up</span><span class="key">⌃⌥T</span>
+          <span class="grow">{{ tr('Tidy up') }}</span><span class="key">⌃⌥T</span>
         </button>
       </div>
     </div>
   </div>
   <template v-if="count >= 2">
-    <div class="ig-l"><span>Spacing</span></div>
+    <div class="ig-l"><span>{{ tr('Spacing') }}</span></div>
     <div class="ig">
-      <label class="sq fld" :title="axis === 'x' ? 'Horizontal spacing' : 'Vertical spacing'">
+      <label class="sq fld" :title="axis === 'x' ? tr('Horizontal spacing') : tr('Vertical spacing')">
         <EditorIcon name="var_spacing" :size="16" :style="axis === 'y' ? { transform: 'rotate(90deg)' } : undefined" />
-        <input :key="String(gap) + axis + count" :value="gap ?? ''" :placeholder="gap === null ? 'Mixed' : ''" inputmode="numeric" aria-label="Spacing" @focus="($event.target as HTMLInputElement).dataset.orig = ($event.target as HTMLInputElement).value" @change="setGap" @keydown="onKey">
+        <input :key="String(gap) + axis + count" :value="gap ?? ''" :placeholder="gap === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Spacing')" @focus="($event.target as HTMLInputElement).dataset.orig = ($event.target as HTMLInputElement).value" @change="setGap" @keydown="onKey">
       </label>
       <span /><span />
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
-import { Avatar, Button, Skeleton, TextButton } from '@ba-dream/design-system'
+import { Button, Skeleton, TextButton } from '@ba-dream/design-system'
+import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
@@ -18,6 +19,7 @@ import { useMixScreens } from '~/composables/useLayerMenu'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
 import { isMediaFile, isVideoFile, mediaLimit, uploadImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
+import EditorVariables from '~/components/editor/EditorVariables.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
@@ -50,16 +52,16 @@ const pageCtx = useContextMenu()
 const confirmPage = ref<{ id: string; name: string; count: number } | null>(null)
 function pageMenu(p: { id: string; name: string }, e: MouseEvent) {
   pageCtx.open(e, [
-    { label: 'Rename', action: () => (renaming.value = p.id) },
+    { label: tr('Rename'), action: () => (renaming.value = p.id) },
     'sep',
-    { label: 'Delete page', danger: true, disabled: (pages.data.value?.length ?? 0) <= 1, action: () => (confirmPage.value = { id: p.id, name: p.name, count: p.id === pageId.value ? list.value.length : -1 }) },
+    { label: tr('Delete page'), danger: true, disabled: (pages.data.value?.length ?? 0) <= 1, action: () => (confirmPage.value = { id: p.id, name: p.name, count: p.id === pageId.value ? list.value.length : -1 }) },
   ])
 }
 async function doRemovePage() {
   const c = confirmPage.value
   confirmPage.value = null
   if (!c) return
-  try { await removePage(c.id); say(`Deleted ${c.name}`) } catch { say('Couldn\'t delete the page. Try again') }
+  try { await removePage(c.id); say(tr('Deleted {name}', { name: c.name })) } catch { say(tr('Couldn\'t delete the page. Try again')) }
 }
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
@@ -73,6 +75,8 @@ const left = ref<'file' | 'assets' | 'docs'>('file')
 const tab = ref<'design' | 'plan' | 'dev'>('design')
 const tool = ref<Tool>('move')
 const asset = ref<string | null>(null)
+/** 변수 화면(좌측 패널 맨 아래 Variables) — 열면 편집기 전체를 덮어요 */
+const varsOpen = ref(false)
 const docId = ref<string | null>(null)
 const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
@@ -85,7 +89,7 @@ const list = computed(() => screens.data.value ?? [])
 /** 캔버스 위(화면 밖)에 그린 레이어: 페이지에 저장되는 가상 화면 하나로 다룹니다(좌표 = 캔버스 좌표) */
 const canvasScreen = computed<ScreenRow | null>(() => {
   const p = pages.data.value?.find((x) => x.id === pageId.value)
-  return p ? { id: pageCanvasId(p.id), name: 'Canvas', source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
+  return p ? { id: pageCanvasId(p.id), name: tr('Canvas'), source: 'native', x: 0, y: 0, width: 0, height: 0, status: 'draft', layers: p.layers ?? null } : null
 })
 const currentPage = computed(() => pages.data.value?.find((x) => x.id === pageId.value) ?? null)
 async function onPageSettings(patch: PageSettings) {
@@ -95,7 +99,7 @@ async function onPageSettings(patch: PageSettings) {
   try {
     await updatePageSettings(p.id, patch)
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
-  } catch { say('Couldn\'t save page settings') }
+  } catch { say(tr('Couldn\'t save page settings')) }
 }
 const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
@@ -143,7 +147,7 @@ watch(() => [pageId.value, screens.status.value] as const, ([pid, st]) => {
 onMounted(() => { if (screens.status.value === 'success' && fitted !== pageId.value) { fitted = pageId.value; canvas.value?.fit() } })
 
 async function onAddPage() {
-  try { await addPage() } catch { say('Couldn\'t add a page. Try again') }
+  try { await addPage() } catch { say(tr('Couldn\'t add a page. Try again')) }
 }
 const renaming = ref<string | null>(null)
 async function onRename(id: string, e: Event) {
@@ -153,7 +157,7 @@ async function onRename(id: string, e: Event) {
   const name = (e.target as HTMLInputElement).value.trim()
   const before = pages.data.value?.find((x) => x.id === id)?.name
   if (!name || name === before) return
-  try { await renamePage(id, name) } catch { say('Couldn\'t rename') }
+  try { await renamePage(id, name) } catch { say(tr('Couldn\'t rename')) }
 }
 /** 프로젝트 이름: 왼쪽 위 이름을 두 번 누르면 바로 고쳐요(피그마 파일 이름과 같아요). Enter · 바깥 누르기 = 저장, Esc = 취소 */
 const projRenaming = ref(false)
@@ -163,7 +167,7 @@ async function onProjRename(e: Event) {
   projRenaming.value = false
   const name = (e.target as HTMLInputElement).value.trim()
   if (!name || name === project.data.value?.name) return
-  try { await projActions.update(projectId, { name }) } catch { say('Couldn\'t rename the project') }
+  try { await projActions.update(projectId, { name }) } catch { say(tr('Couldn\'t rename the project')) }
 }
 /** 이름 바꾸기 입력칸: 열리면 바로 포커스하고 글자를 모두 골라요(피그마와 같아요) */
 const vSelect = { mounted: (el: HTMLInputElement) => nextTick(() => { el.focus(); el.select() }) }
@@ -175,7 +179,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
   if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
   const from = moveFrom.get(id) ?? { x, y }
   moveFrom.delete(id)
-  const fail = () => say('Couldn\'t save the position. Try again')
+  const fail = () => say(tr('Couldn\'t save the position. Try again'))
   updateScreen(id, { x, y }).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
 }
@@ -188,12 +192,16 @@ function onResizeScreen(id: string, r: ScreenRect, done: boolean) {
   if (!done) { if (!resizeFrom.has(id)) resizeFrom.set(id, { x: s.x, y: s.y, width: s.width, height: s.height }); Object.assign(s, r); return }
   const from = resizeFrom.get(id) ?? r
   resizeFrom.delete(id)
-  const fail = () => say('Couldn\'t save the size. Try again')
+  const fail = () => say(tr('Couldn\'t save the size. Try again'))
   updateScreen(id, r).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, r).catch(fail))
 }
 /** 여러 화면 정렬 · 균등 분배 · 간격 맞추기: 한 번에 실행취소 */
 const multiScreens = ref<string[]>([])
+/** 캔버스에서 뭔가 골랐는지(프레임 · 여러 프레임 · 레이어). 사이드바를 접어 둬도 고르면 오른쪽 Design 패널은 펼쳐 보여요(피그마처럼).
+    문서를 열어 둔 오른쪽 패널도 접기와 상관없이 그대로 — 문서 패널 위 X 로 닫아야 접혀요 */
+const hasPick = computed(() => store.layerIds.value.length > 0 || multiScreens.value.length > 0 || (!!selected.value && selected.value !== canvasScreen.value?.id))
+watch(hasPick, (v) => { if (v && collapsed.value.right) tab.value = 'design' })
 const multiList = computed(() => multiScreens.value.map((id) => list.value.find((s) => s.id === id)).filter((s): s is ScreenRow => !!s))
 /** 레이어 목록에서 ⇧ · ⌘ 클릭: 화면 여러 개 고르기(더하기 · 빼기) */
 function toggleScreen(id: string) {
@@ -213,7 +221,7 @@ function onArrangeScreens(op: ArrangeOp) {
   const before = rows.map((s) => ({ id: s.id, x: s.x, y: s.y }))
   const after = rows.map((s, i) => ({ id: s.id, x: out[i]!.x, y: out[i]!.y })).filter((p, i) => p.x !== before[i]!.x || p.y !== before[i]!.y)
   if (!after.length) return
-  const fail = () => say('Couldn\'t save the position. Try again')
+  const fail = () => say(tr('Couldn\'t save the position. Try again'))
   const apply = (ps: { id: string; x: number; y: number }[]) => Promise.all(ps.map((p) => updateScreen(p.id, { x: p.x, y: p.y }))).catch(fail)
   const back = before.filter((b) => after.some((a) => a.id === b.id))
   apply(after)
@@ -227,13 +235,13 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
       let cur = row.id
       store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
     }
-  } catch { say('Couldn\'t create the frame. Try again') }
+  } catch { say(tr('Couldn\'t create the frame. Try again')) }
 }
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
   const s = current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
-  const fail = () => say('Couldn\'t save. Try again')
+  const fail = () => say(tr('Couldn\'t save. Try again'))
   // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요(실행취소는 레이어 기록이 따로)
   if (s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
   updateScreen(s.id, patch).catch(fail)
@@ -246,7 +254,7 @@ function onScaleScreen(k: number, anchor: [number, number]) {
   const w = Math.max(1, Math.round(s.width * k)), h = Math.max(1, Math.round(s.height * k))
   const before = { x: s.x, y: s.y, width: s.width, height: s.height }
   const after = { x: Math.round(s.x + (s.width - w) * anchor[0]), y: Math.round(s.y + (s.height - h) * anchor[1]), width: w, height: h }
-  const fail = () => say('Couldn\'t save. Try again')
+  const fail = () => say(tr('Couldn\'t save. Try again'))
   store.scaleScreenContent(s.id, w / s.width)
   updateScreen(s.id, after).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, after).catch(fail))
@@ -256,14 +264,14 @@ function onRenameScreen(id: string, name: string) {
   const s = canvasList.value.find((v) => v.id === id)
   if (!s) return
   const before = s.name
-  const fail = () => say('Couldn\'t rename the frame. Try again')
+  const fail = () => say(tr('Couldn\'t rename the frame. Try again'))
   updateScreen(id, { name }).catch(fail)
   store.pushAction(id, () => updateScreen(id, { name: before }).catch(fail), () => updateScreen(id, { name }).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); store.selectScreen(null); say(`Deleted ${name}`) } catch { say('Couldn\'t delete the frame') }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(tr('Deleted {name}', { name })) } catch { say(tr('Couldn\'t delete the frame')) }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 
@@ -271,12 +279,14 @@ const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s)
 // 화면 단위 단축키 (레이어 없이 화면만 골랐을 때): Delete · ⌘D · ⌘C/⌘V · 화살표
 // ---------------------------------------------------------------------------
 const screenClip = ref<string[]>([])
+/** 화면 스마트 복제 기억(⌘D · ⌥ 끌기 복제): 원본 → 복제본 */
+const screenDup = ref<{ src: string; copy: string } | null>(null)
 const mixScreens = useMixScreens()
 /** 화면 복제: 레이어까지 그대로, 오른쪽(또는 지정한 자리)에 */
 async function cloneScreen(srcId: string, at?: { x: number; y: number }, select = true) {
   const src = list.value.find((v) => v.id === srcId)
   if (!src) return null
-  if (src.source !== 'native') { say('Figma frames can\'t be duplicated. Import it again from Figma'); return null }
+  if (src.source !== 'native') { say(tr('Figma frames can\'t be duplicated. Import it again from Figma')); return null }
   const rect = { x: at?.x ?? src.x + src.width + 40, y: at?.y ?? src.y, width: src.width, height: src.height }
   const row = await addScreen(rect, src.name) // 피그마처럼 복제본도 같은 이름
   if (!row) return null
@@ -331,10 +341,18 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
       store.pushAction(s.id, () => restore(before), () => restore(after))
       return
     }
-    if (action === 'copy' && s) { screenClip.value = [s.id]; say(`Copied ${s.name}`); return }
+    if (action === 'copy' && s) { screenClip.value = [s.id]; say(tr('Copied {name}', { name: s.name })); return }
     if (action === 'paste') { await pasteScreens(false); return }
     if (!s) return
-    if (action === 'duplicate') { await cloneScreen(s.id); return }
+    if (action === 'duplicate') {
+      // 스마트 복제: 방금 복제한 화면을 옮긴 뒤 다시 ⌘D 면 같은 간격으로
+      const m = screenDup.value
+      const src = m && m.copy === s.id ? list.value.find((v) => v.id === m.src) : undefined
+      const at = src && (s.x !== src.x || s.y !== src.y) ? { x: s.x + (s.x - src.x), y: s.y + (s.y - src.y) } : undefined
+      const row = await cloneScreen(s.id, at)
+      if (row) screenDup.value = { src: s.id, copy: row.id }
+      return
+    }
     if (action === 'nudge') {
       const from = { x: s.x, y: s.y }, to = { x: s.x + dx, y: s.y + dy }
       await updateScreen(s.id, to)
@@ -345,24 +363,24 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
       const linked = (links.data.value ?? []).some((l) => l.screen_id === s.id)
       if (s.source !== 'native' || linked) {
         tab.value = 'design'
-        say(linked ? 'This frame has linked requirements. Delete it from the Design tab' : 'Figma frames can be deleted from the Design tab')
+        say(linked ? tr('This frame has linked requirements. Delete it from the Design tab') : tr('Figma frames can be deleted from the Design tab'))
         return
       }
       const snap = { rect: { x: s.x, y: s.y, width: s.width, height: s.height }, name: s.name, status: s.status, layers: JSON.parse(JSON.stringify(store.doc(s.id))) }
       let cur = s.id
       await removeScreen(cur)
       store.selectScreen(null)
-      say(`Deleted ${s.name} · ⌘Z to undo`)
+      say(tr('Deleted {name} · ⌘Z to undo', { name: s.name }))
       store.pushAction(null, async () => {
         const r = await addScreen(snap.rect, snap.name)
         if (r) { cur = r.id; await updateScreen(r.id, { layers: snap.layers, status: snap.status }); delete store.docs[r.id]; store.selectScreen(r.id) }
       }, async () => { await removeScreen(cur); store.selectScreen(null) })
     }
-  } catch { say('Something went wrong. Try again') }
+  } catch { say(tr('Something went wrong. Try again')) }
 }
 async function onFigmaCreated() {
   await screens.refresh()
-  say('Imported from Figma')
+  say(tr('Imported from Figma'))
 }
 
 /** 다른 페이지의 화면이면 그 페이지로 옮긴 뒤 고르기 */
@@ -387,12 +405,11 @@ function until(ok: () => boolean, ms = 3000) {
 // ---------------------------------------------------------------------------
 // 문서
 // ---------------------------------------------------------------------------
-// 편집기 화면은 영어 라벨(DOC_CATEGORY_LABEL 은 한국어 화면용)
-const DOC_GROUP_EN: Record<DocCategory, string> = { planning: 'Planning', design: 'Design', dev: 'Development', etc: 'Other' }
+// 문서 묶음 이름: DOC_CATEGORY_LABEL(영어 원문)을 보여 줄 때 tr 로 감싸요
 const docGroups = computed(() => {
   const order: DocCategory[] = ['planning', 'design', 'dev', 'etc']
   return order
-    .map((k) => ({ k, label: DOC_GROUP_EN[k] ?? DOC_CATEGORY_LABEL[k], items: (docs.data.value ?? []).filter((d) => d.category === k) }))
+    .map((k) => ({ k, label: tr(DOC_CATEGORY_LABEL[k]), items: (docs.data.value ?? []).filter((d) => d.category === k) }))
     .filter((g) => g.items.length)
 })
 const reqCount = (id: string) => (reqs.data.value ?? []).filter((r) => r.document_id === id).length
@@ -412,8 +429,8 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     if (current.value) await setLink({ screen_id: current.value.id, requirement_id: id, status: 'missing', note: null })
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
-    say(current.value ? `Created ${code} and linked it to ${current.value.name}` : `Created ${code}`)
-  } catch { say('Couldn\'t create the requirement. Try again') }
+    say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
+  } catch { say(tr('Couldn\'t create the requirement. Try again')) }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -421,12 +438,14 @@ async function onDocCreated(id: string) {
   showDoc(id)
 }
 
-// 주소로 들어온 경우: ?doc=&req= (요구사항 보드의 '원문'), ?screen= (화면 바로 열기)
+// 주소로 들어온 경우: ?doc=&req= (요구사항 보드의 '원문'), ?screen= (화면 바로 열기), ?asset= (에셋 상세)
 onMounted(async () => {
   const q = route.query
   if (typeof q.doc === 'string') { left.value = 'docs'; showDoc(q.doc, typeof q.req === 'string' ? q.req : null) }
   if (typeof q.screen === 'string') { await until(() => !!allScreens.data.value); pickScreen(q.screen, true) }
-  if (q.doc || q.screen) router.replace({ query: {} })
+  // ?asset=<컴포넌트 id>: ⌘K 에서 컴포넌트를 고르면 에셋 탭의 그 컴포넌트 상세로(디자인 시스템 화면 대신)
+  if (typeof q.asset === 'string') { left.value = 'assets'; asset.value = q.asset; expandPanels() }
+  if (q.doc || q.screen || q.asset) router.replace({ query: {} })
 })
 
 // ---------------------------------------------------------------------------
@@ -440,7 +459,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 let replaceId: string | null = null
 function pickImage(replace?: string) {
   const s = current.value
-  if (s && s.source !== 'native') return say('Images can\'t be added to Figma frames')
+  if (s && s.source !== 'native') return say(tr('Images can\'t be added to Figma frames'))
   replaceId = typeof replace === 'string' ? replace : null
   fileInput.value?.click()
 }
@@ -455,8 +474,8 @@ async function onImageFile(e: Event) {
  * at 이 Iris 화면 위면 그 화면 안으로, 아니면 캔버스 위로 들어가요.
  */
 async function insertImage(file: File, at?: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
-  if (!isMediaFile(file)) return say('Only image or video files can be added')
-  if (file.size > mediaLimit(file)) return say(isVideoFile(file) ? 'Videos must be smaller than 50MB' : 'Images must be smaller than 10MB')
+  if (!isMediaFile(file)) return say(tr('Only image or video files can be added'))
+  if (file.size > mediaLimit(file)) return say(isVideoFile(file) ? tr('Videos must be smaller than 50MB') : tr('Images must be smaller than 10MB'))
   const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
   const s = (place ? list.value.find((v) => v.id === place.sid) : null) ?? (at ? hitScreen : current.value) ?? canvasScreen.value
   if (!s) return
@@ -475,12 +494,12 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
     const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || (img.video ? 'Video' : 'Image')
     store.add(s.id, parentId, { type: 'image', name, src: img.src, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true })
     tab.value = 'design'
-  } catch { say(isVideoFile(file) ? 'Couldn\'t upload the video. Try again' : 'Couldn\'t upload the image. Try again') }
+  } catch { say(isVideoFile(file) ? tr('Couldn\'t upload the video. Try again') : tr('Couldn\'t upload the image. Try again')) }
 }
 /** 캔버스에 파일 끌어 놓기: 이미지 · 영상. 놓은 화면 · 프레임 안으로 */
 async function onDropFiles(files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
   const media = files.filter(isMediaFile)
-  if (!media.length) return say('Only image or video files (PNG, JPG, SVG, MP4…) can be added')
+  if (!media.length) return say(tr('Only image or video files (PNG, JPG, SVG, MP4…) can be added'))
   for (const [i, f] of media.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 }, place)
 }
 /** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
@@ -527,14 +546,14 @@ function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   if (k === 'assets') { left.value = 'assets'; asset.value = null }
   else if (k === 'figma') figmaOpen.value = true
   else if (k === 'link') {
-    if (!current.value) return say('Select a frame on the canvas first')
+    if (!current.value) return say(tr('Select a frame on the canvas first'))
     closeDoc(); tab.value = 'plan'; nextTick(() => plan.value?.openPicker())
-  } else say('Comments are coming soon')
+  } else say(tr('Comments are coming soon'))
 }
 
 async function share() {
-  try { await navigator.clipboard.writeText(location.origin + route.path); say('Link copied') }
-  catch { say('Couldn\'t copy the link') }
+  try { await navigator.clipboard.writeText(location.origin + route.path); say(tr('Link copied')) }
+  catch { say(tr('Couldn\'t copy the link')) }
 }
 
 const zoomOpen = ref(false)
@@ -542,7 +561,7 @@ const projMenu = ref(false)
 const settingsOpen = ref(false)
 const ZOOMS = [0.25, 0.5, 1, 2]
 const { data: me } = useMe()
-const myName = computed(() => me.value?.name || me.value?.email || 'Me')
+const myName = computed(() => me.value?.name || me.value?.email || tr('Me'))
 
 // 메뉴: 바깥을 누르거나 Esc 로 닫기
 function onDocPointer(e: PointerEvent) {
@@ -564,6 +583,8 @@ const confirmCancel = ref<{ $el?: HTMLElement } | null>(null)
 watch(confirmPage, (v) => { if (v) nextTick(() => confirmCancel.value?.$el?.focus?.()) })
 onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
+// 숫자 칸 계산식(784-6 → 778)
+useMathInputs()
 // 수치 칸 앞쪽을 좌우로 끌어 값 바꾸기: 끄는 동안은 기록 하나로 묶어요
 let scrubSids: string[] = []
 useScrub(
@@ -571,17 +592,8 @@ useScrub(
   () => { scrubSids.forEach((s) => store.release(s)); scrubSids = [] },
 )
 
-// 오른쪽 위 '문서': 문서 읽기 패널을 열고 닫는 토글. 열 때는 마지막에 본 문서(없으면 첫 문서)
-const lastDoc = ref<string | null>(null)
-watch(docId, (v) => { if (v) lastDoc.value = v })
-function toggleDocs() {
-  if (docId.value) return closeDoc()
-  left.value = 'docs'
-  const all = docs.data.value ?? []
-  const next = (lastDoc.value && all.some((d) => d.id === lastDoc.value) ? lastDoc.value : null) ?? docGroups.value[0]?.items[0]?.id
-  if (next) showDoc(next)
-}
-const screenName = (id: string) => allScreens.data.value?.find((s) => s.id === id)?.name ?? list.value.find((s) => s.id === id)?.name ?? 'Frame'
+// 문서는 왼쪽 사이드바 Docs 탭에서 열어요(오른쪽 위 '문서' 토글은 뺐어요)
+const screenName = (id: string) => allScreens.data.value?.find((s) => s.id === id)?.name ?? list.value.find((s) => s.id === id)?.name ?? tr('Frame')
 // 디자인 탭 Status 드롭다운(InspectorDesign)과 같은 영어 라벨
 const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress', review: 'Ready for review', approved: 'Approved' }
 </script>
@@ -599,9 +611,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :highlight="highlight"
       :guides="currentPage?.viewport?.guides ?? { x: [], y: [] }"
       @guides="(g) => onPageSettings({ guides: g })"
-      @clone-screen="(id: string, x: number, y: number) => cloneScreen(id, { x, y })"
+      @clone-screen="async (id: string, x: number, y: number) => { const r = await cloneScreen(id, { x, y }); if (r) screenDup = { src: id, copy: r.id } }"
       @clone-screens="(items: { id: string; x: number; y: number }[]) => cloneMany(items, store.layerIds.value.length > 0)"
-      @clip-screens="(ids: string[]) => { screenClip = ids; say(ids.length > 1 ? `Copied ${ids.length} frames` : 'Copied') }"
+      @clip-screens="(ids: string[]) => { screenClip = ids; say(ids.length > 1 ? tr('Copied {n} frames', { n: ids.length }) : tr('Copied')) }"
       @paste-screens="pasteScreens"
       @move="onMove"
       @resize-screen="onResizeScreen"
@@ -613,55 +625,55 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @drop-files="onDropFiles"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
-      <span class="tx-head">This page is empty</span>
-      <span class="tx-meta ce-sub">Draw a frame with the Frame tool (F) or import one from Figma</span>
+      <span class="tx-head">{{ tr('This page is empty') }}</span>
+      <span class="tx-meta ce-sub">{{ tr('Draw a frame with the Frame tool (F) or import one from Figma') }}</span>
       <span class="row">
-        <Button size="s" type="tertiary" stroke @click="tool = 'frame'">Draw frame</Button>
-        <Button size="s" type="tertiary" stroke @click="figmaOpen = true">Import from Figma</Button>
+        <Button size="s" type="tertiary" stroke @click="tool = 'frame'">{{ tr('Draw frame') }}</Button>
+        <Button size="s" type="tertiary" stroke @click="figmaOpen = true">{{ tr('Import from Figma') }}</Button>
       </span>
     </div>
 
-    <!-- 왼쪽 위: 파일 알약 -->
-    <div class="sq float s pill-left">
-      <div class="home-wrap">
-        <button class="sq hov home" aria-label="Main menu" :aria-expanded="projMenu" @click="projMenu = !projMenu"><IrisLogo kind="symbol" :height="16" /><EditorIcon name="chevron_down" :size="12" /></button>
-        <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
-          <NuxtLink to="/" class="sq menu-item" role="menuitem">Back to files</NuxtLink>
-          <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">Project settings</button>
-          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">Requirements board</NuxtLink>
-          <NuxtLink to="/design-system" class="sq menu-item" role="menuitem">Design system</NuxtLink>
-          <div class="msep" role="separator" />
-          <ThemeSwitch en />
-        </div>
-      </div>
-      <input v-if="projRenaming" v-select class="sqc txt-in rename prename" :value="project.data.value?.name ?? ''" aria-label="Project name" maxlength="80" @blur="onProjRename" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="projRenaming = false">
-      <span v-else class="tx-head ellipsis fname" :title="project.data.value?.name ? `${project.data.value.name} — double-click to rename` : undefined" @dblclick="projRenaming = true">{{ project.data.value?.name ?? '' }}</span>
-      <span v-if="store.saveState.state === 'saving'" class="tx-meta save">Saving…</span>
-      <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">Couldn't save · Retry</TextButton>
-    </div>
-
     <!-- 왼쪽 패널 -->
-    <aside aria-label="Left sidebar" :class="['sq', 'float', 'panel-left', { collapsed: collapsed.left }]">
-      <div role="tablist" aria-label="Left sidebar" class="seg tabs">
-        <button v-for="t in [['file', 'File'], ['assets', 'Assets'], ['docs', 'Docs']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]; expandPanels()">{{ t[1] }}</button>
-        <button class="sq hov fold" :aria-label="collapsed.left ? 'Expand sidebars' : 'Collapse sidebars'" :data-tip="collapsed.left ? 'Expand sidebars' : 'Collapse sidebars'" :aria-expanded="!collapsed.left" @click="togglePanel()"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M1.5 5h11" stroke="currentColor" stroke-width="1.2" /><path :d="collapsed.left ? 'M5 7.5l2 2 2-2' : 'M5 9.5l2-2 2 2'" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+    <aside :aria-label="tr('Left sidebar')" :class="['sq', 'float', 'panel-left', { collapsed: collapsed.left }]">
+      <!-- 맨 위: 파일 줄(메인 메뉴 · 프로젝트 이름 · 저장 상태) — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
+      <div class="panel-top line-b">
+        <div class="home-wrap">
+          <button class="sq hov home" :aria-label="tr('Main menu')" :aria-expanded="projMenu" @click="projMenu = !projMenu"><IrisLogo kind="symbol" :height="16" /><EditorIcon name="chevron_down" :size="12" /></button>
+          <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
+            <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
+            <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
+            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requirements board') }}</NuxtLink>
+            <div class="msep" role="separator" />
+            <ThemeSwitch compact />
+            <LangSwitch />
+          </div>
+        </div>
+        <input v-if="projRenaming" v-select class="sqc txt-in rename prename" :value="project.data.value?.name ?? ''" :aria-label="tr('Project name')" maxlength="80" @blur="onProjRename" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="projRenaming = false">
+        <span v-else class="tx-head ellipsis fname" :title="project.data.value?.name ? tr('{name} — double-click to rename', { name: project.data.value.name }) : undefined" @dblclick="projRenaming = true">{{ project.data.value?.name ?? '' }}</span>
+        <span v-if="store.saveState.state === 'saving'" class="tx-meta save">{{ tr('Saving…') }}</span>
+        <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">{{ tr('Couldn\'t save · Retry') }}</TextButton>
+      </div>
+      <div class="pbody">
+      <div role="tablist" :aria-label="tr('Left sidebar')" class="seg tabs">
+        <button v-for="t in [['file', 'File'], ['assets', 'Assets'], ['docs', 'Docs']] as const" :key="t[0]" role="tab" :aria-selected="left === t[0]" :class="['sq', 'seg-item', { on: left === t[0] }]" @click="left = t[0]; expandPanels()">{{ tr(t[1]) }}</button>
+        <button class="sq hov fold" :aria-label="collapsed.left ? tr('Expand sidebars') : tr('Collapse sidebars')" :data-tip="collapsed.left ? tr('Expand sidebars') : tr('Collapse sidebars')" :aria-expanded="!collapsed.left" @click="togglePanel()"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M1.5 5h11" stroke="currentColor" stroke-width="1.2" /><path :d="collapsed.left ? 'M5 7.5l2 2 2-2' : 'M5 9.5l2-2 2 2'" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
       </div>
 
       <template v-if="left === 'file'">
         <section class="pages">
-          <div class="sec-h"><span>Pages</span><button class="ib s24" aria-label="Add new page" title="Add new page" @click="onAddPage"><EditorIcon name="plus" /></button></div>
+          <div class="sec-h"><span>{{ tr('Pages') }}</span><button class="ib s24" :aria-label="tr('Add new page')" :title="tr('Add new page')" @click="onAddPage"><EditorIcon name="plus" /></button></div>
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <template v-for="p in pages.data.value ?? []" :key="p.id">
-            <input v-if="renaming === p.id" v-select class="sqc txt-in rename" :value="p.name" aria-label="Page name" @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="renaming = null">
+            <input v-if="renaming === p.id" v-select class="sqc txt-in rename" :value="p.name" :aria-label="tr('Page name')" @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="renaming = null">
             <button v-else :class="['sq', 'nav-item', 's', 'prow', { on: pageId === p.id }]" :title="p.name" @click="pageId = p.id" @dblclick="renaming = p.id" @keydown.f2.prevent="renaming = p.id" @contextmenu="pageMenu(p, $event)"><span class="ellipsis">{{ p.name }}</span></button>
           </template>
         </section>
         <section class="layers">
-          <div class="sec-h"><span>Layers</span></div>
-          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" />
+          <div class="sec-h"><span>{{ tr('Layers') }}</span></div>
+          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
-            <span class="tx-meta">No frames yet</span>
-            <TextButton size="s" color="blue" @click="tool = 'frame'">Draw frame</TextButton>
+            <span class="tx-meta">{{ tr('No frames yet') }}</span>
+            <TextButton size="s" color="blue" @click="tool = 'frame'">{{ tr('Draw frame') }}</TextButton>
           </div>
         </section>
       </template>
@@ -669,41 +681,46 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" @insert="(name: string) => canvas?.insertInstance(name)" />
 
       <div v-else class="docs">
-        <div class="sec-h"><span>Docs</span><button class="ib s24" aria-label="Add doc" title="Add doc" @click="addDocOpen = true"><EditorIcon name="plus" /></button></div>
+        <div class="sec-h"><span>{{ tr('Docs') }}</span><button class="ib s24" :aria-label="tr('Add doc')" :title="tr('Add doc')" @click="addDocOpen = true"><EditorIcon name="plus" /></button></div>
         <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
           <span class="nav-label">{{ g.label }}</span>
           <button v-for="d in g.items" :key="d.id" :class="['sq', 'nav-item', 's', 'drow', { on: docId === d.id }]" :title="d.title" :aria-current="docId === d.id ? 'true' : undefined" @click="showDoc(d.id)">
             <EditorIcon :name="docIcon(d)" :size="16" class="flex-none muted" />
             <span class="ellipsis f1">{{ d.title }}</span>
-            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="`${reqCount(d.id)} requirements`">{{ reqCount(d.id) }}</span>
-            <span v-if="d.fetch_status === 'failed'" class="warn" role="img" aria-label="Couldn't fetch this doc"><EditorIcon name="warning" :size="16" /></span>
+            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} requirements', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
+            <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
           </button>
         </div>
         <div v-if="docs.status.value === 'success' && !docGroups.length" class="empty-col">
-          <span class="tx-meta">No docs yet</span>
-          <button class="sq act line" @click="addDocOpen = true"><EditorIcon name="plus" :size="16" />Add doc</button>
+          <span class="tx-meta">{{ tr('No docs yet') }}</span>
+          <button class="sq act line" @click="addDocOpen = true"><EditorIcon name="plus" :size="16" />{{ tr('Add doc') }}</button>
         </div>
+      </div>
+      <!-- 맨 아래: 변수(토큰) — 누르면 캔버스 대신 변수 화면(다른 페이지처럼) -->
+      <div class="vars-foot">
+        <button type="button" :class="['sq', 'vars-btn', { on: varsOpen }]" :aria-pressed="varsOpen" @click="varsOpen = !varsOpen">
+          <EditorIcon name="variable" :size="16" /><span class="f1">{{ tr('Variables') }}</span><EditorIcon name="chevron_right" :size="12" class="muted" />
+        </button>
+      </div>
       </div>
     </aside>
 
-    <!-- 오른쪽 위 알약 -->
-    <div class="sq float s pill-right">
-      <Avatar :size="24" :alt="myName" :title="myName" />
-      <span class="pill-acts">
-        <Button size="s" type="tertiary" :text-color="docId ? 'blue' : 'gray'" :class="['doc-toggle', { 'is-on': !!docId }]" :aria-pressed="!!docId" @click="toggleDocs">Docs</Button>
-        <Button size="s" type="primary" @click="share">Share</Button>
-      </span>
-    </div>
-
     <!-- 오른쪽 패널 -->
-    <aside aria-label="Right sidebar" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !docId }]">
+    <aside :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick && !docId }]">
+      <!-- 맨 위: 나 · Share — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
+      <div class="panel-top r line-b">
+        <MemberAvatar :size="24" :name="myName" :src="me?.avatar_url" :title="myName" />
+        <span class="pill-acts">
+          <Button size="s" type="primary" @click="share">{{ tr('Share') }}</Button>
+        </span>
+      </div>
       <!-- 문서 읽기 -->
       <template v-if="openDoc">
         <div class="panel-h line-b">
-          <span class="tx-head flex-none">Docs</span>
-          <span class="tx-meta ellipsis f1">{{ current ? `Viewing with ${current.name}` : '' }}</span>
-          <button class="ib s24" aria-label="Close doc" title="Close doc" @click="closeDoc"><EditorIcon name="close" /></button>
+          <span class="tx-head flex-none">{{ tr('Docs') }}</span>
+          <span class="tx-meta ellipsis f1">{{ current ? tr('Viewing with {name}', { name: current.name }) : '' }}</span>
+          <button class="ib s24" :aria-label="tr('Close doc')" :title="tr('Close doc')" @click="closeDoc"><EditorIcon name="close" /></button>
         </div>
         <div class="scroll reader">
           <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="(id: string) => (docReq = docReq === id ? null : id)" @create-req="onCreateReq" />
@@ -712,26 +729,26 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
       <!-- 인스펙터 -->
       <template v-else>
-        <div role="tablist" aria-label="Properties tabs" class="seg tabs">
-          <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; expandPanels()">{{ t[1] }}</button>
+        <div role="tablist" :aria-label="tr('Properties tabs')" class="seg tabs">
+          <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; expandPanels()">{{ tr(t[1]) }}</button>
           <div class="zoom-wrap">
-            <button class="sq hov zoom" aria-label="Zoom" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
+            <button class="sq hov zoom" :aria-label="tr('Zoom')" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
             <div v-if="zoomOpen" class="sq menu zmenu" role="menu" @click="zoomOpen = false">
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">Zoom in</span><span class="tx-meta">⌘+</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">Zoom out</span><span class="tx-meta">⌘−</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">Zoom to fit</span><span class="tx-meta">⇧1</span></button>
-              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">Zoom to selection</span><span class="tx-meta">⇧2</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">{{ tr('Zoom in') }}</span><span class="tx-meta">⌘+</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">{{ tr('Zoom out') }}</span><span class="tx-meta">⌘−</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">{{ tr('Zoom to fit') }}</span><span class="tx-meta">⇧1</span></button>
+              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">{{ tr('Zoom to selection') }}</span><span class="tx-meta">⇧2</span></button>
               <div class="msep" role="separator" />
-              <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">Zoom to {{ z * 100 }}%</button>
+              <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">{{ tr('Zoom to {n}%', { n: z * 100 }) }}</button>
             </div>
           </div>
           <!-- 보기 설정(피그마 보기 메뉴에서 Iris 가 그리는 것만). 나머지는 PRD/07 §20 -->
           <div class="view-wrap">
-            <button class="sq hov fold" aria-label="View settings" data-tip="View settings" aria-haspopup="menu" :aria-expanded="viewOpen" @click="viewOpen = !viewOpen"><EditorIcon name="setting" :size="16" /></button>
+            <button class="sq hov fold" :aria-label="tr('View settings')" :data-tip="tr('View settings')" aria-haspopup="menu" :aria-expanded="viewOpen" @click="viewOpen = !viewOpen"><EditorIcon name="setting" :size="16" /></button>
             <div v-if="viewOpen" class="sq menu zmenu vmenu" role="menu" @click="viewOpen = false">
-              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="currentPage?.viewport?.pixelGrid !== false" @click="onPageSettings({ pixelGrid: currentPage?.viewport?.pixelGrid === false })"><EditorIcon name="check" :size="12" :class="['zck', { off: currentPage?.viewport?.pixelGrid === false }]" /><span class="f1">Pixel grid</span></button>
-              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="gridsShown" @click="gridsShown = !gridsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !gridsShown }]" /><span class="f1">Layout grids</span><span class="tx-meta">⌃G</span></button>
-              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="rulersShown" @click="rulersShown = !rulersShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !rulersShown }]" /><span class="f1">Rulers</span><span class="tx-meta">⇧R</span></button>
+              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="currentPage?.viewport?.pixelGrid !== false" @click="onPageSettings({ pixelGrid: currentPage?.viewport?.pixelGrid === false })"><EditorIcon name="check" :size="12" :class="['zck', { off: currentPage?.viewport?.pixelGrid === false }]" /><span class="f1">{{ tr('Pixel grid') }}</span></button>
+              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="gridsShown" @click="gridsShown = !gridsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !gridsShown }]" /><span class="f1">{{ tr('Layout grids') }}</span><span class="tx-meta">⌃G</span></button>
+              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="rulersShown" @click="rulersShown = !rulersShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !rulersShown }]" /><span class="f1">{{ tr('Rulers') }}</span><span class="tx-meta">⇧R</span></button>
             </div>
           </div>
         </div>
@@ -740,9 +757,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div v-if="tab !== 'design'" class="obj">
             <div class="obj-row">
               <span class="tx-head ellipsis">{{ current.name }}</span>
-              <span class="sq badge">{{ STATUS_BADGE[current.status] }}</span>
+              <span class="sq badge">{{ tr(STATUS_BADGE[current.status]) }}</span>
             </div>
-            <span class="tx-meta">{{ current.source === 'figma' ? 'Figma frame' : 'Iris frame' }} · <span class="num">{{ Math.round(current.width) }} × {{ Math.round(current.height) }}</span></span>
+            <span class="tx-meta">{{ current.source === 'figma' ? tr('Figma frame') : tr('Iris frame') }} · <span class="num">{{ Math.round(current.width) }} × {{ Math.round(current.height) }}</span></span>
           </div>
           <div class="scroll">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
@@ -771,12 +788,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
         <div v-else-if="tab === 'design' && currentPage" class="scroll">
-          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say('Couldn\'t rename the page'))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
+          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
-          <span class="tx-head">Select a frame</span>
-          <span class="tx-meta">Select a frame on the canvas or in Layers to see its requirements, design and dev info here</span>
-          <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">Select first frame</TextButton>
+          <span class="tx-head">{{ tr('Select a frame') }}</span>
+          <span class="tx-meta">{{ tr('Select a frame on the canvas or in Layers to see its requirements, design and dev info here') }}</span>
+          <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
     </aside>
@@ -792,39 +809,47 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
+    <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
     <ContextMenu />
     <div v-if="confirmPage" class="pg-dim" @click.self="confirmPage = null">
       <div class="sq float pg-confirm" role="alertdialog" aria-modal="true" aria-labelledby="pg-del-t" aria-describedby="pg-del-d">
-        <span id="pg-del-t" class="tx-head">Delete "{{ confirmPage.name }}"?</span>
-        <span id="pg-del-d" class="pg-desc">All frames and layers on this page will be deleted{{ confirmPage.count >= 0 ? ` (${confirmPage.count} frames)` : '' }}. This can't be undone.</span>
-        <span class="pg-row"><Button ref="confirmCancel" size="s" type="tertiary" @click="confirmPage = null">Cancel</Button><Button size="s" type="destructed" @click="doRemovePage">Delete page</Button></span>
+        <span id="pg-del-t" class="tx-head">{{ tr('Delete "{name}"?', { name: confirmPage.name }) }}</span>
+        <span id="pg-del-d" class="pg-desc">{{ confirmPage.count >= 0 ? tr('All frames and layers on this page will be deleted ({n} frames). This can\'t be undone.', { n: confirmPage.count }) : tr('All frames and layers on this page will be deleted. This can\'t be undone.') }}</span>
+        <span class="pg-row"><Button ref="confirmCancel" size="s" type="tertiary" @click="confirmPage = null">{{ tr('Cancel') }}</Button><Button size="s" type="destructed" @click="doRemovePage">{{ tr('Delete page') }}</Button></span>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.editor { height: 100vh; position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
+.editor { height: calc(100vh - var(--iris-tabs-h, 0px)); position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
 .canvas-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 280px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10) var(--ref-spacing-11); text-align: center; pointer-events: none; }
 .ce-sub { color: var(--sys-color-neutral-600); }
 .canvas-empty .row { display: flex; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-06); pointer-events: auto; }
 .save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
-.pill-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); width: 264px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); z-index: 4; }
+/* 사이드바 맨 위 줄(파일 줄 · 나 · Docs · Share): 높이 40, 아래 구분선 1px 로 탭 줄과 나눠요 — 예전 위에 따로 떠 있던 알약 둘을 합쳤어요 */
+.panel-top { flex: none; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); position: relative; z-index: 2; }
+.panel-top.r { padding: 0 var(--ref-spacing-06); }
+/* 왼쪽 패널 본문: 메인 메뉴(검은 메뉴)가 접힌 패널 밖으로도 보이게 패널은 넘침을 보이고, 본문만 잘라요 */
+.pbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* 좌측 패널 맨 아래 Variables: 위 구분선 + 안쪽 6 · 8 여백 안에 행 32(모서리 6, 호버 · 연 상태 회색) — 패널 둥근 모서리 밖으로 칠이 나가지 않게 */
+.vars-foot { flex: none; margin-top: auto; padding: var(--ref-spacing-05) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
+.vars-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); width: 100%; height: 32px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-800); text-align: left; }
+.vars-btn:hover, .vars-btn.on { --sq-fill: var(--sys-color-neutral-100); }
+.vars-btn .muted { color: var(--sys-color-neutral-500); }
 .home-wrap { position: relative; flex: none; }
 .pmenu { left: 0; right: auto; width: 232px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.panel-left { position: absolute; left: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
-/* 접기: 아래 변이 위로 올라가서 탭 줄(42px)만 남아요 */
-.panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - 56px - 42px); }
-.fold { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); margin-left: var(--ref-spacing-02); }
+.panel-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 4; overflow: visible; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
+/* 접기: 아래 변이 위로 올라가서 맨 위 줄(40) + 탭 줄(42)만 남아요 */
+.panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - var(--iris-gap) - 40px - 42px); }
+.fold { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
 .panel-left .fold { margin-left: auto; }
-.fold:hover { color: var(--sys-color-neutral-800); }
-.pill-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); width: 288px; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); z-index: 3; }
+.fold:hover, .fold[aria-expanded="true"]:not(.panel-left .fold) { color: var(--sys-color-neutral-800); }
 .pill-acts { margin-left: auto; display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.bd-button.doc-toggle.is-on { --bd-btn-bg: var(--sys-color-brand-primary-lightest); }
 .panel-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 42px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
-.panel-right { position: absolute; right: var(--iris-gap); top: 56px; bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
+.panel-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: hidden; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
 .tabs { padding: var(--ref-spacing-06); flex: none; }
 .line-b { box-shadow: 0 1px 0 var(--iris-line); }
 /* 왼쪽 패널 열: 행 바탕은 패널 안쪽 8(탭 줄과 같아요), 글자 · 섹션 제목 · ▸ 는 x 16+8 한 줄에 맞춰요 */

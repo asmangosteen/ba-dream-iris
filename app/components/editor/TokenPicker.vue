@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
-import { KIND_LABEL, nameFromId, parseColor, useTokenCatalog, type CatalogToken, type TokenKind } from '~/canvas/tokens'
+import { KIND_LABEL, groupLabel, nameFromId, parseColor, useTokenCatalog, type CatalogToken, type TokenKind } from '~/canvas/tokens'
 
 /**
  * 변수(토큰) 고르기 — 피그마 변수 버튼처럼 속성 줄 끝(또는 입력칸 안)에 둡니다.
@@ -29,11 +29,19 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ pick: [t: CatalogToken]; unbind: []; step: [d: number] }>()
 
 const catalog = useTokenCatalog()
-const kindLabel = computed(() => KIND_LABEL[props.kinds[0]!])
+const kindLabel = computed(() => tr(KIND_LABEL[props.kinds[0]!]))
+/** 칸 이름: 부모는 영어 원문을 넘기고 여기서 지금 언어로 바꿔요 */
+const lbl = computed(() => (props.label ? tr(props.label) : kindLabel.value))
 const mixed = computed(() => props.bound === 'Mixed')
 const boundToken = computed(() => (props.bound && !mixed.value ? catalog.find(props.bound) : undefined))
-const boundName = computed(() => (mixed.value ? 'Mixed' : props.bound ? boundToken.value?.name ?? nameFromId(props.bound) : ''))
-const chipName = computed(() => (props.short && !mixed.value ? boundName.value.split('/').pop()! : boundName.value))
+const boundName = computed(() => (mixed.value ? tr('Mixed') : props.bound ? boundToken.value?.name ?? nameFromId(props.bound) : ''))
+/** 숫자 토큰(모서리 · 간격 · 크기 · 투명도 · 선 두께 · 글자 크기 · 줄 높이 · 자간)은 칩에 실제 값. 색 · 글자 스타일 · 굵기 · 그림자는 이름 */
+const TEXTY = ['color', 'fontWeight', 'textStyle', 'shadow'] // 굵기는 이름(Medium) 그대로
+const numericShort = computed(() => props.kinds.every((k) => !TEXTY.includes(k)))
+/** 칩 글자: 숫자 토큰은 늘 실제 값(피그마와 같아요), 글자 속성 · 색 등은 이름(좁은 칸은 끝 마디) */
+const chipName = computed(() => (mixed.value ? tr('Mixed') : numericShort.value && chipValue.value ? chipValue.value : props.short ? boundName.value.split('/').pop()! : boundName.value))
+/** 토큰의 실제 값('radius/04' → '8') */
+const chipValue = computed(() => (boundToken.value ? (boundToken.value.num !== undefined ? String(boundToken.value.num) : boundToken.value.value) : ''))
 const asChip = computed(() => props.variant === 'auto' && !!props.bound)
 /** 글자 스타일 목록: 피그마 Text styles 창 모양. 떼기는 목록이 아니라 칸 옆 버튼으로(피그마와 같아요) */
 const isTS = computed(() => props.kinds[0] === 'textStyle')
@@ -96,7 +104,7 @@ function place() {
     ? { left: left + 'px', top: r.bottom + 4 + 'px', maxHeight: Math.max(120, below) + 'px' }
     : { left: left + 'px', bottom: vh - r.top + 4 + 'px', maxHeight: Math.max(120, above) + 'px' }
 }
-async function show() {
+async function show(focusSearch = true) {
   catalog.ensure()
   q.value = ''
   open.value = true
@@ -105,7 +113,7 @@ async function show() {
   const cur = props.bound && !mixed.value ? items.value.findIndex((t) => t.id === props.bound) : -1
   active.value = cur >= 0 ? cur + (hasDetach.value ? 1 : 0) : hasDetach.value ? 1 : 0
   await nextTick()
-  search.value?.focus()
+  if (focusSearch) search.value?.focus()
   scrollActive('center')
 }
 function close(refocus = false) {
@@ -123,10 +131,23 @@ defineExpose({ show, close })
 const caret = ref<HTMLInputElement | null>(null)
 const caretOn = ref(false)
 function focusCaret() { caretOn.value = true; nextTick(() => caret.value?.focus()) }
+/**
+ * 칩 누르기: 처음엔 칩 오른쪽 커서(Backspace = 연결 끊기, 글자 = 찾기), 커서가 떠 있을 때 다시 누르면 토큰 목록 창(피그마와 같아요).
+ * 누르는 순간 커서 칸이 blur 로 꺼지니까 누르기 전(pointerdown) 상태를 기억해요
+ */
+/** 칩 한 번 누르기: 칩 오른쪽 커서 + 토큰 목록 창을 함께 — 바로 다른 값을 고르거나 Backspace(연결 끊기) · 글자(찾기) */
+let caretWas = false
+function chipDown() { caretWas = caretOn.value || open.value }
+function chipClick() {
+  if (caretWas && open.value) { close(); caretOn.value = false; return }
+  focusCaret()
+  show(false)
+}
 async function caretKey(e: KeyboardEvent) {
   if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault()
     const fld = caret.value?.closest('.fld, label')
+    close()
     caretOn.value = false
     emit('unbind')
     await nextTick()
@@ -135,7 +156,9 @@ async function caretKey(e: KeyboardEvent) {
     if (inp) { inp.focus(); const n = inp.value.length; inp.setSelectionRange?.(n, n) }
     return
   }
-  if (e.key === 'Escape') { caretOn.value = false; caret.value?.blur(); return }
+  if (e.key === 'Escape') { close(); caretOn.value = false; caret.value?.blur(); return }
+  // 목록이 떠 있으면 ↑ ↓ · Enter 는 목록에서(다른 값 고르기)
+  if (open.value && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter')) { onKey(e); return }
   if (e.key === 'Enter' || (e.key === 'ArrowDown' && e.altKey)) { e.preventDefault(); caretOn.value = false; show(); return }
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); emit('step', (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)); return }
   if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
@@ -206,19 +229,19 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     v-if="variant === 'dropdown'"
     ref="trigger"
     :class="['sq', 'dd', { open }]"
-    :aria-label="label || kindLabel"
+    :aria-label="lbl"
     aria-haspopup="listbox"
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
     :title="title || undefined"
     @click="toggle"
-  ><span class="dd-l"><span v-if="bound" :class="['sq', 'tchip', 'dd-chip', { mixed }]"><span class="tchip-t">{{ boundName }}</span></span><span v-else class="ph">{{ placeholder }}</span><span v-if="boundToken" class="dd-v">{{ boundToken.value }}</span></span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
+  ><span class="dd-l"><span v-if="bound" :class="['sq', 'tchip', 'dd-chip', { mixed }]"><span class="tchip-t">{{ chipName }}</span></span><span v-else class="ph">{{ placeholder ? tr(placeholder) : '' }}</span><span v-if="boundToken && !numericShort" class="dd-v">{{ boundToken.value }}</span></span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
   <button
     v-else-if="variant === 'style'"
     ref="trigger"
     type="button"
     :class="['sq', 'tsf', { open, mixed }]"
-    :aria-label="`${label || kindLabel}: ${boundName} — change`"
+    :aria-label="tr('{label}: {name} — change', { label: lbl, name: boundName })"
     aria-haspopup="listbox"
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
@@ -229,26 +252,27 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     <button
       ref="trigger"
       :class="['sq', 'tchip', { open, mixed }]"
-      :aria-label="`${label || kindLabel} variable ${boundName} — change`"
+      :aria-label="tr('{label} variable {name} — change', { label: lbl, name: boundName })"
       aria-haspopup="listbox"
       :aria-expanded="open"
       :aria-controls="open ? uid : undefined"
       :title="title"
-      @click.prevent="focusCaret"
+      @pointerdown="chipDown"
+      @click.prevent="chipClick"
       @keydown.up.prevent.stop="emit('step', $event.shiftKey ? 10 : 1)"
       @keydown.down.prevent.stop="emit('step', $event.shiftKey ? -10 : -1)"
       @keydown.enter.prevent="toggle"
     ><span class="tchip-t"><bdi>{{ chipName }}</bdi></span></button>
     <!-- 칩 오른쪽 커서: 누르면 여기로. Backspace = 연결 끊기, 글자 = 새 토큰 찾기 -->
-    <input v-show="caretOn" ref="caret" class="tchip-caret" :aria-label="`${label || kindLabel}: Backspace to detach, type to search`" @keydown="caretKey" @blur="caretOn = false">
-    <button v-if="!short" type="button" class="ib tchip-x" :aria-label="`Detach variable: ${label || kindLabel}`" title="Detach variable" @click.prevent="emit('unbind')"><svg class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+    <input v-show="caretOn" ref="caret" class="tchip-caret" :aria-label="tr('{label}: Backspace to detach, type to search', { label: lbl })" @keydown="caretKey" @blur="caretOn = false">
+    <button v-if="!short" type="button" class="ib tchip-x" :aria-label="tr('Detach variable: {label}', { label: lbl })" :title="tr('Detach variable')" @click.prevent="emit('unbind')"><svg class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
   </span>
   <button
     v-else
     ref="trigger"
     :class="['ib', 'vb', { reveal, open }]"
-    :aria-label="icon ? label || kindLabel : `Apply variable: ${label || kindLabel}`"
-    :data-tip="icon ? label || kindLabel : `Apply variable: ${label || kindLabel}`"
+    :aria-label="icon ? lbl : tr('Apply variable: {label}', { label: lbl })"
+    :data-tip="icon ? lbl : tr('Apply variable: {label}', { label: lbl })"
     aria-haspopup="listbox"
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
@@ -257,15 +281,15 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 
   <Teleport to="body">
     <div v-if="open" ref="menu" :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
-      <div class="tsp-h"><span>{{ isTS ? 'Text styles' : `${kindLabel} variables` }}</span><button type="button" class="ib tsp-x" aria-label="Close" data-tip="Close" @click="close(true)"><EditorIcon name="close" :size="16" /></button></div>
-      <label class="sq tp-s"><EditorIcon name="search" :size="16" class="muted" /><input ref="search" v-model="q" :placeholder="'Search'" :aria-label="`Search ${kindLabel.toLowerCase()} variables`" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
-      <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="`${kindLabel} variables`">
+      <div class="tsp-h"><span>{{ isTS ? tr('Text styles') : tr('{kind} variables', { kind: kindLabel }) }}</span><button type="button" class="ib tsp-x" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button></div>
+      <label class="sq tp-s"><EditorIcon name="search" :size="16" class="muted" /><input ref="search" v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search {kind} variables', { kind: kindLabel.toLowerCase() })" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
+      <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="tr('{kind} variables', { kind: kindLabel })">
         <button v-if="hasDetach" :id="`${uid}-0`" data-i="0" role="option" :aria-selected="active === 0" :class="['sq', 'menu-item', { cur: active === 0 }]" @click="choose(0)" @pointermove="active = 0">
           <svg class="pv" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
-          <span class="nm">Detach variable</span>
+          <span class="nm">{{ tr('Detach variable') }}</span>
         </button>
         <template v-for="g in groups" :key="g.name">
-          <div class="tp-g" role="presentation">{{ g.name }}</div>
+          <div class="tp-g" role="presentation">{{ groupLabel(g.name) }}</div>
           <button
             v-for="{ t, i } in g.items"
             :id="`${uid}-${i}`"
@@ -290,7 +314,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
             </template>
           </button>
         </template>
-        <span v-if="!items.length" class="tp-e">{{ isTS ? (q ? 'No styles found' : 'No text styles') : q ? 'No variables found' : `No ${kindLabel.toLowerCase()} variables` }}</span>
+        <span v-if="!items.length" class="tp-e">{{ isTS ? (q ? tr('No styles found') : tr('No text styles')) : q ? tr('No variables found') : tr('No {kind} variables', { kind: kindLabel.toLowerCase() }) }}</span>
       </div>
     </div>
   </Teleport>
@@ -308,11 +332,11 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 
 /* 연결된 값: 입력칸 자리에 [칩(내용만큼, 넘치면 …)] — 칸에 올리면 오른쪽 끝에 연결 끊기 24 가 생기고 칩 글자는 그 앞에서 잘려요(피그마와 같아요) */
 .tchip-w { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.tchip { flex: 0 1 auto; min-width: 0; height: 20px; display: flex; align-items: center; padding: 0 var(--ref-spacing-04); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
-.tchip:hover { --sq-line: var(--ref-color-gray-900-20); }
+.tchip { flex: 0 1 auto; min-width: 0; height: 20px; display: flex; align-items: center; padding: 0 var(--ref-spacing-05); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--sys-color-neutral-400); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
+.tchip:hover { --sq-line: var(--sys-color-neutral-500); }
 .tchip.open { --sq-line: var(--sys-color-brand-primary-default); }
 .tchip.mixed { color: var(--sys-color-neutral-600); }
-.short .tchip { padding: 0 var(--ref-spacing-03); margin-left: 0; }
+.short .tchip { padding: 0 var(--ref-spacing-04); margin-left: 0; }
 .tchip:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .tchip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 칩 이름이 넘치면 앞을 줄여요(피그마: "…ight/600") — 뒤쪽 마디가 값을 구분해 줘요 */
@@ -351,7 +375,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 /* 고른 행: 레이어 패널에서 고른 행과 같은 옅은 파랑(--iris-sel), 올려도 그대로 · 글자는 그대로 */
 .tp .menu-item.on, .tp .menu-item.on:hover, .tp .menu-item.on.cur { --sq-fill: var(--iris-sel); color: var(--sys-color-neutral-800); font-weight: 400; }
 .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vl { flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.vl { flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); font-variant-numeric: proportional-nums; }
 
 .pv { flex: none; width: 16px; height: 16px; display: grid; place-items: center; color: var(--sys-color-neutral-500); }
 .sw { position: relative; border-radius: var(--ref-radius-02); overflow: hidden; }

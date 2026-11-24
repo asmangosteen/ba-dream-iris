@@ -15,13 +15,13 @@ const gap = computed(() => currentGap(rects.value, axis.value))
 <template>
   <div class="design">
     <section class="s">
-      <div class="sec-h h24"><span>{{ screens.length }} frames</span></div>
+      <div class="sec-h h24"><span>{{ tr('{n} frames', { n: screens.length }) }}</span></div>
       <ul class="names">
         <li v-for="s in screens" :key="s.id" class="tx-meta ellipsis">{{ s.name }} · <span class="num">{{ Math.round(s.width) }} × {{ Math.round(s.height) }}</span></li>
       </ul>
     </section>
     <section class="s">
-      <div class="sec-h h24"><span>Position</span></div>
+      <div class="sec-h h24"><span>{{ tr('Position') }}</span></div>
       <ArrangeControls :count="screens.length" :gap="gap" :axis="axis" @op="emit('arrange', $event)" />
     </section>
   </div>

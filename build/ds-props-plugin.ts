@@ -155,14 +155,33 @@ export function buildDsProps(): Record<string, DsPropMeta[]> {
   return out
 }
 
+/**
+ * virtual:iris-ds-icons — 디자인 시스템 아이콘 이름 목록(종류별). 패키지가 목록을 내보내지 않아서,
+ * dist/index.js 의 아이콘 파일 지도('…/icons/default/<종류>/<크기>px/<이름>.svg')에서 이름을 모읍니다
+ */
+const ICON_ID = 'virtual:iris-ds-icons'
+const ICON_RESOLVED = '\0' + ICON_ID
+function buildDsIcons(): Record<string, string[]> {
+  const options: ts.CompilerOptions = { moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext }
+  const from = ts.sys.resolvePath(ts.sys.getCurrentDirectory()) + '/package.json'
+  const indexDts = ts.resolveModuleName('@ba-dream/design-system', from, options, ts.sys).resolvedModule?.resolvedFileName
+  if (!indexDts) return {}
+  const js = ts.sys.readFile(indexDts.replace(/index\.d\.ts$/, 'index.js')) ?? ''
+  const out: Record<string, Set<string>> = {}
+  for (const m of js.matchAll(/icons\/default\/([a-z]+)\/\d+px\/([^/"']+)\.svg/g)) (out[m[1]!] ??= new Set()).add(m[2]!)
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v].sort()]))
+}
+
 export default function dsPropsPlugin(): Plugin {
   return {
     name: 'iris-ds-props',
     resolveId(id) {
       if (id === ID) return RESOLVED
+      if (id === ICON_ID) return ICON_RESOLVED
     },
     load(id) {
       if (id === RESOLVED) return `export default ${JSON.stringify(buildDsProps())}`
+      if (id === ICON_RESOLVED) return `export default ${JSON.stringify(buildDsIcons())}`
     },
   }
 }

@@ -2,10 +2,10 @@
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import { Button, SearchField, TextButton } from '@ba-dream/design-system'
 import type { ScreenRow } from '~/composables/useEditor'
-import { NEXT_STATUS, STATUS_ORDER, docIcon, type DocCategory, type LinkStatus, type ReqRow } from '~/composables/useIrisData'
-/** 편집기 화면은 영어 라벨(LINK_STATUS · DOC_CATEGORY_LABEL 은 한국어 화면용) */
-const STATUS_EN: Record<LinkStatus, string> = { reflected: 'Reflected', partial: 'Partial', missing: 'Missing', na: 'Not applicable' }
-const CATEGORY_EN: Record<DocCategory, string> = { planning: 'Planning', dev: 'Development', design: 'Design', etc: 'Other' }
+import { DOC_CATEGORY_LABEL, LINK_STATUS, NEXT_STATUS, STATUS_ORDER, docIcon, type DocCategory, type LinkStatus, type ReqRow } from '~/composables/useIrisData'
+/** 상태 · 문서 분류 라벨: 영어 원문(LINK_STATUS · DOC_CATEGORY_LABEL)을 보여 줄 때 지금 언어로(한국어는 app/i18n/ko/docs.ts) */
+const statusLabel = (k: LinkStatus) => tr(LINK_STATUS[k].label)
+const categoryLabel = (k: DocCategory) => tr(DOC_CATEGORY_LABEL[k])
 
 /** 오른쪽 패널 · 기획 탭: 고른 화면의 요구사항 반영 현황 · 연결 · 관련 문서 */
 const props = defineProps<{ projectId: string; screen: ScreenRow }>()
@@ -27,7 +27,7 @@ const bar = (k: LinkStatus) => ({ flex: Math.max(count(k), 0), background: k ===
 const groups = computed(() =>
   STATUS_ORDER.map((k) => ({
     k,
-    label: STATUS_EN[k],
+    label: statusLabel(k),
     items: mine.value
       .filter((x) => x.status === k)
       .map((x) => ({ link: x, req: reqById.value.get(x.requirement_id) }))
@@ -43,7 +43,7 @@ const relDocs = computed(() => {
 
 function anchorLabel(r: ReqRow) {
   const d = docById.value.get(r.document_id)
-  if (!d) return 'No doc'
+  if (!d) return tr('No doc')
   const block = r.anchor?.block ? d.content_blocks?.find((b) => b.id === r.anchor!.block) : null
   const head = block && d.content_blocks ? [...d.content_blocks.slice(0, d.content_blocks.indexOf(block))].reverse().find((b) => b.type === 'h2') : null
   return head?.text ?? d.title
@@ -54,7 +54,7 @@ async function cycle(link: { requirement_id: string; status: LinkStatus; note: s
   const before = link.status
   link.status = next
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: next, note: link.note }) }
-  catch { link.status = before; emit('toast', "Couldn't change status. Try again") }
+  catch { link.status = before; emit('toast', tr("Couldn't change status. Try again")) }
 }
 
 // 요구사항 연결 고르기
@@ -69,13 +69,13 @@ async function link(r: ReqRow) {
   const row = { screen_id: props.screen.id, requirement_id: r.id, status: 'missing' as const, note: null }
   links.data.value = [...(links.data.value ?? []), row]
   try { await setLink(row) }
-  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', "Couldn't link. Try again") }
+  catch { links.data.value = (links.data.value ?? []).filter((x) => x !== row); emit('toast', tr("Couldn't link. Try again")) }
 }
 async function unlink(requirement_id: string) {
   const before = links.data.value
   links.data.value = (links.data.value ?? []).filter((x) => !(x.screen_id === props.screen.id && x.requirement_id === requirement_id))
   try { await removeLink(props.screen.id, requirement_id) }
-  catch { links.data.value = before; emit('toast', "Couldn't unlink") }
+  catch { links.data.value = before; emit('toast', tr("Couldn't unlink")) }
 }
 
 // 메모 고치기
@@ -87,7 +87,7 @@ async function saveNote(link: { requirement_id: string; status: LinkStatus; note
   link.note = noteDraft.value.trim() || null
   editing.value = null
   try { await setLink({ screen_id: props.screen.id, requirement_id: link.requirement_id, status: link.status, note: link.note }) }
-  catch { link.note = before; emit('toast', "Couldn't save note") }
+  catch { link.note = before; emit('toast', tr("Couldn't save note")) }
 }
 defineExpose({ openPicker: () => (picking.value = true) })
 </script>
@@ -96,67 +96,67 @@ defineExpose({ openPicker: () => (picking.value = true) })
   <div class="plan">
     <section v-if="mine.length" class="pad">
       <div class="sq sum">
-        <div class="row"><span class="tx-head">Requirements coverage</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
-        <div role="img" :aria-label="`${count('reflected')} reflected, ${count('partial')} partial, ${count('missing')} missing`" class="bars">
+        <div class="row"><span class="tx-head">{{ tr('Requirements coverage') }}</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
+        <div role="img" :aria-label="tr('{r} reflected, {p} partial, {m} missing', { r: count('reflected'), p: count('partial'), m: count('missing') })" class="bars">
           <span :style="bar('reflected')" /><span :style="bar('partial')" /><span :style="bar('missing')" />
         </div>
         <div class="legend">
-          <span><StatusIcon status="reflected" />Reflected {{ count('reflected') }}</span>
-          <span><StatusIcon status="partial" />Partial {{ count('partial') }}</span>
-          <span><StatusIcon status="missing" />Missing {{ count('missing') }}</span>
+          <span><StatusIcon status="reflected" />{{ statusLabel('reflected') }} {{ count('reflected') }}</span>
+          <span><StatusIcon status="partial" />{{ statusLabel('partial') }} {{ count('partial') }}</span>
+          <span><StatusIcon status="missing" />{{ statusLabel('missing') }} {{ count('missing') }}</span>
         </div>
       </div>
     </section>
 
     <section class="sec2">
-      <div class="sec-h h24"><span>{{ mine.length ? `Requirements ${mine.length}` : 'Requirements' }}</span><button class="ib s24" aria-label="Link requirement" :aria-expanded="picking" @click="picking = !picking"><EditorIcon name="plus" :size="16" /></button></div>
+      <div class="sec-h h24"><span>{{ mine.length ? tr('Requirements {n}', { n: mine.length }) : tr('Requirements') }}</span><button class="ib s24" :aria-label="tr('Link requirement')" :aria-expanded="picking" @click="picking = !picking"><EditorIcon name="plus" :size="16" /></button></div>
 
       <div v-if="picking" class="sq picker">
-        <SearchField v-model:value="q" type="contained" size="s" placeholder="Search by number or text" :input-props="{ 'aria-label': 'Search requirements', autofocus: true }" />
+        <SearchField v-model:value="q" type="contained" size="s" :placeholder="tr('Search by number or text')" :input-props="{ 'aria-label': tr('Search requirements'), autofocus: true }" />
         <div class="plist">
           <button v-for="r in candidates" :key="r.id" class="sq menu-item" @click="link(r)"><span class="num w6">{{ r.code }}</span><span class="ell">{{ r.title }}</span></button>
-          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? 'No requirements found' : (reqs.data.value ?? []).length ? 'No requirements left to link' : 'Create requirements in a doc first' }}</p>
+          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? tr('No requirements found') : (reqs.data.value ?? []).length ? tr('No requirements left to link') : tr('Create requirements in a doc first') }}</p>
         </div>
-        <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">Close</Button></div>
+        <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">{{ tr('Close') }}</Button></div>
       </div>
 
       <div v-for="g in groups" :key="g.k" class="grp-list">
         <span class="glabel"><StatusIcon :status="g.k" />{{ g.label }}<span class="sq count num">{{ g.items.length }}</span></span>
         <div v-for="{ link: lk, req } in g.items" :key="req.id" class="sq card">
           <div class="head">
-            <button class="sq stb" :aria-label="`${req.code} ${STATUS_EN[lk.status]}, click to change status`" :title="`${STATUS_EN[lk.status]} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
+            <button class="sq stb" :aria-label="tr('{code} {status}, click to change status', { code: req.code, status: statusLabel(lk.status) })" :title="tr('{status} · Click to change', { status: statusLabel(lk.status) })" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
             <span class="tx-body w5">{{ req.title }}</span>
             <span />
             <span class="tx-meta ell"><span class="num">{{ req.code }}</span> · {{ anchorLabel(req) }}</span>
           </div>
           <div v-if="editing === req.id" class="note-edit">
-            <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" aria-label="Note" placeholder="Describe what is missing" @keydown.meta.enter="saveNote(lk)" /></div>
-            <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">Cancel</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">Save</Button></span>
+            <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" :aria-label="tr('Note')" :placeholder="tr('Describe what is missing')" @keydown.meta.enter="saveNote(lk)" /></div>
+            <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">{{ tr('Cancel') }}</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">{{ tr('Save') }}</Button></span>
           </div>
           <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><EditorIcon name="warning" :size="16" class="mt3" /><span>{{ lk.note }}</span></button>
           <div class="foot">
             <span class="src"><EditorIcon name="document" :size="16" /><span class="ell">{{ docById.get(req.document_id)?.title ?? '' }}</span></span>
             <span class="acts">
-              <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">Note</TextButton>
-              <TextButton size="s" color="gray" :aria-label="`Unlink ${req.code}`" @click="unlink(req.id)">Unlink</TextButton>
-              <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" @click="emit('open-doc', req.document_id, req.id)">Source</TextButton>
+              <TextButton v-if="!lk.note && editing !== req.id" size="s" color="gray" @click="editNote(lk)">{{ tr('Note') }}</TextButton>
+              <TextButton size="s" color="gray" :aria-label="tr('Unlink {code}', { code: req.code })" @click="unlink(req.id)">{{ tr('Unlink') }}</TextButton>
+              <TextButton size="s" color="blue" contents="text-icon" icon-name="chevron_right" @click="emit('open-doc', req.document_id, req.id)">{{ tr('Source') }}</TextButton>
             </span>
           </div>
         </div>
       </div>
 
       <div v-if="!mine.length && !picking" class="empty-col">
-        <span class="tx-meta">No linked requirements</span>
-        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">Link requirement</Button>
+        <span class="tx-meta">{{ tr('No linked requirements') }}</span>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">{{ tr('Link requirement') }}</Button>
       </div>
     </section>
 
     <section class="sec2 tight">
-      <div class="sec-h h24"><span>Linked docs</span><button class="ib s24" aria-label="Add doc" @click="emit('add-doc')"><EditorIcon name="plus" :size="16" /></button></div>
+      <div class="sec-h h24"><span>{{ tr('Linked docs') }}</span><button class="ib s24" :aria-label="tr('Add doc')" @click="emit('add-doc')"><EditorIcon name="plus" :size="16" /></button></div>
       <button v-for="d in relDocs" :key="d!.id" class="sq hov doc" @click="emit('open-doc', d!.id)">
-        <EditorIcon :name="docIcon(d!)" :size="16" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ CATEGORY_EN[d!.category] }}</span>
+        <EditorIcon :name="docIcon(d!)" :size="16" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ categoryLabel(d!.category) }}</span>
       </button>
-      <p v-if="!relDocs.length" class="tx-meta m0 pb2">Docs appear here once you link requirements</p>
+      <p v-if="!relDocs.length" class="tx-meta m0 pb2">{{ tr('Docs appear here once you link requirements') }}</p>
     </section>
   </div>
 </template>

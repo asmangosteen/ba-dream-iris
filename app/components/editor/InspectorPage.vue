@@ -50,27 +50,26 @@ const blur = (e: KeyboardEvent) => {
   <div class="pg">
     <section class="s first">
       <div class="sec-h h24">
-        <span>Page <span class="tx-meta cnt">{{ screenCount }} {{ screenCount === 1 ? 'frame' : 'frames' }}</span></span>
-        <button class="ib s24" :aria-label="bg ? 'Use default background' : 'Set background color'" :title="bg ? 'Reset to default background' : 'Set background color'" @click="emit('settings', { background: bg ? null : '#E5E5E5' })">
+        <span>{{ tr('Page') }} <span class="tx-meta cnt">{{ screenCount === 1 ? tr('1 frame') : tr('{n} frames', { n: screenCount }) }}</span></span>
+        <button class="ib s24" :aria-label="bg ? tr('Use default background') : tr('Set background color')" :title="bg ? tr('Reset to default background') : tr('Set background color')" @click="emit('settings', { background: bg ? null : '#E5E5E5' })">
           <EditorIcon :name="bg ? 'minus' : 'plus'" />
         </button>
       </div>
       <div v-if="bg" class="ig w1">
-        <label class="sq fld"><ColorField :model-value="live ?? hex" label="Canvas background color" @update:model-value="liveBg" @close="flushBg" /><input :key="bg" :value="(live ?? bg).toUpperCase()" aria-label="Background color value" @focus="($event.target as HTMLInputElement).dataset.orig = ($event.target as HTMLInputElement).value" @change="setHex" @keydown="blur"></label>
+        <label class="sq fld"><ColorField :model-value="live ?? hex" label="Canvas background color" @update:model-value="liveBg" @close="flushBg" /><input :key="bg" :value="(live ?? bg).toUpperCase()" :aria-label="tr('Background color value')"@focus="($event.target as HTMLInputElement).dataset.orig = ($event.target as HTMLInputElement).value" @change="setHex" @keydown="blur"></label>
         <span />
       </div>
-      <p v-else class="tx-meta m0">Default background that follows the theme (light or dark)</p>
-      <div class="presets" role="group" aria-label="Common backgrounds">
-        <button v-for="c in PRESETS" :key="c" class="sq sq-clip pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="`Background ${c}`" :title="c" @click="emit('settings', { background: c })" />
+      <p v-else class="tx-meta m0">{{ tr('Default background that follows the theme (light or dark)') }}</p>
+      <div class="presets" role="group" :aria-label="tr('Common backgrounds')">
+        <button v-for="c in PRESETS" :key="c" class="sq sq-clip pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="tr('Background {color}', { color: c })" :title="c" @click="emit('settings', { background: c })" />
       </div>
     </section>
 
 
     <section class="s">
-      <div class="sec-h h24"><span>Styles</span></div>
-      <div class="style-row"><span class="sqc dot c" aria-hidden="true" /><span class="tx-body f1">Color styles</span><span class="tx-meta num">{{ colorCount }}</span></div>
-      <div class="style-row"><span class="sqc dot t" aria-hidden="true">Ag</span><span class="tx-body f1">Text styles</span><span class="tx-meta num">{{ textCount }}</span></div>
-      <TextButton size="s" color="blue" class="self-start" @click="navigateTo('/design-system')">View in design system</TextButton>
+      <div class="sec-h h24"><span>{{ tr('Styles') }}</span></div>
+      <div class="style-row"><span class="sqc dot c" aria-hidden="true" /><span class="tx-body f1">{{ tr('Color styles') }}</span><span class="tx-meta num">{{ colorCount }}</span></div>
+      <div class="style-row"><span class="sqc dot t" aria-hidden="true">Ag</span><span class="tx-body f1">{{ tr('Text styles') }}</span><span class="tx-meta num">{{ textCount }}</span></div>
     </section>
 
   </div>

@@ -125,8 +125,8 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 const fileLabel = computed(() => (props.doc.file_type ?? '').toUpperCase())
 const meta = computed(() => {
   const d = props.doc
-  const src = d.source_type === 'upload' && d.file_type ? fileLabel.value : DOC_SOURCE_LABEL[d.source_type]
-  return [DOC_CATEGORY_LABEL[d.category], src, relativeTime(d.updated_at), d.version_label].filter(Boolean).join(' · ')
+  const src = d.source_type === 'upload' && d.file_type ? fileLabel.value : tr(DOC_SOURCE_LABEL[d.source_type])
+  return [tr(DOC_CATEGORY_LABEL[d.category]), src, relativeTime(d.updated_at), d.version_label].filter(Boolean).join(' · ')
 })
 const linkFailed = computed(() => props.doc.source_type === 'link' && !text.value.trim() && props.doc.fetch_status === 'failed')
 const showFileCard = computed(() => props.doc.source_type === 'upload' && !text.value.trim())
@@ -142,7 +142,7 @@ async function openFile() {
   openError.value = ''
   const { data, error } = await supabase.storage.from('documents').createSignedUrl(props.doc.file_path, 3600)
   opening.value = false
-  if (error || !data?.signedUrl) { openError.value = '파일을 열지 못했어요. 잠시 뒤 다시 시도해 주세요'; return }
+  if (error || !data?.signedUrl) { openError.value = tr("Couldn't open the file. Try again in a moment."); return }
   window.open(data.signedUrl, '_blank', 'noopener')
 }
 
@@ -158,7 +158,7 @@ async function savePaste() {
   saveError.value = ''
   const { error } = await supabase.from('documents').update({ plain_text: v, fetch_status: 'manual' }).eq('id', props.doc.id)
   saving.value = false
-  if (error) { saveError.value = '저장하지 못했어요. 잠시 뒤 다시 시도해 주세요'; return }
+  if (error) { saveError.value = tr("Couldn't save. Try again in a moment."); return }
   pasted.value = v
   refreshNuxtData(`docs-${props.doc.project_id}`)
 }
@@ -224,9 +224,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </div>
       <div class="tx-meta meta">
         <span>{{ meta }}</span>
-        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(wideHref)">넓게 보기</TextButton>
-        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(editHref)">고치기</TextButton>
-        <TextButton v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" :loading="opening" @click="openFile">원본</TextButton>
+        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(wideHref)">{{ tr('Open wide') }}</TextButton>
+        <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(editHref)">{{ tr('Edit') }}</TextButton>
+        <TextButton v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" :loading="opening" @click="openFile">{{ tr('Original') }}</TextButton>
       </div>
       <a v-if="doc.source_type === 'link' && doc.url" :href="doc.url" target="_blank" rel="noopener noreferrer" class="tx-meta src">
         <Icon name="link" :size="12" />
@@ -237,12 +237,12 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 
     <!-- 올린 파일인데 본문을 못 꺼낸 경우: 파일 카드 -->
     <div v-if="showFileCard" class="sq card">
-      <span class="sq chip num">{{ fileLabel || '파일' }}</span>
+      <span class="sq chip num">{{ fileLabel || tr('File') }}</span>
       <span class="card-col">
         <span class="tx-body name ellipsis" :title="fileName || doc.title">{{ fileName || doc.title }}</span>
-        <span class="tx-meta">{{ preview ? '미리보기에서는 파일을 열 수 없어요' : '본문을 미리 볼 수 없는 파일이에요' }}</span>
+        <span class="tx-meta">{{ preview ? tr('Files can’t be opened in preview') : tr('This file can’t be previewed') }}</span>
       </span>
-      <Button v-if="!preview" size="s" type="tertiary" stroke contents="icon-text" icon-name="arrow_up_right" :loading="opening" :disabled="!doc.file_path" @click="openFile">파일 열기</Button>
+      <Button v-if="!preview" size="s" type="tertiary" stroke contents="icon-text" icon-name="arrow_up_right" :loading="opening" :disabled="!doc.file_path" @click="openFile">{{ tr('Open file') }}</Button>
     </div>
 
     <!-- 링크 본문을 못 가져온 경우: 붙여넣기 -->
@@ -251,22 +251,22 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <span class="sq chip"><Icon name="link" :size="16" /></span>
         <span class="card-col">
           <span class="tx-body name ellipsis" :title="linkHost || doc.title">{{ linkHost || doc.title }}</span>
-          <span class="tx-meta warn"><Icon name="warning" :size="12" />본문을 불러오지 못했어요</span>
+          <span class="tx-meta warn"><Icon name="warning" :size="12" />{{ tr("Couldn't load the page content") }}</span>
         </span>
       </div>
-      <label class="tx-head" :for="`paste-${doc.id}`">본문 붙여넣기</label>
-      <div class="sq area-box"><textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" placeholder="원본 페이지의 글을 복사해서 붙여넣어 주세요" /></div>
+      <label class="tx-head" :for="`paste-${doc.id}`">{{ tr('Paste content') }}</label>
+      <div class="sq area-box"><textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" :placeholder="tr('Copy the text from the original page and paste it here')" /></div>
       <div class="paste-foot">
         <span v-if="saveError" class="tx-meta warn" role="alert">{{ saveError }}</span>
-        <Button size="s" :type="compact ? 'tertiary' : 'primary'" :stroke="compact" :loading="saving" :disabled="!draft.trim() && !saving" @click="savePaste">저장하기</Button>
+        <Button size="s" :type="compact ? 'tertiary' : 'primary'" :stroke="compact" :loading="saving" :disabled="!draft.trim() && !saving" @click="savePaste">{{ tr('Save') }}</Button>
       </div>
     </div>
 
     <article v-else ref="article" class="body" @mouseup="onSelectEnd" @keyup.shift="onSelectEnd">
       <div v-if="!blocks.length" class="empty">
-        <p class="tx-meta">아직 내용이 없어요</p>
-        <TextButton v-if="compact" size="s" color="blue" contents="icon-text" icon-name="pencil" @click="navigateTo(editHref)">내용 쓰기</TextButton>
-        <TextButton v-else size="s" color="blue" contents="icon-text" icon-name="pencil" @click="emit('edit')">내용 쓰기</TextButton>
+        <p class="tx-meta">{{ tr('No content yet') }}</p>
+        <TextButton v-if="compact" size="s" color="blue" contents="icon-text" icon-name="pencil" @click="navigateTo(editHref)">{{ tr('Start writing') }}</TextButton>
+        <TextButton v-else size="s" color="blue" contents="icon-text" icon-name="pencil" @click="emit('edit')">{{ tr('Start writing') }}</TextButton>
       </div>
       <div
         v-for="b in blocks"
@@ -286,8 +286,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         </component>
       </div>
 
-      <div v-if="tool" class="sq tool" role="toolbar" aria-label="고른 글" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="sq tool-btn" @click="createReq"><Icon name="plus" :size="14" />요구사항으로 만들기</button>
+      <div v-if="tool" class="sq tool" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
+        <button type="button" class="sq tool-btn" @click="createReq"><Icon name="plus" :size="14" />{{ tr('Create requirement') }}</button>
       </div>
     </article>
 

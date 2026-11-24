@@ -70,7 +70,7 @@ onBeforeUnmount(() => {
 
 // 미리 보기: 고른 글자의 첫 줄을 지금 모양대로(크기는 창에 맞게 32 까지)
 const first = computed(() => nodes.value[0])
-const sample = computed(() => ((first.value?.text ?? '').split('\n')[0] || 'Preview').slice(0, 60))
+const sample = computed(() => ((first.value?.text ?? '').split('\n')[0] || tr('Preview')).slice(0, 60))
 const previewCss = computed(() => {
   const s = first.value?.style
   if (!s) return {}
@@ -109,64 +109,64 @@ function onParaKey(e: KeyboardEvent) {
 
 <template>
   <Teleport to="body">
-    <div ref="el" class="sq tdp editor" role="dialog" aria-label="Type settings" :style="pos">
+    <div ref="el" class="sq tdp editor" role="dialog" :aria-label="tr('Type settings')" :style="pos">
       <div class="td-h">
         <div class="td-tabs" role="tablist">
-          <button role="tab" :aria-selected="tab === 'basics'" :class="['sq', 'td-tab', { on: tab === 'basics' }]" @click="tab = 'basics'">Basics</button>
-          <button role="tab" :aria-selected="tab === 'details'" :class="['sq', 'td-tab', { on: tab === 'details' }]" @click="tab = 'details'">Details</button>
+          <button role="tab" :aria-selected="tab === 'basics'" :class="['sq', 'td-tab', { on: tab === 'basics' }]" @click="tab = 'basics'">{{ tr('Basics') }}</button>
+          <button role="tab" :aria-selected="tab === 'details'" :class="['sq', 'td-tab', { on: tab === 'details' }]" @click="tab = 'details'">{{ tr('Details') }}</button>
         </div>
-        <button class="ib s24" aria-label="Close" data-tip="Close" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
       </div>
 
       <template v-if="tab === 'basics'">
         <div class="td-b">
           <div class="sq td-pv" aria-hidden="true"><span :style="previewCss">{{ sample }}</span></div>
           <div class="td-r">
-            <span class="td-l">Alignment</span>
-            <div class="grp" role="group" aria-label="Text alignment">
-              <button v-for="a in ALIGN" :key="a[0]" :class="['ib', { on: alignNow === a[0] }]" :aria-pressed="alignNow === a[0]" :aria-label="a[1]" :data-tip="a[1]" @click="pick('align', a[0])"><EditorIcon :name="`align_${a[0]}`" :size="16" /></button>
+            <span class="td-l">{{ tr('Alignment') }}</span>
+            <div class="grp" role="group" :aria-label="tr('Text alignment')">
+              <button v-for="a in ALIGN" :key="a[0]" :class="['ib', { on: alignNow === a[0] }]" :aria-pressed="alignNow === a[0]" :aria-label="tr(a[1])" :data-tip="tr(a[1])" @click="pick('align', a[0])"><EditorIcon :name="`align_${a[0]}`" :size="16" /></button>
             </div>
           </div>
           <div class="td-r">
-            <span class="td-l">Decoration</span>
-            <div class="grp" role="group" aria-label="Decoration">
-              <button :class="['ib', { on: decoNow === null }]" :aria-pressed="decoNow === null" aria-label="None" data-tip="None" @click="pick('decoration', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button :class="['ib', { on: decoNow === 'underline' }]" :aria-pressed="decoNow === 'underline'" aria-label="Underline" data-tip="Underline" data-tip-key="⌘U" @click="pick('decoration', 'underline')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v5a3 3 0 0 0 6 0v-5M3.5 13.5h9" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
-              <button :class="['ib', { on: decoNow === 'strike' }]" :aria-pressed="decoNow === 'strike'" aria-label="Strikethrough" data-tip="Strikethrough" data-tip-key="⇧⌘X" @click="pick('decoration', 'strike')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11M10.8 4.6C10.2 3.4 9.1 2.8 8 2.8c-1.7 0-3 .9-3 2.3 0 1 .7 1.7 1.8 2.1M5.2 11.2c.6 1.4 1.7 2 2.9 2 1.8 0 3.1-1 3.1-2.4 0-.7-.2-1.2-.7-1.6" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
+            <span class="td-l">{{ tr('Decoration') }}</span>
+            <div class="grp" role="group" :aria-label="tr('Decoration')">
+              <button :class="['ib', { on: decoNow === null }]" :aria-pressed="decoNow === null" :aria-label="tr('None')" :data-tip="tr('None')" @click="pick('decoration', undefined)"><EditorIcon name="minus" :size="16" /></button>
+              <button :class="['ib', { on: decoNow === 'underline' }]" :aria-pressed="decoNow === 'underline'" :aria-label="tr('Underline')" :data-tip="tr('Underline')" data-tip-key="⌘U" @click="pick('decoration', 'underline')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v5a3 3 0 0 0 6 0v-5M3.5 13.5h9" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
+              <button :class="['ib', { on: decoNow === 'strike' }]" :aria-pressed="decoNow === 'strike'" :aria-label="tr('Strikethrough')" :data-tip="tr('Strikethrough')" data-tip-key="⇧⌘X" @click="pick('decoration', 'strike')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11M10.8 4.6C10.2 3.4 9.1 2.8 8 2.8c-1.7 0-3 .9-3 2.3 0 1 .7 1.7 1.8 2.1M5.2 11.2c.6 1.4 1.7 2 2.9 2 1.8 0 3.1-1 3.1-2.4 0-.7-.2-1.2-.7-1.6" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
             </div>
           </div>
           <div class="td-r">
-            <span class="td-l">Case</span>
-            <div class="grp" role="group" aria-label="Letter case">
-              <button :class="['ib', { on: caseNow === null }]" :aria-pressed="caseNow === null" aria-label="As typed" data-tip="As typed" @click="pick('textCase', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button v-for="c in ([['upper', 'AG', 'Uppercase'], ['lower', 'ag', 'Lowercase'], ['title', 'Ag', 'Title case']] as const)" :key="c[0]" :class="['ib', 'tb', { on: caseNow === c[0] }]" :aria-pressed="caseNow === c[0]" :aria-label="c[2]" :data-tip="c[2]" @click="pick('textCase', c[0])">{{ c[1] }}</button>
+            <span class="td-l">{{ tr('Case') }}</span>
+            <div class="grp" role="group" :aria-label="tr('Letter case')">
+              <button :class="['ib', { on: caseNow === null }]" :aria-pressed="caseNow === null" :aria-label="tr('As typed')" :data-tip="tr('As typed')" @click="pick('textCase', undefined)"><EditorIcon name="minus" :size="16" /></button>
+              <button v-for="c in ([['upper', 'AG', 'Uppercase'], ['lower', 'ag', 'Lowercase'], ['title', 'Ag', 'Title case']] as const)" :key="c[0]" :class="['ib', 'tb', { on: caseNow === c[0] }]" :aria-pressed="caseNow === c[0]" :aria-label="tr(c[2])" :data-tip="tr(c[2])" @click="pick('textCase', c[0])">{{ c[1] }}</button>
               <!-- 작은 대문자: Pretendard 에 없어서 피그마처럼 흐리게 -->
-              <button class="ib tb sc" disabled aria-label="Small caps (not available for Pretendard)" data-tip="Small caps — not in Pretendard">Aᴀ</button>
+              <button class="ib tb sc" disabled :aria-label="tr('Small caps (not available for Pretendard)')" :data-tip="tr('Small caps — not in Pretendard')">Aᴀ</button>
             </div>
           </div>
         </div>
         <div class="td-b">
           <div class="td-r">
-            <span class="td-l">List style</span>
-            <div class="grp" role="group" aria-label="List style">
-              <button :class="['ib', { on: listNow === null }]" :aria-pressed="listNow === null" aria-label="None" data-tip="None" @click="pick('list', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button :class="['ib', { on: listNow === 'bullet' }]" :aria-pressed="listNow === 'bullet'" aria-label="Bulleted list" data-tip="Bulleted list" @click="pick('list', 'bullet')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="4" r="1" fill="currentColor" /><circle cx="3.5" cy="8" r="1" fill="currentColor" /><circle cx="3.5" cy="12" r="1" fill="currentColor" /><path d="M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
-              <button :class="['ib', { on: listNow === 'number' }]" :aria-pressed="listNow === 'number'" aria-label="Numbered list" data-tip="Numbered list" @click="pick('list', 'number')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 2.8h1v3M2.6 9.3c.2-.5.6-.8 1.1-.8.6 0 1 .4 1 .9 0 .8-2.1 1.5-2.1 2.6h2.1M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            <span class="td-l">{{ tr('List style') }}</span>
+            <div class="grp" role="group" :aria-label="tr('List style')">
+              <button :class="['ib', { on: listNow === null }]" :aria-pressed="listNow === null" :aria-label="tr('None')" :data-tip="tr('None')" @click="pick('list', undefined)"><EditorIcon name="minus" :size="16" /></button>
+              <button :class="['ib', { on: listNow === 'bullet' }]" :aria-pressed="listNow === 'bullet'" :aria-label="tr('Bulleted list')" :data-tip="tr('Bulleted list')" @click="pick('list', 'bullet')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="4" r="1" fill="currentColor" /><circle cx="3.5" cy="8" r="1" fill="currentColor" /><circle cx="3.5" cy="12" r="1" fill="currentColor" /><path d="M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+              <button :class="['ib', { on: listNow === 'number' }]" :aria-pressed="listNow === 'number'" :aria-label="tr('Numbered list')" :data-tip="tr('Numbered list')" @click="pick('list', 'number')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 2.8h1v3M2.6 9.3c.2-.5.6-.8 1.1-.8.6 0 1 .4 1 .9 0 .8-2.1 1.5-2.1 2.6h2.1M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
             </div>
           </div>
           <div class="td-r">
-            <span class="td-l">Paragraph spacing</span>
-            <label class="sq fld td-num"><input :value="paraNow === 'Mixed' ? '' : paraNow" :placeholder="paraNow === 'Mixed' ? 'Mixed' : ''" inputmode="decimal" aria-label="Paragraph spacing" @change="setPara" @keydown="onParaKey"></label>
+            <span class="td-l">{{ tr('Paragraph spacing') }}</span>
+            <label class="sq fld td-num"><input :value="paraNow === 'Mixed' ? '' : paraNow" :placeholder="paraNow === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Paragraph spacing')" @change="setPara" @keydown="onParaKey"></label>
           </div>
           <div class="td-r">
-            <span class="td-l">Truncate text</span>
-            <div class="grp" role="group" aria-label="Truncate text">
-              <button :class="['ib', { on: truncNow === false }]" :aria-pressed="truncNow === false" aria-label="Don't truncate" data-tip="Don't truncate" @click="pick('truncate', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button :class="['ib', 'tb', { on: truncNow === true }]" :aria-pressed="truncNow === true" aria-label="Truncate with ellipsis" data-tip="Truncate with ellipsis" @click="pick('truncate', true)">A…</button>
+            <span class="td-l">{{ tr('Truncate text') }}</span>
+            <div class="grp" role="group" :aria-label="tr('Truncate text')">
+              <button :class="['ib', { on: truncNow === false }]" :aria-pressed="truncNow === false" :aria-label="tr('Don\'t truncate')" :data-tip="tr('Don\'t truncate')" @click="pick('truncate', undefined)"><EditorIcon name="minus" :size="16" /></button>
+              <button :class="['ib', 'tb', { on: truncNow === true }]" :aria-pressed="truncNow === true" :aria-label="tr('Truncate with ellipsis')" :data-tip="tr('Truncate with ellipsis')" @click="pick('truncate', true)">A…</button>
             </div>
           </div>
           <div class="td-r">
-            <span class="td-l">Wrap style</span>
+            <span class="td-l">{{ tr('Wrap style') }}</span>
             <EditorSelect class="td-sel" :model-value="wrapNow === 'Mixed' ? null : wrapNow" :options="[{ value: 'auto', label: 'Auto' }, { value: 'balance', label: 'Balance' }, { value: 'pretty', label: 'Pretty' }]" aria-label="Wrap style" placeholder="Mixed" @update:model-value="(v) => pick('wrap', v === 'auto' ? undefined : (v as 'balance' | 'pretty'))" />
           </div>
         </div>
@@ -174,10 +174,10 @@ function onParaKey(e: KeyboardEvent) {
 
       <div v-else class="td-b">
         <div class="td-r">
-          <span class="td-l">Numbers</span>
+          <span class="td-l">{{ tr('Numbers') }}</span>
           <EditorSelect class="td-sel" :model-value="numNow === 'Mixed' ? null : numNow" :options="[{ value: 'proportional', label: 'Proportional' }, { value: 'tabular', label: 'Tabular' }]" aria-label="Number spacing" placeholder="Mixed" @update:model-value="(v) => pick('numbers', v === 'tabular' ? 'tabular' : undefined)" />
         </div>
-        <p class="td-note">Tabular numbers line up in tables and prices.</p>
+        <p class="td-note">{{ tr('Tabular numbers line up in tables and prices.') }}</p>
       </div>
     </div>
   </Teleport>

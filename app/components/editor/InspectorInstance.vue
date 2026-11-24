@@ -4,8 +4,9 @@ import { Icon } from '@ba-dream/design-system'
 import type { DsPropMeta } from 'virtual:iris-ds-props'
 import type { LayerNode } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { SLOT_KEY, dsComponent, dsDefault, dsProps, slotFallback } from '~/components/editor/InstanceView.vue'
+import { SLOT_KEY, dsComponent, dsProps, instDefault, slotFallback } from '~/components/editor/InstanceView.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
+import IconPicker from '~/components/editor/IconPicker.vue'
 
 /** 인스턴스 속성(피그마 Instance 패널): 변형(선택) · 켜고 끄기 · 글자 · 숫자. 기본값은 컴포넌트 기본값을 보여 줘요 */
 const props = defineProps<{ sid: string; ids: string[] }>()
@@ -16,17 +17,24 @@ const known = computed(() => !!dsComponent(name.value))
 
 // 캔버스에서 고칠 일이 없는 것: 객체 · 함수 · 이벤트, class · style · id
 const HIDDEN = new Set(['class', 'style', 'id', 'key', 'ref'])
-const A11Y = /^(aria[A-Z]|role$|alt$|title$|htmlFor$|name$|tabindex$)/i
+// 화면에 안 보이는 접근성 속성(aria-* · role · for · tabindex)은 패널에 보이지 않아요 — title · name · alt 는 실제 내용이라 보여요
+const A11Y = /^(aria[A-Z]|role$|htmlFor$|tabindex$)/
 const ORDER: Record<DsPropMeta['kind'], number> = { enum: 0, boolean: 1, string: 2, number: 2, other: 9 }
 
 /** dep: 이 값을 쓰는 켜고 끄기(showX) 속성 — 그 토글이 켜졌을 때만 바로 아래에 들여서 보여요(피그마 Left Icon → 아이콘처럼) */
-interface Row extends DsPropMeta { key: string; label: string; a11y: boolean; dep?: string }
+interface Row extends DsPropMeta { key: string; label: string; a11y: boolean; dep?: string; list?: boolean }
+const isLabelList = (v: unknown): v is { label: string }[] => Array.isArray(v) && v.every((x) => x && typeof x === 'object' && 'label' in x)
 /** 피그마 컴포넌트 속성 이름과 다른 코드 이름(바드림 디자인 시스템 피그마 기준) */
-const ALIAS: Record<string, string> = { showSupportingText: 'Supporting Text', showLeftIcon: 'Left Icon', showRightIcon: 'Right Icon', forceState: 'State' }
+const ALIAS: Record<string, string> = { showSupportingText: 'Supporting Text', showLeftIcon: 'Left Icon', showRightIcon: 'Right Icon', forceState: 'State', os: 'OS', items: 'Items' }
 const rows = computed<Row[]>(() => {
-  const list: Row[] = dsProps(name.value)
-    .filter((p) => p.kind !== 'other' && !HIDDEN.has(p.name) && !/^on[A-Z]/.test(p.name))
-    .map((p) => ({ ...p, key: p.slot ? SLOT_KEY : p.name, label: p.slot ? 'Text' : labelOf(p.name), a11y: !p.slot && A11Y.test(p.name) }))
+  // 빌드 속성 목록에 없는 목록 속성(items)도 Iris 기본 목록이 있으면 글자 칸으로 보여요(Tab · SegmentedControl)
+  const base = dsProps(name.value)
+  const extra: DsPropMeta[] = !base.some((p) => p.name === 'items') && isLabelList(instDefault(name.value, 'items')) ? [{ name: 'items', kind: 'other' } as DsPropMeta] : []
+  const list: Row[] = [...extra, ...base]
+    // 목록 속성(items: [{ label }])은 글자 칸 하나로 — 쉼표로 나눠 적어요(Tab 1, Tab 2, Tab 3)
+    .map((p) => (p.name === 'items' && p.kind === 'other' && isLabelList(instDefault(name.value, 'items')) ? { ...p, kind: 'string' as const, list: true } : p))
+    .filter((p) => p.kind !== 'other' && !HIDDEN.has(p.name) && !/^on[A-Z]/.test(p.name) && !A11Y.test(p.name))
+    .map((p) => ({ ...p, key: p.slot ? SLOT_KEY : p.name, label: p.slot ? 'Text' : labelOf(p.name), a11y: false }))
   // 피그마처럼: 변형 → 켜고 끄기 → 글자(슬롯 글자 먼저) → 접근성 속성은 맨 아래
   const rank = (r: Row) => (r.a11y ? 10 : r.slot ? 1.5 : ORDER[r.kind])
   const sorted = list.map((r, i) => [r, i] as const).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([r]) => r)
@@ -41,8 +49,10 @@ const rows = computed<Row[]>(() => {
     const head = /^[a-z]+(?=[A-Z])/.exec(base)?.[0] ?? base
     const list: Row[] = []
     for (const k of sorted) {
-      if (k === r || k.slot || k.a11y || k.kind === 'boolean' || used.has(k.key) || !k.name.startsWith(head)) continue
-      const rest = k.name.startsWith(base) ? k.name.slice(base.length) : k.name.slice(head.length)
+      // 앞 단어가 단어 경계에서 끝나야 딸린 값(showSubPlan 의 'sub' 가 subsidyLabel 을 데려가지 않게)
+      const bound = (pre: string) => k.name.startsWith(pre) && (k.name.length === pre.length || /[A-Z]/.test(k.name.charAt(pre.length)))
+      if (k === r || k.slot || k.a11y || k.kind === 'boolean' || used.has(k.key) || !bound(head)) continue
+      const rest = bound(base) ? k.name.slice(base.length) : k.name.slice(head.length)
       used.add(k.key)
       list.push({ ...k, dep: r.key, label: rest === '' ? 'Text' : rest === 'Name' && /Icon$/.test(base) ? 'Icon' : labelOf(rest) })
     }
@@ -54,6 +64,11 @@ const depRow = (r: Row) => rows.value.find((x) => x.key === r.dep)
 const shown = (r: Row) => { const d = r.dep ? depRow(r) : undefined; return !d || current(d) === true }
 /** 아이콘 이름 칸: 고른 아이콘을 칸 안에 미리 보여요 */
 const isIcon = (r: Row) => /icon(Name)?$/i.test(r.name) && r.kind === 'string'
+// 아이콘 고르기 팝오버: 연 칸(key)과 그 칸 요소(팝오버 자리 기준)
+const iconFor = ref<string | null>(null)
+const iconAnchor = ref<HTMLElement | null>(null)
+const iconRow = computed(() => rows.value.find((r) => r.key === iconFor.value) ?? null)
+function openIcon(r: Row, e: MouseEvent) { iconAnchor.value = e.currentTarget as HTMLElement; iconFor.value = iconFor.value === r.key ? null : r.key }
 
 /** camelCase → 피그마식 Title Case ('showLabel' → 'Show Label', 'iconName' → 'Icon Name') */
 function labelOf(k: string) {
@@ -65,14 +80,22 @@ function labelOf(k: string) {
 function optLabel(o: string | number) {
   if (typeof o === 'number') return String(o)
   if (/^\d*x*[sml]$|^\d?xl$/i.test(o)) return o.toUpperCase()
+  const ACR: Record<string, string> = { ios: 'iOS', aos: 'AOS', android: 'Android', pdf: 'PDF', url: 'URL' }
+  if (ACR[o.toLowerCase()]) return ACR[o.toLowerCase()]!
   const s = o.replace(/[-_]/g, ' ')
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const set = computed(() => node.value?.props ?? {})
 const isSet = (r: Row) => set.value[r.key] !== undefined
+/** 칸에 보일 글자: 목록(items)은 'A, B, C' */
+const asText = (v: unknown) => (isLabelList(v) ? v.map((x) => x.label).join(', ') : String(v ?? ''))
 /** 컴포넌트 기본값(슬롯 글자는 캔버스가 넣는 기본 글자) */
-const def = (r: Row): unknown => (r.slot ? slotFallback(name.value) : r.default ?? dsDefault(name.value, r.name))
+const def = (r: Row): unknown => {
+  if (r.slot) return slotFallback(name.value)
+  const d = instDefault(name.value, r.name) ?? r.default
+  return r.list && isLabelList(d) ? d.map((x) => x.label).join(', ') : d
+}
 /** 지금 값: 고친 값 → 기본값 */
 const current = (r: Row): unknown => (isSet(r) ? set.value[r.key] : def(r))
 const changed = computed(() => Object.values(set.value).some((v) => v !== undefined))
@@ -95,6 +118,12 @@ function pick(r: Row, raw: string) {
 }
 function text(r: Row, e: Event) {
   const v = (e.target as HTMLInputElement).value
+  if (r.list) {
+    const labels = v.split(',').map((x) => x.trim()).filter(Boolean)
+    const joined = labels.join(', ')
+    write(r, !labels.length || joined === def(r) ? undefined : labels.map((label) => ({ label })))
+    return
+  }
   // 비우면 기본값으로(슬롯 글자는 빈 글자도 그대로 둡니다 — 일부러 비울 수 있게)
   write(r, v === '' && !r.slot ? undefined : v)
 }
@@ -125,15 +154,15 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
     <div class="sec-h h24 inst-h">
       <span class="ttl">
         <EditorIcon name="component" :size="20" class="dia" />
-        <span class="ell">{{ name || 'Instance' }}</span>
+        <span class="ell">{{ name || tr('Instance') }}</span>
       </span>
-      <button v-if="changed" class="ib s24" aria-label="Reset all changes" title="Reset all changes" @click="reset">
+      <button v-if="changed" class="ib s24" :aria-label="tr('Reset all changes')" :title="tr('Reset all changes')" @click="reset">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2M3.5 2.5v2.8h2.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
       </button>
     </div>
 
-    <p v-if="!known" class="note">This component isn't in the design system library.</p>
-    <p v-else-if="!rows.length" class="note">No editable properties</p>
+    <p v-if="!known" class="note">{{ tr("This component isn't in the design system library.") }}</p>
+    <p v-else-if="!rows.length" class="note">{{ tr('No editable properties') }}</p>
 
     <template v-for="r in rows" :key="r.key">
     <div v-if="shown(r)" :class="['row', { mod: isSet(r), sub: !!r.dep, bool: r.kind === 'boolean' }]" :title="r.doc">
@@ -144,19 +173,26 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
       </template>
       <template v-else>
         <span class="lbl ell">{{ r.label }}</span>
-        <EditorSelect v-if="r.kind === 'enum'" :model-value="current(r) === undefined ? '' : String(current(r))" :options="enumOpts(r)" :ariaLabel="r.label" @update:model-value="(v) => pick(r, v)" />
+        <EditorSelect v-if="r.kind === 'enum'" :model-value="current(r) === undefined ? '' : String(current(r))" :options="enumOpts(r)" :ariaLabel="r.label" raw @update:model-value="(v) => pick(r, v)" />
         <label v-else-if="r.kind === 'number'" class="sq fld">
-          <input :key="'n' + String(set[r.key])" :value="current(r) ?? ''" inputmode="decimal" :placeholder="current(r) === undefined ? 'Auto' : ''" :aria-label="r.label" @change="num(r, $event)" @keydown="blur">
+          <input :key="'n' + String(set[r.key])" :value="current(r) ?? ''" inputmode="decimal" :placeholder="current(r) === undefined ? tr('Auto') : ''" :aria-label="r.label" @change="num(r, $event)" @keydown="blur">
         </label>
+        <!-- 아이콘 이름: 글자 대신 고르기(디자인 시스템 아이콘 팝오버, 한 줄 4칸) -->
+        <button v-else-if="isIcon(r)" type="button" :class="['sq', 'fld', 'icon-fld', { open: iconFor === r.key }]" :aria-label="r.label" :aria-expanded="iconFor === r.key" @click="openIcon(r, $event)">
+          <Icon v-if="current(r)" :name="String(current(r))" :size="16" class="ico" />
+          <span :class="['ell', { ph: !isSet(r) }]">{{ asText(current(r)) || tr('Choose icon') }}</span>
+          <EditorIcon name="chevron_down" :size="12" class="chev-i" />
+        </button>
         <label v-else class="sq fld">
           <Icon v-if="isIcon(r) && current(r)" :name="String(current(r))" :size="16" class="ico" />
-          <input :key="'t' + String(set[r.key])" :value="isSet(r) ? set[r.key] : ''" :placeholder="String(current(r) ?? '')" :aria-label="r.label" @change="text(r, $event)" @keydown="blur">
+          <input :key="'t' + asText(set[r.key])" :value="isSet(r) ? asText(set[r.key]) : ''" :placeholder="asText(current(r))" :aria-label="r.label" @change="text(r, $event)" @keydown="blur">
         </label>
       </template>
     </div>
     </template>
 
-    <button v-if="changed" class="reset" @click="reset">Reset all changes</button>
+    <button v-if="changed" class="reset" @click="reset">{{ tr('Reset all changes') }}</button>
+    <IconPicker v-if="iconRow" :model-value="String(current(iconRow) ?? '')" :anchor="iconAnchor" @update:model-value="(v) => write(iconRow!, v)" @close="iconFor = null" />
   </section>
 </template>
 
@@ -180,6 +216,12 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
 /* 토글에 딸린 값: 들여서 */
 .row.sub { grid-template-columns: 68px minmax(0, 1fr); padding-left: 12px; }
 .fld .ico { flex: none; color: var(--sys-color-neutral-700); }
+/* 아이콘 칸: 누르면 팝오버 — 아이콘 16 · 이름 · ▾ */
+.icon-fld { width: 100%; gap: var(--ref-spacing-04); text-align: left; cursor: pointer; }
+.icon-fld .ph { color: var(--sys-color-neutral-500); }
+.icon-fld .ell { flex: 1; }
+.icon-fld .chev-i { flex: none; color: var(--sys-color-neutral-500); }
+.icon-fld.open { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 .lbl { font-size: 12px; color: var(--sys-color-neutral-600); }
 .row.mod .lbl { color: var(--sys-color-neutral-800); font-weight: 500; }
 .fld input::placeholder { color: var(--sys-color-neutral-500); }

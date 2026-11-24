@@ -2,9 +2,9 @@ import type { ProjectStatus } from './useProjects'
 
 export type ProjectKind = 'app' | 'web' | 'detail_page'
 export const KIND_INFO: Record<ProjectKind, { label: string; desc: string; w: number; h: number }> = {
-  app: { label: '앱', desc: '모바일 화면 390 × 844', w: 390, h: 844 },
-  web: { label: '웹', desc: '데스크톱 화면 1440 × 900', w: 1440, h: 900 },
-  detail_page: { label: '상세페이지', desc: '긴 세로 화면 860 × 3000', w: 860, h: 3000 },
+  app: { label: 'App', desc: 'Mobile 390 × 844', w: 390, h: 844 },
+  web: { label: 'Web', desc: 'Desktop 1440 × 900', w: 1440, h: 900 },
+  detail_page: { label: 'Detail page', desc: 'Long page 860 × 3000', w: 860, h: 3000 },
 }
 
 export interface ProjectDetail { id: string; name: string; description: string | null; kind: ProjectKind; status: ProjectStatus }
@@ -20,18 +20,22 @@ export function useProjectActions() {
     if (preview) {
       const id = 'preview-' + Math.random().toString(36).slice(2, 7)
       PREVIEW_PROJECTS.unshift({ id, name, status: 'planning', updated_at: new Date().toISOString() })
+      // 미리보기도 실제처럼: 새 프로젝트에 Page 1 + 고른 종류 크기의 빈 Frame 1 을 만들어 바로 그 프로젝트로 열어요
+      const k = KIND_INFO[kind]
+      PREVIEW_PROJECT_PAGES[id] = [{ id: `pg-${id}`, name: 'Page 1', sort_order: 0 }]
+      PREVIEW_SCREENS[`pg-${id}`] = [{ id: `sc-${id}`, name: 'Frame 1', source: 'native', x: 0, y: 0, width: k.w, height: k.h, status: 'draft' }]
       await refreshNuxtData('projects')
-      return 'preview-1' // 미리보기에는 페이지 · 화면 예시가 하나뿐이라 첫 예시 프로젝트로 엽니다
+      return id
     }
     const me = (user.value?.sub ?? user.value?.id) as string
     const { data: ws, error: e0 } = await supabase.from('workspaces').select('id').limit(1).single()
     if (e0) throw e0
     const { data: p, error: e1 } = await supabase.from('projects').insert({ name, kind, workspace_id: ws.id, created_by: me }).select('id').single()
     if (e1) throw e1
-    const { data: pg, error: e2 } = await supabase.from('pages').insert({ project_id: p.id, name: '페이지 1', sort_order: 0 }).select('id').single()
+    const { data: pg, error: e2 } = await supabase.from('pages').insert({ project_id: p.id, name: 'Page 1', sort_order: 0 }).select('id').single()
     if (e2) throw e2
     const k = KIND_INFO[kind]
-    await supabase.from('screens').insert({ page_id: pg.id, name: '화면 1', source: 'native', x: 0, y: 0, width: k.w, height: k.h, sort_order: 0, updated_by: me })
+    await supabase.from('screens').insert({ page_id: pg.id, name: 'Frame 1', source: 'native', x: 0, y: 0, width: k.w, height: k.h, sort_order: 0, updated_by: me })
     await refreshNuxtData('projects')
     return p.id as string
   }

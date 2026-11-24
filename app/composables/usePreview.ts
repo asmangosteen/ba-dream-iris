@@ -20,6 +20,9 @@ export const PREVIEW_PROJECTS: ProjectRow[] = [
   { id: 'preview-5', name: '마이 페이지 정리', status: 'done', updated_at: ago(60 * 24 * 40) },
 ]
 
+/** 미리보기에서 새로 만든 프로젝트의 페이지(프로젝트 id → 페이지). 없으면 예시 페이지(PREVIEW_PAGES) */
+export const PREVIEW_PROJECT_PAGES: Record<string, PageRow[]> = {}
+
 export const PREVIEW_PAGES: PageRow[] = [
   { id: 'pg-1', name: '홈 · 내 차고', sort_order: 0 },
   { id: 'pg-2', name: '구독 신청', sort_order: 1 },

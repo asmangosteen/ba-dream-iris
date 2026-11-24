@@ -113,12 +113,12 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
   <div ref="root" class="rul" aria-hidden="true">
     <!-- 가이드선 -->
     <template v-for="g in shownX" :key="'gx' + g.i">
-      <div :class="['guide', 'gx', { on: picked?.axis === 'x' && picked.i === g.i }]" :style="{ left: sx(g.v) + 'px' }" @pointerdown="start('x', g.i, $event)"><span v-if="picked?.axis === 'x' && picked.i === g.i" class="gv">{{ fmt(g.v) }}</span></div>
+      <div :class="['guide', 'gx', { on: picked?.axis === 'x' && picked.i === g.i }]" :style="{ left: sx(g.v) + 'px' }" @pointerdown="start('x', g.i, $event)"><span v-if="picked?.axis === 'x' && picked.i === g.i" class="sq gv">{{ fmt(g.v) }}</span></div>
     </template>
     <template v-for="g in shownY" :key="'gy' + g.i">
-      <div :class="['guide', 'gy', { on: picked?.axis === 'y' && picked.i === g.i }]" :style="{ top: sy(g.v) + 'px' }" @pointerdown="start('y', g.i, $event)"><span v-if="picked?.axis === 'y' && picked.i === g.i" class="gv">{{ fmt(g.v) }}</span></div>
+      <div :class="['guide', 'gy', { on: picked?.axis === 'y' && picked.i === g.i }]" :style="{ top: sy(g.v) + 'px' }" @pointerdown="start('y', g.i, $event)"><span v-if="picked?.axis === 'y' && picked.i === g.i" class="sq gv">{{ fmt(g.v) }}</span></div>
     </template>
-    <div v-if="drag && !drag.out" :class="['guide', 'live', drag.axis === 'x' ? 'gx' : 'gy']" :style="drag.axis === 'x' ? { left: sx(drag.v) + 'px' } : { top: sy(drag.v) + 'px' }"><span class="gv">{{ fmt(drag.v) }}</span></div>
+    <div v-if="drag && !drag.out" :class="['guide', 'live', drag.axis === 'x' ? 'gx' : 'gy']" :style="drag.axis === 'x' ? { left: sx(drag.v) + 'px' } : { top: sy(drag.v) + 'px' }"><span class="sq gv">{{ fmt(drag.v) }}</span></div>
 
     <!-- 눈금자 -->
     <template v-if="rulers">
@@ -147,9 +147,9 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
 .gy::after { top: 3px; left: 0; right: 0; height: 1px; }
 .live { pointer-events: none; }
 .guide.on::after { background: var(--iris-select, #0D99FF); }
-.guide.on .gv { background: var(--iris-select, #0D99FF); }
+.guide.on .gv { --sq-fill: var(--iris-select, #0D99FF); }
 .guide:hover::after { box-shadow: 0 0 0 0.5px #F24822; }
-.gv { position: absolute; left: 8px; top: 24px; padding: 0 4px; border-radius: 2px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; background: #F24822; color: #FFF; font-size: 11px; line-height: 16px; font-family: var(--font-family-base); }
+.gv { position: absolute; left: 8px; top: 24px; padding: 0 4px; border-radius: 2px; font-weight: 500; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; white-space: nowrap; --sq-fill: #F24822; color: #FFF; font-size: 11px; line-height: 16px; font-family: var(--font-family-base); }
 .gy .gv { top: 8px; left: 24px; }
 .bar { position: absolute; background: var(--sys-color-common-white-default); pointer-events: auto; font-family: var(--font-family-base); color: var(--sys-color-neutral-500); overflow: hidden; }
 .bar.top { left: 0; right: 0; top: 0; height: 18px; box-shadow: 0 1px 0 var(--iris-line); cursor: ns-resize; }
@@ -158,7 +158,7 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
 .tk { position: absolute; background: var(--sys-color-neutral-300); }
 .top .tk { bottom: 0; width: 1px; height: 6px; }
 .left .tk { right: 0; height: 1px; width: 6px; }
-.lb { position: absolute; font-size: 10px; line-height: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lb { position: absolute; font-size: 10px; line-height: 12px; white-space: nowrap; font-variant-numeric: proportional-nums; }
 .top .lb { top: 1px; }
 .left .lb { left: 1px; writing-mode: vertical-rl; transform: rotate(180deg); }
 .band { position: absolute; background: color-mix(in srgb, var(--iris-select, #0D99FF) 14%, transparent); }

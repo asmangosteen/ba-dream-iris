@@ -24,7 +24,7 @@ function num(i: number, key: 'count' | 'gutter' | 'margin' | 'size', e: Event) {
 const hex = (c?: string) => parseColor(c)?.hex ?? '#FF0000'
 const alpha = (c?: string) => parseColor(c)?.a ?? 0.1
 const withA = (h: string, a: number) => (a >= 1 ? h : h + Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase())
-const label = (g: LayoutGrid) => (g.type === 'grid' ? `Grid (${g.size ?? 8}px)` : `${g.count ?? 4} ${g.type === 'columns' ? 'columns' : 'rows'}`)
+const label = (g: LayoutGrid) => (g.type === 'grid' ? tr('Grid ({n}px)', { n: g.size ?? 8 }) : g.type === 'columns' ? tr('{n} columns', { n: g.count ?? 4 }) : tr('{n} rows', { n: g.count ?? 4 }))
 /* 설정 창: 피그마 팝오버(§9.1)처럼 오른쪽 패널 왼쪽에 붙고, 위쪽은 연 행에 맞춰요. 바깥 누르기 · Esc 로 닫기(Esc 는 설정 버튼으로 포커스) */
 const rowEls = new Map<number, HTMLElement>()
 const rowRef = (i: number) => (el: unknown) => { if (el) rowEls.set(i, el as HTMLElement); else rowEls.delete(i) }
@@ -60,56 +60,56 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 
 <template>
   <section class="s">
-    <div :class="['sec-h', 'h24', { empty: !grids.length }]"><span>Layout grid</span><button class="ib s24" aria-label="Add layout grid" data-tip="Add layout grid" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
+    <div :class="['sec-h', 'h24', { empty: !grids.length }]"><span>{{ tr('Layout grid') }}</span><button class="ib s24" :aria-label="tr('Add layout grid')" :data-tip="tr('Add layout grid')" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
     <div v-for="(g, i) in grids" :key="i">
       <!-- 피그마 Layout guide 행: [설정 + 이름] [👁 24] [− 24] -->
       <div :ref="rowRef(i)" class="prow" :class="{ off: g.visible === false }">
         <div class="ef">
-          <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" aria-label="Layout grid settings" data-tip="Layout grid settings" @click="open = open === i ? null : i">
+          <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" :aria-label="tr('Layout grid settings')" :data-tip="tr('Layout grid settings')" @click="open = open === i ? null : i">
             <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path :d="g.type === 'columns' ? 'M2.5 2v10M7 2v10M11.5 2v10' : g.type === 'rows' ? 'M2 2.5h10M2 7h10M2 11.5h10' : 'M2 4.5h10M2 9.5h10M4.5 2v10M9.5 2v10'" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
           </button>
           <button class="name" @click="open = open === i ? null : i">{{ label(g) }}</button>
         </div>
-        <button class="ib s24" :aria-label="g.visible === false ? 'Show layout grid' : 'Hide layout grid'" :data-tip="g.visible === false ? 'Show' : 'Hide'" @click="set(i, { visible: g.visible === false ? undefined : false })">
+        <button class="ib s24" :aria-label="g.visible === false ? tr('Show layout grid') : tr('Hide layout grid')" :data-tip="g.visible === false ? tr('Show') : tr('Hide')" @click="set(i, { visible: g.visible === false ? undefined : false })">
           <EditorIcon :name="g.visible === false ? 'eye_off' : 'eye'" :size="16" />
         </button>
-        <button class="ib s24" aria-label="Remove layout grid" data-tip="Remove" @click="out(grids.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr('Remove layout grid')" :data-tip="tr('Remove')" @click="out(grids.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <Teleport v-if="open === i" to="body">
-      <div :ref="setPop" class="sq fx-pop editor" role="dialog" aria-label="Layout grid settings" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
-        <div class="pop-h"><span class="pop-t">Layout grid</span><button type="button" class="ib s24" aria-label="Close" data-tip="Close" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
+      <div :ref="setPop" class="sq fx-pop editor" role="dialog" :aria-label="tr('Layout grid settings')" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
+        <div class="pop-h"><span class="pop-t">{{ tr('Layout grid') }}</span><button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
         <div class="pop-b">
         <div class="ig">
           <EditorSelect class="span2" :model-value="g.type" :options="TYPES" ariaLabel="Layout grid type" @update:model-value="(v) => setType(i, v as LayoutGrid['type'])" />
           <span />
         </div>
         <template v-if="g.type === 'grid'">
-          <div class="ig-l"><span>Size</span></div>
+          <div class="ig-l"><span>{{ tr('Size') }}</span></div>
           <div class="ig">
-            <label class="sq fld"><input :key="'s' + g.size" :value="g.size ?? 8" inputmode="numeric" aria-label="Grid size" @change="num(i, 'size', $event)" @keydown="blur"><span class="unit">px</span></label>
+            <label class="sq fld"><input :key="'s' + g.size" :value="g.size ?? 8" inputmode="numeric" :aria-label="tr('Grid size')"@change="num(i, 'size', $event)" @keydown="blur"><span class="unit">px</span></label>
             <span /><span />
           </div>
         </template>
         <template v-else>
-          <div class="ig-l"><span>Count</span><span>Gutter</span></div>
+          <div class="ig-l"><span>{{ tr('Count') }}</span><span>{{ tr('Gutter') }}</span></div>
           <div class="ig">
-            <label class="sq fld"><input :key="'c' + g.count" :value="g.count ?? 4" inputmode="numeric" aria-label="Count" @change="num(i, 'count', $event)" @keydown="blur"></label>
-            <label class="sq fld"><input :key="'g' + g.gutter" :value="g.gutter ?? 16" inputmode="numeric" aria-label="Gutter" @change="num(i, 'gutter', $event)" @keydown="blur"></label>
+            <label class="sq fld"><input :key="'c' + g.count" :value="g.count ?? 4" inputmode="numeric" :aria-label="tr('Count')"@change="num(i, 'count', $event)" @keydown="blur"></label>
+            <label class="sq fld"><input :key="'g' + g.gutter" :value="g.gutter ?? 16" inputmode="numeric" :aria-label="tr('Gutter')"@change="num(i, 'gutter', $event)" @keydown="blur"></label>
             <span />
           </div>
-          <div class="ig-l"><span>Margin</span></div>
+          <div class="ig-l"><span>{{ tr('Margin') }}</span></div>
           <div class="ig">
-            <label class="sq fld"><input :key="'m' + g.margin" :value="g.margin ?? 16" inputmode="numeric" aria-label="Margin" @change="num(i, 'margin', $event)" @keydown="blur"></label>
+            <label class="sq fld"><input :key="'m' + g.margin" :value="g.margin ?? 16" inputmode="numeric" :aria-label="tr('Margin')"@change="num(i, 'margin', $event)" @keydown="blur"></label>
             <span /><span />
           </div>
         </template>
-        <div class="ig-l"><span>Color</span></div>
+        <div class="ig-l"><span>{{ tr('Color') }}</span></div>
         <div class="ig">
           <div class="sq fld pf span2">
             <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" label="Grid color" @update:model-value="(v) => set(i, { color: v })" />
-            <input :key="'h' + g.color" class="hex" :value="colorLabel(hex(g.color)).replace('#', '')" aria-label="Grid hex" spellcheck="false" @change="(e) => { const v = (e.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(g.color)) }); else (e.target as HTMLInputElement).value = hex(g.color).slice(1) }" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
+            <input :key="'h' + g.color" class="hex" :value="colorLabel(hex(g.color)).replace('#', '')" :aria-label="tr('Grid hex')"spellcheck="false" @change="(e) => { const v = (e.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(g.color)) }); else (e.target as HTMLInputElement).value = hex(g.color).slice(1) }" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
             <span class="vsep" aria-hidden="true" />
-            <span class="op"><input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100)" inputmode="numeric" aria-label="Grid opacity" @change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
+            <span class="op"><input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100)" inputmode="numeric" :aria-label="tr('Grid opacity')"@change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
           </div>
           <span />
         </div>

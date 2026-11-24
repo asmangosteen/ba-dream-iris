@@ -3,17 +3,19 @@ import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import { descendants, isContainer, normAngle, ratioLocked, frameCss, frameSmoothLayers, frameStroke, type LayerNode, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { radiiOf, simplify } from '~/canvas/paint'
+import { ellipsePath, radiiOf, rectPath, simplify, vectorPath } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
+import { nodePathIn } from '~/canvas/vector'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
 import { layerMenuItems, svgOf, useLastCopy, useMixScreens } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
-import { denorm, normalize } from '~/canvas/vector'
+import { denorm, normalize, shapeVnet } from '~/canvas/vector'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
+import { INSERT_SIZE, STORY_SIZE } from '~/components/editor/InstanceView.vue'
 import { GHOST_KEY } from '~/canvas/ghost'
 import { fmtNum } from '~/canvas/num'
 import { scaledStyle } from '~/canvas/scale'
@@ -128,7 +130,7 @@ type Drag =
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
   | { kind: 'pen'; moved: boolean }
-  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean }
+  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number }; group?: [number, number][] }
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number } }[]; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
@@ -270,7 +272,9 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
     const flow = roots.filter((id) => d.nodes[id]?.parentId === target && !d.nodes[id]!.absolute)
     if (flow.length) {
       const pp = store.absPos(sc.id, p.id)
-      const idx = slotIndex(d, p, { x: w.x - sc.x - pp.x, y: w.y - sc.y - pp.y }, new Set(flow))
+      // 자리: 포인터 대신 끌고 있는 것의 가운데로 — ⌥ 복제본이 원본과 자리를 바꿨다 돌아오지 않고 원본 바로 아래에서 시작해요
+      const c = dg.b0 ? { x: dg.b0.x + dg.b0.w / 2 + dx, y: dg.b0.y + dg.b0.h / 2 + dy } : w
+      const idx = slotIndex(d, p, { x: c.x - sc.x - pp.x, y: c.y - sc.y - pp.y }, new Set(flow))
       const rest = (p.children ?? []).filter((c) => !flow.includes(c))
       const next = [...rest.slice(0, idx), ...flow, ...rest.slice(idx)]
       if (next.join() !== (p.children ?? []).join()) p.children = next
@@ -284,7 +288,12 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
 // ---------------------------------------------------------------------------
 type APt = { x: number; y: number; i?: [number, number]; o?: [number, number] }
 const pen = ref<{ sid: string; parentId: string | null; px: number; py: number; pts: APt[]; hover: [number, number] | null } | null>(null)
-const vedit = ref<{ sid: string; id: string; sel: [number, number] | null } | null>(null)
+/** 점 편집 상태(오른쪽 패널의 편집 칸도 같이 봐요). sel[0] 이 -1 이면 아직 도형인 꼭짓점 */
+const vedit = useState<{ sid: string; id: string; sel: [number, number] | null } | null>('iris-vedit', () => null)
+/** 곡선 손잡이 대칭(Mirroring): none · angle(각도만) · both(각도 + 길이) — 패널에서 골라요 */
+const mirror = useState<'none' | 'angle' | 'both'>('iris-mirror', () => 'both')
+/** 패널에서 고친 점 자리(부모 좌표): 캔버스가 받아서 옮겨요 */
+const vptSet = useState<{ x?: number; y?: number; t: number } | null>('iris-vpt-set', () => null)
 const screenOrigin = (sid: string) => { const v = props.screens.find((x) => x.id === sid); return v && !isCanvas(v) ? { x: v.x, y: v.y } : { x: 0, y: 0 } }
 function penDown(e: PointerEvent, screen?: ScreenRow) {
   const w = toWorld(e.clientX, e.clientY)
@@ -298,7 +307,8 @@ function penDown(e: PointerEvent, screen?: ScreenRow) {
   }
   const pn = pen.value
   const o = screenOrigin(pn.sid)
-  const lx = w.x - o.x, ly = w.y - o.y
+  const sp = snapPoint(w.x, w.y, pn.pts.map((q) => ({ x: q.x + o.x, y: q.y + o.y })), pointTargets(pn.sid), snapOff(e))
+  const lx = sp.x - o.x, ly = sp.y - o.y
   const first = pn.pts[0]
   if (first && pn.pts.length >= 2 && Math.hypot(first.x - lx, first.y - ly) * vp.value.zoom < 8) { finishPen(true); return }
   pn.pts.push({ x: lx, y: ly })
@@ -307,6 +317,7 @@ function penDown(e: PointerEvent, screen?: ScreenRow) {
 function finishPen(closed: boolean) {
   const pn = pen.value
   pen.value = null
+  guides.value = null
   if (!pn || pn.pts.length < 2) return
   const box = normalize([{ pts: pn.pts, closed }])
   store.add(pn.sid, pn.parentId, { type: 'vector', x: Math.round((box.x - pn.px) * 100) / 100, y: Math.round((box.y - pn.py) * 100) / 100, w: Math.round(box.w * 100) / 100, h: Math.round(box.h * 100) / 100, vnet: box.vnet })
@@ -319,11 +330,145 @@ const EDITABLE = new Set(['vector', 'line', 'path', 'polygon', 'star', 'ellipse'
 function enterVectorEdit(sid: string, id: string) {
   const n = store.node(sid, id)
   if (!n || n.locked || !EDITABLE.has(n.type)) return false
-  if (n.type !== 'vector') store.flatten(sid, [id])
+  // 도형(사각형 · 원 등)은 그대로 둬요 — 점을 실제로 옮기는 순간에만 벡터로 바꿔요(피그마와 같아요)
   store.selectLayer(sid, id)
   vedit.value = { sid, id, sel: null }
   return true
 }
+/** 도형 점 편집 중 회색 상자(피그마처럼 모양 대신 상자 선) */
+const vbox = computed(() => {
+  void tick.value
+  const ve = vedit.value
+  const s = ve ? props.screens.find((v) => v.id === ve.sid) : undefined
+  const n = ve && s ? store.node(ve.sid, ve.id) : undefined
+  if (!ve || !s || !n || n.type === 'vector') return null
+  const m = worldMat(s, ve.id)
+  return [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]].map(([x, y]) => { const q = apply(m, x!, y!); return `${sx(q.x)},${sy(q.y)}` }).join(' ')
+})
+/** 선 · 벡터 · 다각형처럼 상자가 아닌 모양: 화면 좌표로 그릴 경로(모양선) */
+const OUTLINE_TYPES = new Set(['vector', 'path', 'line', 'polygon', 'star'])
+function outlineOf(sid: string, id: string) {
+  const s = props.screens.find((v) => v.id === sid)
+  const n = s ? store.node(sid, id) : undefined
+  if (!s || !n || !OUTLINE_TYPES.has(n.type)) return null
+  const d = vectorPath(n.type, n.style, n.w, n.h, n.pts, n.closed, n.vnet)
+  if (!d) return null
+  const m = worldMat(s, id), z = vp.value.zoom
+  return { d, tf: `matrix(${m.a * z} ${m.b * z} ${m.c * z} ${m.d * z} ${m.e * z + vp.value.x} ${m.f * z + vp.value.y})` }
+}
+/** 마우스를 올렸을 때 모양선은 쓰지 않아요 — 어떤 레이어든 네모 상자(hoverOutline)로 잡혀요(사용자 요청 2026-11-24). 고른 펜 · 선의 모양선(selShape)은 그대로 */
+const hoverShape = computed(() => {
+  if (HOVER_BOX_ONLY) return null
+  void tick.value
+  void vp.value
+  const h = hover.value
+  if (!h?.id || vedit.value || moving.value || marqueeOn.value || draft.value || guides.value || (tool.value !== 'move' && tool.value !== 'scale')) return null
+  if (store.screenId.value === h.sid && store.layerIds.value.includes(h.id)) return null
+  const n = store.node(h.sid, h.id)
+  return n && !n.locked ? outlineOf(h.sid, h.id) : null
+})
+/** 고른 펜 · 선 레이어: 상자 + 안에 모양선 1px */
+const selShape = computed(() => {
+  void tick.value
+  void vp.value
+  const sg = single.value, s = selScreen.value
+  return sg && s && !vedit.value ? outlineOf(s.id, sg.id) : null
+})
+/** 편집 중인 도형 위 파란 빗금(피그마처럼 편집 중인 모양을 표시) */
+const vshape = computed(() => {
+  void tick.value
+  const ve = vedit.value
+  const s = ve ? props.screens.find((v) => v.id === ve.sid) : undefined
+  const n = ve && s ? store.node(ve.sid, ve.id) : undefined
+  if (!ve || !s || !n) return null
+  const d = n.type === 'rect' ? rectPath(n.w, n.h, radiiOf(n.style)) : n.type === 'ellipse' ? ellipsePath(n.w, n.h) : vectorPath(n.type, n.style, n.w, n.h, n.pts, n.closed, n.vnet)
+  const m = worldMat(s, ve.id), z = vp.value.zoom
+  const filled = !!n.style.fill || !!n.style.fills?.some((f) => f.visible !== false)
+  return { d, tf: `matrix(${m.a * z} ${m.b * z} ${m.c * z} ${m.d * z} ${m.e * z + vp.value.x} ${m.f * z + vp.value.y})`, pw: 6 / z, filled }
+})
+// 정해진 점 자리(패널 X · Y): 아직 도형이면 벡터로 바꾸고 그 꼭짓점(둥근 모서리면 양 끝 점들)을, 벡터면 그 점을 옮겨요
+watch(vptSet, (r) => {
+  const ve = vedit.value
+  if (!r || !ve?.sel) return
+  vptSet.value = null
+  let n = store.node(ve.sid, ve.id)
+  if (!n) return
+  let group: [number, number][]
+  let cur: { x: number; y: number }
+  if (ve.sel[0] < 0) {
+    const qi = ve.sel[1]
+    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
+    const [cx, cy] = pts[qi] ?? [0, 0]
+    const rad = n.type === 'rect' ? radiiOf(n.style)[qi] ?? 0 : 0
+    store.flatten(ve.sid, [ve.id])
+    n = store.node(ve.sid, ve.id)!
+    const abs = denorm(n.vnet ?? [], n.w, n.h)
+    group = []
+    abs.forEach((p, pi) => p.pts.forEach((q, qj) => { if (Math.abs(q.x - cx!) <= rad + 0.5 && Math.abs(q.y - cy!) <= rad + 0.5) group.push([pi, qj]) }))
+    if (!group.length) return
+    cur = { x: cx!, y: cy! }
+    ve.sel = group[0]!
+  } else {
+    const q = denorm(n.vnet ?? [], n.w, n.h)[ve.sel[0]]?.pts[ve.sel[1]]
+    if (!q) return
+    group = [ve.sel]
+    cur = { x: q.x, y: q.y }
+  }
+  const dx = r.x === undefined ? 0 : r.x - (n.x + cur.x), dy = r.y === undefined ? 0 : r.y - (n.y + cur.y)
+  const abs = denorm(n.vnet ?? [], n.w, n.h)
+  const mv = (p?: [number, number]) => (p ? [p[0] + dx, p[1] + dy] as [number, number] : p)
+  for (const [pi, qj] of group) { const q = abs[pi]?.pts[qj]; if (q) { q.x += dx; q.y += dy; q.i = mv(q.i); q.o = mv(q.o) } }
+  const box = normalize(abs)
+  store.update(ve.sid, [ve.id], { x: n.x + box.x, y: n.y + box.y, w: box.w, h: box.h, vnet: box.vnet })
+})
+/**
+ * 모서리 원형 손잡이(피그마와 같아요): 고른 사각형 · 프레임 · 이미지에 마우스를 올리면 모서리 안쪽에 — 끌면 Corner radius,
+ * ⌥ 를 누르고 끌면 그 모서리만. 끄는 동안 'Radius n' 표시, 실행 취소 한 번
+ */
+const RAD_TYPES = new Set(['rect', 'frame', 'image'])
+const radDrag = ref<{ x: number; y: number; v: number } | null>(null)
+const radHandles = computed(() => {
+  void tick.value
+  const sg = single.value
+  const s = selScreen.value
+  if (!sg || !s || sg.locked || store.editing.value || tool.value !== 'move') return null
+  const n = store.node(s.id, sg.id)
+  if (!n || !RAD_TYPES.has(n.type)) return null
+  const z = vp.value.zoom, W = sg.w * z, H = sg.h * z
+  if (W < 40 || H < 40) return null
+  if (!radDrag.value && !(hover.value?.sid === s.id && hover.value?.id === sg.id)) return null
+  const r = radiiOf(n.style)
+  return (['nw', 'ne', 'se', 'sw'] as const).map((c, i) => {
+    const off = Math.min(Math.max(12, (r[i] ?? 0) * z), W / 2, H / 2)
+    return { c: i, x: c === 'nw' || c === 'sw' ? off : W - off, y: c === 'nw' || c === 'ne' ? off : H - off }
+  })
+})
+function startRadius(e: PointerEvent, c: number) {
+  const sg = single.value
+  const s = selScreen.value
+  const n = sg && s ? store.node(s.id, sg.id) : undefined
+  if (!sg || !s || !n) return
+  const sid = s.id, id = n.id, z = vp.value.zoom
+  const r0 = radiiOf(n.style)[c] ?? 0, max = Math.min(n.w, n.h) / 2
+  const sx0 = e.clientX, sy0 = e.clientY, t = (-sg.angle * Math.PI) / 180
+  const inward = [[1, 1], [-1, 1], [-1, -1], [1, -1]][c]!
+  store.hold(sid)
+  const move = (ev: PointerEvent) => {
+    const dx = ev.clientX - sx0, dy = ev.clientY - sy0
+    const lx = dx * Math.cos(t) - dy * Math.sin(t), ly = dx * Math.sin(t) + dy * Math.cos(t)
+    const v = Math.round(Math.max(0, Math.min(max, r0 + (lx * inward[0]! + ly * inward[1]!) / 2 / z)))
+    store.update(sid, [id], (nn) => {
+      if (ev.altKey) { const rr = [...radiiOf(nn.style)] as [number, number, number, number]; rr[c] = v; return { style: { ...nn.style, radii: rr } } }
+      return { style: { ...nn.style, radius: v, radii: undefined } }
+    })
+    radDrag.value = { x: ev.clientX, y: ev.clientY, v }
+  }
+  const up = () => { window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true); store.release(sid); radDrag.value = null }
+  radDrag.value = { x: e.clientX, y: e.clientY, v: r0 }
+  window.addEventListener('pointermove', move, true)
+  window.addEventListener('pointerup', up, true)
+}
+const radLabel = computed(() => { const r = radDrag.value, h = el.value?.getBoundingClientRect(); return r && h ? { left: r.x - h.left + 'px', top: r.y - h.top + 22 + 'px' } : null })
 /** 점 편집 손잡이(화면 좌표) */
 const vhandles = computed(() => {
   void tick.value
@@ -331,9 +476,14 @@ const vhandles = computed(() => {
   if (!ve) return null
   const s = props.screens.find((v) => v.id === ve.sid)
   const n = s ? store.node(ve.sid, ve.id) : undefined
-  if (!s || !n || n.type !== 'vector') return null
+  if (!s || !n) return null
   const m = worldMat(s, ve.id)
   const P = (lx: number, ly: number) => { const q = apply(m, lx, ly); return { x: sx(q.x), y: sy(q.y) } }
+  if (n.type !== 'vector') {
+    // 아직 도형: 꼭짓점만(사각형은 상자 네 귀퉁이 — 둥근 모서리여도 깨지지 않아요)
+    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
+    return pts.map(([x, y], qi) => ({ pi: -1, qi, a: P(x!, y!), i: null as null | { x: number; y: number }, o: null as null | { x: number; y: number } }))
+  }
   return (n.vnet ?? []).map((p, pi) => p.pts.map((q, qi) => ({ pi, qi, a: P(q.x * n.w, q.y * n.h), i: q.i ? P(q.i[0] * n.w, q.i[1] * n.h) : null, o: q.o ? P(q.o[0] * n.w, q.o[1] * n.h) : null }))).flat()
 })
 function startVpt(e: PointerEvent, pi: number, qi: number, part: 'a' | 'i' | 'o') {
@@ -342,6 +492,15 @@ function startVpt(e: PointerEvent, pi: number, qi: number, part: 'a' | 'i' | 'o'
   const n = ve && s ? store.node(ve.sid, ve.id) : undefined
   if (!ve || !s || !n) return
   try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
+  if (pi < 0) {
+    // 아직 도형: 누른 꼭짓점만 기억해 두고, 실제로 끌기 시작하면 벡터로 바꿔요
+    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
+    const [cx, cy] = pts[qi] ?? [0, 0]
+    const rad = n.type === 'rect' ? (n.style.radii ?? [n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0])[qi] ?? 0 : 0
+    ve.sel = [-1, qi]
+    drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi: -1, qi, part: 'a', sx: e.clientX, sy: e.clientY, abs0: [], inv: invert(worldMat(s, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false, virtual: { cx: cx!, cy: cy!, r: rad } }
+    return
+  }
   ve.sel = [pi, qi]
   drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi, qi, part, sx: e.clientX, sy: e.clientY, abs0: denorm(n.vnet ?? [], n.w, n.h), inv: invert(worldMat(s, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false }
 }
@@ -402,7 +561,16 @@ function sectionCarry(sc: ScreenRow, ids: string[]) {
   return realScreens.value.filter((v) => boxes.some((b) => v.x >= b.x && v.y >= b.y && v.x + v.width <= b.x + b.w && v.y + v.height <= b.y + b.h)).map((v) => ({ id: v.id, x: v.x, y: v.y }))
 }
 
+/** 두 번 누르기 판단용: 그 두 번 누르기의 첫 번째 누름 직전에 골라져 있던 것 */
+let pressSel: string[] = []
+let pressSid: string | null = null
+let lastPress: { t: number; x: number; y: number } | null = null
 function start(e: PointerEvent, screen?: ScreenRow) {
+  // pointerdown 의 detail 은 늘 0 이라 시간 · 자리로 판단: 0.5초 안 · 6px 안이면 같은 두 번 누르기의 둘째 누름(선택을 다시 기억하지 않아요)
+  const now = performance.now()
+  const second = !!lastPress && now - lastPress.t < 500 && Math.hypot(e.clientX - lastPress.x, e.clientY - lastPress.y) < 6
+  if (!second) { pressSel = [...store.layerIds.value]; pressSid = store.screenId.value }
+  lastPress = second ? null : { t: now, x: e.clientX, y: e.clientY }
   if (e.button !== 0 && e.button !== 1) return
   if (store.editing.value) (document.activeElement as HTMLElement | null)?.blur?.()
   try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
@@ -453,13 +621,13 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     return
   }
   if (pointTool(tool.value)) {
-    if (!isNative(screen)) { emit('hint', 'Figma frames are edited in Figma'); tool.value = 'move'; return }
+    if (!isNative(screen)) { emit('hint', tr('Figma frames are edited in Figma')); tool.value = 'move'; return }
     startPoints(screen.id, lx, ly)
     return
   }
   // 화면 안에 그리기
   if (t) {
-    if (!isNative(screen)) { emit('hint', 'Figma frames are edited in Figma'); tool.value = 'move'; return }
+    if (!isNative(screen)) { emit('hint', tr('Figma frames are edited in Figma')); tool.value = 'move'; return }
     const parentId = frameAt(screen.id, lx, ly)
     const p = parentId ? store.absPos(screen.id, parentId) : { x: 0, y: 0 }
     drag = { kind: 'drawLayer', sid: screen.id, type: t, parentId, px: p.x, py: p.y, lx, ly, moved: false }
@@ -576,6 +744,36 @@ function snapTargets(s: ScreenRow, ids: string[]): Targets {
 const guideRects = (): Rect[] => [...(props.guides?.x ?? []).map((x) => ({ x, y: -1e6, w: 0, h: 2e6 })), ...(props.guides?.y ?? []).map((y) => ({ x: -1e6, y, w: 2e6, h: 0 }))]
 const snapOff = (e: PointerEvent) => e.metaKey || e.ctrlKey
 const thr = () => 6 / vp.value.zoom
+/**
+ * 점 하나 스마트 가이드(펜 · 점 편집): 같은 경로의 다른 점, 주변 레이어 · 부모의 가장자리 · 가운데에 가로 · 세로로 붙고 점선을 보여요.
+ * pts · rects 는 캔버스 좌표. 반환: 붙은 자리 + 가이드
+ */
+function snapPoint(wx: number, wy: number, pts: { x: number; y: number }[], rects: Rect[], off = false): { x: number; y: number; g: Guides | null } {
+  if (off) return { x: wx, y: wy, g: null }
+  const t = thr()
+  const xs: { v: number; y0: number; y1: number }[] = [], ys: { v: number; x0: number; x1: number }[] = []
+  for (const p of pts) { xs.push({ v: p.x, y0: p.y, y1: p.y }); ys.push({ v: p.y, x0: p.x, x1: p.x }) }
+  for (const r of rects) {
+    for (const v of [r.x, r.x + r.w / 2, r.x + r.w]) xs.push({ v, y0: r.y, y1: r.y + r.h })
+    for (const v of [r.y, r.y + r.h / 2, r.y + r.h]) ys.push({ v, x0: r.x, x1: r.x + r.w })
+  }
+  const bx = xs.reduce<typeof xs[0] | null>((b, c) => (Math.abs(c.v - wx) <= t && (!b || Math.abs(c.v - wx) < Math.abs(b.v - wx)) ? c : b), null)
+  const by = ys.reduce<typeof ys[0] | null>((b, c) => (Math.abs(c.v - wy) <= t && (!b || Math.abs(c.v - wy) < Math.abs(b.v - wy)) ? c : b), null)
+  const x = bx ? bx.v : wx, y = by ? by.v : wy
+  const lines: Guides['lines'] = []
+  if (bx) lines.push({ x1: x, y1: Math.min(bx.y0, y), x2: x, y2: Math.max(bx.y1, y), dash: true })
+  if (by) lines.push({ x1: Math.min(by.x0, x), y1: y, x2: Math.max(by.x1, x), y2: y, dash: true })
+  return { x, y, g: lines.length ? { lines, labels: [] } : null }
+}
+/** 펜 · 점 편집이 붙는 주변: 그 화면(또는 부모 프레임) 안 레이어들 · 화면 자체 */
+function pointTargets(sid: string, skip?: string): Rect[] {
+  const s = props.screens.find((v) => v.id === sid)
+  if (!s) return []
+  const d = store.doc(sid)
+  const rs = Object.keys(d.nodes).filter((id) => id !== skip && !d.nodes[id]!.hidden).slice(0, 200).map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b)
+  if (!isCanvas(s)) rs.push(rectOf(s))
+  return [...rs, ...guideRects()]
+}
 
 function startResize(e: PointerEvent, handle: Handle) {
   const s = selScreen.value
@@ -655,8 +853,8 @@ function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: num
     guide = alignGuides(fb, targets, { x: ex === null ? [] : [sx > 0 ? fb.x + fb.w : fb.x], y: ey === null ? [] : [sy > 0 ? fb.y + fb.h : fb.y] })
   }
   const r = resizeLocal(g.w, g.h, handle, du, dv, keep, center)
-  // 정수 크기로 맞춘 뒤 붙어 있는 쪽이 그대로이도록 가운데를 다시 계산
-  const w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h))
+  // 정수 크기로(픽셀 그리드를 끄면 소수 둘째 자리까지) 맞춘 뒤 붙어 있는 쪽이 그대로이도록 가운데를 다시 계산
+  const w = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(r.w)), h = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(r.h))
   const ox = center || !sx ? 0 : (sx * (w - g.w)) / 2, oy = center || !sy ? 0 : (sy * (h - g.h)) / 2
   return { w, h, cx: g.cx + ox * cos - oy * sin, cy: g.cy + ox * sin + oy * cos, guide }
 }
@@ -664,7 +862,12 @@ function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: num
 function move(e: PointerEvent) {
   if (!drag) {
     trackHover(e)
-    if (pen.value) { const w = toWorld(e.clientX, e.clientY), o = screenOrigin(pen.value.sid); pen.value.hover = [w.x - o.x, w.y - o.y] }
+    if (pen.value) {
+      const w = toWorld(e.clientX, e.clientY), o = screenOrigin(pen.value.sid)
+      const sp = snapPoint(w.x, w.y, pen.value.pts.map((q) => ({ x: q.x + o.x, y: q.y + o.y })), pointTargets(pen.value.sid), snapOff(e))
+      pen.value.hover = [sp.x - o.x, sp.y - o.y]
+      guides.value = sp.g
+    }
     return
   }
   if (drag.kind === 'pen') {
@@ -684,17 +887,57 @@ function move(e: PointerEvent) {
     const dx = (e.clientX - drag.sx) / vp.value.zoom, dy = (e.clientY - drag.sy) / vp.value.zoom
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 1 / vp.value.zoom) return
     drag.moved = true
+    // 도형 꼭짓점을 처음 끄는 순간: 벡터로 바꾸고, 그 꼭짓점(둥근 모서리면 모서리 양 끝 점들)을 함께 옮겨요
+    if (drag.virtual) {
+      const vt = drag.virtual
+      drag.virtual = undefined
+      store.flatten(drag.sid, [drag.id])
+      const n2 = store.node(drag.sid, drag.id)
+      if (!n2?.vnet) return
+      drag.abs0 = denorm(n2.vnet, n2.w, n2.h)
+      drag.x0 = n2.x; drag.y0 = n2.y
+      const g: [number, number][] = []
+      drag.abs0.forEach((p, pi) => p.pts.forEach((q, qi) => { if (Math.abs(q.x - vt.cx) <= vt.r + 0.5 && Math.abs(q.y - vt.cy) <= vt.r + 0.5) g.push([pi, qi]) }))
+      if (!g.length) return
+      drag.group = g
+      drag.pi = g[0]![0]; drag.qi = g[0]![1]
+      if (vedit.value) vedit.value.sel = [drag.pi, drag.qi]
+    }
     const v = applyVec(drag.inv, dx * vp.value.zoom / vp.value.zoom, dy)
+    // 스마트 가이드: 옮기는 점이 같은 경로의 다른 점 · 주변 레이어에 붙어요(⌘ 누르면 끔)
+    if (drag.part === 'a') {
+      const dsid = drag.sid
+      const sc = props.screens.find((x) => x.id === dsid)
+      const q0 = drag.abs0[drag.pi]?.pts[drag.qi]
+      if (sc && q0) {
+        const m = worldMat(sc, drag.id)
+        const moving = new Set((drag.group ?? [[drag.pi, drag.qi]]).map(([a, b]) => a + ':' + b))
+        const others = drag.abs0.flatMap((p, pi) => p.pts.filter((_, qi) => !moving.has(pi + ':' + qi)).map((q) => { const w = apply(m, q.x, q.y); return { x: w.x, y: w.y } }))
+        const cur = apply(m, q0.x + v.x, q0.y + v.y)
+        const sp = snapPoint(cur.x, cur.y, others, pointTargets(drag.sid, drag.id), snapOff(e))
+        const back = applyVec(drag.inv, sp.x - cur.x, sp.y - cur.y)
+        v.x += back.x; v.y += back.y
+        guides.value = sp.g
+      }
+    }
     const abs = JSON.parse(JSON.stringify(drag.abs0)) as typeof drag.abs0
+    const mv = (p?: [number, number]) => (p ? [p[0] + v.x, p[1] + v.y] as [number, number] : p)
+    for (const [gi, gq] of drag.group ?? []) { const r = abs[gi]?.pts[gq]; if (r) { r.x += v.x; r.y += v.y; r.i = mv(r.i); r.o = mv(r.o) } }
     const q = abs[drag.pi]?.pts[drag.qi]
     if (!q) return
-    const mv = (p?: [number, number]) => (p ? [p[0] + v.x, p[1] + v.y] as [number, number] : p)
-    if (drag.part === 'a') { q.x += v.x; q.y += v.y; q.i = mv(q.i); q.o = mv(q.o) }
+    if (drag.group) { /* 이미 위에서 옮겼어요 */ } else if (drag.part === 'a') { q.x += v.x; q.y += v.y; q.i = mv(q.i); q.o = mv(q.o) }
     else {
       const h = drag.part === 'i' ? 'i' : 'o', other = h === 'i' ? 'o' : 'i'
       q[h] = mv(q[h])
       // 반대쪽 핸들은 대칭으로(⌥ 를 누르면 따로)
-      if (q[other] && !e.altKey) q[other] = [2 * q.x - q[h]![0], 2 * q.y - q[h]![1]]
+      // Mirroring(패널): both = 각도 · 길이 대칭, angle = 각도만(반대쪽 길이 그대로), none = 따로. ⌥ 를 누르면 늘 따로
+      if (q[other] && !e.altKey && mirror.value !== 'none') {
+        if (mirror.value === 'both') q[other] = [2 * q.x - q[h]![0], 2 * q.y - q[h]![1]]
+        else {
+          const len = Math.hypot(q[other]![0] - q.x, q[other]![1] - q.y), dx = q.x - q[h]![0], dy = q.y - q[h]![1], dl = Math.hypot(dx, dy) || 1
+          q[other] = [q.x + (dx / dl) * len, q.y + (dy / dl) * len]
+        }
+      }
     }
     const box = normalize(abs)
     const n = store.node(drag.sid, drag.id)
@@ -760,7 +1003,7 @@ function move(e: PointerEvent) {
       const n = d.nodes[id]
       if (!n) continue
       const v = applyVec(drag.inv[id]!, dx, dy) // 돌린 부모 안이면 부모 좌표로
-      n.x = Math.round(drag.orig[id]!.x + v.x); n.y = Math.round(drag.orig[id]!.y + v.y)
+      n.x = store.snapPx(drag.orig[id]!.x + v.x); n.y = store.snapPx(drag.orig[id]!.y + v.y) // 픽셀 그리드를 끄면 소수점까지
     }
     const dupScreens = drag.carryDup ? drag.mixIds ?? [] : []
     for (const c of drag.carry) if (!dupScreens.includes(c.id)) emit('move', c.id, Math.round(c.x + dx), Math.round(c.y + dy), false)
@@ -956,7 +1199,7 @@ function end(e: PointerEvent) {
       store.transfer(src.id, roots, dest.id, parentId, { x: src.x - dest.x, y: src.y - dest.y })
     }
   }
-  if (d.kind === 'layers' && d.moved && !d.carry.length) { const w = toWorld(e.clientX, e.clientY); if (overFigmaOnly(w.x, w.y)) emit('hint', FIGMA_DROP_HINT) }
+  if (d.kind === 'layers' && d.moved && !d.carry.length) { const w = toWorld(e.clientX, e.clientY); if (overFigmaOnly(w.x, w.y)) emit('hint', tr(FIGMA_DROP_HINT)) }
   if ((d.kind === 'layers' || d.kind === 'screen') && !d.moved && d.clickLayer) store.selectLayer(d.kind === 'layers' ? d.sid : d.id, d.clickLayer)
   if (d.kind === 'layers' && d.moved) {
     const dupScreens = d.carryDup ? d.mixIds ?? [] : []
@@ -1036,6 +1279,30 @@ function commitScreenName(id: string, e: Event) {
   const s = props.screens.find((v) => v.id === id)
   if (s && name && name !== s.name) emit('rename-screen', id, name)
 }
+/**
+ * 캔버스 위(화면 밖) 프레임 레이어 이름표: 피그마처럼 맨 위 단계(섹션 안 포함) 프레임 위에 이름. 그룹(자르기 없음 · 칠 없음)은 이름표 없음.
+ * 누르면 그 프레임을 고르고, 두 번 누르면 그 자리에서 이름 고치기
+ */
+const frameLabels = computed(() => {
+  void tick.value
+  void vp.value
+  const c = canvasDoc.value
+  if (!c) return []
+  const d = store.doc(c.id)
+  return Object.values(d.nodes)
+    .filter((n) => n.type === 'frame' && !n.hidden && !(n.style.clip === false && !n.style.fill && !n.style.fills?.length) && (!n.parentId || d.nodes[n.parentId]?.type === 'section'))
+    .map((n) => { const b = layerWorld(c, n.id); return b ? { id: n.id, name: n.name, box: box({ x: b.x, y: b.y, width: b.w, height: b.h }) } : null })
+    .filter((v): v is NonNullable<typeof v> => !!v)
+})
+const renamingFrame = ref<string | null>(null)
+function pickFrameLabel(id: string) { const c = canvasDoc.value; if (c) { tool.value = 'move'; store.selectLayer(c.id, id) } }
+function commitFrameName(id: string, e: Event) {
+  if (renamingFrame.value !== id) return
+  renamingFrame.value = null
+  const c = canvasDoc.value
+  const name = (e.target as HTMLInputElement).value.trim()
+  if (c && name && name !== store.node(c.id, id)?.name) store.update(c.id, [id], { name })
+}
 function onDblAny(e: MouseEvent) {
   const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
   const lab = hit?.closest('.label') as HTMLElement | null
@@ -1051,17 +1318,25 @@ function onDblAny(e: MouseEvent) {
 function onDbl(target: HTMLElement, screen: ScreenRow) {
   const deepest = (target.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
   if (!deepest || !isNative(screen)) return
-  const lid = pickLayer(screen.id, deepest)!
+  // 판단은 '두 번 누르기 직전'(첫 누름 전) 선택 기준 — 빠르게 누르는 사이 첫 누름이 부모를, 둘째 누름이 안쪽을 골라도
+  // 결과가 천천히 두 번 누른 것과 같아요(피그마와 같아요)
+  const before = pressSid === screen.id ? pressSel : []
+  const lid = pickLayer(screen.id, deepest, false, before)
+  if (!lid) return
   const n = store.node(screen.id, lid)
-  // 프레임 · 그룹을 두 번 누르면 한 단계 안으로(누른 자리의 바로 아래 레이어를 골라요)
-  if (n && isContainer(n) && n.type !== 'section' && lid !== deepest) {
+  if (!n) return
+  // 프레임 · 그룹(오토 레이아웃 포함): 한 단계만 안으로 — 누른 자리의 바로 아래 레이어를 골라요
+  if (isContainer(n) && n.type !== 'section' && lid !== deepest) {
     const d = store.doc(screen.id)
     let c: string | null | undefined = deepest
     while (c && d.nodes[c]?.parentId !== lid) c = d.nodes[c]?.parentId
     if (c) { store.selectLayer(screen.id, c); return }
   }
-  if (n?.type === 'text' && !n.locked) { store.selectLayer(screen.id, lid); store.editing.value = lid; return }
-  if (n && tool.value === 'move') enterVectorEdit(screen.id, lid)
+  if (n.type === 'text' && !n.locked) { store.selectLayer(screen.id, lid); store.editing.value = lid; return }
+  // 도형: 이미 골라 둔 것이거나 맨 위 단계에서 바로 잡히는 것이면 편집, 막 안으로 들어가 골라진 것이면 고르기만
+  const direct = before.includes(lid) || pickLayer(screen.id, deepest, false, []) === lid
+  if (!direct) { store.selectLayer(screen.id, lid); return }
+  if (tool.value === 'move') enterVectorEdit(screen.id, lid)
 }
 
 // ---------------------------------------------------------------------------
@@ -1077,6 +1352,15 @@ const rulersShown = useState('iris-rulers', () => false)
 /** 고른 것의 캔버스 좌표 상자(눈금자에 표시) */
 const selWorld = computed(() => {
   void tick.value
+  // 펜으로 그리는 중: 지금까지 찍은 점(+ 마우스 자리)을 감싸는 상자를 눈금자에(피그마와 같아요)
+  const pn = pen.value
+  if (pn && (pn.pts.length || pn.hover)) {
+    const o = screenOrigin(pn.sid)
+    const ps = [...pn.pts.map((q) => [q.x, q.y] as const), ...(pn.hover ? [pn.hover] : [])]
+    const xs = ps.map((q) => q[0] + o.x), ys = ps.map((q) => q[1] + o.y)
+    const x = Math.min(...xs), y = Math.min(...ys)
+    return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
+  }
   const s = selScreen.value
   if (!s) return null
   if (store.layerIds.value.length) { const bs = store.layerIds.value.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b); return bs.length ? union(bs) : null }
@@ -1122,7 +1406,7 @@ function pasteAt(w: { x: number; y: number }) {
 }
 /** 이름 바꾸기: 오른쪽 패널의 이름 칸으로 */
 function focusName() {
-  nextTick(() => { const i = document.querySelector<HTMLInputElement>('input[aria-label="Layer name"], input[aria-label="Frame name"]'); i?.focus(); i?.select() })
+  nextTick(() => { const i = document.querySelector<HTMLInputElement>(`input[aria-label="Layer name"], input[aria-label="Frame name"], input[aria-label="${tr('Layer name')}"], input[aria-label="${tr('Frame name')}"]`); i?.focus(); i?.select() })
 }
 /** 화면(프레임) 우클릭 메뉴 */
 /** 고른 화면(프레임)들을 감싸는 섹션을 캔버스에 만들어요(둘레 80 여백). 섹션을 옮기면 안의 화면도 함께 움직여요 */
@@ -1141,26 +1425,26 @@ function sectionScreens(ids?: string[]) {
 function screenMenuItems(screen: ScreenRow, at: { x: number; y: number }): MenuItem[] {
   const native = isNative(screen)
   return [
-    { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
-    { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
-    ...(native ? [{ label: 'Paste here', action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
-    { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
-    { label: 'Wrap in section', shortcut: '⌥⌘S', action: () => sectionScreens(multi.value.includes(screen.id) ? multi.value : [screen.id]) },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    ...(native ? [{ label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
+    { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+    { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => sectionScreens(multi.value.includes(screen.id) ? multi.value : [screen.id]) },
     'sep',
-    { label: 'Bring to front', shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
-    { label: 'Bring forward', shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
-    { label: 'Send backward', shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
-    { label: 'Send to back', shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
+    { label: tr('Bring to front'), shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: tr('Bring forward'), shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
+    { label: tr('Send backward'), shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
+    { label: tr('Send to back'), shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
     'sep',
     ...(native ? [
-      { label: 'Select all layers', shortcut: '⌘A', action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
-      { label: (store.doc(screen.id).frame?.grids?.length ? 'Remove' : 'Add') + ' layout grid', action: () => store.frameStyle(screen.id, { grids: store.doc(screen.id).frame?.grids?.length ? undefined : [{ type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }] }) },
-      { label: 'Copy as SVG', action: () => { const d = store.doc(screen.id); const svg = svgOf(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color); if (svg) navigator.clipboard.writeText(svg).then(() => emit('hint', 'Copied to clipboard'), () => emit('hint', 'Couldn\'t copy to the clipboard')); else emit('hint', 'Nothing to copy as SVG') } },
+      { label: tr('Select all layers'), shortcut: '⌘A', action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
+      { label: store.doc(screen.id).frame?.grids?.length ? tr('Remove layout grid') : tr('Add layout grid'), action: () => store.frameStyle(screen.id, { grids: store.doc(screen.id).frame?.grids?.length ? undefined : [{ type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }] }) },
+      { label: tr('Copy as SVG'), action: () => { const d = store.doc(screen.id); const svg = svgOf(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color); if (svg) navigator.clipboard.writeText(svg).then(() => emit('hint', tr('Copied to clipboard')), () => emit('hint', tr('Couldn\'t copy to the clipboard'))); else emit('hint', tr('Nothing to copy as SVG')) } },
     ] : []),
-    { label: 'Rename', action: focusName },
-    { label: 'Zoom to selection', shortcut: '⇧2', action: fitSelection },
+    { label: tr('Rename'), action: focusName },
+    { label: tr('Zoom to selection'), shortcut: '⇧2', action: fitSelection },
     'sep',
-    { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
+    { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ]
 }
 /** 우클릭 메뉴(피그마와 같아요): 레이어 · 화면 · 빈 캔버스 */
@@ -1176,7 +1460,7 @@ function onContext(e: MouseEvent) {
     const n0 = store.node(screen.id, lid)
     const items = layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (t) => emit('hint', t) })
     // 이름 바꾸기 · 점 편집은 Delete 위에(Delete 가 늘 맨 끝)
-    const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 ? [{ label: 'Rename', action: focusName }, ...(EDITABLE.has(n0.type) ? [{ label: 'Edit vector', shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : [])] : []
+    const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 ? [{ label: tr('Rename'), action: focusName }, ...(EDITABLE.has(n0.type) ? [{ label: tr('Edit vector'), shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : [])] : []
     items.splice(Math.max(0, items.length - 2), 0, ...extra)
     ctx.open(e, items)
     return
@@ -1187,16 +1471,16 @@ function onContext(e: MouseEvent) {
     return
   }
   ctx.open(e, [
-    { label: 'Paste', shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
-    { label: 'Paste here', action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' },
+    { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    { label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' },
     'sep',
-    { label: 'Zoom in', shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 1.25) },
-    { label: 'Zoom out', shortcut: '⌘−', action: () => zoomAt(vp.value.zoom / 1.25) },
-    { label: 'Zoom to 100%', shortcut: '⇧0', action: () => zoomAt(1) },
-    { label: 'Zoom to fit', shortcut: '⇧1', action: () => fit() },
+    { label: tr('Zoom in'), shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 1.25) },
+    { label: tr('Zoom out'), shortcut: '⌘−', action: () => zoomAt(vp.value.zoom / 1.25) },
+    { label: tr('Zoom to {n}%', { n: 100 }), shortcut: '⇧0', action: () => zoomAt(1) },
+    { label: tr('Zoom to fit'), shortcut: '⇧1', action: () => fit() },
     'sep',
-    { label: rulersShown.value ? 'Hide rulers' : 'Show rulers', shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
-    { label: gridsShown.value ? 'Hide layout grids' : 'Show layout grids', shortcut: '⌃G', action: () => (gridsShown.value = !gridsShown.value) },
+    { label: rulersShown.value ? tr('Hide rulers') : tr('Show rulers'), shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
+    { label: gridsShown.value ? tr('Hide layout grids') : tr('Show layout grids'), shortcut: '⌃G', action: () => (gridsShown.value = !gridsShown.value) },
   ])
 }
 function onKeyDown(e: KeyboardEvent) {
@@ -1261,11 +1545,11 @@ function onKeyDown(e: KeyboardEvent) {
   // 눈금자 ⇧R
   if (e.shiftKey && !mod && !e.altKey && e.code === 'KeyR') { stop(); rulersShown.value = !rulersShown.value; return }
   // 레이아웃 그리드 보이기 · 숨기기 ⌃G
-  if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? 'Layout grids shown' : 'Layout grids hidden'); return }
+  if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? tr('Layout grids shown') : tr('Layout grids hidden')); return }
   // 오토 레이아웃 ⇧A · 빼기 ⌥⇧A
   if (e.shiftKey && !mod && e.code === 'KeyA') { if (layerMode && native) { stop(); if (e.altKey) store.removeAutoLayout(sid!, ids); else store.addAutoLayout(sid!, ids) } return }
   // 속성 복사 · 붙여넣기 ⌥⌘C / ⌥⌘V
-  if (mod && e.altKey && e.code === 'KeyC') { if (layerMode && store.copyStyle()) { stop(); emit('hint', 'Copied properties') } return }
+  if (mod && e.altKey && e.code === 'KeyC') { if (layerMode && store.copyStyle()) { stop(); emit('hint', tr('Copied properties')) } return }
   if (mod && e.altKey && e.code === 'KeyV') { if (layerMode) { stop(); store.pasteStyle() } return }
   // 복사 · 잘라내기 · 붙여넣기 · 복제
   if (mod && key === 'c') {
@@ -1321,7 +1605,7 @@ function onKeyDown(e: KeyboardEvent) {
     if (layerMode) {
       const d = store.doc(sid!)
       if (isPageCanvas(sid!) && ids.every((id) => !d.nodes[id]?.parentId)) store.wrap(sid!, ids, 'section')
-      else emit('hint', 'Sections can only be placed on the canvas')
+      else emit('hint', tr('Sections can only be placed on the canvas'))
     } else sectionScreens()
     return
   }
@@ -1354,7 +1638,7 @@ function onKeyDown(e: KeyboardEvent) {
     if (e.shiftKey) { store.selectParent(sid); return }
     const n = ids.length === 1 ? store.node(sid, ids[0]!) : undefined
     if (n?.type === 'text') store.editing.value = n.id
-    else if (n && n.type === 'vector') enterVectorEdit(sid, n.id)
+    else if (n && EDITABLE.has(n.type)) enterVectorEdit(sid, n.id) // 도형 · 벡터: Enter = 편집(피그마와 같아요)
     else store.selectChildren(sid)
     return
   }
@@ -1365,6 +1649,9 @@ function onKeyDown(e: KeyboardEvent) {
   if (a) {
     stop()
     const k = e.shiftKey ? 10 : 1
+    // 오토 레이아웃 안이면 옮기지 않고 순서를 바꿔요(피그마와 같아요)
+    const dirOf = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } as const
+    if (layerMode && store.moveInFlow(sid, ids, dirOf[e.key as keyof typeof dirOf])) return
     if (layerMode) store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k }))
     else emit('screen-action', 'nudge', a[0] * k, a[1] * k)
   }
@@ -1492,17 +1779,21 @@ const rotating = ref(false)
 const guides = ref<Guides | null>(null)
 const altOn = ref(false)
 const hover = ref<{ sid: string; id: string | null } | null>(null)
+/** 마우스를 올린 레이어는 모양과 상관없이 늘 네모 상자로(모양선 · 둥근 상자 · 글자 밑줄 대신). false 로 바꾸면 피그마식 모양 따라가기 */
+const HOVER_BOX_ONLY = true
 /**
  * 누르거나 올렸을 때 잡히는 레이어(피그마와 같아요): 화면 바로 아래 것부터 — 고른 레이어(와 그 조상) 안쪽, 섹션 안쪽만 한 단계씩 열려요.
  * 프레임 · 그룹 안 레이어는 그 프레임을 고른 뒤 · 두 번 눌러서 · ⌘ 를 누른 채(deep) 잡아요
  */
-function pickLayer(sid: string, deepId: string | undefined, deep = false): string | undefined {
+function pickLayer(sid: string, deepId: string | undefined, deep = false, selAt?: string[]): string | undefined {
   if (!deepId || deep) return deepId
   const d = store.doc(sid)
   const chain: string[] = []
   for (let id: string | null | undefined = deepId; id && d.nodes[id]; id = d.nodes[id]!.parentId) chain.unshift(id)
   const open = new Set<string>()
-  if (store.screenId.value === sid) for (const id of store.layerIds.value) for (let p: string | null | undefined = id; p && d.nodes[p]; p = d.nodes[p]!.parentId) open.add(p)
+  // selAt: 이 선택 기준으로(두 번 누르기는 첫 누름 직전 선택으로 판단해요)
+  const selNow = selAt ?? (store.screenId.value === sid ? store.layerIds.value : [])
+  for (const id of selNow) for (let p: string | null | undefined = id; p && d.nodes[p]; p = d.nodes[p]!.parentId) open.add(p)
   let target = chain[0]
   for (let i = 1; i < chain.length; i++) {
     const parent = d.nodes[chain[i - 1]!]
@@ -1523,7 +1814,9 @@ function trackHover(e: PointerEvent) {
   if (altOn.value !== e.altKey) altOn.value = e.altKey
   const t = e.target as HTMLElement | null
   const scr = t?.closest?.('[data-screen]') as HTMLElement | null
-  const next = scr?.dataset.screen ? { sid: scr.dataset.screen, id: pickLayer(scr.dataset.screen, (t!.closest('[data-layer]') as HTMLElement | null)?.dataset.layer, e.metaKey) ?? null } : null
+  // 캔버스 위 프레임 이름표에 올리면 그 프레임(화면 이름표와 같아요)
+  const lab = t?.closest?.('[data-label-layer]') as HTMLElement | null
+  const next = lab && canvasDoc.value ? { sid: canvasDoc.value.id, id: lab.dataset.labelLayer! } : scr?.dataset.screen ? { sid: scr.dataset.screen, id: pickLayer(scr.dataset.screen, (t!.closest('[data-layer]') as HTMLElement | null)?.dataset.layer, e.metaKey) ?? null } : null
   if (next?.sid !== hover.value?.sid || next?.id !== hover.value?.id) hover.value = next
   const r = el.value?.getBoundingClientRect()
   ptr.value = r ? { x: e.clientX - r.left, y: e.clientY - r.top } : null
@@ -1648,9 +1941,11 @@ const hoverOutline = computed(() => {
   }
   if (store.screenId.value === s.id && store.layerIds.value.includes(h.id)) return null
   const n = store.node(s.id, h.id)
-  if (!n || n.locked || n.type === 'line' || n.type === 'path') return null
+  if (!n || n.locked || (!HOVER_BOX_ONLY && OUTLINE_TYPES.has(n.type))) return null
   const g = layerGeom(s, h.id)
   if (!g) return null
+  // 어떤 레이어든(둥근 모서리 · 원 · 선 · 벡터 · 글자) 마우스를 올리면 네모 상자 2px — 모양을 따라가지 않아요
+  if (HOVER_BOX_ONLY) return { frame: null, comp: n.type === 'instance', style: rbox(g) }
   const z = vp.value.zoom
   const rv = radiiOf(n.style)
   // Corner smoothing 이 있으면 그 모양(squircle) 그대로 2px — 바깥으로 1px 밀어 선 가운데가 모양 밖 1px 에 오게
@@ -1668,7 +1963,7 @@ const hoverTextLines = computed<MarkBox[]>(() => {
   void vp.value
   const h = hover.value
   const host = el.value
-  if (!h?.id || !hoverOutline.value || !host || store.node(h.sid, h.id)?.type !== 'text') return []
+  if (HOVER_BOX_ONLY || !h?.id || !hoverOutline.value || !host || store.node(h.sid, h.id)?.type !== 'text') return []
   const t = host.querySelector(`.world [data-screen="${h.sid}"] [data-layer="${h.id}"] .txt`)
   return t ? baselineLines(t, 2, host.getBoundingClientRect()) : []
 })
@@ -1728,14 +2023,18 @@ const gapBands = computed(() => {
     .map((k) => rel(k.getBoundingClientRect()))
   const v = lay.mode === 'vertical'
   kids.sort((a, b) => (v ? a.y - b.y : a.x - b.x))
+  // 간격 빗금은 안쪽 여백을 뺀 내용 폭(높이)만큼 — 양옆 여백 빗금(파랑)과 겹치지 않아야 여백 손잡이를 잡을 수 있어요
+  const z = vp.value.zoom
+  const [pt, pr, pb, pl] = lay.padding.map((p) => p * z) as [number, number, number, number]
+  const ix = f.x + pl, iw = Math.max(0, f.w - pl - pr), iy = f.y + pt, ih = Math.max(0, f.h - pt - pb)
   const out: { left: string; top: string; width: string; height: string; v: boolean }[] = []
   for (let i = 0; i + 1 < kids.length; i++) {
     const a = kids[i]!, b = kids[i + 1]!
     const s0 = v ? a.y + a.h : a.x + a.w, s1 = v ? b.y : b.x
     if (s1 - s0 < 1) continue
     out.push(v
-      ? { left: f.x + 'px', top: s0 + 'px', width: f.w + 'px', height: s1 - s0 + 'px', v }
-      : { left: s0 + 'px', top: f.y + 'px', width: s1 - s0 + 'px', height: f.h + 'px', v })
+      ? { left: ix + 'px', top: s0 + 'px', width: iw + 'px', height: s1 - s0 + 'px', v }
+      : { left: s0 + 'px', top: iy + 'px', width: s1 - s0 + 'px', height: ih + 'px', v })
   }
   return out
 })
@@ -1877,6 +2176,8 @@ const gridStyle = computed(() => (props.background ? { backgroundColor: props.ba
  */
 const PX_FROM = 4, PX_FULL = 8
 /** 격자가 보이는 정도: 400% 에서 0 → 800% 에서 1 (꺼져 있거나 400% 미만이면 0) */
+// 페이지 설정 Pixel grid 를 끄면 픽셀에 맞추기도 꺼져요(소수점 움직임) — 피그마의 Snap to pixel grid 와 같은 역할
+watch(() => props.pixelGrid, (v) => { store.pixelSnap.value = v !== false }, { immediate: true })
 const pxAlpha = computed(() => (props.pixelGrid === false ? 0 : Math.max(0, Math.min(1, (vp.value.zoom - PX_FROM) / (PX_FULL - PX_FROM)))))
 /**
  * 픽셀 격자는 <canvas> 에 직접 그려요: 선마다 기기 픽셀 1칸에 딱 맞춰서(피그마와 같아요) — 배율이 딱 떨어지지 않아도 선 진하기가 고르게.
@@ -1928,7 +2229,7 @@ const singleModes = computed(() => {
   const id = store.layerIds.value.length === 1 ? store.layerIds.value[0] : null
   const n = sid && id ? store.node(sid, id) : null
   if (!n) return { w: '', h: '' }
-  const label = (v?: string) => (v === 'hug' ? 'Hug' : v === 'fill' ? 'Fill' : '')
+  const label = (v?: string) => (v === 'hug' ? tr('Hug') : v === 'fill' ? tr('Fill') : '')
   const text = n.type === 'text'
   return { w: label(n.sizeH ?? (text && n.style.autoWidth ? 'hug' : undefined)), h: label(n.sizeV ?? (text ? 'hug' : undefined)) }
 })
@@ -1939,10 +2240,10 @@ function onDrop(e: DragEvent) {
   // 디자인 시스템 컴포넌트 끌어 놓기 → 인스턴스(놓은 자리, Iris 화면 위면 그 안 · 가장 안쪽 프레임으로)
   const comp = e.dataTransfer?.getData(DS_DRAG)
   const w = toWorld(e.clientX, e.clientY)
-  if (comp) { insertInstance(comp, w); if (overFigmaOnly(w.x, w.y)) emit('hint', FIGMA_DROP_HINT); return }
+  if (comp) { insertInstance(comp, w); if (overFigmaOnly(w.x, w.y)) emit('hint', tr(FIGMA_DROP_HINT)); return }
   const files = [...(e.dataTransfer?.files ?? [])]
   if (!files.length) return
-  if (overFigmaOnly(w.x, w.y)) emit('hint', FIGMA_DROP_HINT)
+  if (overFigmaOnly(w.x, w.y)) emit('hint', tr(FIGMA_DROP_HINT))
   const t = dropTarget(w.x, w.y)
   emit('drop-files', files, w, t ? { sid: t.sid, parentId: t.parentId } : undefined)
 }
@@ -1975,7 +2276,7 @@ function onFileDragOver(e: DragEvent) {
   if (r?.x !== dropAt.value?.x || r?.y !== dropAt.value?.y || r?.w !== dropAt.value?.w || r?.h !== dropAt.value?.h) dropAt.value = r ?? null
 }
 function onDragLeave(e: DragEvent) { if (!e.relatedTarget || !el.value?.contains(e.relatedTarget as Node)) dropAt.value = null }
-const FULL_WIDTH = new Set(['BottomSheet', 'BottomBar', 'TopBar', 'NavBarTop', 'ListCommon', 'TextInput', 'TextArea', 'SearchField', 'ButtonGroup', 'Tab', 'NoticeBox', 'Divider', 'Footer', 'StatusBar'])
+const FULL_WIDTH = new Set(['BottomSheet', 'BottomBar', 'TopBar', 'NavBarTop', 'ListCommon', 'TextInput', 'TextArea', 'SearchField', 'ButtonGroup', 'Tab', 'SegmentedControl', 'NoticeBox', 'Divider', 'Footer', 'StatusBar', 'InputBar', 'ListSelect', 'ListSort', 'FileRow', 'MapBottomBar', 'MapBottomGuide', 'PostComment', 'PostReply'])
 /** 디자인 시스템 컴포넌트 인스턴스 넣기(캔버스 좌표). at 이 없으면 보이는 캔버스 가운데 */
 function insertInstance(component: string, at?: { x: number; y: number }) {
   const c = at ?? toWorld(window.innerWidth / 2, window.innerHeight / 2)
@@ -1986,15 +2287,28 @@ function insertInstance(component: string, at?: { x: number; y: number }) {
   const parentId = frameAt(target.id, lx, ly)
   const p = parentId ? store.absPos(target.id, parentId) : { x: 0, y: 0 }
   // 화면 폭을 채우는 컴포넌트는 부모(없으면 화면) 폭에 맞춰 고정 폭으로
-  const full = FULL_WIDTH.has(component)
+  const full = !STORY_SIZE[component] && FULL_WIDTH.has(component)
   const pw = parentId ? store.node(target.id, parentId)?.w : scr ? scr.width : 375
+  // 스토리북 기준 크기(InstanceView STORY_SIZE): 고정 폭(높이까지 정해진 것은 높이도) · 나머지는 Hug. 목록에 없으면 예전처럼(화면 폭 채우기 · Hug)
+  const fixed = INSERT_SIZE[component]
   // 가운데에 여러 번 넣으면 조금씩 비켜서
   const nudge = at ? 0 : (Object.values(store.doc(target.id).nodes).filter((n) => n.type === 'instance').length % 8) * 16
-  store.add(target.id, parentId, { type: 'instance', name: component, component, props: {}, x: full ? 0 : Math.round(lx - p.x + nudge), y: Math.round(ly - p.y + nudge), w: full ? pw ?? 375 : 120, h: 48, sizeH: full ? undefined : 'hug', sizeV: 'hug' })
+  store.add(target.id, parentId, { type: 'instance', name: component, component, props: {}, x: full ? 0 : Math.round(lx - p.x + nudge), y: Math.round(ly - p.y + nudge), w: fixed ? fixed.w : full ? pw ?? 375 : 120, h: fixed?.h ?? 48, sizeH: full || fixed ? undefined : 'hug', sizeV: fixed?.h ? undefined : 'hug' })
   tool.value = 'move'
 }
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
 const frameImg = useImageSrc()
+/** 화면 바로 아래 마스크(하나만 골라 Use as mask): 그 위 레이어들을 마스크 모양으로 가려요(LayerView 의 프레임 안 마스크와 같아요) */
+function rootMask(sid: string) {
+  const d = store.doc(sid)
+  const i = d.rootIds.findIndex((c) => d.nodes[c]?.isMask && !d.nodes[c]?.hidden)
+  if (i < 0) return null
+  const m = d.nodes[d.rootIds[i]!]!
+  return { below: d.rootIds.slice(0, i), mask: m.id, above: d.rootIds.slice(i + 1), clip: `path(${m.evenodd ? 'evenodd, ' : ''}'${nodePathIn(d, m, 0, 0)}')` }
+}
+// 점 편집(Edit object): 오른쪽 패널 머리 버튼에서
+const editReq = useState<{ sid: string; id: string; t: number } | null>('iris-edit-object', () => null)
+watch(editReq, (r) => { if (r) { enterVectorEdit(r.sid, r.id); editReq.value = null } })
 const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color, frameImg, s.width, s.height) : {})
 /** Corner smoothing 화면: 바탕 · 그림자 · 선을 squircle 모양으로 그리는 층 */
 const frameSm = (s: ScreenRow) => (s.source === 'native' ? frameSmoothLayers(store.doc(s.id).frame, s.width, s.height, store.color, frameImg) : null)
@@ -2005,7 +2319,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 <template>
   <main
     ref="el"
-    aria-label="Canvas"
+    :aria-label="tr('Canvas')"
     class="canvas canvas-dots"
     :style="{ cursor, ...gridStyle }"
     @pointerdown.self="start($event)"
@@ -2031,13 +2345,20 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         tabindex="-1"
         :data-screen="s.id"
         :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor, ...frameLook(s) }"
-        :aria-label="`${s.name} 화면`"
+        :aria-label="tr('{name} frame', { name: s.name })"
         @pointerdown.stop="start($event, s)"
       >
         <img v-if="s.thumbnail_path && s.source === 'figma'" :src="s.thumbnail_path" alt="" draggable="false" class="thumb">
         <template v-else>
           <template v-for="sm in [frameSm(s)]" :key="'fsm'"><i v-if="sm" class="fsmw"><i class="fsmb" :style="sm.bg" /></i></template>
-          <LayerView v-for="id in store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
+          <template v-for="rm in [rootMask(s.id)]" :key="'rm'">
+            <template v-if="rm">
+              <LayerView v-for="id in rm.below" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
+              <!-- 마스크 자체는 그리지 않아요(프레임 안 마스크와 같아요) -->
+              <div class="rmask" :style="{ clipPath: rm.clip }"><LayerView v-for="id in rm.above" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" /></div>
+            </template>
+            <LayerView v-for="id in rm ? [] : store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
+          </template>
           <GridOverlay v-if="store.doc(s.id).frame?.grids" :grids="store.doc(s.id).frame?.grids" :w="s.width" :h="s.height" />
           <!-- 화면 스트로크(안쪽): 자식 레이어 위에 — 피그마처럼 안에 든 레이어가 테두리를 덮지 않아요 -->
           <i v-if="s.source === 'native' && frameStroke(store.doc(s.id).frame, store.color, s.width, s.height)" class="frame-stk" :style="{ boxShadow: frameStroke(store.doc(s.id).frame, store.color, s.width, s.height) }" />
@@ -2067,6 +2388,30 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     <template v-if="pxOn"><canvas ref="pxDif" class="pxgrid dif" :style="{ opacity: pxAlpha }" aria-hidden="true" /><canvas ref="pxMid" class="pxgrid mid" :style="{ opacity: pxAlpha }" aria-hidden="true" /></template>
     <div class="overlay" aria-hidden="true">
       <span
+        v-for="f in frameLabels"
+        :key="'fl' + f.id"
+        class="label"
+        :data-label-layer="f.id"
+        :class="{ on: canvasDoc && ((store.screenId.value === canvasDoc.id && store.layerIds.value.includes(f.id)) || (hover?.sid === canvasDoc.id && hover?.id === f.id)) }"
+        :style="{ left: f.box.left, top: `calc(${f.box.top} - 20px)`, maxWidth: f.box.width }"
+        @pointerdown.stop="pickFrameLabel(f.id)"
+        @dblclick.stop="renamingFrame = f.id"
+      >
+        <input
+          v-if="renamingFrame === f.id"
+          v-select-all
+          class="label-in"
+          :value="f.name"
+          :aria-label="tr('Frame name')"
+          spellcheck="false"
+          @pointerdown.stop
+          @dblclick.stop
+          @keydown.stop="($event.key === 'Enter' && ($event.target as HTMLInputElement).blur()) || ($event.key === 'Escape' && (renamingFrame = null))"
+          @blur="commitFrameName(f.id, $event)"
+        >
+        <template v-else>{{ f.name }}</template>
+      </span>
+      <span
         v-for="s in realScreens"
         :key="'l' + s.id"
         class="label"
@@ -2080,7 +2425,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
           v-select-all
           class="label-in"
           :value="s.name"
-          aria-label="Frame name"
+          :aria-label="tr('Frame name')"
           spellcheck="false"
           @pointerdown.stop
           @dblclick.stop
@@ -2099,7 +2444,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :target="s.figma_url ? '_blank' : undefined"
         :rel="s.figma_url ? 'noopener noreferrer' : undefined"
         tabindex="-1"
-        :title="s.figma_url ? 'Linked from Figma · Open in Figma' : 'Linked from Figma'"
+        :title="s.figma_url ? tr('Linked from Figma · Open in Figma') : tr('Linked from Figma')"
         :style="{ left: `calc(${box(s).left} + ${box(s).width})`, top: `calc(${box(s).top} - 20px)` }"
         @pointerdown.stop
       >
@@ -2108,7 +2453,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-if="parentOutline" class="parent" :style="parentOutline" />
       <template v-if="gapHot || bandDrag?.kind === 'gap'"><div v-for="(b, i) in gapBands" :key="'gap' + i" class="gap" :class="{ v: b.v }" :style="{ left: b.left, top: b.top, width: b.width, height: b.height }"><i :style="{ cursor: b.v ? 'ns-resize' : 'ew-resize' }" @pointerdown="startBand($event, 'gap')" /></div></template>
       <template v-else-if="padHot || bandDrag?.kind === 'pad'"><div v-for="(b, i) in padBands" :key="'pad' + i" class="pad" :class="{ v: b.side === 0 || b.side === 2 }" :style="{ left: b.left, top: b.top, width: b.width, height: b.height }"><i :style="{ cursor: b.side === 0 || b.side === 2 ? 'ns-resize' : 'ew-resize' }" @pointerdown="startBand($event, 'pad', b.side)" /></div></template>
-      <span v-if="bandLabel && bandDrag" class="glabel" :class="{ gapl: bandDrag.kind === 'gap' }" :style="bandLabel">{{ bandDrag.value }}</span>
+      <span v-if="radLabel && radDrag" class="sq size rlabel" :style="radLabel">{{ tr('Radius {n}', { n: radDrag.v }) }}</span>
+      <span v-if="bandLabel && bandDrag" class="sq glabel" :class="{ gapl: bandDrag.kind === 'gap' }" :style="bandLabel">{{ bandDrag.value }}</span>
       <template v-if="hoverOutline && !gapHot && !padHot && !cmdMarks"><div v-for="(k, i) in hoverKids" :key="'hk' + i" class="kid" :style="k" /></template>
       <template v-if="hoverTextLines.length && !gapHot && !padHot && !cmdMarks"><div v-for="(l, i) in hoverTextLines" :key="'ht' + i" class="cmd-ul" :style="l" /></template>
       <div v-else-if="hoverOutline && !gapHot && !padHot && !cmdMarks" class="hov" :class="{ comp: hoverOutline.comp, shaped: 'path' in hoverOutline }" :style="hoverOutline.style"><svg v-if="'path' in hoverOutline" class="shape-line" aria-hidden="true"><path :d="hoverOutline.path" stroke-width="2" /></svg></div>
@@ -2125,7 +2471,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <template v-if="!selBoxes.length">
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
           <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
-          <span class="size">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
+          <span class="sq size">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
@@ -2133,7 +2479,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-if="selBoxes.length > 1 && selWorld && !multi.length" class="sel group" :class="{ comp: selComp }" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
         <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startResizeMany($event, h)" />
         <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, 0) }" @pointerdown.stop.prevent="startResizeMany($event, c)" />
-        <span class="size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
+        <span class="sq size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
       </div>
       <!-- 점 편집 중에는 상자 · 손잡이 · 크기 표시를 숨겨요(피그마와 같아요) -->
       <template v-if="single && !vhandles">
@@ -2142,9 +2488,10 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
             <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" @pointerdown.stop.prevent="startRotate($event)" />
             <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, single.angle) }" @pointerdown.stop.prevent="startResize($event, h)" />
             <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
+            <span v-for="h in radHandles ?? []" :key="'rh' + h.c" class="rh" :style="{ left: h.x + 'px', top: h.y + 'px' }" :title="tr('Corner radius (⌥ one corner)')" @pointerdown.stop.prevent="startRadius($event, h.c)" />
           </template>
         </div>
-        <span class="size below" :class="{ comp: selComp }" :style="belowBox(single)">
+        <span class="sq size below" :class="{ comp: selComp }" :style="belowBox(single)">
           <template v-if="rotating">{{ fmt(single.rotation) }}°</template>
           <template v-else>{{ fmt(single.w) }}<span v-if="singleModes.w" class="mode">{{ singleModes.w }}</span> × {{ fmt(single.h) }}<span v-if="singleModes.h" class="mode">{{ singleModes.h }}</span></template>
         </span>
@@ -2155,9 +2502,9 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
           <template v-if="l.tick"><line v-for="(t, j) in ticks(l)" :key="j" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" /></template>
         </template>
       </svg>
-      <template v-if="shown"><span v-for="(lb, i) in shown.labels" :key="'g' + i" class="glabel" :style="{ left: sx(lb.x) + 'px', top: sy(lb.y) + 'px' }">{{ lb.text }}</span></template>
+      <template v-if="shown"><span v-for="(lb, i) in shown.labels" :key="'g' + i" class="sq glabel" :style="{ left: sx(lb.x) + 'px', top: sy(lb.y) + 'px' }">{{ lb.text }}</span></template>
       <div v-for="(g, i) in mixGhosts" :key="'mg' + i" class="sel" :style="box(g)" />
-      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="size">{{ fmt(draft.width) }} × {{ fmt(draft.height) }}</span></div>
+      <div v-if="draft && !marqueeOn" class="sel" :style="box(draft)"><span class="sq size">{{ fmt(draft.width) }} × {{ fmt(draft.height) }}</span></div>
       <div v-if="draft && marqueeOn" class="marq" :style="box(draft)" />
       <!-- 펜 미리보기 -->
       <svg v-if="penView" class="pen" width="100%" height="100%">
@@ -2170,7 +2517,16 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </template>
       </svg>
       <!-- 벡터 점 편집 -->
+      <svg v-if="hoverShape || selShape" class="shape-ol" width="100%" height="100%" aria-hidden="true">
+        <path v-if="selShape" :d="selShape.d" :transform="selShape.tf" vector-effect="non-scaling-stroke" stroke-width="1" />
+        <path v-if="hoverShape" :d="hoverShape.d" :transform="hoverShape.tf" vector-effect="non-scaling-stroke" stroke-width="2" />
+      </svg>
       <svg v-if="vhandles" class="vedit" width="100%" height="100%">
+        <defs><pattern id="vhatch" :width="vshape?.pw ?? 6" :height="vshape?.pw ?? 6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" :y2="vshape?.pw ?? 6" class="vh-line" :stroke-width="(vshape?.pw ?? 6) / 6" /></pattern></defs>
+        <!-- 편집 중: 모양은 회색 선, 칠이 있으면 파란 빗금(피그마와 같아요) -->
+        <path v-if="vshape?.filled" :d="vshape.d" :transform="vshape.tf" class="vhatch" />
+        <path v-if="vshape" :d="vshape.d" :transform="vshape.tf" class="vline" vector-effect="non-scaling-stroke" />
+        <polygon v-if="vbox" :points="vbox" class="vbox" />
         <template v-for="q in vhandles" :key="q.pi + ':' + q.qi">
           <line v-if="q.i" :x1="q.a.x" :y1="q.a.y" :x2="q.i.x" :y2="q.i.y" class="hl" /><line v-if="q.o" :x1="q.a.x" :y1="q.a.y" :x2="q.o.x" :y2="q.o.y" class="hl" />
           <circle v-if="q.i" :cx="q.i.x" :cy="q.i.y" r="3.5" class="hd" @pointerdown.stop.prevent="startVpt($event, q.pi, q.qi, 'i')" />
@@ -2191,7 +2547,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .world.moving { will-change: transform; }
 .free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .free :deep(.ly:not(.lk)) { pointer-events: auto; }
-.frame { position: absolute; pointer-events: auto; background: var(--iris-paper); overflow: hidden; outline: none; }
+/* 화면(screen) 요소만 — 맨 위 단계 프레임 레이어(.ly.frame)도 이 컴포넌트의 scope 를 받아서, 화면에만 걸리게 [data-screen] 으로 */
+.frame[data-screen] { position: absolute; pointer-events: auto; background: var(--iris-paper); overflow: hidden; outline: none; }
 /* 피그마처럼 기본 테두리 · 그림자 없음. 마우스를 올리면 얇은 파란 선(확대와 상관없이 1px) */
 .ghost { position: absolute; width: 0; height: 0; overflow: visible; pointer-events: none; z-index: 3; }
 .ghost.clipped { overflow: hidden; }
@@ -2203,6 +2560,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .frame-stk { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; }
 /* Corner smoothing 화면: 바탕 · 그림자 층은 내용 뒤, 선은 내용 위 */
 .fsmw { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.rmask { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.rmask > * { pointer-events: auto; }
 .fsmb { position: absolute; inset: 0; }
 .frame-sqk { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
@@ -2250,7 +2609,7 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .pad { display: grid; place-items: center; }
 .pad i { position: relative; width: 1px; height: 8px; background: var(--iris-select); pointer-events: auto; }
 .pad.v i { width: 8px; height: 1px; }
-.glabel.gapl { background: rgb(242 72 156); }
+.glabel.gapl { --sq-fill: rgb(242 72 156); }
 .sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--iris-select) 45%, transparent); }
 .sel.none { box-shadow: none; }
 .hl { position: absolute; box-shadow: 0 0 0 2px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); }
@@ -2284,12 +2643,23 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .pen .an.cur { fill: var(--iris-select); }
 .vedit .an, .vedit .hd { pointer-events: auto; cursor: default; }
 .vedit .an.on { fill: var(--iris-select); }
+/* 아직 도형인 채 점 편집: 모양 대신 회색 상자 선(피그마와 같아요) */
+.vedit .vbox { fill: none; stroke: var(--sys-color-neutral-400); stroke-width: 1; }
+.vedit .vhatch { fill: url(#vhatch); pointer-events: none; }
+.vedit .vline { fill: none; stroke: var(--sys-color-neutral-500); stroke-width: 1; pointer-events: none; }
+.shape-ol { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.shape-ol path { fill: none; stroke: var(--iris-select); }
+.vedit .vh-line { stroke: var(--iris-select); opacity: .7; }
+/* 모서리 원형 손잡이(Corner radius 끌기) */
+.rh { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 0 1px var(--iris-select); pointer-events: auto; cursor: default; }
+.rh::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+.rlabel { position: absolute; left: auto; top: auto; margin: 0; transform: translateX(-50%); }
 .guides.draw polyline { fill: none; stroke: var(--iris-select); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
 /* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
-.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 2px; font-variant-numeric: tabular-nums; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 2px; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; --sq-fill: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
 /* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
-.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 8px; padding: 0 4px; border-radius: 2px; font-variant-numeric: tabular-nums; pointer-events: none; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 8px; padding: 0 4px; border-radius: 2px; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; pointer-events: none; --sq-fill: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; }
 .size .mode { font-weight: 500; opacity: .8; margin-left: 3px; }
 .marq { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 </style>

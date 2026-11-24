@@ -55,7 +55,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="landing" :class="theme">
-    <div ref="stage" class="stage" :class="{ ready }" aria-label="Iris 3D 로고. 끌어서 돌리고, 스크롤해서 크기를 바꿀 수 있어요" />
+    <div ref="stage" class="stage" :class="{ ready }" :aria-label="tr('Iris 3D logo. Drag to rotate, scroll to resize')" />
     <span class="loading cap" :class="{ done: ready }" aria-hidden="true">{{ pct }}%</span>
 
     <header class="top">
@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
     <div class="bottom">
       <Button class="reset" :class="{ on: changed }" :aria-hidden="!changed" :tabindex="changed ? 0 : -1" size="l" type="tertiary" contents="icon-text" icon-name="refresh" @click="iris?.reset()">Reset</Button>
       <p class="copy cap">© 2026 CYCLOID.CORP. All rights reserved.</p>
-      <nav class="links cap" aria-label="회사 홈페이지">
+      <nav class="links cap" :aria-label="tr('Company website')">
         <a href="https://cycloid-corp.vercel.app/" target="_blank" rel="noopener">CYCLOID</a>
         <span aria-hidden="true">・</span>
         <a href="https://ba-dream.com" target="_blank" rel="noopener">Ba-dream</a>

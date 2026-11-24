@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
-import { isContainer, type LayerNode } from '~/canvas/schema'
+import { isContainer, isGroupNode, type LayerNode } from '~/canvas/schema'
 import { LAYER_ICON } from '~/canvas/icons'
+import { vectorPath } from '~/canvas/paint'
 import { layerMenuItems, useLastCopy, useMixScreens } from '~/composables/useLayerMenu'
 import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
-const props = defineProps<{ screens: ScreenRow[]; multi?: string[] }>()
+const props = defineProps<{ screens: ScreenRow[]; multi?: string[]; canvasId?: string | null }>()
 const emit = defineEmits<{ 'pick-screen': [id: string]; 'toggle-screen': [id: string]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'front' | 'back' | 'forward' | 'backward' | 'section'] }>()
 const store = useLayerStore()
 
@@ -98,20 +99,78 @@ function rename(r: Row, e: Event) {
   if (v && v !== r.n.name) store.update(r.sid, [r.n.id], { name: v })
 }
 
-// 끌어서 순서 바꾸기 (같은 화면 안)
+/**
+ * 끌어서 옮기기(피그마와 같아요): 같은 화면 안 순서 · 다른 프레임 · 오토 레이아웃 안 · 다른 화면 · 캔버스 어디로든.
+ * 줄 위쪽 = 그 앞(위)에, 프레임 · 그룹 · 화면 줄 가운데 = 그 안으로. 화면에서 보이던 자리는 그대로(대상 밖이면 대상 가운데로)
+ */
 const dragging = ref<{ sid: string; id: string } | null>(null)
-const over = ref<{ id: string; into: boolean } | null>(null)
+const over = ref<{ id: string; into: boolean; y?: number } | null>(null)
+/** 목록 안 줄 번호(줄 높이 28) */
+const rowIdx = (key: string) => items.value.findIndex((it) => itemKey(it) === key)
+/** 놓을 자리 구분선: 두 줄 사이에 따로 그리는 일자 선(줄 모서리에 잘리지 않게) */
+const dropY = computed(() => (over.value && !over.value.into && over.value.y !== undefined ? over.value.y : null))
 function onDragOver(e: DragEvent, r: Row) {
-  if (!dragging.value || dragging.value.sid !== r.sid || dragging.value.id === r.n.id) return
+  const dg = dragging.value
+  if (!dg || dg.id === r.n.id) return
+  // 자기 안으로는 못 넣어요
+  if (dg.sid === r.sid) { const d = store.doc(r.sid); for (let p: string | null | undefined = r.n.id; p; p = d.nodes[p]?.parentId) if (p === dg.id) return }
   e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const into = isContainer(r.n) && e.clientY > rect.top + rect.height * 0.3 && e.clientY < rect.bottom - rect.height * 0.3
-  over.value = { id: r.n.id, into }
+  over.value = { id: r.n.id, into, y: rowIdx(r.sid + ':' + r.n.id) * 28 }
+}
+/** 화면 줄 위: 그 화면 안 맨 위로 */
+function onDragOverScreen(e: DragEvent, s: ScreenRow) {
+  const dg = dragging.value
+  if (!dg) return
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  // 화면 줄 위 · 아래 가장자리 = 화면들 사이(캔버스로 꺼내기), 가운데 = 그 화면 안으로(피그마 화면만)
+  const edge = e.clientY < rect.top + rect.height * 0.3 ? 'top' : e.clientY > rect.bottom - rect.height * 0.3 ? 'bottom' : null
+  const into = !edge && s.source === 'native' && !s.id.startsWith('page:')
+  if (!into && !edge) return
+  if (!into && !props.canvasId) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  const i = rowIdx('s:' + s.id)
+  over.value = { id: 'screen:' + s.id, into, y: (edge === 'bottom' ? i + 1 : i) * 28 }
+}
+const originOf = (sid: string) => { const s = props.screens.find((v) => v.id === sid); return { x: s?.x ?? 0, y: s?.y ?? 0 } }
+/** 다른 화면(문서)으로 옮기기: 화면 위 자리 그대로, 대상 부모 밖이면 부모 가운데 */
+function moveAcross(from: string, id: string, to: string, parentId: string | null) {
+  const a = originOf(from), b = originOf(to)
+  store.transfer(from, [id], to, parentId, { x: a.x - b.x, y: a.y - b.y })
+  const d = store.doc(to), n = d.nodes[id]
+  if (!n) return
+  const box = parentId ? d.nodes[parentId] : props.screens.find((v) => v.id === to)
+  const pw = box ? ('w' in box ? box.w : (box as ScreenRow).width) : 0, ph = box ? ('h' in box ? box.h : (box as ScreenRow).height) : 0
+  if (pw > 0 && ph > 0 && (n.x + n.w <= 0 || n.y + n.h <= 0 || n.x >= pw || n.y >= ph)) store.update(to, [id], { x: Math.round((pw - n.w) / 2), y: Math.round((ph - n.h) / 2) })
 }
 function onDrop(r: Row) {
-  if (dragging.value && over.value) store.moveTo(r.sid, dragging.value.id, r.n.id, over.value.into)
+  const dg = dragging.value, ov = over.value
   dragging.value = null
   over.value = null
+  if (!dg || !ov) return
+  if (dg.sid === r.sid) { store.moveTo(r.sid, dg.id, r.n.id, ov.into); return }
+  // 다른 화면 · 캔버스: 먼저 그 문서로 옮기고, 그 안에서 자리(앞 · 안으로)를 맞춰요
+  const target = store.doc(r.sid).nodes[r.n.id]
+  moveAcross(dg.sid, dg.id, r.sid, ov.into ? r.n.id : target?.parentId ?? null)
+  store.moveTo(r.sid, dg.id, r.n.id, ov.into)
+}
+function onDropScreen(s: ScreenRow) {
+  const dg = dragging.value
+  const ov = over.value
+  dragging.value = null
+  over.value = null
+  if (!dg) return
+  // 화면들 사이: 캔버스(페이지) 맨 위 단계로 꺼내요
+  if (ov && !ov.into && props.canvasId) {
+    if (dg.sid === props.canvasId) { const d = store.doc(dg.sid); const top = d.rootIds[d.rootIds.length - 1]; if (d.nodes[dg.id]?.parentId) store.moveTo(dg.sid, dg.id, top && top !== dg.id ? top : null, false); else if (top && top !== dg.id) store.moveTo(dg.sid, dg.id, top, false); return }
+    moveAcross(dg.sid, dg.id, props.canvasId, null)
+    return
+  }
+  if (dg.sid === s.id) { const d = store.doc(s.id); const top = d.rootIds[d.rootIds.length - 1]; if (top && top !== dg.id) store.moveTo(s.id, dg.id, top, false); return }
+  moveAcross(dg.sid, dg.id, s.id, null)
 }
 /** 이름 바꾸기 입력칸: 열리면 바로 포커스하고 글자를 모두 골라요(피그마와 같아요) */
 const vSelect = { mounted: (el: HTMLInputElement) => nextTick(() => { el.focus(); el.select() }) }
@@ -136,6 +195,20 @@ const groups = computed(() => {
  * 레이어 목록 고르기(피그마와 같아요): ⌘(Ctrl) 클릭 = 하나씩 더하기 · 빼기, Shift 클릭 = 마지막으로 고른 줄부터 여기까지(같은 화면 안)
  */
 let anchor: { sid: string; id: string } | null = null
+/** 오토 레이아웃 프레임 아이콘(12 칸): 세로 = 위아래 두 칸, 가로 = 좌우 두 칸, 줄바꿈 = 네 칸 */
+const AL_ICON: Record<'vertical' | 'horizontal' | 'wrap', string> = {
+  vertical: 'M2.5 1.5h7a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1zM2.5 6.5h7a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1z',
+  horizontal: 'M2.5 1.5h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM7.5 1.5h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z',
+  wrap: 'M1.5 1.5h4v4h-4zM6.5 1.5h4v4h-4zM1.5 6.5h4v4h-4zM6.5 6.5h4v4h-4z',
+}
+/** 벡터 · 연필 레이어 아이콘: 그 도형의 경로를 16 칸 가운데 12 안에 맞춰서 */
+function shapeIcon(n: LayerNode): { d: string; vb: string } | null {
+  if ((n.type !== 'vector' && n.type !== 'path') || !(n.w > 0 || n.h > 0)) return null
+  const d = vectorPath(n.type, n.style, n.w, n.h, n.pts, n.closed, n.vnet)
+  if (!d) return null
+  const size = Math.max(n.w, n.h, 1), box = size / 0.75 // 16 중 12 를 쓰게
+  return { d, vb: `${(n.w - box) / 2} ${(n.h - box) / 2} ${box} ${box}` }
+}
 function pick(r: Row, e: MouseEvent | KeyboardEvent) {
   // 화면(들)만 고른 채 다른 화면 안 레이어를 ⇧ · ⌘ 클릭: 화면은 그대로, 그 레이어를 함께(섞어 고르기)
   if ((e.shiftKey || e.metaKey || e.ctrlKey) && store.screenId.value !== r.sid && !store.layerIds.value.length) {
@@ -167,37 +240,38 @@ const lastCopy = useLastCopy()
 const paste = () => { if (lastCopy.value !== 'screen' && store.hasClipboard()) store.paste(); else emit('screen-action', 'paste') }
 function rowMenu(r: Row, e: MouseEvent) {
   if (!isSel(r)) store.selectLayer(r.sid, r.n.id)
-  ctx.open(e, [{ label: 'Rename', shortcut: 'F2', action: () => (renaming.value = r.n.id) }, 'sep', ...layerMenuItems(store, r.sid, [...store.layerIds.value], { lastCopy, paste })])
+  ctx.open(e, [{ label: tr('Rename'), shortcut: 'F2', action: () => (renaming.value = r.n.id) }, 'sep', ...layerMenuItems(store, r.sid, [...store.layerIds.value], { lastCopy, paste })])
 }
 function screenMenu(s: ScreenRow, e: MouseEvent) {
   if (s.id.startsWith('page:')) return
   emit('pick-screen', s.id)
   ctx.open(e, [
-    { label: 'Copy', shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
-    { label: 'Paste', shortcut: '⌘V', action: paste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
-    { label: 'Duplicate', shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
-    { label: 'Wrap in section', shortcut: '⌥⌘S', action: () => emit('screen-action', 'section') },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: tr('Paste'), shortcut: '⌘V', action: paste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+    { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
+    { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => emit('screen-action', 'section') },
     'sep',
-    { label: 'Bring to front', shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
-    { label: 'Bring forward', shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
-    { label: 'Send backward', shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
-    { label: 'Send to back', shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
+    { label: tr('Bring to front'), shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: tr('Bring forward'), shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
+    { label: tr('Send backward'), shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
+    { label: tr('Send to back'), shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
     'sep',
-    { label: 'Delete', shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
+    { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ])
 }
 </script>
 
 <template>
-  <div class="tree" role="tree" aria-label="Layers">
+  <div class="tree" role="tree" :aria-label="tr('Layers')">
+    <div v-if="dropY !== null" class="drop-line" :style="{ top: dropY - 1 + 'px' }" aria-hidden="true" />
     <div v-for="(g, i) in groups" :key="'g' + i" class="sqc grp-bg" :style="{ top: g.top * 28 + 'px', height: g.n * 28 + 'px' }" aria-hidden="true" />
     <template v-for="it in items" :key="itemKey(it)">
-      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under }]" :style="{ '--d': it.depth }" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
-        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
+      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id }]" :style="{ '--d': it.depth }" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
+        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(s.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="16" height="16" viewBox="-2 -2 16 16" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1" fill="none" /></svg>
         <span class="name" :title="s.name">{{ s.name }}</span>
-        <span v-if="s.source === 'figma'" class="muted ext" role="img" aria-label="Figma frame" title="Figma frame"><EditorIcon name="arrow_up_right" :size="12" /></span>
+        <span v-if="s.source === 'figma'" class="muted ext" role="img" :aria-label="tr('Figma frame')" :title="tr('Figma frame')"><EditorIcon name="arrow_up_right" :size="12" /></span>
       </div>
       <div
         v-else
@@ -215,23 +289,29 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         @keydown.space.self.prevent="pick(r, $event)"
         @keydown.f2.self.prevent="renaming = r.n.id"
         @dblclick="renaming = r.n.id"
-        @dragstart="dragging = { sid: r.sid, id: r.n.id }"
+        @dragstart="dragging = { sid: r.sid, id: r.n.id }; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')"
         @dragover="onDragOver($event, r)"
         @dragleave="over = null"
         @drop.prevent="onDrop(r)"
         @dragend="dragging = null; over = null"
       >
-        <button v-if="(isContainer(r.n) && r.n.children?.length) || (r.n.type === 'section' && hasScreens(r.n.id))" class="sq chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(r.sid + ':' + r.n.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
+        <button v-if="(isContainer(r.n) && r.n.children?.length) || (r.n.type === 'section' && hasScreens(r.n.id))" class="sq chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(r.sid + ':' + r.n.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
         <span v-else class="chev" />
-        <svg v-if="LAYER_ICON[r.n.type]" width="16" height="16" viewBox="-2 -2 16 16" aria-hidden="true" class="ic"><path :d="LAYER_ICON[r.n.type]" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
+        <!-- 벡터 · 연필 레이어: 펜 모양 대신 지금 그 도형 모양 그대로(점을 고치면 바로 따라 바뀌어요) -->
+        <svg v-if="shapeIcon(r.n)" width="16" height="16" :viewBox="shapeIcon(r.n)!.vb" aria-hidden="true" class="ic"><path :d="shapeIcon(r.n)!.d" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
+        <!-- 오토 레이아웃 프레임: 방향별 아이콘(세로 · 가로 · 줄바꿈) — 피그마와 같아요 -->
+        <svg v-else-if="r.n.style.layout" width="16" height="16" viewBox="-2 -2 16 16" aria-hidden="true" class="ic"><path :d="AL_ICON[r.n.style.layout.wrap ? 'wrap' : r.n.style.layout.mode]" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
+        <!-- 그룹(채우기 · 자르기 없는 프레임): 자잘한 점선 네모 — 피그마 그룹 아이콘처럼 -->
+        <svg v-else-if="isGroupNode(r.n)" width="16" height="16" viewBox="-2 -2 16 16" aria-hidden="true" class="ic"><rect x="1.5" y="1.5" width="9" height="9" rx="0.5" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1.5" stroke-dashoffset="0.75" fill="none" /></svg>
+        <svg v-else-if="LAYER_ICON[r.n.type]" width="16" height="16" viewBox="-2 -2 16 16" aria-hidden="true" class="ic"><path :d="LAYER_ICON[r.n.type]" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
         <span v-else class="ic ic-box"><EditorIcon name="image" :size="12" /></span>
-        <input v-if="renaming === r.n.id" v-select class="sqc txt-in ren" :value="r.n.name" aria-label="Layer name" @click.stop @dblclick.stop @keydown.stop @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null" @blur="rename(r, $event)">
+        <input v-if="renaming === r.n.id" v-select class="sqc txt-in ren" :value="r.n.name" :aria-label="tr('Layer name')" @click.stop @dblclick.stop @keydown.stop @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null" @blur="rename(r, $event)">
         <span v-else class="name" :title="r.n.name">{{ r.n.name }}</span>
         <span class="tools" :class="{ keep: r.n.hidden || r.n.locked }">
-          <button class="sq mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? 'Unlock' : 'Lock'" :title="r.n.locked ? 'Unlock' : 'Lock'" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
+          <button class="sq mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? tr('Unlock') : tr('Lock')" :title="r.n.locked ? tr('Unlock') : tr('Lock')" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
             <EditorIcon :name="r.n.locked ? 'lock' : 'unlock'" />
           </button>
-          <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? 'Show' : 'Hide'" :title="r.n.hidden ? 'Show' : 'Hide'" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
+          <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? tr('Show') : tr('Hide')" :title="r.n.hidden ? tr('Show') : tr('Hide')" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
             <EditorIcon :name="r.n.hidden ? 'eye_off' : 'eye'" />
           </button>
         </span>
@@ -281,6 +361,9 @@ button.chev:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .mini:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .mini.act2 { color: var(--sys-color-neutral-700); }
 .chev:focus-visible, .mini:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -1px; }
-.drop-above { box-shadow: inset 0 2px 0 var(--sys-color-brand-primary-default); }
-.drop-into { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+/* 놓을 자리: 두 줄 사이에 따로 얹는 일자 구분선(양 끝 둥글리지 않음) */
+.drop-line { position: absolute; left: var(--ref-spacing-04); right: var(--ref-spacing-04); height: 2px; z-index: 3; pointer-events: none; background: color-mix(in srgb, var(--sys-color-brand-primary-default) 55%, transparent); }
+.drop-into { --sq-line: var(--lt-drop); --sq-line-w: 1px; }
+/* 놓을 자리 선: 한 단계 옅은 파랑, 양 끝 둥글리지 않은 일자(줄 모서리 squircle 에 잘리지 않게 줄 바탕에 그려요) */
+.lr, .srow { --lt-drop: color-mix(in srgb, var(--sys-color-brand-primary-default) 55%, transparent); }
 </style>

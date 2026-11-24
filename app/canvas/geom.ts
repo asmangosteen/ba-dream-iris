@@ -332,7 +332,8 @@ export function arrangeRects(rs: Rect[], op: ArrangeOp) {
  * 정리(Tidy up ⌃⌥T, 피그마와 같아요): 줄(행)로 나눠 같은 간격으로 가지런히.
  * 간격은 지금 간격들의 평균(없으면 10), 왼쪽 위 자리는 그대로
  */
-export function tidyRects(rs: Rect[]): { x: number; y: number }[] {
+/** 줄(행)로 나누기: 세로 가운데가 앞 줄 안에 들면 같은 줄, 줄 안은 왼쪽부터. gapX · gapY = 지금 간격들의 평균(없으면 10) */
+export function rowsOf(rs: Rect[]): { rows: number[][]; gapX: number; gapY: number } {
   const order = rs.map((r, i) => i).sort((a, b) => rs[a]!.y - rs[b]!.y || rs[a]!.x - rs[b]!.x)
   const rows: number[][] = []
   let band: { top: number; bottom: number } | null = null
@@ -347,6 +348,11 @@ export function tidyRects(rs: Rect[]): { x: number; y: number }[] {
   rows.slice(1).forEach((row, k) => { const prev = rows[k]!; gy.push(Math.min(...row.map((i) => rs[i]!.y)) - Math.max(...prev.map((i) => rs[i]!.y + rs[i]!.h))) })
   const avg = (v: number[]) => { const pos = v.filter((x) => x > 0); return pos.length ? Math.round(pos.reduce((a, b) => a + b, 0) / pos.length) : 10 }
   const gapX = avg(gx), gapY = avg(gy.length ? gy : gx)
+  return { rows, gapX, gapY }
+}
+
+export function tidyRects(rs: Rect[]): { x: number; y: number }[] {
+  const { rows, gapX, gapY } = rowsOf(rs)
   const x0 = Math.min(...rs.map((r) => r.x)), out = rs.map((r) => ({ x: r.x, y: r.y }))
   let y = Math.min(...rs.map((r) => r.y))
   for (const row of rows) {

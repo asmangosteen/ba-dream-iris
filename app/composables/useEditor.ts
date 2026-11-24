@@ -17,7 +17,7 @@ export function useEditor(projectId: string) {
     return data as { id: string; name: string }
   }, { deep: true })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
-    if (preview) return PREVIEW_PAGES
+    if (preview) return PREVIEW_PROJECT_PAGES[projectId] ?? PREVIEW_PAGES
     const { data, error } = await supabase.from('pages').select('id, name, sort_order, layers, viewport').eq('project_id', projectId).order('sort_order')
     if (error) throw error
     return (data ?? []) as PageRow[]
@@ -108,7 +108,10 @@ export function useEditor(projectId: string) {
   async function addScreen(rect: { x: number; y: number; width: number; height: number }, name?: string): Promise<ScreenRow | null> {
     if (!pageId.value) return null
     const list = screens.data.value ?? []
-    const row: ScreenRow = { id: tmpId(), name: name ?? `화면 ${list.length + 1}`, source: 'native', status: 'draft', ...rect }
+    // 피그마처럼 'Frame N' — 지금 있는 'Frame 숫자' 중 가장 큰 수 다음
+    const nums = list.map((v) => /^Frame (\d+)$/.exec(v.name)?.[1]).filter(Boolean).map(Number)
+    const next = nums.length ? Math.max(...nums) + 1 : 1
+    const row: ScreenRow = { id: tmpId(), name: name ?? `Frame ${next}`, source: 'native', status: 'draft', ...rect }
     if (!preview) {
       const { data, error } = await supabase
         .from('screens')

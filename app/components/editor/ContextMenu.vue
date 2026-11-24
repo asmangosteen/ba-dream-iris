@@ -33,7 +33,7 @@ onBeforeUnmount(() => { window.removeEventListener('pointerdown', onDoc, true); 
 </script>
 
 <template>
-  <div v-if="state" ref="el" class="sq ctx" role="menu" aria-label="Context menu" tabindex="-1" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent @pointerleave="el?.focus({ preventScroll: true })">
+  <div v-if="state" ref="el" class="sq ctx" role="menu" :aria-label="tr('Context menu')" tabindex="-1" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent @pointerleave="el?.focus({ preventScroll: true })">
     <template v-for="(it, i) in state.items" :key="i">
       <hr v-if="it === 'sep'" role="separator">
       <button v-else type="button" role="menuitem" tabindex="-1" :class="['sq', { danger: it.danger }]" :disabled="it.disabled" :aria-disabled="it.disabled || undefined" @click="run(it.action)" @pointerenter="($event.currentTarget as HTMLElement).focus({ preventScroll: true })"><span class="lb">{{ it.label }}</span><span v-if="it.shortcut" class="sc">{{ it.shortcut }}</span></button>
@@ -49,7 +49,7 @@ button:hover:not(:disabled), button:focus-visible, button:focus:not(:disabled) {
 button:disabled { color: rgb(255 255 255 / 40%); cursor: default; }
 button.danger:is(:hover, :focus):not(:disabled) { --sq-fill: #E5484D; }
 .lb { flex: 1; white-space: nowrap; }
-.sc { color: rgb(255 255 255 / 70%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sc { color: rgb(255 255 255 / 70%); white-space: nowrap; font-variant-numeric: proportional-nums; }
 button:is(:hover, :focus):not(:disabled) .sc { color: #FFFFFF; }
 hr { height: 1px; margin: 4px 0 3px; border: 0; background: rgb(255 255 255 / 12%); }
 </style>

@@ -67,7 +67,7 @@ const text = computed(() => {
   if (props.type === 'color') return props.value.toUpperCase()
   try {
     const t = JSON.parse(props.value) as { fontSize?: number; lineHeight?: number; letterSpacing?: number; fontWeight?: number }
-    return [`${t.fontSize ?? 16}px`, `Weight ${t.fontWeight ?? 400}`, `Line ${t.lineHeight ?? 'Auto'}`, `Letter ${t.letterSpacing ?? 0}`].join(' · ')
+    return [`${t.fontSize ?? 16}px`, tr('Weight {n}', { n: t.fontWeight ?? 400 }), tr('Line height {n}', { n: t.lineHeight ?? tr('Auto') }), tr('Letter spacing {n}', { n: t.letterSpacing ?? 0 })].join(' · ')
   } catch { return props.value }
 })
 
@@ -81,32 +81,32 @@ async function save() {
     await refreshNuxtData('ds-tokens')
     emit('created', 'db:' + n)
     close(true)
-  } catch { err.value = 'Could not save the style. Try again.' } finally { busy.value = false }
+  } catch { err.value = 'Could not save the style. Try again.' /* 영어 원문 — 보여 줄 때 tr */ } finally { busy.value = false }
 }
 </script>
 
 <template>
-  <button ref="btn" type="button" :class="['ib', 's24', { on: open }]" :aria-label="label" :data-tip="label" aria-haspopup="dialog" :aria-expanded="open" @click="toggle">
+  <button ref="btn" type="button" :class="['ib', 's24', { on: open }]" :aria-label="tr(label)" :data-tip="tr(label)" aria-haspopup="dialog" :aria-expanded="open" @click="toggle">
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="1.25" fill="currentColor" /><circle cx="11" cy="5" r="1.25" fill="currentColor" /><circle cx="5" cy="11" r="1.25" fill="currentColor" /><circle cx="11" cy="11" r="1.25" fill="currentColor" /></svg>
   </button>
   <Teleport to="body">
     <!-- 피그마 팝오버(§9.1): 폭 240 · 머리 40(제목 + ✕, 아래 선) · 본문 안쪽 12 16 16 · 라벨 11/16 → 칸 28. body 로 옮겨져도 편집기 규칙을 받게 editor 클래스 -->
-    <div v-if="open" ref="pop" class="sq sc-pop editor" role="dialog" :aria-label="label" :style="pos" @keydown.esc.stop.prevent="close(true)">
+    <div v-if="open" ref="pop" class="sq sc-pop editor" role="dialog" :aria-label="tr(label)" :style="pos" @keydown.esc.stop.prevent="close(true)">
       <div class="pop-h">
-        <span class="pop-t">{{ label }}</span>
-        <button type="button" class="ib s24" aria-label="Close" data-tip="Close" @click="close(true)"><EditorIcon name="close" :size="16" /></button>
+        <span class="pop-t">{{ tr(label) }}</span>
+        <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button>
       </div>
       <div class="pop-b">
         <div class="fl">
-          <span class="lb">Name</span>
-          <label class="sq fld"><input ref="input" v-model="name" aria-label="Style name" placeholder="e.g. brand/primary" spellcheck="false" autocomplete="off" @keydown.enter.prevent="save"></label>
+          <span class="lb">{{ tr('Name') }}</span>
+          <label class="sq fld"><input ref="input" v-model="name" :aria-label="tr('Style name')" :placeholder="tr('e.g. {example}', { example: 'brand/primary' })" spellcheck="false" autocomplete="off" @keydown.enter.prevent="save"></label>
         </div>
         <div class="fl">
-          <span class="lb">Value</span>
+          <span class="lb">{{ tr('Value') }}</span>
           <span class="val"><span v-if="type === 'color'" class="sqc vsw" :style="{ background: `linear-gradient(${value}, ${value}), repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px` }" /><span class="vt">{{ text }}</span></span>
         </div>
-        <span v-if="err" class="err" role="alert">{{ err }}</span>
-        <div class="end"><button type="button" class="sq act gray" @click="close(true)">Cancel</button><button type="button" class="sq act pri" :disabled="!name.trim() || busy" @click="save">{{ busy ? 'Saving…' : 'Create style' }}</button></div>
+        <span v-if="err" class="err" role="alert">{{ tr(err) }}</span>
+        <div class="end"><button type="button" class="sq act gray" @click="close(true)">{{ tr('Cancel') }}</button><button type="button" class="sq act pri" :disabled="!name.trim() || busy" @click="save">{{ busy ? tr('Saving…') : tr('Create style') }}</button></div>
       </div>
     </div>
   </Teleport>
@@ -121,7 +121,7 @@ async function save() {
 .pop-b { padding: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .fl { display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
 .lb { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
-.val { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; min-height: 18px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.val { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; min-height: 18px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); font-variant-numeric: proportional-nums; }
 .vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vsw { flex: none; width: 16px; height: 16px; border-radius: var(--ref-radius-02); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
 .err { font-size: 11px; line-height: 16px; color: var(--sys-color-system-error, #E5484D); }
