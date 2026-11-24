@@ -244,7 +244,7 @@ async function onSaved(msg: string) {
         </div>
         <div v-else class="grid">
           <div v-for="c in cards" :key="c.id" class="card">
-            <span :class="['sq', 'thumb', { on: curComp?.id === c.id }]">
+            <span :class="['sq', 'sq-clip', 'thumb', { on: curComp?.id === c.id }]">
               <DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" />
             </span>
             <button type="button" class="card-btn" :aria-pressed="curComp?.id === c.id" @click="pickComponent(c)">
@@ -275,9 +275,9 @@ async function onSaved(msg: string) {
             <button v-for="t in g.items" :key="t.id" type="button" :class="['sq', 'tok-row', { on: curToken?.id === t.id }]" :aria-pressed="curToken?.id === t.id" @click="pickToken(t)">
               <span data-preview class="tok-pv" aria-hidden="true">
                 <span v-if="g.type === 'typography'" class="pv-typo" :style="typoStyle(t.value)">가나 Aa</span>
-                <span v-else-if="g.type === 'spacing'" class="pv-space" :style="{ width: px(t.value) + 'px' }" />
-                <span v-else-if="g.type === 'radius'" class="pv-radius" :style="{ borderRadius: t.value }" />
-                <span v-else class="pv-shadow" :style="{ boxShadow: t.value }" />
+                <span v-else-if="g.type === 'spacing'" class="sqc pv-space" :style="{ width: px(t.value) + 'px' }" />
+                <span v-else-if="g.type === 'radius'" class="sq pv-radius" :style="{ borderRadius: t.value }" />
+                <span v-else class="sq pv-shadow" :style="{ boxShadow: t.value }" />
               </span>
               <span class="tx-body name ell" :title="t.name">{{ t.name }}</span>
               <span class="tx-meta num ell" :title="t.value">{{ t.value }}</span>
@@ -352,9 +352,9 @@ async function onSaved(msg: string) {
           <span data-preview class="sq big-pv" aria-hidden="true">
             <span v-if="curToken.type === 'color'" class="big-swatch" :style="{ background: curToken.value }" />
             <span v-else-if="curToken.type === 'typography'" :style="typoStyle(curToken.value)">가나다라 Aa</span>
-            <span v-else-if="curToken.type === 'spacing'" class="pv-space" :style="{ width: px(curToken.value) + 'px' }" />
-            <span v-else-if="curToken.type === 'radius'" class="pv-radius big" :style="{ borderRadius: curToken.value }" />
-            <span v-else class="pv-shadow big" :style="{ boxShadow: curToken.value }" />
+            <span v-else-if="curToken.type === 'spacing'" class="sqc pv-space" :style="{ width: px(curToken.value) + 'px' }" />
+            <span v-else-if="curToken.type === 'radius'" class="sq pv-radius big" :style="{ borderRadius: curToken.value }" />
+            <span v-else class="sq pv-shadow big" :style="{ boxShadow: curToken.value }" />
           </span>
           <div class="sq code">
             <pre class="tx-code">{{ curCode }}</pre>
@@ -410,7 +410,6 @@ async function onSaved(msg: string) {
 .thumb { display: block; height: 92px; position: relative; border-radius: var(--ref-radius-07); overflow: hidden; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 /* 미리보기를 실제 크기의 60% 로 줄여 작은 칸에 담습니다 */
 .thumb :deep(.pv) { position: absolute; left: 0; top: 0; width: 166.67%; height: 166.67%; transform: scale(.6); transform-origin: 0 0; }
-.thumb :deep(.pv) { border-radius: inherit; }
 .card:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }
 .thumb.on, .card:hover .thumb.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 .card-btn { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ref-spacing-06); min-width: 0; }
@@ -439,8 +438,8 @@ async function onSaved(msg: string) {
 .tok-pv { display: flex; align-items: center; min-height: 32px; overflow: hidden; color: var(--sys-color-neutral-800); }
 .pv-typo { white-space: nowrap; }
 .pv-space { display: block; height: 12px; min-width: 1px; background: var(--sys-color-brand-primary-light); border-radius: var(--ref-radius-01); }
-.pv-radius { display: block; width: 32px; height: 32px; box-shadow: inset 0 0 0 1.5px var(--sys-color-neutral-800); }
-.pv-shadow { display: block; width: 32px; height: 32px; border-radius: var(--ref-radius-04); background: var(--sys-color-common-white-default); }
+.pv-radius { display: block; width: 32px; height: 32px; --sq-line: var(--sys-color-neutral-800); --sq-line-w: 1.5px; }
+.pv-shadow { display: block; width: 32px; height: 32px; border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); }
 .big { width: 72px; height: 72px; }
 .desc { color: var(--sys-color-neutral-500); }
 

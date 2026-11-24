@@ -377,7 +377,7 @@ function exportCsv() {
       <div class="d-pad">
         <p class="tx-body d-title">{{ selected.req.title }}</p>
         <p v-if="selected.req.body" class="tx-read">{{ selected.req.body }}</p>
-        <div class="summary">
+        <div class="sq summary">
           <div class="kv"><span class="tx-meta">상태</span>
             <span class="status tx-body">
               <StatusIcon v-if="selected.status !== 'none'" :status="selected.status" :size="12" />
@@ -411,7 +411,7 @@ function exportCsv() {
           </div>
           <div v-for="{ link: l, screen } in selectedLinks" :key="l.screen_id" class="sq card">
             <div class="card-row">
-              <button type="button" class="st-btn" :disabled="saving" :aria-label="`상태 바꾸기: 지금 ${LINK_STATUS[l.status].label}`" :title="`눌러서 ${LINK_STATUS[NEXT_STATUS[l.status]].label}(으)로 바꿔요`" @click="cycle(l)">
+              <button type="button" class="sq st-btn" :disabled="saving" :aria-label="`상태 바꾸기: 지금 ${LINK_STATUS[l.status].label}`" :title="`눌러서 ${LINK_STATUS[NEXT_STATUS[l.status]].label}(으)로 바꿔요`" @click="cycle(l)">
                 <StatusIcon :status="l.status" :size="12" />
               </button>
               <div class="card-col">
@@ -420,7 +420,7 @@ function exportCsv() {
               </div>
               <button type="button" class="ib s" :disabled="saving" aria-label="연결 끊기" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><Icon name="trashbin" :size="14" /></button>
             </div>
-            <p v-if="l.note" class="tx-body note">{{ l.note }}</p>
+            <p v-if="l.note" class="sq tx-body note">{{ l.note }}</p>
             <div v-if="unlinking === l.screen_id" class="unlink" role="alertdialog" :aria-label="`${screen?.name ?? '화면'} 연결 끊기`">
               <span class="tx-meta">이 화면과의 연결을 끊을까요?</span>
               <Button size="s" type="tertiary" @click="unlinking = null">취소</Button>
@@ -489,7 +489,7 @@ function exportCsv() {
 .d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-08) var(--ref-spacing-10); }
 .d-pad p { margin: 0; }
 .d-title { font-weight: 500; }
-.summary { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); }
+.summary { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
 .kv { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-06); }
 .src { align-self: flex-start; }
 .no-link { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); }
@@ -506,13 +506,13 @@ function exportCsv() {
 .card-name { transition: color .12s ease; }
 .card-name:hover { color: var(--sys-color-brand-primary-default); }
 .card-name:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; border-radius: var(--ref-radius-01); }
-.st-btn { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-03); margin-left: calc(-1 * var(--ref-spacing-04)); transition: background-color .12s ease; }
-.st-btn:hover { background: var(--interaction-light-gray-hover); }
-.st-btn:active { background: var(--interaction-light-gray-pressed); }
+.st-btn { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-03); margin-left: calc(-1 * var(--ref-spacing-04)); }
+.st-btn:hover { --sq-fill: var(--interaction-light-gray-hover); }
+.st-btn:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .st-btn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.st-btn:disabled { cursor: default; background: none; }
+.st-btn:disabled { cursor: default; --sq-fill: transparent; }
 .unlink { display: flex; align-items: center; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-06); box-shadow: inset 0 1px 0 var(--iris-line); }
 .unlink > span { flex: 1; min-width: 0; }
-.note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-100); }
+.note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .err { color: var(--sys-color-theme-destructed-default); }
 </style>

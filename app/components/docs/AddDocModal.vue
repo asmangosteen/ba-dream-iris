@@ -343,7 +343,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               </div>
               <div class="col6">
                 <label for="docBody" class="tx-head">내용</label>
-                <textarea id="docBody" v-model="body" class="area" rows="7" placeholder="'# ' 제목, '## ' 소제목, '- ' 목록. 빈 줄로 문단을 나눠요." />
+                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" placeholder="'# ' 제목, '## ' 소제목, '- ' 목록. 빈 줄로 문단을 나눠요." /></div>
                 <span class="tx-meta num">요구사항 번호(REQ-001 등)로 시작하는 줄은 요구사항으로 등록돼요{{ foundCount ? ` · 지금 ${foundCount}개` : '' }}</span>
               </div>
             </div>
@@ -416,9 +416,11 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .tpl-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .tpl-item.on { font-weight: 600; --sq-overlay: transparent; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
 
-.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
-.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+/* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
+.area-box { display: block; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
+.area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 
 .err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0; color: var(--sys-color-theme-error-default); }

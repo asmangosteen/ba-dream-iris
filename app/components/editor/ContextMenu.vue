@@ -20,20 +20,20 @@ onBeforeUnmount(() => { window.removeEventListener('pointerdown', onDoc, true); 
 </script>
 
 <template>
-  <div v-if="state" ref="el" class="ctx" role="menu" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent>
+  <div v-if="state" ref="el" class="sq ctx" role="menu" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent>
     <template v-for="(it, i) in state.items" :key="i">
       <hr v-if="it === 'sep'">
-      <button v-else role="menuitem" :class="{ danger: it.danger }" :disabled="it.disabled" @click="run(it.action)"><span class="lb">{{ it.label }}</span><span v-if="it.shortcut" class="sc">{{ it.shortcut }}</span></button>
+      <button v-else role="menuitem" :class="['sq', { danger: it.danger }]" :disabled="it.disabled" @click="run(it.action)"><span class="lb">{{ it.label }}</span><span v-if="it.shortcut" class="sc">{{ it.shortcut }}</span></button>
     </template>
   </div>
 </template>
 
 <style scoped>
-.ctx { position: fixed; z-index: 100; min-width: 220px; padding: 6px; border-radius: 12px; background: #1E1E1E; color: #FFFFFF; box-shadow: 0 2px 6px rgb(0 0 0 / 20%), 0 10px 32px rgb(0 0 0 / 28%); font-family: var(--font-family-base); font-size: 12px; }
+.ctx { position: fixed; z-index: 100; min-width: 220px; padding: 6px; border-radius: 12px; --sq-fill: #1E1E1E; color: #FFFFFF; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 20%)) drop-shadow(0 10px 16px rgb(0 0 0 / 28%)); font-family: var(--font-family-base); font-size: 12px; }
 button { display: flex; align-items: center; gap: 16px; width: 100%; height: 26px; padding: 0 10px; border-radius: 6px; color: inherit; text-align: left; }
-button:hover:not(:disabled), button:focus-visible { background: var(--iris-select, #0D99FF); outline: none; }
+button:hover:not(:disabled), button:focus-visible { --sq-fill: var(--iris-select, #0D99FF); outline: none; }
 button:disabled { color: rgb(255 255 255 / 35%); }
-button.danger:hover:not(:disabled) { background: #E5484D; }
+button.danger:hover:not(:disabled) { --sq-fill: #E5484D; }
 .lb { flex: 1; white-space: nowrap; }
 .sc { color: rgb(255 255 255 / 55%); white-space: nowrap; }
 button:hover:not(:disabled) .sc { color: rgb(255 255 255 / 85%); }

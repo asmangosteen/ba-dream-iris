@@ -87,7 +87,7 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
   <div class="tree" role="tree" aria-label="Layers">
     <template v-for="s in screens" :key="s.id">
       <div v-if="!isCanvasRow(s)" role="treeitem" tabindex="0" :aria-selected="store.screenId.value === s.id && !store.layerIds.value.length" :class="['sq', 'nav-item', 's', 'row', { on: store.screenId.value === s.id && !store.layerIds.value.length }]" @click="emit('pick-screen', s.id)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
-        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
+        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(s.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path d="M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
         <span class="name">{{ s.name }}</span>
@@ -114,17 +114,17 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         @drop.prevent="onDrop(r)"
         @dragend="dragging = null; over = null"
       >
-        <button v-if="isContainer(r.n) && r.n.children?.length" class="chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(r.sid + ':' + r.n.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
+        <button v-if="isContainer(r.n) && r.n.children?.length" class="sq chev" :aria-label="closed.has(r.sid + ':' + r.n.id) ? 'Expand' : 'Collapse'" @click.stop="toggle(r.sid + ':' + r.n.id)"><Icon name="chevron_down" :size="12" :class="{ rot: closed.has(r.sid + ':' + r.n.id) }" /></button>
         <span v-else class="chev" />
         <svg v-if="LAYER_ICON[r.n.type]" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" class="ic"><path :d="LAYER_ICON[r.n.type]" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
         <Icon v-else name="image" :size="12" class="ic" />
-        <input v-if="renaming === r.n.id" class="txt-in ren" :value="r.n.name" aria-label="Layer name" autofocus @click.stop @blur="rename(r, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
+        <input v-if="renaming === r.n.id" class="sqc txt-in ren" :value="r.n.name" aria-label="Layer name" autofocus @click.stop @blur="rename(r, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
         <span v-else class="name">{{ r.n.name }}</span>
         <span class="tools" :class="{ keep: r.n.hidden || r.n.locked }">
-          <button class="mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? 'Unlock' : 'Lock'" :title="r.n.locked ? 'Unlock' : 'Lock'" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
+          <button class="sq mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? 'Unlock' : 'Lock'" :title="r.n.locked ? 'Unlock' : 'Lock'" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
             <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="5.5" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.1" /><path :d="r.n.locked ? 'M4 5.5V4a2 2 0 0 1 4 0v1.5' : 'M4 5.5V4a2 2 0 0 1 3.8-.9'" fill="none" stroke="currentColor" stroke-width="1.1" /></svg>
           </button>
-          <button class="mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? 'Show' : 'Hide'" :title="r.n.hidden ? 'Show' : 'Hide'" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
+          <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? 'Show' : 'Hide'" :title="r.n.hidden ? 'Show' : 'Hide'" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
             <svg v-if="!r.n.hidden" width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7s2-3.8 5.5-3.8S12.5 7 12.5 7 10.5 10.8 7 10.8 1.5 7 1.5 7z" stroke="currentColor" stroke-width="1.2" fill="none" /><circle cx="7" cy="7" r="1.6" fill="currentColor" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M5.2 3.6A6 6 0 0 1 7 3.2c3.5 0 5.5 3.8 5.5 3.8a10 10 0 0 1-1.7 2.2M3.2 4.9A10 10 0 0 0 1.5 7S3.5 10.8 7 10.8c.7 0 1.3-.1 1.9-.4" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
           </button>
@@ -138,8 +138,8 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
 .tree { display: flex; flex-direction: column; }
 .row { cursor: default; user-select: none; gap: var(--ref-spacing-02) !important; }
 .chev { width: 14px; height: 14px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-01); color: var(--sys-color-neutral-500); }
-button.chev:hover { color: var(--sys-color-neutral-800); background: var(--interaction-light-gray-hover); }
-button.chev:active { background: var(--interaction-light-gray-pressed); }
+button.chev:hover { color: var(--sys-color-neutral-800); --sq-fill: var(--interaction-light-gray-hover); }
+button.chev:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .chev .rot, .chev :deep(svg) { transition: transform .12s ease; }
 .chev .rot { transform: rotate(-90deg); }
 .ic { flex: none; color: var(--sys-color-neutral-600); margin-right: var(--ref-spacing-02); }
@@ -149,9 +149,9 @@ button.chev:active { background: var(--interaction-light-gray-pressed); }
 .ren { height: 22px; flex: 1; min-width: 0; }
 .tools { display: none; gap: var(--ref-spacing-02); flex: none; }
 .row:hover .tools, .row:focus-within .tools, .tools.keep { display: flex; }
-.mini { width: 18px; height: 18px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); transition: background-color .12s ease, color .12s ease; }
-.mini:hover { background: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
-.mini:active { background: var(--interaction-light-gray-pressed); }
+.mini { width: 18px; height: 18px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); transition: color .12s ease; }
+.mini:hover { --sq-fill: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.mini:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .mini.act2 { color: var(--sys-color-neutral-800); }
 .chev:focus-visible, .mini:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .drop-above { box-shadow: inset 0 2px 0 var(--sys-color-brand-primary-default); }

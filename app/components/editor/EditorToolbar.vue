@@ -72,7 +72,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
           <Icon v-else :name="it.icon!" :size="16" />
         </template>
       </button>
-      <button v-if="g.tools.length > 1" class="more" :class="{ open: open === g.id }" :aria-label="`More ${g.id} tools`" :aria-expanded="open === g.id" @click="open = open === g.id ? null : g.id">
+      <button v-if="g.tools.length > 1" class="sq more" :class="{ open: open === g.id }" :aria-label="`More ${g.id} tools`" :aria-expanded="open === g.id" @click="open = open === g.id ? null : g.id">
         <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 3l2.5 2.5L6.5 3" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
       </button>
       <div v-if="open === g.id" class="sq menu pop" role="menu">
@@ -95,7 +95,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
 .bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-04); display: flex; align-items: center; gap: var(--ref-spacing-02); z-index: 3; }
 .grp-wrap { position: relative; display: flex; align-items: center; }
 .more { width: 12px; height: 32px; display: grid; place-items: center; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-02); }
-.more:hover, .more.open { color: var(--sys-color-neutral-800); background: var(--interaction-light-gray-hover); }
+.more:hover, .more.open { color: var(--sys-color-neutral-800); --sq-fill: var(--interaction-light-gray-hover); }
 .pop { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; min-width: 180px; }
 .pop .menu-item { gap: var(--ref-spacing-05); }
 .pop .menu-item svg, .pop .menu-item :deep(svg) { flex: none; }

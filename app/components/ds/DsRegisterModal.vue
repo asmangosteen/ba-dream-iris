@@ -395,7 +395,7 @@ async function save() {
             />
             <div class="row">
               <label for="ds-c-props" class="tx-head">속성</label>
-              <textarea id="ds-c-props" v-model="comp.props" rows="3" class="area tx-code" placeholder="type: primary, secondary&#10;label: text&#10;disabled: boolean" />
+              <div class="sq area-box"><textarea id="ds-c-props" v-model="comp.props" rows="3" class="area tx-code" placeholder="type: primary, secondary&#10;label: text&#10;disabled: boolean" /></div>
             </div>
           </template>
 
@@ -417,7 +417,7 @@ async function save() {
                 :input-props="{ id: 'ds-t-value', required: true }"
                 :label-props="{ htmlFor: 'ds-t-value' }"
               />
-              <span v-if="tok.type === 'color' && tok.value" class="sw val-sw" :style="{ background: tok.value }" aria-hidden="true" />
+              <span v-if="tok.type === 'color' && tok.value" class="sq sq-clip sw val-sw" :style="{ background: tok.value }" aria-hidden="true" />
             </div>
             <TextInput v-model:value="tok.description" v-bind="TI" label="설명" placeholder="어디에 쓰는지 적어 주세요" :input-props="{ id: 'ds-t-desc' }" :label-props="{ htmlFor: 'ds-t-desc' }" />
           </template>
@@ -432,12 +432,12 @@ async function save() {
                   <input ref="fileInput" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
                 </span>
               </div>
-              <textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="area tx-code" spellcheck="false" placeholder="name,code_name,category,description,aliases&#10;Button,Button,입력,주요 동작 버튼,btn|버튼" />
+              <div class="sq area-box"><textarea id="ds-bulk" v-model="bulk" data-first rows="8" class="area tx-code" spellcheck="false" placeholder="name,code_name,category,description,aliases&#10;Button,Button,입력,주요 동작 버튼,btn|버튼" /></div>
               <details class="help">
                 <summary class="tx-meta">받는 형식 보기</summary>
                 <ul class="tx-meta">
-                  <li>CSV · 시트에서 복사한 표(탭): 첫 줄은 머리. <code class="tx-code">value</code> 칸이 있으면 토큰(type, name, value, description), 없으면 컴포넌트(name, code_name, category, description, aliases, props)로 읽어요. 별칭은 <code class="tx-code">|</code>, 속성은 <code class="tx-code">type:primary|secondary; disabled:boolean</code> 처럼 적어요.</li>
-                  <li>JSON: <code class="tx-code">{ "components": [...], "tokens": [...] }</code>, 객체 배열(<code class="tx-code">value</code> 가 있으면 토큰), 또는 토큰 트리(<code class="tx-code">{ "color": { "brand": { "$value": "#2C7BE2" } } }</code>, 이름은 경로를 / 로 이어요).</li>
+                  <li>CSV · 시트에서 복사한 표(탭): 첫 줄은 머리. <code class="sq tx-code">value</code> 칸이 있으면 토큰(type, name, value, description), 없으면 컴포넌트(name, code_name, category, description, aliases, props)로 읽어요. 별칭은 <code class="sq tx-code">|</code>, 속성은 <code class="sq tx-code">type:primary|secondary; disabled:boolean</code> 처럼 적어요.</li>
+                  <li>JSON: <code class="sq tx-code">{ "components": [...], "tokens": [...] }</code>, 객체 배열(<code class="sq tx-code">value</code> 가 있으면 토큰), 또는 토큰 트리(<code class="sq tx-code">{ "color": { "brand": { "$value": "#2C7BE2" } } }</code>, 이름은 경로를 / 로 이어요).</li>
                   <li>토큰 종류: color · typography · spacing · radius · shadow (비우면 이름 · 값으로 짐작해요). 같은 이름 토큰은 값을 덮어쓰고, 이미 있는 컴포넌트 이름은 건너뛰어요.</li>
                 </ul>
               </details>
@@ -447,7 +447,7 @@ async function save() {
               <ul v-if="preview.length" class="plist">
                 <li v-for="p in preview.slice(0, 8)" :key="p.key" class="prow">
                   <span class="tx-meta kind">{{ p.kind }}</span>
-                  <span v-if="p.swatch" class="sw" :style="{ background: p.swatch }" aria-hidden="true" />
+                  <span v-if="p.swatch" class="sq sq-clip sw" :style="{ background: p.swatch }" aria-hidden="true" />
                   <span class="tx-body pname" :title="p.name">{{ p.name }}</span>
                   <span class="tx-meta pmeta num" :title="p.meta">{{ p.meta }}</span>
                 </li>
@@ -483,22 +483,24 @@ async function save() {
 .row > .tx-head:first-child, .bulk-h > .tx-head { color: var(--sys-color-neutral-700); }
 .row > .help { margin-top: var(--ref-spacing-02); }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ref-spacing-06); }
-.area { display: block; width: 100%; box-sizing: border-box; min-height: 66px; resize: vertical; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); color: var(--sys-color-neutral-800); transition: box-shadow .12s ease; }
-.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
-.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.area { display: block; width: 100%; box-sizing: border-box; min-height: 66px; resize: vertical; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; color: var(--sys-color-neutral-800); }
+/* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
+.area-box { display: block; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
+.area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .val { position: relative; }
 .val-sw { position: absolute; right: var(--ref-spacing-08); bottom: 9px; width: 12px; height: 12px; }
 .val :deep(input) { padding-right: var(--ref-spacing-10); }
 .types { flex-wrap: wrap; margin-left: calc(-1 * var(--ref-spacing-06)); }
-.sw { width: 14px; height: 14px; border-radius: var(--ref-radius-02); box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
+.sw { width: 14px; height: 14px; border-radius: var(--ref-radius-02); --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 0.5px; }
 .bulk-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .bulk-act { display: flex; align-items: center; gap: var(--ref-spacing-08); }
 .help summary { cursor: pointer; width: max-content; border-radius: var(--ref-radius-02); transition: color .12s ease; }
 .help summary:hover { color: var(--sys-color-neutral-800); }
 .help summary:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .help ul { margin: var(--ref-spacing-04) 0 0; padding-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.help code { padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); background: var(--sys-color-neutral-100); }
+.help code { padding: 0 var(--ref-spacing-02); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); }
 .result { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); }
 .plist, .errs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
 .prow { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }

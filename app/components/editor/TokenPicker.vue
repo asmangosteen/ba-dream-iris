@@ -202,10 +202,10 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
             @click="choose(i)"
             @pointermove="active = i"
           >
-            <span v-if="t.kind === 'color'" :class="['pv', 'sw', { al: alpha(t.color) }]"><i :style="{ background: t.color }" /></span>
+            <span v-if="t.kind === 'color'" :class="['sqc', 'pv', 'sw', { al: alpha(t.color) }]"><i class="sq" :style="{ '--sq-fill': t.color }" /></span>
             <span v-else-if="t.kind === 'textStyle'" class="pv ts" data-preview :style="{ fontSize: sampleSize(t.text!.size) + 'px', fontWeight: t.text!.weight ?? 400 }">Ag</span>
             <span v-else-if="t.kind === 'fontWeight'" class="pv ts" :style="{ fontWeight: t.num }">Ag</span>
-            <span v-else-if="t.kind === 'shadow'" class="pv sh" :style="{ boxShadow: t.css }" />
+            <span v-else-if="t.kind === 'shadow'" class="sq pv sh" :style="{ boxShadow: t.css }" />
             <span class="nm">{{ t.name }}</span>
             <span class="vl">{{ t.value }}</span>
           </button>
@@ -262,7 +262,7 @@ const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${
 .pv { flex: none; width: 14px; height: 14px; display: grid; place-items: center; color: var(--sys-color-neutral-600); }
 .sw { position: relative; border-radius: 3px; overflow: hidden; }
 .sw.al { background: repeating-conic-gradient(var(--iris-paper) 0 25%, #D6D9DD 0 50%) 0 0 / 6px 6px; }
-.sw i { position: absolute; inset: 0; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); border-radius: inherit; }
+.sw i { position: absolute; inset: 0; --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 0.5px; border-radius: inherit; }
 .ts { width: 28px; height: auto; min-height: 18px; line-height: 1.2; color: var(--sys-color-neutral-800); font-family: var(--font-family-base); }
-.sh { border-radius: 3px; background: var(--iris-paper); margin: 0 2px; width: 12px; height: 12px; }
+.sh { border-radius: 3px; --sq-fill: var(--iris-paper); margin: 0 2px; width: 12px; height: 12px; }
 </style>

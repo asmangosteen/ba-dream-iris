@@ -49,7 +49,7 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
         <span class="nav-label p2">{{ g.label }}</span>
         <div class="grid">
           <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="`View ${c.name} details`" :title="exportName(c) ? 'Drag onto the canvas' : undefined" :draggable="exportName(c) ? 'true' : 'false'" @dragstart="(e) => { const n = exportName(c); if (n) onDrag(e, n); else e.preventDefault() }" @click="emit('update:open', c.id)">
-            <span class="sq asset-thumb" data-preview><DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" /></span>
+            <span class="sq sq-clip asset-thumb" data-preview><DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" /></span>
             <span class="tname">{{ c.name }}</span>
             <span class="tx-meta tuse">{{ useCount(c.id) ? `${useCount(c.id)} in this file` : 'Unused' }}</span>
           </button>
@@ -70,7 +70,7 @@ const propRows = computed(() => Object.entries(detail.value?.props_schema ?? {})
     </div>
     <div class="dbody">
       <div class="pad">
-        <span class="sq big" data-preview><DsPreview :names="[detail.name, detail.code_name, ...(detail.match_aliases ?? [])]" :label="detail.name" /></span>
+        <span class="sq sq-clip big" data-preview><DsPreview :names="[detail.name, detail.code_name, ...(detail.match_aliases ?? [])]" :label="detail.name" /></span>
         <p v-if="detail.description" class="tx-meta m0 mt4">{{ detail.description }}</p>
         <div v-if="detailExport" class="ins mt8">
           <Button size="s" type="primary" class="grow" @click="emit('insert', detailExport)">Insert instance</Button>

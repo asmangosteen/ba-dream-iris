@@ -68,14 +68,14 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
       <RadioButton size="l" :checked="false" aria-label="선택 안 됨" />
     </template>
     <template v-else-if="kind === 'listitem'">
-      <span class="li"><i class="lead" /><span class="li-t">알림 설정</span><Icon name="chevron_right" :size="16" /></span>
-      <span class="li"><i class="lead" /><span class="li-t">계정 관리</span><Icon name="chevron_right" :size="16" /></span>
+      <span class="li"><i class="sqc lead" /><span class="li-t">알림 설정</span><Icon name="chevron_right" :size="16" /></span>
+      <span class="li"><i class="sqc lead" /><span class="li-t">계정 관리</span><Icon name="chevron_right" :size="16" /></span>
     </template>
     <template v-else-if="kind === 'card'">
-      <span class="card"><span class="card-img" /><span class="card-col"><span class="card-t">모델 A</span><span class="card-s">월 89,000원부터</span></span></span>
+      <span class="sq card"><span class="sqc card-img" /><span class="card-col"><span class="card-t">모델 A</span><span class="card-s">월 89,000원부터</span></span></span>
     </template>
     <template v-else-if="kind === 'bottomsheet'">
-      <span class="sheet"><span class="grab" /><span class="sheet-t">요금제를 골라주세요</span><span class="sheet-btn">선택하기</span></span>
+      <span class="sq sheet"><span class="grab" /><span class="sheet-t">요금제를 골라주세요</span><span class="sqc sheet-btn">선택하기</span></span>
     </template>
     <template v-else-if="kind === 'toast'">
       <span class="pad-x"><Toast type="success" message="저장했어요" /></span>
@@ -85,7 +85,7 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
     </template>
     <template v-else-if="kind === 'bottomnavigation'">
       <span class="bnav">
-        <span v-for="(t, i) in ['홈', '내 차고', '커뮤니티', '마이']" :key="t" :class="['bn', { on: i === 0 }]"><i /><span>{{ t }}</span></span>
+        <span v-for="(t, i) in ['홈', '내 차고', '커뮤니티', '마이']" :key="t" :class="['bn', { on: i === 0 }]"><i class="sqc" /><span>{{ t }}</span></span>
       </span>
     </template>
     <!-- 기본 탑재 목록(dsCatalog)의 나머지 컴포넌트: 실제 컴포넌트를 기본 속성으로 -->
@@ -108,7 +108,7 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
     <template v-else-if="label === 'Pagination'"><Pagination :current="2" :total="5" /></template>
     <template v-else-if="label === 'Tooltip'"><Tooltip>여기를 눌러 보세요</Tooltip></template>
     <template v-else>
-      <span class="ph">{{ initials }}</span>
+      <span class="sq ph">{{ initials }}</span>
     </template>
   </span>
 </template>
@@ -128,14 +128,14 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
 .lead { width: 28px; height: 28px; border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); }
 
 .pv.card { padding: 0 var(--ref-spacing-11); }
-.card { display: flex; align-items: center; gap: var(--ref-spacing-08); width: 100%; padding: var(--ref-spacing-07); border-radius: var(--ref-radius-07); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); box-sizing: border-box; }
+.card { display: flex; align-items: center; gap: var(--ref-spacing-08); width: 100%; padding: var(--ref-spacing-07); border-radius: var(--ref-radius-07); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; box-sizing: border-box; }
 .card-img { width: 44px; height: 44px; flex: none; border-radius: var(--ref-radius-05); background: var(--sys-color-neutral-100); }
 .card-col { display: flex; flex-direction: column; }
 .card-t { font-weight: 500; }
 .card-s { font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); }
 
 .pv.bottomsheet { align-items: flex-end; background: var(--ref-color-gray-900-20); padding: 0 var(--ref-spacing-10); }
-.sheet { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); width: 100%; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-10); border-radius: var(--ref-radius-08) var(--ref-radius-08) 0 0; background: var(--sys-color-common-white-default); box-sizing: border-box; }
+.sheet { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); width: 100%; padding: var(--ref-spacing-04) var(--ref-spacing-10) calc(var(--ref-spacing-10) + 2 * var(--ref-radius-08)); margin-bottom: calc(-2 * var(--ref-radius-08)); border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-default); box-sizing: border-box; }
 .grab { width: 36px; height: 4px; border-radius: var(--ref-radius-12); background: var(--sys-color-neutral-300); margin-bottom: var(--ref-spacing-02); }
 .sheet-t { align-self: flex-start; font-weight: 600; }
 .sheet-btn { width: 100%; padding: var(--ref-spacing-07) 0; border-radius: var(--ref-radius-05); background: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-weight: 600; text-align: center; }
@@ -150,6 +150,6 @@ const initials = computed(() => props.label.replace(/[^A-Za-z0-9가-힣]/g, '').
 .bn.on { color: var(--sys-color-neutral-800); font-weight: 600; }
 .bn.on i { background: var(--sys-color-neutral-800); }
 
-.ph { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--ref-radius-06); background: var(--sys-color-neutral-100); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-5); color: var(--sys-color-neutral-500); font-size: 14px; font-weight: 600; }
+.ph { display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--ref-color-gray-900-5); --sq-line-w: 1px; color: var(--sys-color-neutral-500); font-size: 14px; font-weight: 600; }
 .col { display: flex; flex-direction: column; gap: 8px; }
 </style>

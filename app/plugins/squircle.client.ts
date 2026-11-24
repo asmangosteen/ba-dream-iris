@@ -5,7 +5,7 @@ function irisSquircle(): void {
   const w = window as unknown as { __irisSq?: boolean };
   if (w.__irisSq) return;
   w.__irisSq = true;
-  const SEL = '.sq,.ib,.fld,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field';
+  const SEL = '.sq,.ib,.fld,.float,.seg-item,.rail-btn,.dd,.menu,.menu-item,.grp,.act,.field,.sqc';
   const S = 0.6;
   const f = (n: number) => n.toFixed(3);
   const corner = (r: number, budget: number) => {
@@ -44,9 +44,15 @@ function irisSquircle(): void {
     if (raw.trim().endsWith('%')) r = Math.min(ow, oh) * r / 100;
     const lw = parseFloat(cs.getPropertyValue('--sq-line-w')) || 0;
     const key = ow + '|' + oh + '|' + r + '|' + lw;
-    if (last.get(el) === key && el.style.getPropertyValue('--sq-path')) return;
+    if (last.get(el) === key && (el.style.getPropertyValue('--sq-path') || el.style.getPropertyValue('--sq-clip'))) return;
     last.set(el, key);
-    if (r <= 0) { el.removeAttribute('data-sq'); return; }
+    if (r <= 0) { el.removeAttribute('data-sq'); el.removeAttribute('data-sqc'); return; }
+    // .sqc: 요소 자체를 squircle 로 자르기만(견본 · 썸네일 · 입력칸처럼 배경 · 그림을 직접 칠하는 요소)
+    if (el.classList.contains('sqc')) {
+      el.style.setProperty('--sq-clip', "path('" + path(ow, oh, r, 0, 0) + "')");
+      if (!el.hasAttribute('data-sqc')) el.setAttribute('data-sqc', '');
+      return;
+    }
     const outer = path(ow, oh, r, 1, 1);
     el.style.setProperty('--sq-path', "path('" + outer + "')");
     el.style.setProperty('--sq-ring', lw > 0 && ow > lw * 2 && oh > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(ow - lw * 2, oh - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
@@ -60,6 +66,17 @@ function irisSquircle(): void {
     document.querySelectorAll<HTMLElement>(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
   };
   new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  // :focus-within · :focus-visible 로 --sq-line-w 가 바뀌는 요소(입력칸 · 카드 포커스 선): 포커스가 옮겨질 때 조상 · 자손만 다시 계산
+  const refocus = (e: Event) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    requestAnimationFrame(() => {
+      for (let el = t.closest<HTMLElement>(SEL); el; el = el.parentElement?.closest<HTMLElement>(SEL) ?? null) apply(el);
+      t.querySelectorAll<HTMLElement>(SEL).forEach(apply);
+    });
+  };
+  document.addEventListener('focusin', refocus);
+  document.addEventListener('focusout', refocus);
   tick();
   if (document.fonts) document.fonts.ready.then(tick);
 }

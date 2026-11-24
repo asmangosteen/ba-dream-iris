@@ -59,13 +59,13 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       </div>
       <p v-else class="tx-meta m0">Default background that follows the theme (light or dark)</p>
       <div class="presets" role="group" aria-label="Common backgrounds">
-        <button v-for="c in PRESETS" :key="c" class="pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="`Background ${c}`" :title="c" @click="emit('settings', { background: c })" />
+        <button v-for="c in PRESETS" :key="c" class="sq sq-clip pre" :class="{ on: bg === c }" :style="{ background: c }" :aria-label="`Background ${c}`" :title="c" @click="emit('settings', { background: c })" />
       </div>
     </section>
 
     <section class="s">
       <div class="sec-h h24"><span>Canvas</span></div>
-      <button :class="['cb', { on: page.viewport?.pixelGrid !== false }]" role="switch" :aria-checked="page.viewport?.pixelGrid !== false" @click="emit('settings', { pixelGrid: page.viewport?.pixelGrid === false })"><i />Pixel grid (at 800% zoom and above)</button>
+      <button :class="['cb', { on: page.viewport?.pixelGrid !== false }]" role="switch" :aria-checked="page.viewport?.pixelGrid !== false" @click="emit('settings', { pixelGrid: page.viewport?.pixelGrid === false })"><i class="sq" />Pixel grid (at 800% zoom and above)</button>
       <div class="zoom-row">
         <span class="tx-meta">Zoom</span>
         <span class="num zv">{{ Math.round(zoom * 100) }}%</span>
@@ -80,8 +80,8 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 
     <section class="s">
       <div class="sec-h h24"><span>Styles</span></div>
-      <div class="style-row"><span class="dot c" aria-hidden="true" /><span class="tx-body f1">Color styles</span><span class="tx-meta num">{{ colorCount }}</span></div>
-      <div class="style-row"><span class="dot t" aria-hidden="true">Ag</span><span class="tx-body f1">Text styles</span><span class="tx-meta num">{{ textCount }}</span></div>
+      <div class="style-row"><span class="sqc dot c" aria-hidden="true" /><span class="tx-body f1">Color styles</span><span class="tx-meta num">{{ colorCount }}</span></div>
+      <div class="style-row"><span class="sqc dot t" aria-hidden="true">Ag</span><span class="tx-body f1">Text styles</span><span class="tx-meta num">{{ textCount }}</span></div>
       <TextButton size="s" color="blue" class="self-start" @click="navigateTo('/design-system')">View in design system</TextButton>
     </section>
 
@@ -105,14 +105,12 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .s24 { width: 24px; height: 24px; }
 .m0 { margin: 0; }
 .color-row { display: grid; grid-template-columns: minmax(0, 1fr); }
-.swatch { width: 14px !important; height: 14px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; background: none; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
-.swatch::-webkit-color-swatch-wrapper { padding: 0; }
-.swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .presets { display: flex; gap: var(--ref-spacing-04); }
-.pre { width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); transition: box-shadow .12s ease; }
-.pre:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
-.pre.on { box-shadow: 0 0 0 1.5px var(--sys-color-brand-primary-default); }
-.pre:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.pre { width: 20px; height: 20px; border-radius: 6px; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.pre:hover { --sq-line: var(--ref-color-gray-900-20); }
+/* 요소가 squircle 로 잘려서 바깥 선 · outline 은 안 보여요 — 고름 · 포커스는 안쪽 선으로 */
+.pre.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; }
+.pre:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
 .zoom-row { display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 28px; }
 .zv { color: var(--sys-color-neutral-800); }
 .zb { display: flex; margin-left: auto; }

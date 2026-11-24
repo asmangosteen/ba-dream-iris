@@ -120,13 +120,13 @@ defineExpose({ openPicker: () => (picking.value = true) })
         <span class="glabel"><StatusIcon :status="g.k" />{{ g.label }}<span class="sq count num">{{ g.items.length }}</span></span>
         <div v-for="{ link: lk, req } in g.items" :key="req.id" class="sq card">
           <div class="head">
-            <button class="st" :aria-label="`${req.code} ${LINK_STATUS[lk.status].label}, click to change status`" :title="`${LINK_STATUS[lk.status].label} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
+            <button class="sq st" :aria-label="`${req.code} ${LINK_STATUS[lk.status].label}, click to change status`" :title="`${LINK_STATUS[lk.status].label} · Click to change`" @click="cycle(lk)"><StatusIcon :status="lk.status" /></button>
             <span class="tx-body w5">{{ req.title }}</span>
             <span />
             <span class="tx-meta ell"><span class="num">{{ req.code }}</span> · {{ anchorLabel(req) }}</span>
           </div>
           <div v-if="editing === req.id" class="note-edit">
-            <textarea v-model="noteDraft" rows="2" class="sq txt" aria-label="Note" placeholder="Describe what is missing" @keydown.meta.enter="saveNote(lk)" />
+            <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" aria-label="Note" placeholder="Describe what is missing" @keydown.meta.enter="saveNote(lk)" /></div>
             <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">Cancel</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">Save</Button></span>
           </div>
           <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><Icon name="warning" :size="12" class="mt3" /><span>{{ lk.note }}</span></button>
@@ -183,15 +183,17 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .note { display: flex; gap: var(--ref-spacing-04); margin-left: var(--ref-spacing-10); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
 .mt3 { margin-top: 3px; flex: none; }
 .note-edit { margin-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.txt { width: 100%; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font-size: 12px; line-height: 18px; }
-.txt:focus { box-shadow: inset 0 0 0 0.5px var(--sys-color-brand-primary-default); }
+.txt { width: 100%; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); display: block; background: transparent; font-size: 12px; line-height: 18px; }
+/* 메모 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선을 그려요 */
+.txt-box { border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); --sq-line-w: 0.5px; }
+.txt-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); margin-left: var(--ref-spacing-10); padding-top: var(--ref-spacing-04); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500); }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-06); flex: none; }
 .st { border-radius: var(--ref-radius-02); }
-.st:hover { background: var(--interaction-light-gray-hover); }
-.st:active { background: var(--interaction-light-gray-pressed); }
+.st:hover { --sq-fill: var(--interaction-light-gray-hover); }
+.st:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .st:focus-visible, .note:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .note { text-align: left; }
 .note:hover { --sq-overlay: var(--interaction-light-gray-hover); }

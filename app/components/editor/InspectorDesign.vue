@@ -153,7 +153,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none" /><path d="M2.5 11.5l9-9" stroke="currentColor" stroke-width="1.2" /></svg><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" aria-label="Frame opacity" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span>%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
           <label class="sq fld"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 11.5V6a3.5 3.5 0 0 1 3.5-3.5h5.5" stroke="currentColor" stroke-width="1.2" fill="none" /></svg><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" aria-label="Frame corner radius" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
         </div>
-        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i />Clip content</button>
+        <button :class="['cb', { on: look.clip !== false }]" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />Clip content</button>
       </section>
 
       <InspectorPaints :sid="screen.id" :ids="[]" kind="fill" title="Fill" frame />
@@ -209,10 +209,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .keys dd { margin: 0; font-weight: 600; color: var(--sys-color-neutral-700); }
 .s24 { width: 24px; height: 24px; }
 .color-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center; }
-.swatch { width: 14px !important; height: 14px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; background: none; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
-.swatch::-webkit-color-swatch-wrapper { padding: 0; }
-.swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
-.swatch:focus-visible, .cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
 .fld > svg { flex: none; color: var(--sys-color-neutral-600); }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }

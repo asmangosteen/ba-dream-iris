@@ -255,7 +255,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         </span>
       </div>
       <label class="tx-head" :for="`paste-${doc.id}`">본문 붙여넣기</label>
-      <textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" placeholder="원본 페이지의 글을 복사해서 붙여넣어 주세요" />
+      <div class="sq area-box"><textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" placeholder="원본 페이지의 글을 복사해서 붙여넣어 주세요" /></div>
       <div class="paste-foot">
         <span v-if="saveError" class="tx-meta warn" role="alert">{{ saveError }}</span>
         <Button size="s" :type="compact ? 'tertiary' : 'primary'" :stroke="compact" :loading="saving" :disabled="!draft.trim() && !saving" @click="savePaste">저장하기</Button>
@@ -276,18 +276,18 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         :class="['blk', b.type, { sq: reqsByBlock.has(b.id), marked: reqsByBlock.has(b.id), on: isOn(b) }]"
       >
         <span v-if="headerReqs(b).length" class="codes">
-          <button v-for="r in headerReqs(b)" :key="r.id" type="button" class="code num" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)">{{ r.code }}</button>
+          <button v-for="r in headerReqs(b)" :key="r.id" type="button" class="sq code num" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)">{{ r.code }}</button>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
           <template v-for="(s, i) in segments(b.text)" :key="i">
-            <button v-if="s.req" type="button" class="code num" :aria-pressed="highlight === s.req.id" :title="s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
+            <button v-if="s.req" type="button" class="sq code num" :aria-pressed="highlight === s.req.id" :title="s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
             <template v-else>{{ s.t }}</template>
           </template>
         </component>
       </div>
 
       <div v-if="tool" class="sq tool" role="toolbar" aria-label="고른 글" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="tool-btn" @click="createReq"><Icon name="plus" :size="14" />요구사항으로 만들기</button>
+        <button type="button" class="sq tool-btn" @click="createReq"><Icon name="plus" :size="14" />요구사항으로 만들기</button>
       </div>
     </article>
 
@@ -323,9 +323,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .blk p, .blk h3 { margin: 0; }
 .compact .blk.marked { padding: var(--ref-spacing-06) var(--ref-spacing-07); }
 .codes { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
-.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); text-align: inherit; }
-.code { transition: background-color .12s ease; }
-.code:hover, .code[aria-pressed='true'] { background: var(--sys-color-brand-primary-lighter); }
+.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest); text-align: inherit; }
+.code:hover, .code[aria-pressed='true'] { --sq-fill: var(--sys-color-brand-primary-lighter); }
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 .card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; min-width: 0; }
@@ -336,17 +335,18 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-theme-error-default); }
 
 .paste { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
-.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
-.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+/* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
+.area-box { display: block; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
+.area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .paste-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); }
 .paste-foot .warn { margin-right: auto; }
 
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
-.tool-btn { transition: background-color .12s ease; }
-.tool-btn:hover { background: rgb(253 253 253 / 12%); }
-.tool-btn:active { background: rgb(253 253 253 / 20%); }
+.tool-btn:hover { --sq-fill: rgb(253 253 253 / 12%); }
+.tool-btn:active { --sq-fill: rgb(253 253 253 / 20%); }
 .tool-btn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-light); outline-offset: 1px; }
 </style>

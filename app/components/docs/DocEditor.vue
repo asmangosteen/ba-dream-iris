@@ -332,6 +332,7 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 
     <div class="col6 grow">
       <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? '내용' : '본문' }}</label>
+      <div class="sq area-box">
       <textarea
         :id="`edBody-${doc.id}`"
         v-model="form.body"
@@ -339,6 +340,7 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
         rows="16"
         :placeholder="native ? `'# ' 제목, '## ' 소제목, '- ' 목록. 빈 줄로 문단을 나눠요.` : '원본의 글을 붙여넣거나 고쳐 주세요'"
       />
+      </div>
       <span class="tx-meta num">
         <template v-if="native">'# ' 제목, '## ' 소제목, '- ' 목록, 빈 줄은 새 문단이에요. </template>요구사항 번호(REQ-001 등)로 시작하는 줄은 요구사항으로 등록돼요{{ found ? ` · 지금 ${found}개` : '' }}
       </span>
@@ -365,9 +367,11 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 .grow { flex: 1; }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.area { flex: 1; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; border-radius: var(--ref-radius-05); transition: box-shadow .12s ease; background: var(--sys-color-common-white-default); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-.area:hover { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-20); }
-.area:focus { box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
+.area { flex: 1; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+/* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
+.area-box { flex: 1; display: flex; flex-direction: column; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
+.area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) 0; background: var(--sys-color-common-white-emphasis); }
 .foot .warn { margin-right: auto; }

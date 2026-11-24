@@ -250,12 +250,12 @@ async function removeDoc() {
             <span class="f-status" />
             <span class="f-title">{{ s.name }}</span>
             <span class="f-body">
-              <span class="f-bar" />
-              <span class="f-card" />
-              <span class="f-card" />
-              <span class="f-card" />
+              <span class="sqc f-bar" />
+              <span class="sq f-card" />
+              <span class="sq f-card" />
+              <span class="sq f-card" />
             </span>
-            <span class="f-cta" />
+            <span class="sqc f-cta" />
           </span>
           <span class="frame-page">{{ s.page }}</span>
         </button>
@@ -308,7 +308,7 @@ async function removeDoc() {
             <span class="gone-col">
               <span class="tx-body gone-t">
                 문서에서 사라진 요구사항:
-                <button v-for="r in goneReqs" :key="r.id" type="button" class="code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
+                <button v-for="r in goneReqs" :key="r.id" type="button" class="sq code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
               <span class="tx-meta">요구사항과 화면 연결은 그대로 남겨 뒀어요. 필요 없으면 <NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">요구사항</NuxtLink>에서 정리해 주세요</span>
             </span>
@@ -398,7 +398,7 @@ async function removeDoc() {
 .f-title { display: block; padding: 0 9px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: #03091A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-body { display: flex; flex-direction: column; gap: 6px; padding: 0 9px; }
 .f-bar { height: 22px; border-radius: 6px; background: #F6F7F7; }
-.f-card { height: 54px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--iris-paper-line); }
+.f-card { display: block; height: 54px; border-radius: 8px; --sq-line: var(--iris-paper-line); --sq-line-w: 1px; }
 .f-cta { position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: #2C7BE2; }
 
 .doc { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); z-index: 3; width: 600px; max-width: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
@@ -422,9 +422,8 @@ async function removeDoc() {
 .gone-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .gone-t { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-04); font-weight: 500; }
 .ib.s { width: 24px; height: 24px; }
-.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); background: var(--sys-color-brand-primary-lightest); }
-.code { transition: background-color .12s ease; }
-.code:hover, .code[aria-pressed='true'] { background: var(--sys-color-brand-primary-lighter); }
+.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest); }
+.code:hover, .code[aria-pressed='true'] { --sq-fill: var(--sys-color-brand-primary-lighter); }
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 .confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }

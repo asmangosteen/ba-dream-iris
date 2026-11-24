@@ -94,11 +94,11 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 
     <div v-for="r in rows" :key="r.key" :class="['row', { mod: isSet(r) }]" :title="r.doc">
       <template v-if="r.kind === 'boolean'">
-        <button :class="['cb', { on: current(r) === true }]" role="switch" :aria-checked="current(r) === true" @click="write(r, current(r) !== true)"><i />{{ r.label }}</button>
+        <button :class="['cb', { on: current(r) === true }]" role="switch" :aria-checked="current(r) === true" @click="write(r, current(r) !== true)"><i class="sq" />{{ r.label }}</button>
       </template>
       <template v-else>
         <span class="lbl ell">{{ r.label }}</span>
-        <select v-if="r.kind === 'enum'" class="sq sel" :aria-label="r.label" :value="current(r) === undefined ? '' : String(current(r))" @change="pick(r, $event)">
+        <select v-if="r.kind === 'enum'" class="sqc sel" :aria-label="r.label" :value="current(r) === undefined ? '' : String(current(r))" @change="pick(r, $event)">
           <option v-if="def(r) === undefined" value="">—</option>
           <option v-for="o in r.options" :key="String(o)" :value="String(o)">{{ optLabel(o) }}</option>
         </select>
@@ -128,11 +128,12 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .lbl { font-size: 12px; color: var(--sys-color-neutral-600); }
 .row.mod .lbl { color: var(--sys-color-neutral-800); font-weight: 500; }
 .sel { height: 28px; padding: 0 var(--ref-spacing-04); border: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font: inherit; font-size: 12px; color: var(--sys-color-neutral-800); min-width: 0; width: 100%; }
-.sel:focus-visible { outline: 1px solid var(--sys-color-brand-primary-default); }
+/* select 는 ::before · ::after 가 없어서 .sqc 로 요소 자체를 squircle 로 잘라요 — 포커스 선도 안쪽에 */
+.sel:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
 .fld input::placeholder { color: var(--sys-color-neutral-500); }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 .cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
-.cb:hover > i { box-shadow: inset 0 0 0 1px var(--sys-color-neutral-600); }
+.cb:hover > i { --sq-line: var(--sys-color-neutral-600); }
 .cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .reset { align-self: flex-start; margin-top: var(--ref-spacing-02); font-size: 12px; color: var(--sys-color-brand-primary-default); border-radius: var(--ref-radius-02); }
 .reset:hover { text-decoration: underline; }

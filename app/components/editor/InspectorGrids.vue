@@ -42,7 +42,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         <button class="ib s24" aria-label="Remove layout grid" title="Remove" @click="out(grids.filter((_, k) => k !== i)); open = null"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
       </div>
       <div v-if="open === i" class="sq editor">
-        <div class="seg"><button v-for="t in TYPES" :key="t.k" :class="['seg-b', { on: g.type === t.k }]" @click="setType(i, t.k)">{{ t.label }}</button></div>
+        <div class="sq seg"><button v-for="t in TYPES" :key="t.k" :class="['sq', 'seg-b', { on: g.type === t.k }]" @click="setType(i, t.k)">{{ t.label }}</button></div>
         <div v-if="g.type === 'grid'" class="grid2"><label class="sq fld"><span>Size</span><input :key="'s' + g.size" :value="g.size ?? 8" inputmode="numeric" aria-label="Grid size" @change="num(i, 'size', $event)" @keydown="blur"></label></div>
         <div v-else class="grid2">
           <label class="sq fld"><span>Count</span><input :key="'c' + g.count" :value="g.count ?? 4" inputmode="numeric" aria-label="Count" @change="num(i, 'count', $event)" @keydown="blur"></label>
@@ -69,13 +69,10 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .grow { flex: 1; font-size: 12px; color: var(--sys-color-neutral-800); }
 .ib.on { --sq-fill: var(--sys-color-neutral-200); }
 .editor { margin-top: var(--ref-spacing-04); padding: var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-04); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
 .seg-b { height: 24px; border-radius: var(--ref-radius-02); font-size: 11px; color: var(--sys-color-neutral-600); }
-.seg-b.on { background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.seg-b.on { --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 8%)); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
 .pct { width: 40px !important; flex: none; text-align: right; color: var(--sys-color-neutral-600) !important; }
-.swatch { width: 14px !important; height: 14px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; background: none; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
-.swatch::-webkit-color-swatch-wrapper { padding: 0; }
-.swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 </style>

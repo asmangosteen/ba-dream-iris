@@ -3,7 +3,7 @@ import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import { descendants, isContainer, normAngle, ratioLocked, frameCss, type LayerNode, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { simplify } from '~/canvas/paint'
+import { radiiOf, simplify } from '~/canvas/paint'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
@@ -1267,7 +1267,87 @@ function trackHover(e: PointerEvent) {
   const scr = t?.closest?.('[data-screen]') as HTMLElement | null
   const next = scr?.dataset.screen ? { sid: scr.dataset.screen, id: (t!.closest('[data-layer]') as HTMLElement | null)?.dataset.layer ?? null } : null
   if (next?.sid !== hover.value?.sid || next?.id !== hover.value?.id) hover.value = next
+  const r = el.value?.getBoundingClientRect()
+  ptr.value = r ? { x: e.clientX - r.left, y: e.clientY - r.top } : null
 }
+
+// ---------------------------------------------------------------------------
+// 피그마식 표시: 마우스 올림 테두리 · 고른 레이어의 부모 점선 · 오토 레이아웃 간격
+// 모두 바깥 층(화면 좌표)에 그려서 확대 · 축소와 상관없이 늘 1px
+// ---------------------------------------------------------------------------
+const ptr = ref<{ x: number; y: number } | null>(null)
+const hoverOutline = computed(() => {
+  void tick.value
+  const h = hover.value
+  if (!h || moving.value || marqueeOn.value || draft.value || guides.value || store.editing.value || (tool.value !== 'move' && tool.value !== 'scale')) return null
+  const s = props.screens.find((v) => v.id === h.sid)
+  if (!s) return null
+  if (!h.id) {
+    // 화면(프레임): 이미 고른 화면이면 선택 상자가 있으니 생략
+    if (isCanvas(s) || (store.screenId.value === s.id && !store.layerIds.value.length) || multi.value.includes(s.id)) return null
+    return { frame: s.id, style: box(s) }
+  }
+  if (store.screenId.value === s.id && store.layerIds.value.includes(h.id)) return null
+  const n = store.node(s.id, h.id)
+  if (!n || n.locked || n.type === 'line' || n.type === 'path') return null
+  const g = layerGeom(s, h.id)
+  if (!g) return null
+  const z = vp.value.zoom
+  const r = n.type === 'ellipse' ? '50%' : (() => { const v = radiiOf(n.style); return v.some(Boolean) ? v.map((x) => x * z + 'px').join(' ') : undefined })()
+  return { frame: null, style: { ...rbox(g), borderRadius: r } }
+})
+/** 하나 고르면 그 부모(프레임 · 그룹, 맨 위면 화면)의 테두리를 점선으로 */
+const parentOutline = computed(() => {
+  void tick.value
+  const sg = single.value
+  const s = selScreen.value
+  if (!sg || !s || rotating.value) return null
+  const p = store.node(s.id, sg.id)?.parentId
+  if (p) { const g = layerGeom(s, p); return g ? rbox(g) : null }
+  return isCanvas(s) ? null : box(s)
+})
+/** 고른 오토 레이아웃 프레임의 간격: 마우스를 간격 위에 올리면 모든 간격을 분홍 빗금으로 */
+const gapBands = computed(() => {
+  void tick.value
+  void vp.value
+  const sg = single.value
+  const s = selScreen.value
+  const host = el.value
+  if (!sg || !s || !host || sg.angle || moving.value || guides.value) return []
+  const n = store.node(s.id, sg.id)
+  const lay = n?.style.layout
+  if (!lay || lay.wrap) return []
+  const fel = host.querySelector(`[data-screen="${s.id}"] [data-layer="${sg.id}"]`) as HTMLElement | null
+  if (!fel) return []
+  const hr = host.getBoundingClientRect()
+  const rel = (r: DOMRect) => ({ x: r.left - hr.left, y: r.top - hr.top, w: r.width, h: r.height })
+  const f = rel(fel.getBoundingClientRect())
+  const d = store.doc(s.id)
+  const kids = (n.children ?? [])
+    .filter((id) => d.nodes[id] && !d.nodes[id]!.hidden && !d.nodes[id]!.absolute)
+    .map((id) => fel.querySelector(`:scope [data-layer="${id}"]`) as HTMLElement | null)
+    .filter((k): k is HTMLElement => !!k)
+    .map((k) => rel(k.getBoundingClientRect()))
+  const v = lay.mode === 'vertical'
+  kids.sort((a, b) => (v ? a.y - b.y : a.x - b.x))
+  const out: { left: string; top: string; width: string; height: string; v: boolean }[] = []
+  for (let i = 0; i + 1 < kids.length; i++) {
+    const a = kids[i]!, b = kids[i + 1]!
+    const s0 = v ? a.y + a.h : a.x + a.w, s1 = v ? b.y : b.x
+    if (s1 - s0 < 1) continue
+    out.push(v
+      ? { left: f.x + 'px', top: s0 + 'px', width: f.w + 'px', height: s1 - s0 + 'px', v }
+      : { left: s0 + 'px', top: f.y + 'px', width: s1 - s0 + 'px', height: f.h + 'px', v })
+  }
+  return out
+})
+const gapHot = computed(() => {
+  const p = ptr.value
+  return !!p && gapBands.value.some((b) => {
+    const x = parseFloat(b.left), y = parseFloat(b.top)
+    return p.x >= x && p.x <= x + parseFloat(b.width) && p.y >= y && p.y <= y + parseFloat(b.height)
+  })
+})
 const measure = computed<Guides | null>(() => {
   void tick.value
   const s = selScreen.value
@@ -1468,10 +1548,13 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :key="'l' + s.id"
         class="label"
         :data-screen="s.id"
-        :class="{ on: store.screenId.value === s.id && !store.layerIds.value.length }"
+        :class="{ on: (store.screenId.value === s.id && !store.layerIds.value.length) || hoverOutline?.frame === s.id }"
         :style="{ left: box(s).left, top: `calc(${box(s).top} - 20px)`, maxWidth: box(s).width }"
         @pointerdown.stop="tool = 'move'; start($event, s)"
       >{{ s.name }}</span>
+      <div v-if="parentOutline" class="parent" :style="parentOutline" />
+      <template v-if="gapHot"><div v-for="(b, i) in gapBands" :key="'gap' + i" class="gap" :class="{ v: b.v }" :style="b"><i /></div></template>
+      <div v-if="hoverOutline && !gapHot" class="hov" :style="hoverOutline.style" />
       <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
       <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="box(m)" />
       <div v-if="selFrame && !multi.length && !selBoxes.length" class="sel" :style="box(selFrame)">
@@ -1549,13 +1632,20 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .ghost :deep(.ly) { pointer-events: none !important; }
 .drop-at.line { outline-width: calc(1.5px / var(--z, 1)); background: none; }
 .drop-at { position: absolute; pointer-events: none; outline: calc(2px / var(--z, 1)) solid var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); z-index: 4; }
-.frame:hover { outline: calc(1px / var(--z, 1)) solid var(--iris-select); }
 .thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 .overlay { position: absolute; inset: 0; pointer-events: none; }
 .label { position: absolute; pointer-events: auto; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
 .label.on { color: var(--iris-select); font-weight: 500; }
 .sel { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 마우스 올림: 모양(둥근 모서리 · 원)을 따라 1px */
+.hov { position: absolute; pointer-events: none; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 고른 레이어의 부모: 옅은 1px 점선 */
+.parent { position: absolute; pointer-events: none; outline: 1px dashed color-mix(in srgb, var(--iris-select) 70%, transparent); }
+/* 오토 레이아웃 간격: 분홍 빗금 + 가운데 짧은 손잡이 선 */
+.gap { position: absolute; pointer-events: none; display: grid; place-items: center; background: repeating-linear-gradient(-45deg, rgb(242 72 156 / 32%) 0 1px, transparent 1px 4px), rgb(242 72 156 / 8%); }
+.gap i { width: 8px; height: 1px; background: rgb(242 72 156); }
+.gap:not(.v) i { width: 1px; height: 8px; }
 .sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--iris-select) 45%, transparent); }
 .sel.none { box-shadow: none; }
 .hl { position: absolute; box-shadow: 0 0 0 2px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); }
@@ -1591,9 +1681,9 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .guides.draw polyline { fill: none; stroke: var(--iris-select); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
 /* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
-.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 3px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 3px; background: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
 /* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
-.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 0 4px; border-radius: 3px; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); }
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 6px; padding: 0 4px; border-radius: 3px; background: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; }
 .size .mode { font-weight: 500; opacity: .8; margin-left: 2px; }
 .marq { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
 </style>

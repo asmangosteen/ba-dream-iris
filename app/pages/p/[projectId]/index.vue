@@ -550,7 +550,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: '작업 중',
           <div class="sec-h"><span>Pages</span><IconButton size="s" type="ghost" icon-name="plus" ariaLabel="Add new page" @click="onAddPage" /></div>
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <template v-for="p in pages.data.value ?? []" :key="p.id">
-            <input v-if="renaming === p.id" class="txt-in rename" :value="p.name" aria-label="Page name" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
+            <input v-if="renaming === p.id" class="sqc txt-in rename" :value="p.name" aria-label="Page name" autofocus @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null">
             <button v-else :class="['sq', 'nav-item', 's', { on: pageId === p.id }]" :title="'Double-click to rename'" @click="pageId = p.id" @dblclick="renaming = p.id" @contextmenu="pageMenu(p, $event)">{{ p.name }}</button>
           </template>
         </section>

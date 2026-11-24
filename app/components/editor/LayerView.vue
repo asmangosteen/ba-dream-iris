@@ -249,7 +249,7 @@ function onKey(e: KeyboardEvent) {
 
 <style scoped>
 .ly { position: absolute; box-sizing: border-box; font-family: var(--font-family-base); }
-.ly:not(.lk):hover:not(:has(.ly:hover)) { outline: calc(1px / var(--z, 1)) solid var(--iris-select, #0D99FF); }
+/* 마우스 올림 테두리는 EditorCanvas 바깥 층(.hov)이 그려요 — 확대해도 늘 1px */
 .ly.line, .ly.path { outline-offset: 0; }
 .ly.line:hover, .ly.path:hover { outline: none !important; }
 .image img, .image video { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--sys-color-neutral-100); }

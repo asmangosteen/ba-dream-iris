@@ -191,7 +191,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
       <!-- 바탕 칠 -->
       <div v-if="i < 0" class="row">
         <div class="sq fld grow" :class="{ act: open === -1 }">
-          <button :ref="anchorRef(-1)" class="swatch" :style="baseSwatch" :aria-label="`Edit ${title.toLowerCase()} color`" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
+          <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="`Edit ${title.toLowerCase()} color`" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
           <template v-if="!bound">
             <input :key="'h' + baseVal" class="hex" :value="colorLabel(store.color(baseVal) ?? '').split(' ')[0]!.replace('#', '')" :aria-label="`${title} hex`" spellcheck="false" @change="onBaseHex" @keydown="blur" @focus="sel">
             <span class="vsep" aria-hidden="true" />
@@ -207,7 +207,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
       <!-- 덧붙인 칠 -->
       <div v-else-if="extras[i]" class="row" :class="{ off: extras[i]!.visible === false }">
         <div class="sq fld grow" :class="{ act: open === i }">
-          <button :ref="anchorRef(i)" class="swatch" :style="swatch(extras[i]!)" :aria-label="`Edit ${title.toLowerCase()}`" :aria-expanded="open === i" @click="open = open === i ? null : i" />
+          <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="`Edit ${title.toLowerCase()}`" :aria-expanded="open === i" @click="open = open === i ? null : i" />
           <input v-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="`${title} hex`" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
           <button v-else class="pname" @click="open = open === i ? null : i">{{ TYPE_NAME[extras[i]!.type] }}</button>
           <span class="vsep" aria-hidden="true" />
@@ -253,7 +253,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 .pct { width: 28px !important; flex: none; text-align: right; }
 .unit { color: var(--sys-color-neutral-500) !important; margin-left: calc(-1 * var(--ref-spacing-04)); }
 .pname { flex: 1; min-width: 0; text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); cursor: pointer; }
-.swatch { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
-.swatch:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.swatch { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.swatch:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
 button:disabled { opacity: 0.35; pointer-events: none; }
 </style>

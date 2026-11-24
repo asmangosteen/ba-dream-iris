@@ -51,9 +51,9 @@ const isOn = (col: number, row: number) => {
         </div>
       </div>
       <div class="cols">
-        <div class="align" role="group" aria-label="Alignment">
+        <div class="sq align" role="group" aria-label="Alignment">
           <template v-for="row in 3" :key="row">
-            <button v-for="col in 3" :key="col" :class="['dot', { on: isOn(col - 1, row - 1) }]" :aria-label="`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`" @click="pick(col - 1, row - 1)"><i /></button>
+            <button v-for="col in 3" :key="col" :class="['dot', { on: isOn(col - 1, row - 1) }]" :aria-label="`Align ${['top', 'middle', 'bottom'][row - 1]} ${['left', 'center', 'right'][col - 1]}`" @click="pick(col - 1, row - 1)"><i class="sqc" /></button>
           </template>
         </div>
         <div class="side">
@@ -62,7 +62,7 @@ const isOn = (col: number, row: number) => {
             <input v-if="l.gap !== 'auto'" :key="'g' + l.gap" :value="l.gap" inputmode="decimal" aria-label="Gap between items" @change="num($event, (v) => set({ gap: v }))" @keydown="blur">
             <span v-else class="auto">Auto</span>
           </label>
-          <button :class="['cb', { on: l.gap === 'auto' }]" @click="set({ gap: l.gap === 'auto' ? 10 : 'auto' })"><i />Space between</button>
+          <button :class="['cb', { on: l.gap === 'auto' }]" @click="set({ gap: l.gap === 'auto' ? 10 : 'auto' })"><i class="sq" />Space between</button>
           <label v-if="l.wrap" class="sq fld" title="Gap between rows"><span>Row</span><input :key="'rg' + l.rowGap" :value="l.rowGap ?? (l.gap === 'auto' ? 0 : l.gap)" inputmode="decimal" aria-label="Gap between rows" @change="num($event, (v) => set({ rowGap: v }))" @keydown="blur"></label>
         </div>
       </div>
@@ -84,7 +84,7 @@ const isOn = (col: number, row: number) => {
 .s24 { width: 24px; height: 24px; }
 .row { display: flex; }
 .cols { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--ref-spacing-04); align-items: start; }
-.align { display: grid; grid-template-columns: repeat(3, 1fr); width: 72px; height: 72px; padding: 4px; box-sizing: border-box; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
+.align { display: grid; grid-template-columns: repeat(3, 1fr); width: 72px; height: 72px; padding: 4px; box-sizing: border-box; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
 .dot { display: grid; place-items: center; border-radius: 3px; }
 .dot i { width: 4px; height: 4px; border-radius: 1px; background: var(--sys-color-neutral-400); }
 .dot:hover i { background: var(--sys-color-neutral-700); }

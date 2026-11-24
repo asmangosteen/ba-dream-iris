@@ -126,10 +126,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
       tabindex="0"
       aria-label="Saturation and brightness"
       :aria-valuetext="`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`"
-      :style="{ backgroundColor: pure }"
       @pointerdown.prevent="drag($event, 'sv')"
       @keydown="key($event, 'sv')"
     >
+      <span class="sqc cp-sv-bg" :style="{ backgroundColor: pure }" />
       <i class="knob" :style="{ left: hsv.s * 100 + '%', top: (1 - hsv.v) * 100 + '%', background: solid }" />
     </div>
     <div class="cp-row">
@@ -170,8 +170,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 
 <style scoped>
 .cp { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
-.cp-sv { position: relative; height: 208px; border-radius: var(--ref-radius-03); cursor: crosshair; touch-action: none; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); outline: none; }
-.cp-sv:focus-visible { box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default); }
+.cp-sv { position: relative; height: 208px; border-radius: var(--ref-radius-03); cursor: crosshair; touch-action: none; outline: none; }
+.cp-sv-bg { position: absolute; inset: 0; border-radius: inherit; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); }
+.cp-sv:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .cp-sv .knob { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(0 0 0 / 20%), inset 0 0 0 1px rgb(0 0 0 / 15%); pointer-events: none; }
 .cp-row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .s24 { width: 24px; height: 24px; }

@@ -280,7 +280,8 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
               <button class="ib s24" aria-label="Flip gradient" title="Flip gradient" @click="flip"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5h10L9.5 2.5M12 9H2l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
               <button class="ib s24" aria-label="Remove stop" title="Remove stop" :disabled="stops.length <= 2" @click="removeStop"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg></button>
             </div>
-            <div ref="bar" class="gr-bar" :style="{ background: gradCss }" title="Click to add a color stop" @pointerdown="onBar($event)">
+            <div ref="bar" class="gr-bar" title="Click to add a color stop" @pointerdown="onBar($event)">
+              <span class="sq sq-clip gr-bg" :style="{ background: gradCss }" aria-hidden="true" />
               <button
                 v-for="(s, k) in stops"
                 :key="k"
@@ -289,7 +290,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
                 :aria-label="`Color stop ${k + 1} at ${Math.round(s.pos * 100)}%`"
                 @pointerdown.stop="onBar($event, k)"
                 @keydown="onStopKey($event, k)"
-              ><b :style="swatchBg(store.color(s.color) ?? s.color)" /></button>
+              ><span class="sq gr-ring" /><span class="sq gr-face"><b class="sqc" :style="swatchBg(store.color(s.color) ?? s.color)" /></span></button>
             </div>
             <div class="gr-pos tx-meta">Stop {{ stop + 1 }} · {{ Math.round((stops[stop]?.pos ?? 0) * 100) }}%</div>
             <ColorPicker :model-value="stopColor" @update:model-value="setStopColor" @start="hold" @end="release" />
@@ -298,7 +299,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
           <!-- 이미지 -->
           <template v-else-if="paint.type === 'image'">
             <div
-              class="img-box"
+              class="sq sq-clip img-box"
               :class="{ drop: dropping }"
               @dragover.prevent="dropping = true"
               @dragleave="dropping = false"
@@ -307,8 +308,8 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
               <div class="img-prev" :style="imgCss" />
               <button class="sq img-choose" :disabled="uploading" @click="fileEl?.click()">{{ uploading ? 'Uploading…' : (paint as { src: string }).src ? 'Replace image' : 'Choose image' }}</button>
             </div>
-            <div class="seg" role="radiogroup" aria-label="Image fit">
-              <button v-for="f in FITS" :key="f.k" role="radio" :aria-checked="((paint as { fit?: string }).fit ?? 'fill') === f.k" :class="['seg-b', { on: ((paint as { fit?: string }).fit ?? 'fill') === f.k }]" @click="emit('update', { ...paint, fit: f.k } as Paint)">{{ f.label }}</button>
+            <div class="sq seg" role="radiogroup" aria-label="Image fit">
+              <button v-for="f in FITS" :key="f.k" role="radio" :aria-checked="((paint as { fit?: string }).fit ?? 'fill') === f.k" :class="['sq', 'seg-b', { on: ((paint as { fit?: string }).fit ?? 'fill') === f.k }]" @click="emit('update', { ...paint, fit: f.k } as Paint)">{{ f.label }}</button>
             </div>
             <p class="tx-meta m0">Drop an image here or choose a file (PNG, JPG, GIF, WebP, SVG)</p>
             <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden @change="onFile">
@@ -318,7 +319,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         <div v-if="paint.type !== 'image' && pageColors.length" class="pp-sw">
           <div class="sw-h">On this page</div>
           <div class="sw-grid">
-            <button v-for="c in pageColors" :key="c" class="sw" :style="swatchBg(c)" :aria-label="c" :title="c" @click="pickSwatch(c)" />
+            <button v-for="c in pageColors" :key="c" class="sq sq-clip sw" :style="swatchBg(c)" :aria-label="c" :title="c" @click="pickSwatch(c)" />
           </div>
         </div>
       </template>
@@ -330,7 +331,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
             <div v-for="g in libs" :key="g.name" class="lib-g">
               <div class="sw-h">{{ g.name }}</div>
               <div class="sw-grid">
-                <button v-for="t in g.items" :key="t.id" class="sw" :style="swatchBg(t.color ?? '#000')" :aria-label="t.name" :title="`${t.name} · ${t.value}`" @click="pickToken(t)" />
+                <button v-for="t in g.items" :key="t.id" class="sq sq-clip sw" :style="swatchBg(t.color ?? '#000')" :aria-label="t.name" :title="`${t.name} · ${t.value}`" @click="pickToken(t)" />
               </div>
             </div>
             <p v-if="!libs.length" class="tx-meta m0 empty">No colors found</p>
@@ -357,29 +358,34 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .m0 { margin: 0; }
 .gr-tools { display: flex; align-items: center; gap: var(--ref-spacing-02); }
 .ang { width: 76px; flex: none; gap: var(--ref-spacing-03); }
-.gr-bar { position: relative; height: 20px; margin: 0 8px 14px; border-radius: 4px; cursor: copy; touch-action: none; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 15%); }
-.gr-stop { position: absolute; top: 100%; width: 16px; height: 16px; margin-top: 2px; transform: translateX(-50%); border-radius: 4px; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / 20%), 0 1px 3px rgb(0 0 0 / 20%); cursor: ew-resize; padding: 2px; display: grid; }
-.gr-stop::before { content: ''; position: absolute; left: 50%; top: -4px; width: 0; height: 0; transform: translateX(-50%); border: 3px solid transparent; border-top: 0; border-bottom: 4px solid #fff; filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 20%)); }
-.gr-stop b { display: block; border-radius: 2px; }
-.gr-stop.on { box-shadow: 0 0 0 2px var(--iris-select, #0D99FF), 0 1px 3px rgb(0 0 0 / 20%); }
+.gr-bar { position: relative; height: 20px; margin: 0 8px 14px; border-radius: 4px; cursor: copy; touch-action: none; }
+.gr-bg { position: absolute; inset: 0; border-radius: inherit; --sq-line: rgb(0 0 0 / 15%); --sq-line-w: 0.5px; pointer-events: none; }
+/* 정지점: 바깥 선(.gr-ring)과 흰 면(.gr-face)을 따로 squircle 로 — 바깥 선이 면 밖에 그려지도록. 위 꼭지는 ::before */
+.gr-stop { position: absolute; top: 100%; width: 16px; height: 16px; margin-top: 2px; transform: translateX(-50%); border-radius: 4px; cursor: ew-resize; padding: 0; isolation: isolate; }
+.gr-stop::before { content: ''; position: absolute; z-index: 1; left: 50%; top: -4px; width: 0; height: 0; transform: translateX(-50%); border: 3px solid transparent; border-top: 0; border-bottom: 4px solid #fff; filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 20%)); }
+.gr-ring { position: absolute; inset: -1px; border-radius: 5px; --sq-line: rgb(0 0 0 / 20%); --sq-line-w: 1px; pointer-events: none; }
+.gr-stop.on .gr-ring { inset: -2px; border-radius: 6px; --sq-line: var(--iris-select, #0D99FF); --sq-line-w: 2px; }
+.gr-face { position: absolute; inset: 0; box-sizing: border-box; padding: 2px; display: grid; border-radius: 4px; --sq-fill: #fff; filter: drop-shadow(0 1px 3px rgb(0 0 0 / 20%)); pointer-events: none; }
+.gr-face b { display: block; border-radius: 2px; }
 .gr-stop:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .gr-pos { margin-top: -2px; }
-.img-box { position: relative; height: 160px; border-radius: var(--ref-radius-03); overflow: hidden; background: repeating-conic-gradient(#e6e6e6 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 12%); display: grid; place-items: center; }
-.img-box.drop { box-shadow: inset 0 0 0 2px var(--iris-select, #0D99FF); }
+.img-box { position: relative; height: 160px; border-radius: var(--ref-radius-03); overflow: hidden; background: repeating-conic-gradient(#e6e6e6 0% 25%, #fff 0% 50%) 0 0 / 12px 12px; --sq-line: rgb(0 0 0 / 12%); --sq-line-w: 0.5px; display: grid; place-items: center; }
+.img-box.drop { --sq-line: var(--iris-select, #0D99FF); --sq-line-w: 2px; }
 .img-prev { position: absolute; inset: 0; }
 .img-choose { position: relative; height: 28px; padding: 0 var(--ref-spacing-07); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: #fff; --sq-fill: rgb(0 0 0 / 55%); opacity: 1; transition: opacity .12s; }
 .img-box:has(.img-prev[style*='url']) .img-choose { opacity: 0; }
 .img-box:hover .img-choose, .img-choose:focus-visible { opacity: 1; }
 .img-choose:hover { --sq-fill: rgb(0 0 0 / 70%); }
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
 .seg-b { height: 24px; border-radius: var(--ref-radius-02); font-size: 11px; color: var(--sys-color-neutral-600); }
-.seg-b.on { background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.seg-b.on { --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 8%)); }
 .pp-sw { padding: var(--ref-spacing-05) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .sw-h { font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); }
 .sw-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-.sw { aspect-ratio: 1; border-radius: 4px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%); cursor: pointer; }
-.sw:hover { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%), 0 0 0 2px var(--sys-color-neutral-300); }
-.sw:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.sw { aspect-ratio: 1; border-radius: 4px; --sq-line: rgb(0 0 0 / 10%); --sq-line-w: 1px; cursor: pointer; }
+/* 요소가 squircle 로 잘려서 바깥 선 · outline 은 안 보여요 — hover · 포커스는 안쪽 선 색으로 */
+.sw:hover { --sq-line: var(--sys-color-neutral-400); }
+.sw:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
 .lib { display: flex; flex-direction: column; gap: var(--ref-spacing-05); padding: var(--ref-spacing-06); }
 .lib-s { gap: var(--ref-spacing-04); color: var(--sys-color-neutral-500); }
 .lib-l { max-height: 360px; overflow: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-07); margin-right: calc(-1 * var(--ref-spacing-04)); padding-right: var(--ref-spacing-04); }

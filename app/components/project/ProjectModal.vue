@@ -116,7 +116,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
           <button type="submit" class="sr" tabindex="-1">저장</button>
         </form>
 
-        <div v-if="editing" class="danger-zone">
+        <div v-if="editing" class="sq danger-zone">
           <template v-if="!confirmDelete">
             <span class="tx-meta">프로젝트를 지우면 페이지 · 화면 · 문서 · 요구사항이 모두 함께 지워져요.</span>
             <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">지우기</Button>
@@ -152,7 +152,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 .shape.web { width: 56px; height: 34px; }
 .shape.detail_page { width: 14px; height: 40px; }
 .err { color: var(--sys-color-theme-error-default); margin: var(--ref-spacing-04) 0 0; }
-.danger-zone { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: 0 var(--ref-spacing-12) var(--ref-spacing-10); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); background: var(--sys-color-neutral-100); }
+.danger-zone { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: 0 var(--ref-spacing-12) var(--ref-spacing-10); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
 .row { display: flex; gap: var(--ref-spacing-04); flex: none; }
 .red { color: var(--sys-color-theme-error-default); }
 .foot { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }

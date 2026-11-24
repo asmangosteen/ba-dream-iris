@@ -58,7 +58,7 @@ function createProject() { newOpen.value = true }
         />
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
-            <span class="sq thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="ghost" /><span class="tx-meta">아직 화면이 없어요</span></span></span>
+            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq cover"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">아직 화면이 없어요</span></span></span>
             <button class="ib more" :aria-label="`${p.name} 설정`" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
@@ -83,9 +83,11 @@ function createProject() { newOpen.value = true }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08); }
 .card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
 .thumb { height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
-.sq-clip-inner { position: absolute; inset: 12px 24% 0; overflow: hidden; border-radius: 6px 6px 0 0; box-shadow: 0 0 0 1px var(--iris-line); }
+/* 화면 표지: 바깥 1px 선(.cover) 안에 squircle 로 자른 그림. 아래 두 모서리는 썸네일(.sq-clip) 밖으로 내려 감춤 */
+.cover { position: absolute; inset: 11px calc(24% - 1px) -14px; border-radius: 7px; --sq-line: var(--iris-line); --sq-line-w: 1px; }
+.sq-clip-inner { position: absolute; inset: 1px; overflow: hidden; border-radius: 6px; }
 .no-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-06); }
-.ghost { width: 44px; height: 72px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); background: var(--sys-color-common-white-default); }
+.ghost { width: 44px; height: 72px; border-radius: 6px; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; --sq-fill: var(--sys-color-common-white-default); }
 .proj:focus-visible { outline: 0; }
 .proj:focus-visible .thumb { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
 .proj:hover .name { color: var(--sys-color-neutral-900, var(--sys-color-neutral-800)); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--ref-color-gray-900-20); }

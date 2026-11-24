@@ -24,7 +24,7 @@ defineExpose({ open: () => (open.value = true) })
 <template>
   <button
     ref="btn"
-    class="cf-sw"
+    class="sq sq-clip cf-sw"
     :class="{ on: open }"
     :style="{ background: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px` }"
     :aria-label="label"
@@ -36,7 +36,8 @@ defineExpose({ open: () => (open.value = true) })
 </template>
 
 <style scoped>
-.cf-sw { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
-.cf-sw.on { box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10), 0 0 0 2px var(--sys-color-brand-primary-default); }
-.cf-sw:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.cf-sw { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+/* 요소가 squircle 로 잘려서 바깥 선 · outline 은 안 보여요 — 열림 · 포커스는 안쪽 선 색으로 */
+.cf-sw.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
+.cf-sw:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); }
 </style>

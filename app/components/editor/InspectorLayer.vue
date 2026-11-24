@@ -302,7 +302,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </div>
         <button v-if="nodes.length > 1" class="ib" aria-label="Use as mask" title="Use as mask ⌃⌘M" @click="store.toggleMask(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" /></svg></button>
       </div>
-      <button v-if="one?.isMask" class="cb on" @click="store.toggleMask(sid, ids)"><i />Use as mask</button>
+      <button v-if="one?.isMask" class="cb on" @click="store.toggleMask(sid, ids)"><i class="sq" />Use as mask</button>
       <label v-if="one" class="sq fld"><span>Name</span><input :key="one.id + one.name" :value="one.name" aria-label="Layer name" @change="store.update(sid, ids, { name: ($event.target as HTMLInputElement).value.trim() || one.name })" @keydown="blurOnEnter"></label>
     </section>
 
@@ -334,13 +334,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <label class="sq fld"><span>H</span><input v-if="!vb('h')" :value="show(same((n) => n.h))" :placeholder="same((n) => n.h) === 'Mixed' ? 'Mixed' : ''" inputmode="numeric" aria-label="Height" @change="setNum('h', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, 'h', n.h + d)))"><TokenPicker :kinds="['spacing']" :bound="vb('h')" reveal label="Height" @pick="(t) => pickNum('h', t)" @unbind="unbind('h')" @step="(d) => stepNum('h', d)" /></label>
       </div>
       <div class="grid2">
-        <select v-for="ax in (['w', 'h'] as const)" :key="ax" class="sq sel" :aria-label="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :title="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :value="sizingNow(ax)" @change="setSizing(ax, ($event.target as HTMLSelectElement).value as Sizing)">
+        <select v-for="ax in (['w', 'h'] as const)" :key="ax" class="sqc sel" :aria-label="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :title="ax === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" :value="sizingNow(ax)" @change="setSizing(ax, ($event.target as HTMLSelectElement).value as Sizing)">
           <option v-if="sizingNow(ax) === 'Mixed'" value="Mixed" disabled>Mixed</option>
           <option v-for="o in sizingOpts(ax)" :key="o.k" :value="o.k">{{ o.label }}</option>
         </select>
       </div>
-      <button v-if="inFlow" :class="['cb', { on: same((n) => !!n.absolute) === true }]" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><i />Absolute position</button>
-      <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i />Clip content</button>
+      <button v-if="inFlow" :class="['cb', { on: same((n) => !!n.absolute) === true }]" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><i class="sq" />Absolute position</button>
+      <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i class="sq" />Clip content</button>
     </section>
 
     <InspectorInstance v-if="one?.type === 'instance'" :sid="sid" :ids="ids" />
@@ -350,15 +350,15 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     <section v-if="showConstraints" class="s">
       <div class="sec-h h24"><span>Constraints</span></div>
       <div class="cons">
-        <div class="cons-box" aria-hidden="true">
+        <div class="sq cons-box" aria-hidden="true">
           <i :class="['ct', 'l', { on: ['left', 'leftright'].includes(String(consNow('h'))) }]" /><i :class="['ct', 'r', { on: ['right', 'leftright'].includes(String(consNow('h'))) }]" />
           <i :class="['ct', 't', { on: ['top', 'topbottom'].includes(String(consNow('v'))) }]" /><i :class="['ct', 'b', { on: ['bottom', 'topbottom'].includes(String(consNow('v'))) }]" />
           <i :class="['ct', 'ch', { on: consNow('h') === 'center' || consNow('h') === 'scale' }]" /><i :class="['ct', 'cv', { on: consNow('v') === 'center' || consNow('v') === 'scale' }]" />
-          <b />
+          <b class="sq" />
         </div>
         <div class="cons-sel">
-          <select class="sq sel" aria-label="Horizontal constraint" :value="consNow('h')" @change="setCons('h', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('h') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_H" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
-          <select class="sq sel" aria-label="Vertical constraint" :value="consNow('v')" @change="setCons('v', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('v') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_V" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+          <select class="sqc sel" aria-label="Horizontal constraint" :value="consNow('h')" @change="setCons('h', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('h') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_H" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
+          <select class="sqc sel" aria-label="Vertical constraint" :value="consNow('v')" @change="setCons('v', ($event.target as HTMLSelectElement).value)"><option v-if="consNow('v') === 'Mixed'" value="Mixed" disabled>Mixed</option><option v-for="o in CONS_V" :key="o[0]" :value="o[0]">{{ o[1] }}</option></select>
         </div>
       </div>
     </section>
@@ -431,7 +431,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <button :class="['ib', { on: same((n) => n.style.list) === 'number' }]" aria-label="Numbered list" title="Numbered list" @click="toggleStyle('list', 'number')"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2.5h1v2.5M1.8 8.2c.2-.5.6-.7 1-.7.5 0 .9.3.9.8 0 .7-1.9 1.4-1.9 2.2h1.9M5 3.5h7M5 7h7M5 10.5h7" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
         </div>
       </div>
-      <button :class="['cb', { on: same((n) => !!n.style.autoWidth) === true }]" @click="setStyle('autoWidth', same((n) => !!n.style.autoWidth) !== true)"><i />Auto width</button>
+      <button :class="['cb', { on: same((n) => !!n.style.autoWidth) === true }]" @click="setStyle('autoWidth', same((n) => !!n.style.autoWidth) !== true)"><i class="sq" />Auto width</button>
       <span v-if="one" class="tx-meta">Double-click or press Enter to edit text</span>
     </section>
 
@@ -446,7 +446,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           </div>
           <label class="sq fld" title="Stroke weight"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 3.5h10" stroke="currentColor" stroke-width="1" /><path d="M2 7h10" stroke="currentColor" stroke-width="1.6" /><path d="M2 10.5h10" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :value="show(same((n) => n.style.strokeWidth ?? 0))" :placeholder="same((n) => n.style.strokeWidth ?? 0) === 'Mixed' ? 'Mixed' : ''" inputmode="decimal" aria-label="Stroke weight" @change="setStyleNum('strokeWidth', $event)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('strokeWidth', d))"><span>px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbind('strokeWidth')" @step="(d) => stepStyle('strokeWidth', d)" /></label>
         </div>
-        <button v-if="!has('text')" :class="['cb', { on: dashed }]" @click="setStyle('dash', dashed ? undefined : [4, 4])"><i />Dashed</button>
+        <button v-if="!has('text')" :class="['cb', { on: dashed }]" @click="setStyle('dash', dashed ? undefined : [4, 4])"><i class="sq" />Dashed</button>
         <div v-if="dashed" class="grid2">
           <label class="sq fld"><span>Dash</span><input :key="'d' + one?.style.dash?.[0]" :value="nodes[0]?.style.dash?.[0] ?? 4" inputmode="numeric" aria-label="Dash" @change="setDash(0, $event)" @keydown="blurOnEnter"></label>
           <label class="sq fld"><span>Gap</span><input :key="'g' + one?.style.dash?.[1]" :value="nodes[0]?.style.dash?.[1] ?? 4" inputmode="numeric" aria-label="Gap" @change="setDash(1, $event)" @keydown="blurOnEnter"></label>
@@ -472,8 +472,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 
     <section v-if="one?.type === 'image'" class="s">
       <div class="sec-h h24"><span>Image</span></div>
-      <div class="seg4">
-        <button v-for="f in (['fill', 'fit', 'crop', 'tile'] as const)" :key="f" :class="['seg-b', { on: fitNow === f }]" @click="setStyle('fit', f === 'fill' ? undefined : f)">{{ { fill: 'Fill', fit: 'Fit', crop: 'Crop', tile: 'Tile' }[f] }}</button>
+      <div class="sq seg4">
+        <button v-for="f in (['fill', 'fit', 'crop', 'tile'] as const)" :key="f" :class="['sq', 'seg-b', { on: fitNow === f }]" @click="setStyle('fit', f === 'fill' ? undefined : f)">{{ { fill: 'Fill', fit: 'Fit', crop: 'Crop', tile: 'Tile' }[f] }}</button>
       </div>
       <div v-if="fitNow === 'crop'" class="grid3c">
         <label class="sq fld" title="Zoom"><span>Zoom</span><input :key="'z' + cropNow.scale" :value="Math.round(cropNow.scale * 100) + '%'" inputmode="numeric" aria-label="Crop zoom" @change="setCrop('scale', $event)" @keydown="blurOnEnter"></label>
@@ -505,10 +505,11 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .tog:hover { color: var(--sys-color-neutral-800); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-items: center; }
 .sel { height: 28px; padding: 0 var(--ref-spacing-04); border: 0; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); font: inherit; font-size: 12px; color: var(--sys-color-neutral-800); min-width: 0; }
-.sel:focus-visible { outline: 1px solid var(--sys-color-brand-primary-default); }
+/* select 는 ::before · ::after 가 없어서 .sqc 로 요소 자체를 squircle 로 잘라요 — 포커스 선도 안쪽에 */
+.sel:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--sys-color-brand-primary-default); }
 .cons { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: var(--ref-spacing-04); align-items: center; }
-.cons-box { position: relative; width: 72px; height: 72px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
-.cons-box b { position: absolute; left: 24px; top: 24px; width: 24px; height: 24px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-400); }
+.cons-box { position: relative; width: 72px; height: 72px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
+.cons-box b { position: absolute; left: 24px; top: 24px; width: 24px; height: 24px; border-radius: 2px; --sq-line: var(--sys-color-neutral-400); --sq-line-w: 1px; }
 .ct { position: absolute; background: var(--sys-color-neutral-400); border-radius: 1px; }
 .ct.on { background: var(--iris-select, #0D99FF); }
 .ct.l { left: 8px; top: 35px; width: 10px; height: 2px; } .ct.r { right: 8px; top: 35px; width: 10px; height: 2px; }
@@ -521,21 +522,18 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .txt-b { width: auto; min-width: 24px; padding: 0 4px; font-size: 11px; font-weight: 500; }
 .caps { align-self: flex-start; }
 .blend { max-height: 280px; overflow: auto; }
-.seg4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); background: var(--sys-color-neutral-200); }
+.seg4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 2px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
 .seg-b { height: 24px; border-radius: var(--ref-radius-02); font-size: 11px; color: var(--sys-color-neutral-600); }
-.seg-b.on { background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.seg-b.on { --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-weight: 500; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 8%)); }
 .grid3c { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: var(--ref-spacing-04); }
 .color-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--ref-spacing-04); align-items: center; }
-.swatch { width: 14px !important; height: 14px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; background: none; box-shadow: inset 0 0 0 0.5px var(--ref-color-gray-900-20); }
-.swatch::-webkit-color-swatch-wrapper { padding: 0; }
-.swatch::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .rel { position: relative; min-width: 0; }
 .muted { color: var(--sys-color-neutral-500); }
 .grow { flex: 1; min-width: 0; }
 .fld > svg { flex: none; color: var(--sys-color-neutral-600); }
 .full { width: 100%; }
 .cb { align-self: flex-start; border-radius: var(--ref-radius-02); }
-.cb:hover > i { box-shadow: inset 0 0 0 1px var(--sys-color-neutral-600); }
-.cb:focus-visible, .swatch:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.cb:hover > i { --sq-line: var(--sys-color-neutral-600); }
+.cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
 </style>
