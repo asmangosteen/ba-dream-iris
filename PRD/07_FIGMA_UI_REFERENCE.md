@@ -684,6 +684,18 @@ Copy ⌘C · Paste here · Paste to replace ⇧⌘R · Copy/Paste as › · Buil
 - **Appearance:** 머리에 숨기기 · 블렌드(묶음 구분선이 있는 메뉴)를 뒀어요. Opacity · Corner radius + 개별 모서리 토글, 개별 모서리는 2×2예요.
 - **Stroke · 화살표 끝 · 글자 굵기:** 공용 드롭다운으로 바꿨어요.
 
+다른 인스펙터도 같은 규칙으로 바꿨어요.
+
+| 파일 | 바꾼 내용 |
+|---|---|
+| `InspectorDesign.vue`(화면 프레임) | Status · 크기 프리셋을 공용 드롭다운으로 바꿨어요(맞는 게 없으면 Custom, 기기 묶음 구분선). 모든 줄을 격자로 맞추고, 빈 Stroke 제목은 옅게 |
+| `InspectorPaints.vue` | 행을 [칠 칸 \| 👁 24 \| − 24]로 바꿨어요. 변수 버튼은 칸에 올리면 보이고, 색 스타일 만들기는 머리로 옮겼어요 |
+| `InspectorEffects.vue` | 효과 종류를 공용 드롭다운으로(피그마 순서) 바꿨어요. 새 효과는 설정이 바로 열려요 |
+| `InspectorGrids.vue` | 종류(Grid/Columns/Rows)를 드롭다운으로, 값은 격자 줄로 |
+| `InspectorAutoLayout.vue` | 머리 토글 · Flow + 줄바꿈 · Alignment \| Gap(칸 안 Fixed/Auto ▾) · Padding + 개별 토글 |
+| `InspectorInstance.vue` · `ColorPicker.vue` · `PaintPopover.vue` | 기본 select와 형식 메뉴를 공용 드롭다운으로 바꿨어요 |
+| `InspectorPage.vue` · `InspectorDev.vue` | 격자 줄로 정리 |
+
 ## 15. 나중에 넣을 것 (우선순위 제안)
 
 1. **캔버스 깊이 고르기:** 클릭은 맨 위 프레임의 자식, 더블클릭은 한 단계 안, ⌘클릭은 가장 깊은 것. 레이어 목록 자동 펼침·스크롤
