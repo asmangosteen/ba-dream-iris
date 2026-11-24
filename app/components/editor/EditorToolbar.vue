@@ -123,14 +123,14 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
 </template>
 
 <style scoped>
-/* 피그마 UI3 도구 막대: 높이 48 · 안쪽 8 · 묶음 사이 8 · 도구 32 + ▾ 16(붙어 있음 1px) · 칸막이는 위아래 끝까지 */
-.bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 48px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); display: flex; align-items: center; gap: var(--ref-spacing-06); z-index: 3; }
+/* 도구 막대: 높이 44 · 모서리 14(= 도구 8 + 안쪽 6, 안팎 곡선이 나란해요) · 안쪽 6(도구 32 둘레가 위아래 · 좌우 모두 6) · 묶음 사이 6 · 도구 32 + ▾ 16(붙어 있음 1px) · 칸막이는 위아래 끝까지 */
+.bar { position: absolute; bottom: var(--iris-gap); left: 50%; transform: translateX(-50%); height: 44px; box-sizing: border-box; border-radius: 14px; padding: 0 var(--ref-spacing-05); display: flex; align-items: center; gap: var(--ref-spacing-05); z-index: 3; }
 .grp-wrap { position: relative; display: flex; align-items: center; gap: 1px; }
 .more { width: 16px; height: 32px; display: grid; place-items: center; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-02); }
 .more:hover, .more.open { color: var(--sys-color-neutral-800); --sq-fill: var(--interaction-light-gray-hover); }
 .more:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 /* 펼침 메뉴: 막대 위 4px, 묶음 버튼 왼쪽 끝에 맞춤. ✓ 칸 · 아이콘 · 이름 · 단축키 */
-.pop { top: auto; bottom: calc(100% + 12px); left: 0; right: auto; min-width: 200px; padding: var(--ref-spacing-04); }
+.pop { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; min-width: 200px; padding: var(--ref-spacing-04); }
 .pop .menu-item { gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-04); }
 .pop .menu-item svg, .pop .menu-item :deep(svg) { flex: none; }
 .ck { color: var(--sys-color-neutral-800); }
