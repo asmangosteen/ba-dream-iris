@@ -40,13 +40,17 @@ const rows = computed<Row[]>(() => {
   const sorted = list.map((r, i) => [r, i] as const).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([r]) => r)
   // showX 토글에 딸린 값(xLabel · xIconName · xTheme · x …)을 그 토글 바로 아래로 — 먼저 딸린 것을 다 고른 뒤 늘어놓아요
   const kids = new Map<string, Row[]>()
+  // 슬롯 글자(Text) 칸이 따로 있으면 딸린 글자 칸은 'Text' 대신 제 이름(Menu 의 Caption)
+  const hasSlot = sorted.some((x) => x.slot)
   const used = new Set<string>()
   for (const r of sorted) {
     const m = r.kind === 'boolean' ? /^show([A-Z]\w*)$/.exec(r.name) : null
     if (!m) continue
     const base = m[1]!.charAt(0).toLowerCase() + m[1]!.slice(1)
     // 여러 단어면 앞 단어로도 묶어요(showSupportingText → supportingText · supportingTheme). 한 단어 이름은 그대로
-    const head = /^[a-z]+(?=[A-Z])/.exec(base)?.[0] ?? base
+    // 단, 앞 단어와 같은 이름의 속성이 따로 있으면(ListSort 의 label · showLabelIcon) 그건 따로 쓰는 값이라 앞 단어로는 안 묶어요
+    const head0 = /^[a-z]+(?=[A-Z])/.exec(base)?.[0] ?? base
+    const head = head0 !== base && sorted.some((x) => x.name === head0) ? base : head0
     const list: Row[] = []
     for (const k of sorted) {
       // 앞 단어가 단어 경계에서 끝나야 딸린 값(showSubPlan 의 'sub' 가 subsidyLabel 을 데려가지 않게)
@@ -54,14 +58,85 @@ const rows = computed<Row[]>(() => {
       if (k === r || k.slot || k.a11y || k.kind === 'boolean' || used.has(k.key) || !bound(head)) continue
       const rest = bound(base) ? k.name.slice(base.length) : k.name.slice(head.length)
       used.add(k.key)
-      list.push({ ...k, dep: r.key, label: rest === '' ? 'Text' : rest === 'Name' && /Icon$/.test(base) ? 'Icon' : labelOf(rest) })
+      list.push({ ...k, dep: r.key, label: rest === '' ? (hasSlot ? labelOf(k.name) : 'Text') : rest === 'Name' && /Icon$/.test(base) ? 'Icon' : labelOf(rest) })
     }
     kids.set(r.key, list)
   }
   return sorted.filter((r) => !used.has(r.key)).flatMap((r) => [r, ...(kids.get(r.key) ?? [])])
 })
 const depRow = (r: Row) => rows.value.find((x) => x.key === r.dep)
-const shown = (r: Row) => { const d = r.dep ? depRow(r) : undefined; return !d || current(d) === true }
+
+/** 속성 값(이름으로): 고친 값 → Iris 기본값 → 빌드 속성 목록 기본값 → 컴포넌트 런타임 기본값 */
+function val(n: string): unknown {
+  if (set.value[n] !== undefined) return set.value[n]
+  const d = instDefault(name.value, n) ?? dsProps(name.value).find((p) => p.name === n)?.default
+  if (d !== undefined) return d
+  const rp = (dsComponent(name.value) as { props?: Record<string, { default?: unknown }> } | null)?.props?.[n]?.default
+  return typeof rp === 'function' ? undefined : rp
+}
+type Get = (n: string) => unknown
+/** 'text-icon' 처럼 '-' 로 이은 값에 그 낱말이 있는지 */
+const has = (v: unknown, w: string) => typeof v === 'string' && v.split('-').includes(w)
+const isOn = (v: unknown) => v === true
+const HIDE = () => false
+const byContents = { iconName: (g: Get) => has(g('contents'), 'icon'), default: (g: Get) => has(g('contents'), 'text') }
+/**
+ * 필요할 때만 보이는 속성(디자인 시스템 컴포넌트가 실제로 그 값을 쓰는 조건) — 컴포넌트 → 속성 이름(슬롯 글자는 'default') → 보일 조건.
+ * 여기 적은 조건이 showX 토글 규칙보다 앞서요. HIDE: Contents 가 대신하는 옛 켜고 끄기(Chip · FilterChip)
+ */
+const WHEN: Record<string, Record<string, (g: Get) => boolean>> = {
+  Button: byContents,
+  TextButton: byContents,
+  Chip: { ...byContents, default: () => true, avatarSrc: (g) => has(g('contents'), 'avatar'), showIcon: HIDE, showAvatar: HIDE, iconPosition: HIDE },
+  FilterChip: { default: (g) => has(g('contents'), 'text'), avatarSrc: (g) => has(g('contents'), 'avatar'), showText: HIDE, showAvatar: HIDE },
+  ButtonGroup: {
+    secondaryLabel: (g) => !['solo', 'with-etc', 'with-check', 'with-icon'].includes(String(g('type'))),
+    etcLabel: (g) => g('type') === 'with-etc',
+    costLabel: (g) => g('type') === 'with-cost', cost: (g) => g('type') === 'with-cost',
+    checkLabel: (g) => g('type') === 'with-check', showCheckIcon: (g) => g('type') === 'with-check',
+  },
+  ListCommon: {
+    iconName: (g) => g('leftBlock') === 'icon', iconCategory: (g) => g('leftBlock') === 'icon', iconColor: (g) => g('leftBlock') === 'icon',
+    imageSrc: (g) => g('leftBlock') === 'image', imageAlt: (g) => g('leftBlock') === 'image',
+    buttonLabel: (g) => g('rightBlock') === 'button', cost: (g) => has(g('rightBlock'), 'cost'), checked: (g) => g('rightBlock') === 'check',
+  },
+  Menu: {
+    with: (g) => isOn(g('leftBlock')),
+    iconName: (g) => isOn(g('leftBlock')) && g('with') === 'icon', iconCategory: (g) => isOn(g('leftBlock')) && g('with') === 'icon',
+    imageSrc: (g) => isOn(g('leftBlock')) && g('with') === 'image', imageAlt: (g) => isOn(g('leftBlock')) && g('with') === 'image',
+    captionType: (g) => isOn(g('showCaption')), captionTheme: (g) => isOn(g('showCaption')),
+    caption: (g) => isOn(g('showCaption')) && g('captionType') !== 'badge-numeric',
+    captionCount: (g) => isOn(g('showCaption')) && g('captionType') === 'badge-numeric',
+  },
+  Select: { iconName: (g) => has(g('trailing'), 'icon'), subText: (g) => has(g('trailing'), 'subtext') },
+  NavTrailingItem: { iconName: (g) => g('type') === 'icon', label: (g) => g('type') === 'button' },
+  NavBarTop: {
+    showBackLabel: (g) => isOn(g('showLeading')) && String(g('type')).endsWith('-back'),
+    backLabel: (g) => isOn(g('showLeading')) && String(g('type')).endsWith('-back') && g('showBackLabel') !== false,
+    title: (g) => g('type') === 'big-title' || (String(g('type')).startsWith('smalltitle') && isOn(g('showSmalltitle'))),
+    showSmalltitle: (g) => /^(smalltitle|seg)-/.test(String(g('type'))),
+    segmentValue: (g) => String(g('type')).startsWith('seg-'), defaultSegmentValue: (g) => String(g('type')).startsWith('seg-'),
+  },
+  NoticeBox: { title: (g) => g('contents') !== 'caption', description: (g) => g('contents') !== 'title' },
+  SupportingText: { current: (g) => isOn(g('showCount')), max: (g) => isOn(g('showCount')), countState: (g) => isOn(g('showCount')) },
+  TimelineEntry: { buttonLabel: (g) => g('trailing') === 'button', amount: (g) => g('trailing') !== 'button' },
+  TimelineTask: { with: (g) => isOn(g('showAction')), actionLabel: (g) => isOn(g('showAction')) },
+  Toast: { buttonLabel: (g) => isOn(g('button')) },
+  ToastCard: { buttonLabel: (g) => isOn(g('button')) },
+  PopUp: { secondaryLabel: (g) => String(g('buttonCount')) === '2' },
+  PopUpCard: { secondaryLabel: (g) => String(g('buttonCount')) === '2' },
+  Tab: { tailingIcon: (g) => g('type') === 'hug', sidePadding: (g) => g('type') === 'hug' },
+}
+/** 들여 보일지: 딸린 토글이 패널에 보일 때만(옛 토글을 숨긴 Chip 의 Icon 은 들이지 않아요) */
+const subOf = (r: Row) => { const d = r.dep ? depRow(r) : undefined; return !!d && shown(d) }
+/** 칸 이름: 딸린 토글이 숨었으면(Chip 의 Show Icon) 'Name' 이 아니라 제 이름 그대로('Icon Name') */
+const labelFor = (r: Row) => (r.dep && !subOf(r) ? labelOf(r.name) : r.label)
+const shown = (r: Row): boolean => {
+  const rule = WHEN[name.value]?.[r.slot ? 'default' : r.name]
+  if (rule) return rule(val)
+  const d = r.dep ? depRow(r) : undefined
+  return !d || current(d) === true
+}
 /** 아이콘 이름 칸: 고른 아이콘을 칸 안에 미리 보여요 */
 const isIcon = (r: Row) => /icon(Name)?$/i.test(r.name) && r.kind === 'string'
 // 아이콘 고르기 팝오버: 연 칸(key)과 그 칸 요소(팝오버 자리 기준)
@@ -165,14 +240,14 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
     <p v-else-if="!rows.length" class="note">{{ tr('No editable properties') }}</p>
 
     <template v-for="r in rows" :key="r.key">
-    <div v-if="shown(r)" :class="['row', { mod: isSet(r), sub: !!r.dep, bool: r.kind === 'boolean' }]" :title="r.doc">
+    <div v-if="shown(r)" :class="['row', { mod: isSet(r), sub: subOf(r), bool: r.kind === 'boolean' }]" :title="r.doc">
       <template v-if="r.kind === 'boolean'">
         <!-- 피그마처럼: 이름 왼쪽, 토글 오른쪽 -->
-        <span class="lbl ell">{{ r.label }}</span>
+        <span class="lbl ell">{{ labelFor(r) }}</span>
         <button :class="['tg', 'tsw', { on: current(r) === true }]" role="switch" :aria-checked="current(r) === true" :aria-label="r.label" @click="write(r, current(r) !== true)" />
       </template>
       <template v-else>
-        <span class="lbl ell">{{ r.label }}</span>
+        <span class="lbl ell">{{ labelFor(r) }}</span>
         <EditorSelect v-if="r.kind === 'enum'" :model-value="current(r) === undefined ? '' : String(current(r))" :options="enumOpts(r)" :ariaLabel="r.label" raw @update:model-value="(v) => pick(r, v)" />
         <label v-else-if="r.kind === 'number'" class="sq fld">
           <input :key="'n' + String(set[r.key])" :value="current(r) ?? ''" inputmode="decimal" :placeholder="current(r) === undefined ? tr('Auto') : ''" :aria-label="r.label" @change="num(r, $event)" @keydown="blur">
