@@ -19,21 +19,21 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: DESCRIPTION },
-        // 링크 공유 미리보기 — 썸네일은 랜딩(/welcome)의 3D 로고 (design/logo 참고)
+        // 링크 공유 미리보기 — 썸네일은 랜딩(/welcome) 다크 모드의 3D 로고(배경 black-default #03091A)
         { property: 'og:type', content: 'website' },
         { property: 'og:site_name', content: 'Iris' },
         { property: 'og:locale', content: 'ko_KR' },
         { property: 'og:title', content: 'Iris' },
         { property: 'og:description', content: DESCRIPTION },
         { property: 'og:url', content: SITE_URL },
-        { property: 'og:image', content: `${SITE_URL}/og.png` },
+        { property: 'og:image', content: `${SITE_URL}/og-dark.png` },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
         { property: 'og:image:alt', content: 'Iris logo' },
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: 'Iris' },
         { name: 'twitter:description', content: DESCRIPTION },
-        { name: 'twitter:image', content: `${SITE_URL}/og.png` },
+        { name: 'twitter:image', content: `${SITE_URL}/og-dark.png` },
       ],
       // 파비콘: design/logo/favicon.mjs 로 만듦 (진한 타일 · 코너 스무딩 60%)
       link: [

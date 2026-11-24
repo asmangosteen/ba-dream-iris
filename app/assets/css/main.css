@@ -153,7 +153,8 @@ button:active{cursor:grabbing}
    캔버스 위 화면(실제 디자인 결과물)은 --iris-paper 로 늘 흰색입니다.
    모드: <html data-theme="dark|light">, 없으면 기기 설정(prefers-color-scheme)
    ============================================================ */
-:root{--iris-paper:#FFFFFF;--iris-paper-line:rgb(3 9 26 / 10%);--iris-grid-pixel:rgb(3 9 26 / 5%)}
+/* --iris-black: black-default(gray-900) 의 라이트 값. 다크에선 gray-900 이 밝게 뒤집혀서, 웰컴 · 로그인 다크 배경은 이 값을 씀 */
+:root{--iris-black:#03091A;--iris-paper:#FFFFFF;--iris-paper-line:rgb(3 9 26 / 10%);--iris-grid-pixel:rgb(3 9 26 / 5%)}
 :root[data-theme="dark"]{
   --ref-color-gray-0:#1B2029;--ref-color-gray-50:#171B22;--ref-color-gray-100:#101318;--ref-color-gray-200:#252B35;--ref-color-gray-300:#343B47;--ref-color-gray-400:#4B5361;--ref-color-gray-500:#8C9199;--ref-color-gray-600:#A7ACB4;--ref-color-gray-700:#C3C7CD;--ref-color-gray-800:#E6E8EB;--ref-color-gray-900:#F6F7F7;--ref-color-gray-1000:#FFFFFF;
   --ref-color-gray-900-2:rgb(255 255 255 / 2%);--ref-color-gray-900-5:rgb(255 255 255 / 6%);--ref-color-gray-900-10:rgb(255 255 255 / 10%);--ref-color-gray-900-20:rgb(255 255 255 / 18%);--ref-color-gray-900-40:rgb(255 255 255 / 36%);--ref-color-gray-900-60:rgb(255 255 255 / 56%);--ref-color-gray-900-80:rgb(255 255 255 / 78%);

@@ -31,6 +31,7 @@ export type IrisSteelOptions = {
   sway?: number
   bob?: number
   shadow?: number // 그림자 진하기
+  shadowColor?: THREE.ColorRepresentation // 그림자 색 (흰 바탕: 검정, 다크 바탕: 밝은 색)
   exposure?: number
   env?: number
   zoomMin?: number
@@ -40,7 +41,7 @@ export type IrisSteelOptions = {
 }
 
 export async function mountIrisSteel(host: HTMLElement, o: IrisSteelOptions) {
-  const opt = { frame: 6, camY: -0.35, rest: [0, 0] as [number, number], sway: 0.32, bob: 0.07, shadow: 0.1, exposure: 1, env: 1, zoomMin: 0.6, zoomMax: 1.6, onProgress: () => {}, onChange: () => {}, ...o }
+  const opt = { frame: 6, camY: -0.35, rest: [0, 0] as [number, number], sway: 0.32, bob: 0.07, shadow: 0.1, shadowColor: 0x000000 as THREE.ColorRepresentation, exposure: 1, env: 1, zoomMin: 0.6, zoomMax: 1.6, onProgress: () => {}, onChange: () => {}, ...o }
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
   const ac = new AbortController()
   const on = { signal: ac.signal }
@@ -113,7 +114,8 @@ export async function mountIrisSteel(host: HTMLElement, o: IrisSteelOptions) {
   depthMat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace(
       'gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
-      'gl_FragColor = vec4( vec3( 0.0 ), pow( 1.0 - fragCoordZ, 1.6 ) * 1.6 );',
+      // 색은 흰색으로 찍고(진하기는 알파), 실제 색은 바닥 판 재질 색(shadowColor)이 정해요 — 다크 바탕에선 밝은 그림자
+      'gl_FragColor = vec4( vec3( 1.0 ), pow( 1.0 - fragCoordZ, 1.6 ) * 1.6 );',
     )
   }
   depthMat.depthTest = false
@@ -138,8 +140,9 @@ export async function mountIrisSteel(host: HTMLElement, o: IrisSteelOptions) {
   // 화면을 향한 판에 납작하게 펼쳐서, 살짝 위에서 내려다본 바닥처럼
   const shadow = new THREE.Mesh(
     new THREE.PlaneGeometry(S.w, S.d),
-    new THREE.MeshBasicMaterial({ map: rt.texture, transparent: true, opacity: opt.shadow, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: rt.texture, color: opt.shadowColor, transparent: true, opacity: opt.shadow, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
   )
+  const shadowMat = shadow.material as THREE.MeshBasicMaterial
   shadow.scale.set(1, -S.squash, 1) // 뒤쪽(-z)이 화면 위로
   shadow.position.set(0, S.floor, -4)
   shadow.renderOrder = -1
@@ -278,7 +281,9 @@ export async function mountIrisSteel(host: HTMLElement, o: IrisSteelOptions) {
     shadow.visible = false
     scene.overrideMaterial = depthMat
     renderer.setRenderTarget(rt)
+    renderer.setClearColor(0xffffff, 0) // 흐리게 할 때 가장자리가 어둡게 번지지 않게 바깥도 흰색(투명)
     renderer.clear()
+    renderer.setClearColor(0, 0)
     renderer.render(scene, shCam)
     scene.overrideMaterial = null
     blur(S.blur)
@@ -330,6 +335,11 @@ export async function mountIrisSteel(host: HTMLElement, o: IrisSteelOptions) {
   })()
 
   return {
+    // 화면 모드가 바뀔 때 그림자 색 · 진하기 바꾸기
+    setShadow(color: THREE.ColorRepresentation, amount: number) {
+      shadowMat.color.set(color)
+      shadowMat.opacity = amount
+    },
     // 정면 · 기본 크기로 부드럽게 되돌리기
     reset() {
       vy = vp = 0

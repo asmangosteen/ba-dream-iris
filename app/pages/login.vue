@@ -3,11 +3,11 @@ import { Button, TextButton, TextInput } from '@ba-dream/design-system'
 
 /**
  * 로그인: 회사 메일 → 6자리 코드(또는 메일 링크). 로고와 입력을 화면 가운데에.
- * 이 화면은 기기 · 앱 설정과 상관없이 늘 라이트 모드예요(떠나면 원래 모드로 돌아가요).
+ * 화면 모드는 웰컴과 같아요: 다크를 골랐을 때만 다크(배경 black-default), 그 밖엔 라이트.
  */
 // 랜딩(/welcome) ↔ 로그인은 스르륵 바뀜 (main.css 의 iris-fade)
 definePageMeta({ pageTransition: { name: 'iris-fade', mode: 'out-in' } })
-useHead({ htmlAttrs: { 'data-theme': 'light' }, meta: [{ name: 'color-scheme', content: 'light' }] })
+const { theme } = usePublicTheme()
 
 const supabase = useSupabaseClient()
 const route = useRoute()
@@ -128,14 +128,14 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 </script>
 
 <template>
-  <div class="page">
+  <div class="page" :class="theme">
     <!-- 랜딩으로 나가기: 랜딩의 Sign in 과 같은 크기 · 같은 높이, 왼쪽에 -->
     <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" aria-label="Back to home" @click="navigateTo('/welcome')" />
     <h1 class="bar-title">Sign in</h1>
     <section class="side">
 
       <form class="form" novalidate @submit.prevent="submit">
-        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" theme="light" /></NuxtLink>
+        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" :theme="theme" /></NuxtLink>
         <!-- 코드 단계: 어디로 보냈는지만 알려요 -->
         <p v-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
 
@@ -198,6 +198,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 
 <style scoped>
 .page { position: relative; min-height: 100vh; background: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; }
+.page.dark { background: var(--iris-black); }
 .side { display: flex; flex-direction: column; padding: var(--ref-spacing-14) var(--ref-spacing-20); box-sizing: border-box; min-height: 100vh; }
 .brand { display: inline-flex; align-self: center; margin-bottom: var(--ref-spacing-12); border-radius: var(--ref-radius-02); }
 .brand:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 4px; }

@@ -19,4 +19,19 @@ export function useThemeHead() {
   })
 }
 
+/**
+ * 로그인 전 화면(/welcome · /login)용: 라이트 · 다크 둘 중 하나로만 보여요.
+ * 다크로 골랐을 때만 다크, 그 밖(라이트 · 기기 설정)은 라이트 — 금속 로고 조명이 흰 바탕 기준이라 기본은 라이트.
+ * 여기서 고르면 같은 쿠키에 저장돼서 로그인 화면 · 안쪽 화면도 같은 모드가 돼요.
+ */
+export function usePublicTheme() {
+  const { mode, setMode } = useTheme()
+  const theme = computed<'light' | 'dark'>(() => (mode.value === 'dark' ? 'dark' : 'light'))
+  useHead({
+    htmlAttrs: { 'data-theme': theme },
+    meta: [{ name: 'color-scheme', content: theme }],
+  })
+  return { theme, setTheme: (t: 'light' | 'dark') => setMode(t) }
+}
+
 export const THEME_LABEL: Record<ThemeMode, string> = { system: '기기 설정', light: '라이트', dark: '다크' }

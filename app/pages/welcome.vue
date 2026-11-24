@@ -6,16 +6,17 @@ import { Button } from '@ba-dream/design-system'
  * - 끌어서 360도 돌리기, 위아래 스크롤로 커서 위치 기준 확대 · 축소
  * - 처음 모습에서 바뀌면 Reset 이 나타나고, 누르면 처음 자세 · 크기로
  * - 위: 워드마크 · Sign in(→ /login), 아래: Reset · 저작권 · 회사 링크
- * - 항상 밝은 화면 (금속 조명이 흰 바탕 기준)
+ * - 오른쪽 아래: 라이트 · 다크 토글. 다크 배경은 black-default(#03091A). 고른 모드는 로그인 · 안쪽 화면에도 그대로
  */
 // 랜딩 ↔ 로그인은 스르륵 바뀜 (main.css 의 iris-fade)
 definePageMeta({ pageTransition: { name: 'iris-fade', mode: 'out-in' } })
 
-useHead({
-  title: 'Iris',
-  htmlAttrs: { 'data-theme': 'light' },
-  meta: [{ name: 'color-scheme', content: 'light' }],
-})
+useHead({ title: 'Iris' })
+const { theme, setTheme } = usePublicTheme()
+
+// 바닥 그림자: 흰 바탕엔 검정, 다크(black-default) 바탕엔 밝은 색으로 — 라이트와 같은 느낌으로 보이게
+const SHADOW = { light: { shadowColor: 0x000000, shadow: 0.1 }, dark: { shadowColor: 0xFFFFFF, shadow: 0.18 } } as const
+watch(theme, (t) => iris?.setShadow(SHADOW[t].shadowColor, SHADOW[t].shadow))
 
 const stage = ref<HTMLElement | null>(null)
 const pct = ref(0)
@@ -37,6 +38,7 @@ onMounted(async () => {
     env: 3,
     zoomMin: 0.55,
     zoomMax: 4.5,
+    ...SHADOW[theme.value],
     onChange: (v) => { changed.value = v },
     onProgress: (p) => {
       pct.value = Math.round(p * 100)
@@ -52,12 +54,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="landing">
+  <div class="landing" :class="theme">
     <div ref="stage" class="stage" :class="{ ready }" aria-label="Iris 3D 로고. 끌어서 돌리고, 스크롤해서 크기를 바꿀 수 있어요" />
     <span class="loading cap" :class="{ done: ready }" aria-hidden="true">{{ pct }}%</span>
 
     <header class="top">
-      <img src="/logo/iris-logo-horizontal.svg" alt="Iris" height="20" width="49">
+      <IrisLogo kind="horizontal" :height="20" :theme="theme" />
       <Button size="l" type="tertiary" contents="text-icon" icon-name="arrow_right" @click="navigateTo('/login')">Sign in</Button>
     </header>
 
@@ -70,11 +72,19 @@ onBeforeUnmount(() => {
         <a href="https://ba-dream.com" target="_blank" rel="noopener">Ba-dream</a>
       </nav>
     </div>
+
+    <!-- 오른쪽 아래: 화면 모드 -->
+    <div class="sq mode" role="radiogroup" aria-label="Appearance">
+      <button v-for="t in (['light', 'dark'] as const)" :key="t" type="button" role="radio" :aria-checked="theme === t" :aria-label="t === 'light' ? 'Light mode' : 'Dark mode'" :title="t === 'light' ? 'Light' : 'Dark'" :class="['sq', 'mode-item', { on: theme === t }]" @click="setTheme(t)">
+        <ThemeIcon :name="t" />
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.landing { position: fixed; inset: 0; overflow: hidden; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); }
+.landing { position: fixed; inset: 0; overflow: hidden; background: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); transition: background-color 0.3s ease; }
+.landing.dark { background: var(--iris-black); }
 
 .stage { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; }
 .stage.ready { opacity: 1; }
@@ -85,7 +95,6 @@ onBeforeUnmount(() => {
 
 .top { position: absolute; z-index: 2; inset: 0 0 auto; height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; pointer-events: none; }
 .top > * { pointer-events: auto; }
-.top img { display: block; height: 20px; width: auto; }
 
 /* 아래 가운데: Reset → 저작권 → 회사 링크 */
 .bottom { position: absolute; z-index: 2; left: 0; right: 0; bottom: 28px; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
@@ -107,10 +116,20 @@ onBeforeUnmount(() => {
 .links a:hover { text-decoration: underline; }
 .links a:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; border-radius: var(--ref-radius-02); }
 
+/* 화면 모드 토글: 아이콘 두 칸, 고른 칸만 떠 보이게 */
+.mode { position: absolute; z-index: 2; right: 40px; bottom: 28px; display: flex; gap: 2px; padding: 2px; border-radius: var(--ref-radius-05); --sq-fill: var(--ref-color-gray-900-5); }
+.mode-item { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--ref-radius-04); background: none; color: var(--sys-color-neutral-500); cursor: pointer; transition: color var(--bd-motion-hover) ease; }
+.mode-item:hover { color: var(--sys-color-neutral-700); }
+.mode-item.on { --sq-fill: var(--sys-color-common-white-emphasis); color: var(--sys-color-neutral-800); filter: drop-shadow(0 1px 1px var(--ref-color-gray-900-10)); }
+.dark .mode-item.on { --sq-fill: var(--ref-color-gray-900-10); filter: none; }
+.mode-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+
 @media (max-width: 760px) {
   .top { height: 60px; padding: 0 16px; }
-  .bottom { bottom: 20px; }
+  /* 좁은 화면: 가운데 문구가 오른쪽 아래 토글과 겹치지 않게 토글 위로 */
+  .bottom { bottom: 64px; }
   .copy { margin-top: 20px; }
+  .mode { right: 16px; bottom: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .stage, .loading, .reset { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .stage, .loading, .reset, .landing { transition: none; } }
 </style>
