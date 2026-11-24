@@ -37,7 +37,8 @@ function typedScale(i: number, ev: Event) {
   if (v) setAt(i, { scale: v })
   else el.value = list.value[i]!.scale
 }
-const SCALE_OPTS = EXPORT_SCALES.map((s) => ({ value: s, label: s }))
+/** 칸 안 ▾ 메뉴: 값은 입력칸에 이미 있으니 버튼에는 ▾ 만(W/H 칸과 같아요) */
+const SCALE_OPTS = EXPORT_SCALES.map((s) => ({ value: s, label: s, short: '' }))
 const FORMAT_OPTS = EXPORT_FORMATS.map((f) => ({ value: f, label: f === 'JPG' ? 'JPEG' : f }))
 
 // ⋯ 설정(피그마와 같은 항목): Suffix · Color profile · Ignore overlapping layers
@@ -109,7 +110,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
           <button class="cb on dis" disabled title="Only this layer is exported — layers on top aren't included"><i class="sq" />Ignore overlapping layers</button>
         </div>
       </div>
-      <button class="sq exbtn" :disabled="busy" @click="run">{{ busy ? 'Exporting…' : `Export ${label}` }}</button>
+      <button class="sq exbtn" :disabled="busy" @click="run"><span class="exl">{{ busy ? 'Exporting…' : `Export ${label}` }}</span></button>
       <button class="pvt" :aria-expanded="pvOpen" @click="pvOpen = !pvOpen"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !pvOpen }" />Preview</button>
       <div v-if="pvOpen" class="sq sq-clip pv">
         <img v-if="pvSrc" :src="pvSrc" alt="Export preview">
@@ -138,7 +139,9 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 .em-r { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-04); }
 .ro { color: var(--sys-color-neutral-600); }
 .cb.dis { opacity: .6; cursor: default; }
-.exbtn { height: 28px; border-radius: var(--ref-radius-03); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-800); }
+/* Export 버튼: 패널 폭 · 28h · 1px 선, 글자는 가운데(넘치면 …) */
+.exbtn { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 var(--ref-spacing-06); height: 28px; border-radius: var(--ref-radius-03); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-800); }
+.exl { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .exbtn:hover:not(:disabled) { --sq-overlay: var(--interaction-light-gray-hover); }
 .exbtn:disabled { color: var(--sys-color-neutral-500); }
 .pvt { display: flex; align-items: center; gap: var(--ref-spacing-02); width: max-content; font-size: 12px; color: var(--sys-color-neutral-600); }

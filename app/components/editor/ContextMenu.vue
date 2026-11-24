@@ -42,9 +42,9 @@ onBeforeUnmount(() => { window.removeEventListener('pointerdown', onDoc, true); 
 </template>
 
 <style scoped>
-/* 피그마 UI3 검은 메뉴: 안쪽 8 · 행 24 · 행 모서리 4(바깥 12 − 안쪽 8) · 단축키 흰 .7 · 비활성 .4 · 구분선은 8 칸 안 1px */
+/* 피그마 UI3 검은 메뉴: 안쪽 8 · 행 24 · 모서리 바깥 12 · 행 6(다른 메뉴 · Text styles 창과 같아요, squircle 60%) · 단축키 흰 .7 · 비활성 .4 · 구분선은 8 칸 안 1px */
 .ctx { outline: none; position: fixed; z-index: 100; min-width: 200px; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06); --sq-fill: #1E1E1E; --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: #FFFFFF; filter: var(--iris-float-shadow); font-family: var(--font-family-base); font-size: 12px; line-height: 16px; }
-button { display: flex; align-items: center; gap: var(--ref-spacing-10); width: 100%; height: 24px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-02); color: inherit; text-align: left; outline: none; }
+button { display: flex; align-items: center; gap: var(--ref-spacing-10); width: 100%; height: 24px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); color: inherit; text-align: left; outline: none; }
 button:hover:not(:disabled), button:focus-visible, button:focus:not(:disabled) { --sq-fill: var(--iris-select, #0D99FF); }
 button:disabled { color: rgb(255 255 255 / 40%); cursor: default; }
 button.danger:is(:hover, :focus):not(:disabled) { --sq-fill: #E5484D; }
