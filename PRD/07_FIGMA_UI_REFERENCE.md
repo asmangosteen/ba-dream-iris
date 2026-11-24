@@ -673,6 +673,8 @@ Copy ⌘C · Paste here · Paste to replace ⇧⌘R · Copy/Paste as › · Buil
 | 캔버스 | `EditorCanvas.vue` | 호버 2px, 자식 점선, 오토 레이아웃 여백 파란 빗금, 손잡이 7px r1, 크기 표시 8px · r2 |
 | 토스트 | `pages/p/[projectId]/index.vue` | 40h, 3초, 애니메이션 없음 |
 | 드롭다운 | `EditorSelect.vue`, `main.css` | 브라우저 기본 `<select>`를 없애고 공용 드롭다운으로 바꿨어요. 종류는 칸 · 칸 안 글자(W의 Hug ▾) · 아이콘 버튼이에요. 메뉴 공통: 안쪽 4, 행 28, ✓ 칸, 묶음 구분선, 고른 행은 ✓ + 500, ↑↓ Enter Esc |
+| 아이콘 규칙 | `EditorIcon.vue`, `main.css` | 크기 20(툴바) · 16(패널, 레이어 행, 메뉴) · 12(▾ ▸ ✓), 선은 늘 1.25px, 색은 역할별. 편집기 크롬의 디자인 시스템 아이콘을 모두 바꿨어요(규칙은 [08](08_EDITOR_ICONS.md)) |
+| 페이지 패널 | `InspectorPage.vue`, `index.vue` | 피그마 Page 패널처럼 정리했어요. Page(배경) · Styles만 남기고, Canvas 줌 줄과 Shortcuts는 지웠어요. Pixel grid는 줌 메뉴의 ✓ 항목으로 옮겼어요. 아무것도 고르지 않았을 때의 단축키 안내도 지웠어요 |
 | 인스펙터 격자 | `main.css`(`.ig` · `.ig-l`) | 모든 줄을 [칸 \| 칸 \| 아이콘 24], 사이 8로 맞췄어요. 칸 위에 보조 라벨이 있어요 |
 | 레이어 인스펙터 구성 | `InspectorLayer.vue`, `ArrangeControls.vue` | 피그마 구성으로 다시 짰어요 |
 
