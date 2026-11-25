@@ -14,6 +14,7 @@ import { layerMenuItems, svgOf, useLastCopy, useMixScreens } from '~/composables
 import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize, shapeVnet } from '~/canvas/vector'
+import { vk, vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
 import { INSERT_SIZE, STORY_SIZE } from '~/components/editor/InstanceView.vue'
@@ -131,7 +132,7 @@ type Drag =
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
   | { kind: 'pen'; moved: boolean }
-  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number }; group?: [number, number][] }
+  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number }[]; group?: [number, number][]; collapse?: VKey }
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number } }[]; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
@@ -290,7 +291,18 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
 type APt = { x: number; y: number; i?: [number, number]; o?: [number, number] }
 const pen = ref<{ sid: string; parentId: string | null; px: number; py: number; pts: APt[]; hover: [number, number] | null } | null>(null)
 /** 점 편집 상태(오른쪽 패널의 편집 칸도 같이 봐요). sel[0] 이 -1 이면 아직 도형인 꼭짓점 */
-const vedit = useState<{ sid: string; id: string; sel: [number, number] | null } | null>('iris-vedit', () => null)
+const vedit = useState<VEdit | null>('iris-vedit', () => null)
+/** 아직 도형인 레이어의 꼭짓점(편집 손잡이 자리): 사각형은 상자 네 귀퉁이, 나머지는 도형 경로의 점들 */
+function shapeCorners(n: LayerNode): [number, number][] {
+  return n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y] as [number, number]))
+}
+/** 지금 고른 점 전부(고른 선의 양 끝 포함) */
+function vselOf(ve: VEdit): VKey[] {
+  const n = store.node(ve.sid, ve.id)
+  if (!n) return []
+  const corners = n.type === 'vector' ? [] : shapeCorners(n)
+  return vselPoints(ve, (pi) => (pi < 0 ? corners.length : n.vnet?.[pi]?.pts.length ?? 0), (pi) => (pi < 0 ? n.type !== 'line' : !!n.vnet?.[pi]?.closed))
+}
 /** 곡선 손잡이 대칭(Mirroring): none · angle(각도만) · both(각도 + 길이) — 패널에서 골라요 */
 const mirror = useState<'none' | 'angle' | 'both'>('iris-mirror', () => 'both')
 /** 패널에서 고친 점 자리(부모 좌표): 캔버스가 받아서 옮겨요 */
@@ -333,7 +345,7 @@ function enterVectorEdit(sid: string, id: string) {
   if (!n || n.locked || !EDITABLE.has(n.type)) return false
   // 도형(사각형 · 원 등)은 그대로 둬요 — 점을 실제로 옮기는 순간에만 벡터로 바꿔요(피그마와 같아요)
   store.selectLayer(sid, id)
-  vedit.value = { sid, id, sel: null }
+  vedit.value = { sid, id, sel: null, pts: [], segs: [] }
   return true
 }
 /** 도형 점 편집 중 회색 상자(피그마처럼 모양 대신 상자 선) */
@@ -387,33 +399,38 @@ const vshape = computed(() => {
   const filled = !!n.style.fill || !!n.style.fills?.some((f) => f.visible !== false)
   return { d, tf: `matrix(${m.a * z} ${m.b * z} ${m.c * z} ${m.d * z} ${m.e * z + vp.value.x} ${m.f * z + vp.value.y})`, pw: 6 / z, filled }
 })
-// 정해진 점 자리(패널 X · Y): 아직 도형이면 벡터로 바꾸고 그 꼭짓점(둥근 모서리면 양 끝 점들)을, 벡터면 그 점을 옮겨요
+// 정해진 점 자리(패널 X · Y): 고른 점들(고른 선의 양 끝 포함)을 함께 옮겨요 — X · Y 는 고른 점들 상자의 왼쪽 위.
+// 아직 도형이면 벡터로 바꾸고 고른 꼭짓점들(둥근 모서리면 양 끝 점들)을, 벡터면 그 점들을
 watch(vptSet, (r) => {
   const ve = vedit.value
-  if (!r || !ve?.sel) return
+  if (!r || !ve) return
+  const keys = vselOf(ve)
+  if (!keys.length) return
   vptSet.value = null
   let n = store.node(ve.sid, ve.id)
   if (!n) return
   let group: [number, number][]
   let cur: { x: number; y: number }
-  if (ve.sel[0] < 0) {
-    const qi = ve.sel[1]
-    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
-    const [cx, cy] = pts[qi] ?? [0, 0]
-    const rad = n.type === 'rect' ? radiiOf(n.style)[qi] ?? 0 : 0
+  if (keys[0]![0] < 0) {
+    const corners = shapeCorners(n)
+    const rads = n.type === 'rect' ? radiiOf(n.style) : []
+    const cs = keys.map(([, qi]) => ({ c: corners[qi] ?? [0, 0], r: rads[qi] ?? 0 }))
+    cur = { x: Math.min(...cs.map((v) => v.c[0])), y: Math.min(...cs.map((v) => v.c[1])) }
     store.flatten(ve.sid, [ve.id])
     n = store.node(ve.sid, ve.id)!
     const abs = denorm(n.vnet ?? [], n.w, n.h)
     group = []
-    abs.forEach((p, pi) => p.pts.forEach((q, qj) => { if (Math.abs(q.x - cx!) <= rad + 0.5 && Math.abs(q.y - cy!) <= rad + 0.5) group.push([pi, qj]) }))
+    abs.forEach((p, pi) => p.pts.forEach((q, qj) => { if (cs.some((v) => Math.abs(q.x - v.c[0]) <= v.r + 0.5 && Math.abs(q.y - v.c[1]) <= v.r + 0.5)) group.push([pi, qj]) }))
     if (!group.length) return
-    cur = { x: cx!, y: cy! }
+    ve.pts = group
+    ve.segs = []
     ve.sel = group[0]!
   } else {
-    const q = denorm(n.vnet ?? [], n.w, n.h)[ve.sel[0]]?.pts[ve.sel[1]]
-    if (!q) return
-    group = [ve.sel]
-    cur = { x: q.x, y: q.y }
+    const abs = denorm(n.vnet ?? [], n.w, n.h)
+    group = keys.filter(([pi, qi]) => abs[pi]?.pts[qi])
+    if (!group.length) return
+    const qs = group.map(([pi, qi]) => abs[pi]!.pts[qi]!)
+    cur = { x: Math.min(...qs.map((q) => q.x)), y: Math.min(...qs.map((q) => q.y)) }
   }
   const dx = r.x === undefined ? 0 : r.x - (n.x + cur.x), dy = r.y === undefined ? 0 : r.y - (n.y + cur.y)
   const abs = denorm(n.vnet ?? [], n.w, n.h)
@@ -487,35 +504,121 @@ const vhandles = computed(() => {
   }
   return (n.vnet ?? []).map((p, pi) => p.pts.map((q, qi) => ({ pi, qi, a: P(q.x * n.w, q.y * n.h), i: q.i ? P(q.i[0] * n.w, q.i[1] * n.h) : null, o: q.o ? P(q.o[0] * n.w, q.o[1] * n.h) : null }))).flat()
 })
+/**
+ * 점 누르기(피그마와 같아요): 그 점만 고르고 끌면 옮겨요. ⇧ 누르고 누르면 고른 점에 더하거나 빼요.
+ * 여러 개 고른 가운데 하나를 누르고 끌면 고른 것 전부를 함께 옮기고, 끌지 않고 떼면 그 점만 남겨요.
+ * 핸들(i · o)은 그 점의 핸들만
+ */
 function startVpt(e: PointerEvent, pi: number, qi: number, part: 'a' | 'i' | 'o') {
   const ve = vedit.value
   const s = ve ? props.screens.find((v) => v.id === ve.sid) : undefined
   const n = ve && s ? store.node(ve.sid, ve.id) : undefined
   if (!ve || !s || !n) return
-  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
-  if (pi < 0) {
-    // 아직 도형: 누른 꼭짓점만 기억해 두고, 실제로 끌기 시작하면 벡터로 바꿔요
-    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
-    const [cx, cy] = pts[qi] ?? [0, 0]
-    const rad = n.type === 'rect' ? (n.style.radii ?? [n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0, n.style.radius ?? 0])[qi] ?? 0 : 0
-    ve.sel = [-1, qi]
-    drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi: -1, qi, part: 'a', sx: e.clientX, sy: e.clientY, abs0: [], inv: invert(worldMat(s, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false, virtual: { cx: cx!, cy: cy!, r: rad } }
+  const key: VKey = [pi, qi]
+  if (part === 'a') {
+    if (e.shiftKey) {
+      const pts = [...(ve.pts?.length ? ve.pts : ve.sel ? [ve.sel] : [])]
+      const i = pts.findIndex((k) => k[0] === pi && k[1] === qi)
+      if (i >= 0) pts.splice(i, 1)
+      else pts.push(key)
+      ve.pts = pts
+      ve.sel = i >= 0 ? pts[pts.length - 1] ?? null : key
+      return
+    }
+    const cur = vselOf(ve)
+    const inSel = cur.some((k) => k[0] === pi && k[1] === qi)
+    if (!(inSel && cur.length > 1)) { ve.pts = [key]; ve.segs = [] }
+    ve.sel = key
+    beginGroupDrag(e, ve, s, n, key, inSel && cur.length > 1 ? key : undefined)
     return
   }
-  ve.sel = [pi, qi]
+  ve.sel = key
+  ve.pts = [key]
+  ve.segs = []
+  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
   drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi, qi, part, sx: e.clientX, sy: e.clientY, abs0: denorm(n.vnet ?? [], n.w, n.h), inv: invert(worldMat(s, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false }
 }
+/** 고른 점들(고른 선의 양 끝 포함)을 함께 끌기 시작 — at: 누른 점(스마트 가이드 기준). collapse: 끌지 않고 떼면 이 점만 남겨요 */
+function beginGroupDrag(e: PointerEvent, ve: VEdit, s: { id: string }, n: LayerNode, at: VKey, collapse?: VKey) {
+  try { el.value?.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
+  const keys = vselOf(ve)
+  const sc = props.screens.find((v) => v.id === s.id)!
+  if (at[0] < 0) {
+    // 아직 도형: 고른 꼭짓점들만 기억해 두고, 실제로 끌기 시작하면 벡터로 바꿔요(누른 꼭짓점이 맨 앞)
+    const corners = shapeCorners(n)
+    const rads = n.type === 'rect' ? radiiOf(n.style) : []
+    const order = [at[1], ...keys.filter((k) => k[0] < 0 && k[1] !== at[1]).map((k) => k[1])]
+    const virtual = order.map((qi) => ({ cx: corners[qi]?.[0] ?? 0, cy: corners[qi]?.[1] ?? 0, r: rads[qi] ?? 0 }))
+    drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi: -1, qi: at[1], part: 'a', sx: e.clientX, sy: e.clientY, abs0: [], inv: invert(worldMat(sc, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false, virtual, collapse }
+    return
+  }
+  drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi: at[0], qi: at[1], part: 'a', sx: e.clientX, sy: e.clientY, abs0: denorm(n.vnet ?? [], n.w, n.h), inv: invert(worldMat(sc, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false, group: keys.length > 1 ? keys : undefined, collapse }
+}
+/** 선(두 점 사이) 손잡이: 화면 좌표 경로 — 누르면 그 선을 골라요(⇧ 로 더하기 · 빼기), 끌면 양 끝 점을 함께 옮겨요 */
+const vsegs = computed(() => {
+  void tick.value
+  const ve = vedit.value
+  if (!ve) return null
+  const s = props.screens.find((v) => v.id === ve.sid)
+  const n = s ? store.node(ve.sid, ve.id) : undefined
+  if (!s || !n) return null
+  const m = worldMat(s, ve.id)
+  const P = (lx: number, ly: number) => { const q = apply(m, lx, ly); return `${sx(q.x)} ${sy(q.y)}` }
+  const out: { pi: number; qi: number; d: string }[] = []
+  const seg = (pi: number, qi: number, a: { x: number; y: number; o?: [number, number] }, b: { x: number; y: number; i?: [number, number] }) => {
+    const d = a.o || b.i ? `M ${P(a.x, a.y)} C ${P(...(a.o ?? [a.x, a.y]))} ${P(...(b.i ?? [b.x, b.y]))} ${P(b.x, b.y)}` : `M ${P(a.x, a.y)} L ${P(b.x, b.y)}`
+    out.push({ pi, qi, d })
+  }
+  const ring = (pi: number, pts: { x: number; y: number; i?: [number, number]; o?: [number, number] }[], closed: boolean, base = 0) => {
+    for (let k = 0; k < pts.length; k++) {
+      const nx = k + 1 < pts.length ? k + 1 : closed ? 0 : -1
+      if (nx < 0 || nx === k) continue
+      seg(pi, base + k, pts[k]!, pts[nx]!)
+    }
+  }
+  if (n.type === 'rect') ring(-1, shapeCorners(n).map(([x, y]) => ({ x, y })), true)
+  else if (n.type !== 'vector') {
+    let base = 0
+    for (const p of denorm(shapeVnet(n), n.w, n.h)) { ring(-1, p.pts, n.type !== 'line' && p.closed !== false, base); base += p.pts.length }
+  } else denorm(n.vnet ?? [], n.w, n.h).forEach((p, pi) => ring(pi, p.pts, !!p.closed))
+  return out
+})
+const segOn = (pi: number, qi: number) => !!vedit.value?.segs?.some((k) => k[0] === pi && k[1] === qi)
+const ptOn = computed(() => { const ve = vedit.value; return new Set(ve ? vselOf(ve).map(vk) : []) })
+function startVseg(e: PointerEvent, pi: number, qi: number) {
+  const ve = vedit.value
+  const s = ve ? props.screens.find((v) => v.id === ve.sid) : undefined
+  const n = ve && s ? store.node(ve.sid, ve.id) : undefined
+  if (!ve || !s || !n) return
+  const key: VKey = [pi, qi]
+  const segs = [...(ve.segs ?? [])]
+  const i = segs.findIndex((k) => k[0] === pi && k[1] === qi)
+  if (e.shiftKey) {
+    if (i >= 0) segs.splice(i, 1)
+    else segs.push(key)
+    ve.segs = segs
+    if (!ve.pts?.length && ve.sel) ve.pts = [ve.sel]
+    return
+  }
+  const many = vselOf(ve).length > 2
+  if (!(i >= 0 && many)) { ve.segs = [key]; ve.pts = []; ve.sel = null }
+  const ends = vselOf({ ...ve, pts: [], segs: [key] })
+  beginGroupDrag(e, ve, s, n, ends[0] ?? key, undefined)
+}
+/** 고른 점 지우기(벡터): 고른 점 · 고른 선의 양 끝을 모두 */
 function deleteVpt() {
   const ve = vedit.value
   const n = ve ? store.node(ve.sid, ve.id) : undefined
-  if (!ve || !n || !ve.sel) return
-  const [pi, qi] = ve.sel
+  if (!ve || !n) return
+  const keys = vselOf(ve).filter((k) => k[0] >= 0)
+  if (!keys.length) return
   const abs = denorm(n.vnet ?? [], n.w, n.h)
-  const p = abs[pi]
-  if (!p) return
-  p.pts.splice(qi, 1)
-  if (p.pts.length < 2) abs.splice(pi, 1)
+  // 뒤 번호부터 지워야 앞 번호가 밀리지 않아요
+  for (const [pi, qi] of [...keys].sort((a, b) => b[0] - a[0] || b[1] - a[1])) abs[pi]?.pts.splice(qi, 1)
+  for (let pi = abs.length - 1; pi >= 0; pi--) if ((abs[pi]?.pts.length ?? 0) < 2) abs.splice(pi, 1)
   ve.sel = null
+  ve.pts = []
+  ve.segs = []
   if (!abs.length) { vedit.value = null; store.remove(ve.sid, [ve.id]); return }
   const box = normalize(abs)
   store.update(ve.sid, [ve.id], { x: n.x + box.x, y: n.y + box.y, w: box.w, h: box.h, vnet: box.vnet })
@@ -890,19 +993,22 @@ function move(e: PointerEvent) {
     drag.moved = true
     // 도형 꼭짓점을 처음 끄는 순간: 벡터로 바꾸고, 그 꼭짓점(둥근 모서리면 모서리 양 끝 점들)을 함께 옮겨요
     if (drag.virtual) {
-      const vt = drag.virtual
+      const vts = drag.virtual
       drag.virtual = undefined
       store.flatten(drag.sid, [drag.id])
       const n2 = store.node(drag.sid, drag.id)
       if (!n2?.vnet) return
       drag.abs0 = denorm(n2.vnet, n2.w, n2.h)
       drag.x0 = n2.x; drag.y0 = n2.y
+      const near = (q: { x: number; y: number }, vt: { cx: number; cy: number; r: number }) => Math.abs(q.x - vt.cx) <= vt.r + 0.5 && Math.abs(q.y - vt.cy) <= vt.r + 0.5
       const g: [number, number][] = []
-      drag.abs0.forEach((p, pi) => p.pts.forEach((q, qi) => { if (Math.abs(q.x - vt.cx) <= vt.r + 0.5 && Math.abs(q.y - vt.cy) <= vt.r + 0.5) g.push([pi, qi]) }))
+      // 누른 꼭짓점(맨 앞)의 점이 먼저 오게
+      for (const vt of vts) drag.abs0.forEach((p, pi) => p.pts.forEach((q, qi) => { if (near(q, vt) && !g.some((k) => k[0] === pi && k[1] === qi)) g.push([pi, qi]) }))
       if (!g.length) return
       drag.group = g
       drag.pi = g[0]![0]; drag.qi = g[0]![1]
-      if (vedit.value) vedit.value.sel = [drag.pi, drag.qi]
+      if (vedit.value) { vedit.value.sel = [drag.pi, drag.qi]; vedit.value.pts = g; vedit.value.segs = [] }
+      drag.collapse = undefined
     }
     const v = applyVec(drag.inv, dx * vp.value.zoom / vp.value.zoom, dy)
     // 스마트 가이드: 옮기는 점이 같은 경로의 다른 점 · 주변 레이어에 붙어요(⌘ 누르면 끔)
@@ -1184,6 +1290,8 @@ function end(e: PointerEvent) {
     if (s) emit('move', d.id, s.x, s.y, true)
   }
   if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
+  // 여러 점을 고른 채 하나를 끌지 않고 눌렀다 떼면: 그 점만 남겨요(피그마와 같아요)
+  if (d.kind === 'vpt' && !d.moved && d.collapse && vedit.value) { vedit.value.pts = [d.collapse]; vedit.value.segs = []; vedit.value.sel = d.collapse }
   dragOut.value = null
   dropScreen.value = null
   if (d.kind === 'layers') setDropLine(null)
@@ -1497,7 +1605,7 @@ function onKeyDown(e: KeyboardEvent) {
   // 점 편집 중: Enter · Esc 끝내기, Backspace 고른 점 지우기
   if (vedit.value && ['Enter', 'Escape', 'Backspace', 'Delete'].includes(e.key)) {
     e.preventDefault()
-    if (e.key === 'Backspace' || e.key === 'Delete') { if (vedit.value.sel) deleteVpt() } else vedit.value = null
+    if (e.key === 'Backspace' || e.key === 'Delete') { if (vselOf(vedit.value).length) deleteVpt() } else vedit.value = null
     return
   }
   const mod = e.metaKey || e.ctrlKey
@@ -2528,11 +2636,16 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <path v-if="vshape?.filled" :d="vshape.d" :transform="vshape.tf" class="vhatch" />
         <path v-if="vshape" :d="vshape.d" :transform="vshape.tf" class="vline" vector-effect="non-scaling-stroke" />
         <polygon v-if="vbox" :points="vbox" class="vbox" />
+        <!-- 선 손잡이: 보이지 않는 굵은 선(누르기 쉬움) · 고른 선은 파란 2px -->
+        <g v-for="g in vsegs ?? []" :key="'s' + g.pi + ':' + g.qi" :class="['vseg', { on: segOn(g.pi, g.qi) }]">
+          <path :d="g.d" class="vs-line" />
+          <path :d="g.d" class="vs-hit" @pointerdown.stop.prevent="startVseg($event, g.pi, g.qi)" />
+        </g>
         <template v-for="q in vhandles" :key="q.pi + ':' + q.qi">
           <line v-if="q.i" :x1="q.a.x" :y1="q.a.y" :x2="q.i.x" :y2="q.i.y" class="hl" /><line v-if="q.o" :x1="q.a.x" :y1="q.a.y" :x2="q.o.x" :y2="q.o.y" class="hl" />
           <circle v-if="q.i" :cx="q.i.x" :cy="q.i.y" r="3.5" class="hd" @pointerdown.stop.prevent="startVpt($event, q.pi, q.qi, 'i')" />
           <circle v-if="q.o" :cx="q.o.x" :cy="q.o.y" r="3.5" class="hd" @pointerdown.stop.prevent="startVpt($event, q.pi, q.qi, 'o')" />
-          <circle :cx="q.a.x" :cy="q.a.y" r="4" class="an" :class="{ on: vedit?.sel?.[0] === q.pi && vedit?.sel?.[1] === q.qi }" @pointerdown.stop.prevent="startVpt($event, q.pi, q.qi, 'a')" />
+          <circle :cx="q.a.x" :cy="q.a.y" r="4" class="an" :class="{ on: ptOn.has(q.pi + ':' + q.qi) }" @pointerdown.stop.prevent="startVpt($event, q.pi, q.qi, 'a')" />
         </template>
       </svg>
       <svg v-if="draftPts" class="guides draw" width="100%" height="100%"><polyline :points="draftPts.map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ')" /></svg>
@@ -2644,6 +2757,11 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .pen .an.cur { fill: var(--iris-select); }
 .vedit .an, .vedit .hd { pointer-events: auto; cursor: default; }
 .vedit .an.on { fill: var(--iris-select); }
+/* 선 손잡이: 누를 자리는 12px 굵기(투명), 마우스를 올리면 파란 1px, 고르면 파란 2px(피그마와 같아요) */
+.vedit .vs-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: default; }
+.vedit .vs-line { fill: none; stroke: transparent; stroke-width: 1; pointer-events: none; }
+.vedit .vseg:hover .vs-line { stroke: var(--iris-select); }
+.vedit .vseg.on .vs-line { stroke: var(--iris-select); stroke-width: 2; }
 /* 아직 도형인 채 점 편집: 모양 대신 회색 상자 선(피그마와 같아요) */
 .vedit .vbox { fill: none; stroke: var(--sys-color-neutral-400); stroke-width: 1; }
 .vedit .vhatch { fill: url(#vhatch); pointer-events: none; }

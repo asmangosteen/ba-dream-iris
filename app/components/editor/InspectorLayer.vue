@@ -26,6 +26,8 @@ import { BLEND_MODES, defaultAlign } from '~/canvas/paint'
 import { isContainer, isGroupNode, isVector } from '~/canvas/schema'
 import { useContextMenu } from '~/composables/useContextMenu'
 import { denorm, shapeVnet } from '~/canvas/vector'
+import { vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
+import { radiiOf } from '~/canvas/paint'
 import { canFlatten } from '~/canvas/boolean'
 
 /**
@@ -289,23 +291,61 @@ const BOOL_OPS = [
   { k: 'exclude' as const, label: 'Exclude selection', key: '⌥⇧E', d: 'M2.5 2.5h7v4h-3v3h-4zM9.5 6.5h4v7h-7v-4h3z' },
 ]
 // --- 점 편집 칸(캔버스 EditorCanvas 와 같은 상태) ---
-const vedit = useState<{ sid: string; id: string; sel: [number, number] | null } | null>('iris-vedit', () => null)
+const vedit = useState<VEdit | null>('iris-vedit', () => null)
 const mirror = useState<'none' | 'angle' | 'both'>('iris-mirror', () => 'both')
 const vptSet = useState<{ x?: number; y?: number; t: number } | null>('iris-vpt-set', () => null)
 const editing = computed(() => !!vedit.value && !!one.value && vedit.value.id === one.value.id && vedit.value.sid === sid.value)
-/** 고른 점의 자리(부모 좌표). 아직 도형이면 꼭짓점 */
-const ptNow = computed(() => {
+/** 아직 도형인 레이어의 꼭짓점(캔버스 편집 손잡이와 같은 순서) */
+function editCorners(n: LayerNode): [number, number][] {
+  return n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y] as [number, number]))
+}
+/** 고른 점 전부(고른 선의 양 끝 포함) — 캔버스와 같은 규칙(canvas/vsel) */
+const vselNow = computed<VKey[]>(() => {
   const ve = vedit.value, n = one.value
-  if (!editing.value || !ve?.sel || !n) return null
-  const [pi, qi] = ve.sel
-  if (pi < 0) {
-    const pts = n.type === 'rect' ? [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]] : denorm(shapeVnet(n), n.w, n.h).flatMap((p) => p.pts.map((q) => [q.x, q.y]))
-    const c = pts[qi]
-    return c ? { x: n.x + c[0]!, y: n.y + c[1]! } : null
-  }
-  const q = n.vnet?.[pi]?.pts[qi]
-  return q ? { x: n.x + q.x * n.w, y: n.y + q.y * n.h } : null
+  if (!editing.value || !ve || !n) return []
+  const corners = n.type === 'vector' ? [] : editCorners(n)
+  return vselPoints(ve, (pi) => (pi < 0 ? corners.length : n.vnet?.[pi]?.pts.length ?? 0), (pi) => (pi < 0 ? n.type !== 'line' : !!n.vnet?.[pi]?.closed))
 })
+/** 고른 점들의 자리(부모 좌표) — 여럿이면 그 점들 상자의 왼쪽 위(피그마와 같아요). 아직 도형이면 꼭짓점 */
+const ptNow = computed(() => {
+  const n = one.value
+  const keys = vselNow.value
+  if (!n || !keys.length) return null
+  const corners = n.type === 'vector' ? [] : editCorners(n)
+  const at = keys.map(([pi, qi]) => {
+    if (pi < 0) { const c = corners[qi]; return c ? { x: c[0], y: c[1] } : null }
+    const q = n.vnet?.[pi]?.pts[qi]
+    return q ? { x: q.x * n.w, y: q.y * n.h } : null
+  }).filter((v): v is { x: number; y: number } => !!v)
+  if (!at.length) return null
+  return { x: n.x + Math.min(...at.map((v) => v.x)), y: n.y + Math.min(...at.map((v) => v.y)) }
+})
+/** 사각형 점 편집에서 고른 모서리(꼭짓점 번호: 왼위 · 오위 · 오아래 · 왼아래). 고른 게 없으면 null = 네 모서리 모두 */
+const selCorners = computed(() => {
+  const n = one.value
+  if (!n || n.type !== 'rect') return null
+  const c = [...new Set(vselNow.value.filter((k) => k[0] < 0).map((k) => k[1]))]
+  return c.length ? c : null
+})
+/** Corner radius 칸 값: 고른 모서리들(없으면 네 모서리)이 같으면 그 값, 다르면 Mixed */
+const editRad = computed<number | 'Mixed'>(() => {
+  const n = one.value
+  if (!n) return 0
+  const r = radiiOf(n.style)
+  const vals = (selCorners.value ?? [0, 1, 2, 3]).map((i) => r[i] ?? 0)
+  return vals.every((v) => v === vals[0]) ? vals[0]! : 'Mixed'
+})
+/** Corner radius 바꾸기: 고른 모서리만(없으면 네 모서리 모두). 네 값이 같아지면 한 값(radius)으로 */
+function setEditRad(v: number) {
+  const idx = selCorners.value
+  const val = Math.max(0, Math.round(v * 100) / 100)
+  store.update(sid.value, ids.value, (nn) => {
+    if (!idx) return { style: { ...nn.style, radius: val, radii: undefined } }
+    const rr = [...radiiOf(nn.style)] as [number, number, number, number]
+    for (const i of idx) rr[i] = val
+    return rr.every((x) => x === rr[0]) ? { style: { ...nn.style, radius: rr[0], radii: undefined } } : { style: { ...nn.style, radii: rr } }
+  })
+}
 function setPt(axis: 'x' | 'y', e: Event) {
   const v = Number((e.target as HTMLInputElement).value)
   if (Number.isFinite(v)) vptSet.value = { [axis]: v, t: Date.now() }
@@ -533,7 +573,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <template v-if="one.type === 'rect'">
         <div class="ig-l"><span>{{ tr('Corner radius') }}</span></div>
         <div class="ig">
-          <label class="sq fld"><EditorIcon name="var_radius" :size="16" /><input :key="'er' + same((n) => n.style.radius ?? 0)" :value="show(same((n) => n.style.radius ?? 0))" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setStyle('radius', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('radius', d))"></label>
+          <!-- 고른 꼭짓점 · 선이 있으면 그 모서리만, 없으면 네 모서리 모두(피그마와 같아요) -->
+          <label class="sq fld"><EditorIcon name="var_radius" :size="16" /><input :key="'er' + editRad + (selCorners ?? []).join()" :value="show(editRad)" :placeholder="editRad === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')" @change="setEditRad(Number(($event.target as HTMLInputElement).value) || 0)" @keydown="blurOnEnter($event); step($event, (d) => editRad !== 'Mixed' && setEditRad(editRad + d))"></label>
           <span /><span />
         </div>
       </template>
