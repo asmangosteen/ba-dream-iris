@@ -107,7 +107,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     { label: tr('Flip horizontal'), shortcut: '⇧H', action: () => store.flip(sid, ids, 'x') },
     { label: tr('Flip vertical'), shortcut: '⇧V', action: () => store.flip(sid, ids, 'y') },
     'sep',
-    { label: tr('Copy properties'), shortcut: '⌥⌘C', action: () => store.copyStyle(), disabled: !one },
+    { label: tr('Copy properties'), shortcut: '⌥⌘C', action: () => store.copyStyle(), disabled: !ids.length },
     { label: tr('Paste properties'), shortcut: '⌥⌘V', action: () => store.pasteStyle() },
     ...(opts.fit ? ['sep' as const, { label: tr('Zoom to selection'), shortcut: '2', action: opts.fit }] : []),
     'sep',

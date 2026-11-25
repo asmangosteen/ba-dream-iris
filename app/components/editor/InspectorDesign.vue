@@ -20,7 +20,7 @@ import { currentGap, guessAxis, type ArrangeOp, type Rect } from '~/canvas/geom'
  * 고치면 고른 프레임 모두에 한꺼번에(실행취소 한 번). screen 은 그중 첫 프레임
  */
 const props = defineProps<{ screen: ScreenRow; multi?: ScreenRow[] }>()
-const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: []; arrange: [op: ArrangeOp] }>()
+const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: []; arrange: [op: ArrangeOp]; step: [key: 'x' | 'y' | 'width' | 'height', d: number] }>()
 const all = computed<ScreenRow[]>(() => (props.multi && props.multi.length > 1 ? props.multi : [props.screen]))
 const isMulti = computed(() => all.value.length > 1)
 const ids = computed(() => all.value.map((s) => s.id))
@@ -38,16 +38,31 @@ function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
   if (!input.value.trim() || !Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = same(key) === null ? '' : String(same(key)); return }
   const r = Math.round(v * 100) / 100 // 소수도 그대로(둘째 자리까지)
-  if (r !== same(key)) emit('update', { [key]: r })
+  if (r === same(key)) return
+  // 비율 잠금: W 를 바꾸면 H 도 같은 비율로(피그마와 같아요)
+  if (ratioOn.value && (key === 'width' || key === 'height') && !isMulti.value) {
+    const s = props.screen, k = r / (s[key] || 1)
+    emit('update', key === 'width' ? { width: r, height: Math.max(1, Math.round(s.height * k * 100) / 100) } : { height: r, width: Math.max(1, Math.round(s.width * k * 100) / 100) })
+    return
+  }
+  emit('update', { [key]: r })
 }
+/** 화면 비율 잠금(피그마 Lock aspect ratio) */
+const ratioOn = computed(() => !!(store.doc(props.screen.id).frame ?? {}).lockRatio)
 /** 화살표 키로 1씩(Shift 는 10씩) 바꾸기 */
 function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
   e.preventDefault()
   const cur = same(key)
-  if (cur === null) return
   const d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+  // 값이 서로 다르면(Mixed) 각자 값에 더해요(피그마와 같아요)
+  if (cur === null) { emit('step', key, d); return }
   const v = Math.max(key === 'width' || key === 'height' ? 1 : -1e9, cur + d)
+  if (ratioOn.value && (key === 'width' || key === 'height') && !isMulti.value) {
+    const s = props.screen, k = v / (s[key] || 1)
+    emit('update', key === 'width' ? { width: v, height: Math.max(1, Math.round(s.height * k * 100) / 100) } : { height: v, width: Math.max(1, Math.round(s.width * k * 100) / 100) })
+    return
+  }
   emit('update', { [key]: v })
 }
 // --- 화면 모양: 레이어와 같은 방식(토큰 연결 포함). 기본은 흰 바탕 · 선 없음 · 모서리 0 ---
@@ -191,7 +206,10 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <div class="ig">
         <label class="sq fld"><span>W</span><input :key="'w' + same('width')" :value="same('width') ?? ''" :placeholder="same('width') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <label class="sq fld"><span>H</span><input :key="'h' + same('height')" :value="same('height') ?? ''" :placeholder="same('height') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <span />
+        <button v-if="!isMulti" :class="['ib', 's24', 'tog', { on: ratioOn }]" :aria-pressed="ratioOn" :aria-label="ratioOn ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" :title="ratioOn ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" @click="store.frameStyle(screen.id, { lockRatio: ratioOn ? undefined : true })">
+          <EditorIcon :name="ratioOn ? 'ratio_locked' : 'ratio_unlocked'" />
+        </button>
+        <span v-else />
       </div>
       <button v-if="native" :class="['cb', { on: !mixClip && look.clip !== false, mix: mixClip }]" role="checkbox" :aria-checked="mixClip ? 'mixed' : look.clip !== false" @click="fstyle({ clip: !mixClip && look.clip !== false ? false : undefined })"><i class="sq" />{{ tr('Clip content') }}</button>
     </section>

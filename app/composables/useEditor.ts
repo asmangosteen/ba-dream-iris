@@ -8,23 +8,48 @@ export const isPageCanvas = (id: string | null | undefined) => !!id && id.starts
 export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown }
 
 import { moveOrder } from '~/canvas/order'
+import type { NuxtApp } from '#app'
+
+/**
+ * 이 브라우저 창에서 한 번 불러온 편집기 데이터(프로젝트 · 페이지 · 화면)를 탭을 옮겨 다녀도 들고 있어요.
+ * 다시 그 탭으로 오면 다시 받지 않고 바로 보여요(로딩 화면 없이 — 피그마 탭처럼). 새로 고치면 새로 받아요.
+ * 내 수정은 같은 객체를 고치거나 data 를 바꿔 끼우므로 여기에도 그대로 남아요
+ * TODO(협업): 여러 명이 함께 편집하게 되면 실시간 구독으로 다른 사람 변경을 바로 반영하고 자동 저장으로 바꿔야 해요 — 지금은 다른 사람 수정이 새로 고쳐야 보여요
+ */
+const editorCache = new Map<string, unknown>()
+/** 이 프로젝트를 다시 받게(탭 새로 고침) */
+export function forgetEditorCache(projectId: string) {
+  for (const k of [...editorCache.keys()]) if (k === `project-${projectId}` || k === `pages-${projectId}` || k.startsWith(`screens-${projectId}:`)) editorCache.delete(k)
+}
+function fromCache(cacheKey: () => string) {
+  return (key: string, nuxtApp: NuxtApp, ctx?: { cause?: string }) => {
+    if (nuxtApp.isHydrating) return nuxtApp.payload.data[key]
+    if (ctx?.cause && ctx.cause !== 'initial') return undefined
+    return editorCache.get(cacheKey())
+  }
+}
 
 /** 에디터 데이터: 프로젝트 · 페이지 · 선택한 페이지의 화면 */
 export function useEditor(projectId: string) {
   const supabase = useSupabaseClient()
   const preview = useDevPreview()
   const project = useAsyncData(`project-${projectId}`, async () => {
-    if (preview) return PREVIEW_PROJECTS.find((p) => p.id === projectId) ?? PREVIEW_PROJECTS[0]!
+    if (preview) {
+      // 미리보기: 메모리에만 있어 새로 고침하면 사라진 프로젝트는 빈 이름으로 다시 만들어 둬요(다른 프로젝트 이름이 보이지 않게)
+      let p = PREVIEW_PROJECTS.find((x) => x.id === projectId)
+      if (!p) { p = { id: projectId, name: 'Untitled', status: 'planning', updated_at: new Date().toISOString() }; PREVIEW_PROJECTS.push(p); refreshNuxtData('projects') }
+      return p
+    }
     const { data, error } = await supabase.from('projects').select('id, name').eq('id', projectId).single()
     if (error) throw error
     return data as { id: string; name: string }
-  }, { deep: true })
+  }, { deep: true, getCachedData: fromCache(() => `project-${projectId}`) })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
     if (preview) return PREVIEW_PROJECT_PAGES[projectId] ?? PREVIEW_PAGES
     const { data, error } = await supabase.from('pages').select('id, name, sort_order, layers, viewport').eq('project_id', projectId).order('sort_order')
     if (error) throw error
     return (data ?? []) as PageRow[]
-  }, { deep: true })
+  }, { deep: true, getCachedData: fromCache(() => `pages-${projectId}`) })
   // 서버에서 고른 페이지가 브라우저로 그대로 넘어가도록 useState 로 둡니다
   const pageId = useState<string | null>(`page-${projectId}`, () => null)
   const screens = useAsyncData(`screens-${projectId}`, async () => {
@@ -37,7 +62,12 @@ export function useEditor(projectId: string) {
     const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers').eq('page_id', pageId.value).order('sort_order')
     if (error) throw error
     return (data ?? []) as ScreenRow[]
-  }, { watch: [pageId], deep: true })
+  }, { watch: [pageId], deep: true, getCachedData: fromCache(() => `screens-${projectId}:${pageId.value}`) })
+  if (import.meta.client) {
+    watch(project.data, (v) => { if (v) editorCache.set(`project-${projectId}`, v) }, { immediate: true })
+    watch(pages.data, (v) => { if (v) editorCache.set(`pages-${projectId}`, v) }, { immediate: true })
+    watch(screens.data, (v) => { if (v && pageId.value) editorCache.set(`screens-${projectId}:${pageId.value}`, v) }, { immediate: true })
+  }
 
   const user = useSupabaseUser()
   const me = () => (user.value?.sub ?? user.value?.id) as string | undefined
@@ -56,6 +86,7 @@ export function useEditor(projectId: string) {
     } else PREVIEW_SCREENS[row.id] = []
     pages.data.value = [...list, row]
     pageId.value = row.id
+    return row
   }
 
   /** 페이지 설정 저장 (배경색 · 픽셀 격자) */

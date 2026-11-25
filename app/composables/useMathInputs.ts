@@ -42,10 +42,17 @@ export function evalExpr(src: string): number | null {
 }
 
 export function useMathInputs() {
+  /** 칸에 들어갈 때의 값(% 를 지금 값의 비율로 계산할 때 써요) */
+  const orig = new WeakMap<HTMLInputElement, string>()
+  function onFocus(e: Event) { const t = e.target; if (t instanceof HTMLInputElement) orig.set(t, t.value) }
   function onChange(e: Event) {
     const t = e.target
     if (!(t instanceof HTMLInputElement)) return
     if (t.inputMode !== 'numeric' && t.inputMode !== 'decimal') return
+    // 지금 값이 % 가 아닌 칸(W · H · X · Y 등)에 50% 를 넣으면 지금 값의 50%(피그마와 같아요: W 50 → 50% → 25)
+    const pct = /^\s*(\d*\.?\d+)\s*%\s*$/.exec(t.value)
+    const was = orig.get(t) ?? ''
+    if (pct && !/%/.test(was) && /^\s*-?\d*\.?\d+\s*$/.test(was)) { t.value = String(Math.round(parseFloat(was) * parseFloat(pct[1]!)) / 100); return }
     const m = /^(.*?)(\s*(?:%|°|px|x))?\s*$/.exec(t.value)
     const body = m?.[1] ?? ''
     // 계산식일 때만: 맨 앞 부호를 뺀 자리에 연산자가 있어야 해요
@@ -54,6 +61,6 @@ export function useMathInputs() {
     if (v === null) return
     t.value = String(Math.round(v * 100) / 100) + (m?.[2]?.trim() ?? '')
   }
-  onMounted(() => document.addEventListener('change', onChange, true))
-  onBeforeUnmount(() => document.removeEventListener('change', onChange, true))
+  onMounted(() => { document.addEventListener('change', onChange, true); document.addEventListener('focusin', onFocus, true) })
+  onBeforeUnmount(() => { document.removeEventListener('change', onChange, true); document.removeEventListener('focusin', onFocus, true) })
 }

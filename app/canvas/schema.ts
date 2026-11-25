@@ -82,6 +82,8 @@ export interface LayerStyle {
   /** 모서리 따로 [왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래] — 있으면 radius 대신 씁니다 (v2) */
   radii?: [number, number, number, number]
   opacity?: number // 0~1
+  /** 화면(맨 위 프레임) 비율 잠금 — 화면은 레이어가 아니라 frame 모양에 둬요(레이어는 LayerNode.lockRatio) */
+  lockRatio?: boolean
   // 텍스트
   color?: string
   fontSize?: number

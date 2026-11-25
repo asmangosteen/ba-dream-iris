@@ -20,7 +20,7 @@ export function relayout(d: LayerDoc) {
     for (const c of n.children ?? []) visit(c)
     // 불리언: 상자를 결과 모양에 맞춰요(안쪽 도형이 바뀌면 곧바로)
     if (n.type === 'boolean') fitBoolean(d, n)
-    // 마스크 그룹: 상자를 마스크 모양에 맞춰요(피그마와 같아요 — 그룹 크기 = 마스크 크기)
+    // 그룹: 상자를 늘 안의 레이어에 맞춰요(피그마와 같아요 — 마스크 그룹은 마스크 크기, 그 밖은 자식 전체를 감싸는 크기)
     else if (isGroupNode(n)) fitMaskGroup(d, n)
     if (n.style.layout && !done.has(id)) { layoutFrame(d, n); done.add(id) }
   }
@@ -122,13 +122,14 @@ export function slotIndex(d: LayerDoc, p: LayerNode, local: { x: number; y: numb
  * 제약: 부모 크기가 (ow, oh) → (nw, nh) 로 바뀔 때 자식 자리 · 크기. 오토 레이아웃 부모는 레이아웃이 맡아요.
  * kids0: 바뀌기 전 자식 상자(끄는 동안 쌓이지 않게)
  */
-export function constrain(kids: LayerNode[], kids0: Record<string, { x: number; y: number; w: number; h: number }>, ow: number, oh: number, nw: number, nh: number) {
+/** force: 모든 자식에 같은 제약(그룹 크기를 바꾸면 안이 비율대로 — 피그마와 같아요) */
+export function constrain(kids: LayerNode[], kids0: Record<string, { x: number; y: number; w: number; h: number }>, ow: number, oh: number, nw: number, nh: number, force?: Constraints) {
   const dw = nw - ow, dh = nh - oh
   const kx = ow ? nw / ow : 1, ky = oh ? nh / oh : 1
   for (const k of kids) {
     const o = kids0[k.id]
     if (!o) continue
-    const c: Constraints = k.constraints ?? { h: 'left', v: 'top' }
+    const c: Constraints = force ?? k.constraints ?? { h: 'left', v: 'top' }
     let { x, w } = o
     if (c.h === 'right') x = o.x + dw
     else if (c.h === 'center') x = o.x + dw / 2
@@ -148,10 +149,10 @@ export const boxes0 = (kids: LayerNode[]) => Object.fromEntries(kids.map((k) => 
 /** 마스크 그룹(맨 아래 마스크 + 위 내용): 그룹 상자를 마스크 상자에 맞춰요 — 내용이 마스크 밖으로 나가 있어도 보이는 건 마스크 안이라서 */
 function fitMaskGroup(d: LayerDoc, g: LayerNode) {
   const m = (g.children ?? []).map((c) => d.nodes[c]).find((c) => c?.isMask && !c.hidden)
-  if (!m) return
-  // 돌린 마스크도: 네 꼭짓점을 그룹 안 좌표로
-  const M = localMatrix(m, m.w, m.h)
-  const ps = [[0, 0], [m.w, 0], [m.w, m.h], [0, m.h]].map(([x, y]) => apply(M, x!, y!))
+  const kids = m ? [m] : (g.children ?? []).map((c) => d.nodes[c]).filter((c): c is LayerNode => !!c && !c.hidden)
+  if (!kids.length) return
+  // 돌린 레이어도: 네 꼭짓점을 그룹 안 좌표로
+  const ps = kids.flatMap((k) => { const M = localMatrix(k, k.w, k.h); return [[0, 0], [k.w, 0], [k.w, k.h], [0, k.h]].map(([x, y]) => apply(M, x!, y!)) })
   const bx = r2(Math.min(...ps.map((p) => p.x))), by = r2(Math.min(...ps.map((p) => p.y)))
   const w = Math.max(0.01, r2(Math.max(...ps.map((p) => p.x)) - bx)), h = Math.max(0.01, r2(Math.max(...ps.map((p) => p.y)) - by))
   if (Math.abs(bx) < 0.01 && Math.abs(by) < 0.01 && Math.abs(w - g.w) < 0.01 && Math.abs(h - g.h) < 0.01) return

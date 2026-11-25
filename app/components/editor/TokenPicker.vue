@@ -276,6 +276,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     v-else
     ref="trigger"
     :class="['ib', 'vb', { reveal, open }]"
+    :tabindex="reveal ? -1 : undefined"
     :aria-label="icon ? lbl : tr('Apply variable: {label}', { label: lbl })"
     :data-tip="icon ? lbl : tr('Apply variable: {label}', { label: lbl })"
     aria-haspopup="listbox"

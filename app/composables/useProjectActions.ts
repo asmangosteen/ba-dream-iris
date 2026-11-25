@@ -52,8 +52,9 @@ export function useProjectActions() {
 
   async function update(id: string, patch: Partial<Omit<ProjectDetail, 'id'>>) {
     if (preview) {
-      const p = PREVIEW_PROJECTS.find((x) => x.id === id)
-      if (p) Object.assign(p, { ...(patch.name ? { name: patch.name } : {}), ...(patch.status ? { status: patch.status } : {}), updated_at: new Date().toISOString() })
+      let p = PREVIEW_PROJECTS.find((x) => x.id === id)
+      if (!p) { p = { id, name: 'Untitled', status: 'planning', updated_at: new Date().toISOString() }; PREVIEW_PROJECTS.push(p) }
+      Object.assign(p, { ...(patch.name ? { name: patch.name } : {}), ...(patch.status ? { status: patch.status } : {}), updated_at: new Date().toISOString() })
     } else {
       const { error } = await supabase.from('projects').update(patch).eq('id', id)
       if (error) throw error

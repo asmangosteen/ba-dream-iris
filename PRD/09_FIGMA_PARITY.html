@@ -1,0 +1,398 @@
+<title>Iris 피그마 동작 점검표</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- 피그마 단축키 · 동작 기준표(앞으로 기능 추가 기준). 공개 페이지: https://claude.ai/artifact/Hi2wBgWWGDhzMf5A7Jgu83 — 이 파일을 고친 뒤 같은 주소로 다시 올려요 -->
+<style>
+/* 레이아웃: 위에 요약 숫자(누르면 거르기) → 탭 3개(먼저 손볼 것 · 전체 점검 · 피그마 기준표) → 영역별 표 */
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #16181d; --mute: #5d6470; --line: #e3e6eb; --soft: #eef0f4;
+  --accent: #2b59d9;
+  --x: #c8322b; --x-bg: #fdecea;
+  --w: #a85d00; --w-bg: #fff3dc;
+  --k: #2b59d9; --k-bg: #e8eefc;
+  --o: #1f7a46; --o-bg: #e5f5eb;
+  --q: #5d6470; --q-bg: #eef0f4;
+  --i: #6b4fd8; --i-bg: #efeafd;
+  --n: #7a7f88; --n-bg: #f1f2f4;
+  --r: #c8322b;
+  --font: "Pretendard", "Pretendard Variable", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --keyfont: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121418; --panel: #1a1d23; --fg: #e8eaee; --mute: #9aa1ad; --line: #2b2f37; --soft: #22262d;
+  --accent: #7b9cff;
+  --x: #ff7b72; --x-bg: #3a1d1c; --w: #f0b44c; --w-bg: #3a2c12; --k: #8eabff; --k-bg: #1d2747;
+  --o: #5fd08f; --o-bg: #15301f; --q: #a8afba; --q-bg: #262a31; --i: #b8a6ff; --i-bg: #2a2446; --n: #8d939c; --n-bg: #24272d; --r: #ff7b72; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121418; --panel: #1a1d23; --fg: #e8eaee; --mute: #9aa1ad; --line: #2b2f37; --soft: #22262d;
+  --accent: #7b9cff;
+  --x: #ff7b72; --x-bg: #3a1d1c; --w: #f0b44c; --w-bg: #3a2c12; --k: #8eabff; --k-bg: #1d2747;
+  --o: #5fd08f; --o-bg: #15301f; --q: #a8afba; --q-bg: #262a31; --i: #b8a6ff; --i-bg: #2a2446; --n: #8d939c; --n-bg: #24272d; --r: #ff7b72; color-scheme: dark }
+* { box-sizing: border-box; letter-spacing: 0 }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+h1 { font-size: 28px; line-height: 1.25; margin: 0; text-wrap: balance; font-weight: 700 }
+h2 { font-size: 19px; margin: 0; font-weight: 700 }
+h3 { font-size: 15px; margin: 0; font-weight: 700 }
+p { margin: 0 }
+.lede { color: var(--mute); max-width: 72ch; display: grid; gap: 6px }
+.counts { display: flex; flex-wrap: wrap; gap: 8px }
+.count { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font: inherit; color: inherit; text-align: left }
+.count b { font-size: 22px; font-weight: 700 }
+.count[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -1px }
+.count:focus-visible, .tab:focus-visible, .chip:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto }
+.tab { font: inherit; color: var(--mute); background: none; border: 0; padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 600 }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent) }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.chip { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+.search { flex: 1 1 220px; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg) }
+.group { display: grid; gap: 10px }
+.ghead { display: flex; align-items: baseline; gap: 10px }
+.ghead span { color: var(--mute); font-size: 13px }
+.tbl-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px }
+table { width: 100%; border-collapse: collapse; font-size: 14px }
+th { text-align: left; font-weight: 600; color: var(--mute); font-size: 12.5px; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap }
+td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top }
+tr:last-child td { border-bottom: 0 }
+td.st { width: 108px; white-space: nowrap }
+td.fn { width: 22%; font-weight: 600 }
+td.src { color: var(--mute); font-size: 12.5px; width: 16%; word-break: break-all }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px }
+.s-x { color: var(--x); background: var(--x-bg) } .s-w { color: var(--w); background: var(--w-bg) }
+.s-k { color: var(--k); background: var(--k-bg) } .s-o { color: var(--o); background: var(--o-bg) }
+.s-q { color: var(--q); background: var(--q-bg) }
+.s-i { color: var(--i); background: var(--i-bg) } .s-n { color: var(--n); background: var(--n-bg) }
+.flag { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--o) }
+.flag.same { color: var(--mute) } .flag.code { color: var(--w) }
+.risk { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--r) }
+.hi { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--accent) }
+kbd { font-family: var(--keyfont); font-size: 12.5px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--soft); white-space: nowrap }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 8px; font-size: 14px }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 4px }
+.cert { font-size: 12px; color: var(--mute); white-space: nowrap }
+.cert.c-bad { color: var(--w) }
+.empty { color: var(--mute); padding: 24px; text-align: center }
+@media (max-width: 720px) {
+  table, thead, tbody, tr, td { display: block } thead { display: none }
+  tr { padding: 12px; border-bottom: 1px solid var(--line) } tr:last-child { border-bottom: 0 }
+  td { border: 0; padding: 3px 0; width: auto !important }
+  td[data-l]::before { content: attr(data-l); display: block; font-size: 12px; color: var(--mute) }
+}
+@media (prefers-reduced-motion: no-preference) { .count, .chip, .tab { transition: background .15s, color .15s } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <h1>Iris 피그마 동작 점검표</h1>
+    <div class="lede">
+      <p>피그마 단축키·기본 동작과 Iris 편집기를 하나씩 맞춰 본 기준표예요. 새 기능을 만들거나 고칠 때 이 표를 기준으로 삼아요.</p>
+      <p><b>기준:</b> 팀이 쓰는 피그마(키보드 배열 <b>Korean</b>)의 단축키 패널(<kbd>⌃⇧?</kbd>)을 직접 읽고, 헷갈리는 동작은 피그마 파일에서 눌러 보고 정했어요. 한국어 배열에서는 화면 맞춤이 <kbd>1</kbd>·<kbd>2</kbd>, 불투명도가 <kbd>⇧</kbd>+숫자예요.</p>
+      <p><b>마지막 갱신:</b> 2026-11-25. 고친 항목은 Iris 미리보기에서 눌러 확인했어요. ‘코드로 확인’ 표시는 파일 창·IME·클립보드 권한처럼 자동으로 누를 수 없어 코드로만 확인한 거예요.</p>
+    </div>
+    <div class="counts" id="counts"></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="보기">
+    <button class="tab" role="tab" aria-selected="true" data-v="first">요약</button>
+    <button class="tab" role="tab" aria-selected="false" data-v="all">전체 점검 결과</button>
+    <button class="tab" role="tab" aria-selected="false" data-v="ref">피그마 단축키 기준표</button>
+  </nav>
+
+  <section id="view-first" style="display:grid;gap:20px"></section>
+
+  <section id="view-all" hidden style="display:grid;gap:20px">
+    <div class="bar" id="areaBar"></div>
+    <div class="bar"><input class="search" id="q" type="search" placeholder="기능이나 키로 찾기 (예: 불투명도, ⌘R)" aria-label="점검 결과 찾기"></div>
+    <div id="allList" style="display:grid;gap:24px"></div>
+  </section>
+
+  <section id="view-ref" hidden style="display:grid;gap:20px">
+    <div class="note">
+      <p>피그마 앱의 단축키 패널(<kbd>⌃⇧?</kbd>, 키보드 배열 Korean)을 그대로 옮긴 표예요. 패널에 없는 마우스 동작은 공식 도움말과 직접 눌러 본 결과로 채웠어요.</p>
+      <p>출처: <b>앱</b> = 단축키 패널에서 읽음, <b>직접</b> = 피그마 파일에서 눌러 확인, <b>문서</b> = Figma 도움말(help.figma.com).</p>
+    </div>
+    <div class="bar"><input class="search" id="rq" type="search" placeholder="기능이나 키로 찾기" aria-label="기준표 찾기"></div>
+    <div id="refList" style="display:grid;gap:24px"></div>
+    <div class="note">
+      <h3>문서와 실제 앱이 다른 것(앱 기준으로 맞췄어요)</h3>
+      <ul>
+        <li>평탄화: 문서 <kbd>⌘E</kbd> → 앱 <kbd>⌥⇧F</kbd>. 맨 앞·맨 뒤: 문서 <kbd>⌥⌘]</kbd> → 앱 <kbd>]</kbd> · <kbd>[</kbd>.</li>
+        <li>그룹 풀기: 앱 패널에는 <kbd>⌘⌫</kbd>. 부모 고르기: <kbd>\</kbd>. 레이아웃 그리드: <kbd>⇧G</kbd>. 픽셀 미리보기: <kbd>⇧⌘P</kbd>. 스포이트: <kbd>⌃C</kbd>. 주석: <kbd>Y</kbd>.</li>
+        <li>한국어 배열: 화면 맞춤 <kbd>1</kbd> · 선택 맞춤 <kbd>2</kbd> · 100% <kbd>⌘0</kbd>, 불투명도 <kbd>⇧1</kbd>=10% … <kbd>⇧0</kbd>=100%, <kbd>⇧5</kbd><kbd>⇧5</kbd>=55%, <kbd>⇧0</kbd><kbd>⇧0</kbd>=0%.</li>
+        <li>섹션으로 감싸기는 단축키가 없어요(<kbd>⌘S</kbd>는 아무 일 없음, <kbd>⌥⌘S</kbd>는 버전 기록 저장).</li>
+        <li>확대·축소 키는 한 번에 2배씩(100→200, 100→50→25).</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+const ST = {
+  o: { t: '잘 됨', c: 's-o' },
+  w: { t: '다르게 동작', c: 's-w' },
+  q: { t: '확인 필요', c: 's-q' },
+  i: { t: '일부러 다름', c: 's-i' },
+  n: { t: '보류 · Iris에 없는 기능', c: 's-n' },
+}
+const FLAG = { fix: ['이번에 고침', ''], same: ['확인해 보니 원래 같음', 'same'], code: ['이번에 고침 · 코드로 확인', 'code'] }
+// [키] → 키 모양. 키에 [ ] 가 들어가면 {키} 로 적어요
+const K = (s) => s
+  .replace(/\{([^}]+)\}/g, (_, k) => '<kbd>' + k.replace(/\[/g, '&#91;').replace(/\]/g, '&#93;') + '</kbd>')
+  .replace(/\[([^\]]+)\]/g, '<kbd>$1</kbd>')
+// [영역, 상태, 표시(fix · same · code · ''), 기능, 피그마, Iris, 코드 위치]
+const ROWS = [
+// 위험했던 것
+['위험했던 것','o','fix','바꿔 붙여넣기 [⇧⌘R]','고른 것을 클립보드 내용으로 바꿔요','같은 자리 · 같은 순서로 바꿔요. 예전엔 브라우저 새로고침이 됐어요','store.pasteOnSelection'],
+['위험했던 것','o','fix','프레임을 고른 채 [⌘R]','이름 바꾸기','프레임 이름표에서 바로 이름을 고쳐요. 예전엔 새로고침이 됐어요','EditorCanvas onKeyDown'],
+['위험했던 것','o','fix','[⌘S] · [⌘P]','아무 일도 없어요(직접 확인)','막아서 브라우저 저장 · 인쇄 창이 뜨지 않아요','EditorCanvas onKeyDown'],
+['위험했던 것','o','fix','[⌘⌫]','그룹 · 프레임 · 섹션 풀기(안의 내용은 남김)','같아요. 예전엔 내용까지 지워졌어요','store.unwrap'],
+['위험했던 것','o','fix','[⌥] 누른 채 클릭','아무 일도 없어요(끌어야 복제)','같아요. 예전엔 보이지 않는 복제본이 생겼어요','EditorCanvas start · move'],
+['위험했던 것','o','fix','색 고르기 창에서 방향키','색만 바뀌어요','같아요. 예전엔 고른 레이어도 함께 움직였어요','ColorPicker.vue'],
+['위험했던 것','o','code','변수 화면이 열린 채 [⌫]','변수 화면 안에서만','변수 화면이 열려 있으면 캔버스 단축키가 동작하지 않아요','EditorCanvas onKeyDown'],
+['위험했던 것','o','fix','글자 편집 중 [⌘+] [⌘−] · 핀치','캔버스 확대 · 축소','같아요. 예전엔 브라우저 화면 전체가 커졌어요','EditorCanvas onKeyDown · onWheel'],
+['위험했던 것','o','fix','[⌥⌘B] 등 브라우저 키','피그마 동작만','막아서 북마크 관리자 등이 열리지 않아요','EditorCanvas onKeyDown'],
+['위험했던 것','o','code','다른 앱에서 복사한 그림 · SVG를 [⌘V]','그림 · 벡터로 붙어요','[⌘V]를 막지 않고 붙여넣기 이벤트로 받아요. Iris에서 복사하면 클립보드에 표시를 남겨, 마지막에 복사한 것이 붙어요','useLayerMenu markIrisClip · onPaste'],
+['위험했던 것','o','fix','데스크톱 앱의 [⌘R] · [⇧⌘R]','이름 바꾸기 · 바꿔 붙여넣기','고른 게 있으면 이름 바꾸기 · 바꿔 붙여넣기. 앱 메뉴 Reload Tab [⌥⌘R] 은 지금 탭만, 창 전체 강제 새로고침은 [⌥⇧⌘R]','desktop/src/main.cjs'],
+['탭 막대','o','fix','탭 새로 고침 · 고른 게 없을 때 [⌘R]','그 탭만 새로 고침(탭 막대 · 다른 탭은 그대로)','같아요. 고른 게 없을 때 [⌘R] · 탭 메뉴 Reload · 데스크톱 [⌥⌘R] 모두 지금 화면만 다시 만들고 데이터를 다시 받아요(로딩 화면). 브라우저 전체 새로고침이 아니에요','useTabReload · app.vue pageKey · EditorCanvas onKeyDown'],
+
+// 도구
+['도구','o','','기본 도구 키','[V] [K] [H] [F]·[A] [⇧S] [R] [O] [L] [⇧L] [P] [⇧P] [T] [⇧⌘K]','같아요. 한글 입력 상태에서도 돼요','EditorToolbar.vue'],
+['도구','o','','그린 뒤 이동 도구로','도형 · 프레임 · 텍스트 · 펜을 다 그리면 [V]로','같아요(연필은 계속 연필)','EditorCanvas'],
+['도구','o','code','스포이트 [⌃C]','화면에서 색을 집어 고른 것의 칠로','같아요(크롬 · 엣지). 고른 게 없으면 HEX를 복사','EditorCanvas pickColor'],
+['도구','n','','코멘트 [C] · 주석 [Y] · 슬라이스 [S] · 컴포넌트 찾기 [⇧I]','각 도구','Iris에 아직 없는 기능이라 만들지 않았어요',''],
+
+// 그리기
+['그리기','o','','[⇧] 정비율','정사각 · 정원, 선은 45°','같아요','EditorCanvas'],
+['그리기','o','fix','[⌥] 가운데에서 그리기','누른 점이 가운데, [⇧⌥]는 둘 다','같아요(사각형 · 타원 · 프레임 · 선)','EditorCanvas boxFrom'],
+['그리기','o','code','그리는 중 [Space]','그리던 것을 통째로 옮겨요','같아요','EditorCanvas spaceShift'],
+['그리기','o','fix','그릴 때 스냅','시작점 · 끝점이 주변 가장자리 · 가운데에 붙어요','같아요([⌘] · [⌃] 누르면 끔)','EditorCanvas snapPoint'],
+['그리기','o','fix','클릭만 해서 만들기','누른 점이 가운데. 도형 · 프레임 100×100, 섹션 496×496(직접 확인)','같아요. 도형은 원래 같았고, 프레임(200×200 · 390×844) · 섹션(400×300)을 맞췄어요','EditorCanvas end'],
+['그리기','o','fix','텍스트 도구','빈 상자로 시작, 안 치고 나가면 사라짐. 끌면 그 크기의 고정 상자','같아요. 예전엔 ‘Text’가 미리 들어갔어요','EditorCanvas end'],
+['그리기','o','code','이미지 넣기 [⇧⌘K]','여러 장 고르고 누를 때마다 하나씩 놓기, 끌면 그 크기','같아요','pages/p/[projectId] onPlaceImage'],
+['그리기','o','','이미지 파일 끌어 놓기','놓은 자리 프레임 안으로','같아요','EditorCanvas · onDropFiles'],
+['그리기','o','fix','SVG 파일 끌어 놓기','고칠 수 있는 벡터로','같아요. 예전엔 그림 레이어가 됐어요','onDropFiles · importSvgVectors'],
+['그리기','o','','SVG 코드 붙여넣기','벡터로','같아요','onPaste'],
+['그리기','o','fix','그룹 · 불리언 위에서 그리기 · 끌어 놓기 · 붙여넣기','그룹 · 불리언 안으로 들어가지 않아요(프레임만)','같아요. 그룹 안 레이어는 같은 프레임 안에서 끄는 동안 그룹에 남아요','frameAt · retarget · store.paste'],
+['그리기','o','','다각형 · 별 기본값','다각형 3변, 별 5개','같아요','schema.ts'],
+['그리기','w','','연필','부드러운 곡선 벡터','점을 줄였지만(화면 2px) 곡선으로 바꾸지는 않아요','EditorCanvas finishPoints'],
+['그리기','n','','프레임 도구 기기 프리셋','오른쪽 패널에 iPhone 등 크기 목록','Iris에 없는 기능',''],
+
+// 펜 · 점 편집
+['펜 · 점 편집','o','','펜 기본','클릭 직선 점, 끌기 곡선, 첫 점 누르면 닫기, [⌫] 마지막 점','같아요','EditorCanvas penDown'],
+['펜 · 점 편집','o','fix','펜 [⇧]','45° 단위','같아요(점 · 핸들 모두)','EditorCanvas snap45'],
+['펜 · 점 편집','o','code','펜 [⌥]','반대쪽 핸들은 두고 이쪽만(꺾인 곡선)','같아요','EditorCanvas move pen'],
+['펜 · 점 편집','o','fix','펜으로 다 그린 뒤 [↵] · [Esc]','이동 도구로, 그린 벡터 선택(직접 확인). [↵] 한 번 더 = 점 편집','같아요. 예전엔 펜이 계속 켜져 있었어요','EditorCanvas finishPen'],
+['펜 · 점 편집','o','','점 고르기 · 옮기기','점 · 선 클릭, [⇧] 더하기, 범위 선택, 방향키, [⌘A], 패널 좌표 · 코너','같아요','EditorCanvas'],
+['펜 · 점 편집','o','code','점 끌 때 [⇧]','가로 · 세로로만','같아요','EditorCanvas move vpt'],
+['펜 · 점 편집','o','fix','점 지우기 [⌫] · [⇧⌫]','[⌫] 경로가 끊겨요, [⇧⌫] 이웃 점끼리 이어요','같아요. 사각형 꼭짓점도 지워져요','EditorCanvas deleteVpt'],
+['펜 · 점 편집','o','code','핸들 표시','고른 점과 그 이웃만','같아요','EditorCanvas vhandles'],
+['펜 · 점 편집','o','fix','평탄화 · 불리언 · 마스크','[⌥⇧F] 평탄화(앱), [⌥⇧U] [⌥⇧S] [⌥⇧I] [⌥⇧E], [⌃⌘M]','같아요([⌘E]도 그대로 돼요)','EditorCanvas onKeyDown'],
+['펜 · 점 편집','n','','굽히기 [⌘] · 페인트 [⇧B] · 합치기 [⌘J] · 선 외곽선 [⌥⌘O] · 펜으로 점 추가 · 끝점 이어 그리기','점 편집 도구들','Iris에 없는 기능',''],
+
+// 선택
+['선택','o','','기본 선택','더블클릭 한 단계 안, [⌘]클릭 깊은 선택, [⇧]클릭, [⌘]끌기 깊은 범위, [⌥] 거리','같아요','EditorCanvas'],
+['선택','o','fix','키보드 선택','[↵] 자식, [\\] · [⇧↵] 부모, [⇥] 형제, [⌘A] [⇧⌘A] [⌥⌘A], [Esc] 선택 모두 풀기(직접 확인)','같아요. 예전엔 [Esc]가 바깥 프레임을 골랐어요','EditorCanvas onKeyDown'],
+['선택','o','fix','캔버스에 바로 놓인 프레임 안 클릭','안쪽 레이어가 바로 골라져요','같아요(맨 위 프레임과 똑같이)','EditorCanvas pickLayer'],
+['선택','o','fix','프레임 빈 곳 끌기','안 고른 프레임은 범위 선택, 고른 프레임은 옮기기(직접 확인)','같아요. 예전엔 늘 프레임이 움직였어요','EditorCanvas start'],
+['선택','o','code','겹친 레이어 아래의 고른 것 끌기','고른 것의 상자 안을 끌면 고른 것이 옮겨져요','같아요','EditorCanvas start'],
+['선택','o','same','프레임을 꽉 채운 레이어 클릭','프레임이 먼저 골라져요(직접 확인)','같아요','EditorCanvas pickLayer'],
+['선택','o','fix','우클릭','왼쪽 클릭과 같은 레이어 + Select layer로 겹친 것 고르기, [⌘]우클릭은 바로 목록','같아요','EditorCanvas onContext'],
+['선택','i','','마우스 올림 표시','레이어 모양을 따라가요','늘 네모 상자(2026-11-24 사용자 요청)','EditorCanvas HOVER_BOX_ONLY'],
+
+// 이동 · 변형
+['이동 · 변형','o','','이동 · 스냅','끌어 옮기기, 스마트 가이드, 프레임 안팎, 오토 레이아웃 끼우기','같아요','EditorCanvas · geom.ts'],
+['이동 · 변형','o','same','끄는 중 스냅 잠깐 끄기','[⌃]','[⌃] · [⌘] 둘 다 돼요','EditorCanvas snapOff'],
+['이동 · 변형','o','code','끄는 중 [Space]','프레임 안에 넣지 않고 옮기기','같아요','EditorCanvas retarget'],
+['이동 · 변형','o','same','[⇧] 끌기','가로 · 세로로만 고정(45° 없음 — 사용자가 피그마에서 확인)','같아요','EditorCanvas move'],
+['이동 · 변형','o','','크기 조절','[⇧] 비율, [⌥] 가운데, [⌘] 제약 무시, 배지, 코너 손잡이','같아요','EditorCanvas'],
+['이동 · 변형','o','fix','그룹 크기 조절 · 그룹 상자','안의 레이어가 비율대로, 그룹 상자는 늘 안을 감싸요','같아요','layout.ts · constrain'],
+['이동 · 변형','o','code','여러 개 크기 조절','묶음 비율대로, 돌린 레이어도 틀어지지 않게, 스냅 · 제약','같아요','EditorCanvas resizeMany'],
+['이동 · 변형','o','code','크기 조절 중 [⌃]','비율 잠금 잠깐 풀기','같아요','EditorCanvas move resize'],
+['이동 · 변형','o','fix','키보드 크기 [⌘→] 등','1, [⇧⌘] 10(직접 확인: → 너비 +, ↓ 높이 +)','같아요','EditorCanvas onKeyDown'],
+['이동 · 변형','o','fix','[⌥⌘↑] [⌥⌘↓]','아무 일도 없어요(직접 확인)','같아요. 예전엔 1px 이동이었어요','EditorCanvas onKeyDown'],
+['이동 · 변형','o','fix','내용에 맞게 크기 [⌥⇧⌘R]','프레임을 안의 내용 크기로','같아요','store.resizeToFit'],
+['이동 · 변형','o','code','스케일 도구 [K]','선 두께 · 글자까지 비율로','같아요(여러 개 · 화면 끌기도)','EditorCanvas'],
+['이동 · 변형','o','','회전 · [⌘D] 반복 · 방향키','[⇧] 15°, 간격 기억, 1 · 10px, 오토 레이아웃 안은 순서','같아요','EditorCanvas · store'],
+['이동 · 변형','o','fix','크기 · 회전 손잡이','왼쪽 버튼으로만','같아요','EditorCanvas startResize 등'],
+['이동 · 변형','n','','여러 개 함께 회전','묶음째 회전','Iris에 없는 기능',''],
+
+// 텍스트
+['텍스트','o','','들어가고 나오기','[↵] 전체 선택하며 시작, [Esc] · [⌘↵] 끝, 비우면 삭제','같아요','LayerView.vue'],
+['텍스트','o','','여러 텍스트 한꺼번에 편집','여러 개 고르고 [↵]','같아요','LayerView.vue'],
+['텍스트','o','fix','더블클릭으로 편집 시작','누른 자리 단어 선택','같아요','LayerView · editAt'],
+['텍스트','o','fix','[⌘B] 굵게 · [⌘U] 밑줄 · [⇧⌘X] 취소선','서식','같아요(고친 상태 · 고르기만 한 상태 모두, 레이어 전체에)','canvas/textKeys.ts'],
+['텍스트','o','fix','정렬 [⌥⌘L] [⌥⌘T] [⌥⌘R] [⌥⌘J]','왼쪽 · 가운데 · 오른쪽 · 양쪽','같아요','canvas/textKeys.ts'],
+['텍스트','o','fix','[⇧⌘<] [⇧⌘>] · [⌥⌘<] [⌥⌘>] · [⌥<] [⌥>] · [⌥⇧<] [⌥⇧>]','크기 · 굵기 · 자간 · 행간','같아요(&lt; 는 쉼표 키, &gt; 는 마침표 키)','canvas/textKeys.ts'],
+['텍스트','o','fix','목록 [⇧⌘7] [⇧⌘8]','번호 · 글머리','같아요','canvas/textKeys.ts'],
+['텍스트','o','fix','편집 중 [⇥]','편집에서 빠져나가지 않아요','같아요(탭 글자)','LayerView onKey'],
+['텍스트','o','code','글자 붙여넣기','서식 없이 글자만','같아요','LayerView onPaste'],
+['텍스트','o','code','크기 방식','Auto width · Auto height(줄면 줄어요) · Fixed size(높이를 끌면)','같아요','LayerView · EditorCanvas'],
+['텍스트','o','code','좌우 · 위아래 변 두 번 누르기','Auto width · Auto height로','같아요','EditorCanvas edgeDbl'],
+['텍스트','o','fix','한글 조합 중 [Esc]','조합 중인 글자가 남아요','같아요(사용자 확인: 안녕 → ‘안녀’까지 치고 Esc)','LayerView onKey'],
+['텍스트','n','','글자 일부만 서식 · 기울임 [⌘I] · 링크 [⇧⌘U] · 목록 들여쓰기','부분 서식','Iris는 글자 레이어 하나에 서식 하나라 없는 기능',''],
+['텍스트','n','','편집 중 오른쪽 패널 누르기','편집 유지','부분 서식이 없어 결과는 같아요(레이어 전체에 적용)',''],
+['텍스트','i','','글꼴','여러 글꼴','디자인 시스템 글꼴(Pretendard)만 써요',''],
+
+// 레이어 · 페이지
+['레이어 · 페이지','o','','기본 동작','클릭, [⌘]클릭, 더블클릭 · [⌘R] 이름, 끌어서 안으로 · 형제로, 눈 · 자물쇠, 아이콘, 우클릭','같아요','LayerTree.vue'],
+['레이어 · 페이지','o','fix','처음엔 접힘 · 고르면 펼침','캔버스에서 고르면 그 줄까지 펼치고 스크롤','같아요','LayerTree reveal'],
+['레이어 · 페이지','o','fix','[⌥]클릭 · [⌥L]','하위까지 모두 펼치기 · 모두 접기','같아요','LayerTree toggle · onWinKey'],
+['레이어 · 페이지','o','fix','패널에서 방향키 · [↵]','↑↓ 고르기, ←→ 접기 · 펼치기, 캔버스로 새지 않아요','같아요','LayerTree rowKey'],
+['레이어 · 페이지','o','fix','이름 바꾸는 중 [⇥] · [⇧⇥]','다음 · 이전 레이어 이름 바꾸기','같아요','LayerTree renameNext'],
+['레이어 · 페이지','o','fix','줄 위에 마우스','캔버스에 테두리','같아요','useState iris-hover'],
+['레이어 · 페이지','o','code','[⇧]클릭 범위','마지막으로 고른 것부터(캔버스에서 골랐어도)','같아요','LayerTree pick'],
+['레이어 · 페이지','o','code','끌어서 옮기기','여러 줄 함께, 아래 가장자리에 놓기','같아요','LayerTree onDrop · store.moveTo'],
+['레이어 · 페이지','o','code','눈 · 자물쇠','켜진 것만 늘 보임, 누른 채 위아래로 끌면 여러 개(실행취소 한 번)','같아요','LayerTree paintStart'],
+['레이어 · 페이지','o','fix','[PageUp] [PageDown] · [⌥1] [⌥2] [⌥8]','이전 · 다음 페이지, 레이어 · 에셋 · 디자인 탭','같아요','EditorCanvas · onUiKey'],
+['레이어 · 페이지','o','fix','페이지별 보던 위치','다시 열어도 그 자리 · 확대','같아요(이 브라우저에 기억)','pages/p/[projectId] savedView'],
+['레이어 · 페이지','o','fix','페이지 추가 · 이름 바꾸기 실행취소','[⌘Z]로 되돌려요','같아요','onAddPage · renamePageUndoable'],
+['레이어 · 페이지','n','','찾기 [⌘F] · 페이지 복제 · [⌥3] 라이브러리 · [⌥9] 프로토타입','각 기능','Iris에 없는 기능',''],
+
+// 오른쪽 패널
+['오른쪽 패널','o','','숫자 칸 기본','[↑] [↓] 1 · [⇧] 10, 라벨 끌기, 계산식, [↵] [Esc], Mixed','같아요','InspectorLayer · useScrub'],
+['오른쪽 패널','o','fix','불투명도 숫자키','[⇧1] 10% … [⇧0] 100%, [⇧5][⇧5] 55%, [⇧0][⇧0] 0%(직접 확인 · 한국어 배열)','같아요','EditorCanvas onKeyDown'],
+['오른쪽 패널','o','fix','% 계산','W 칸에 50% → 지금 값의 50%(직접 확인). *2처럼 연산자로 시작하면 무시','같아요','useMathInputs'],
+['오른쪽 패널','o','fix','프레임(화면) 값 끌기','끄는 동안이 실행취소 한 번','같아요(저장도 한 번)','pages/p/[projectId] useScrub'],
+['오른쪽 패널','o','fix','프레임(화면) 비율 잠금 · Mixed 방향키','W를 바꾸면 H도 같은 비율, 값이 달라도 각자 ±','같아요','InspectorDesign'],
+['오른쪽 패널','o','code','[⇥]로 다음 칸','X → Y','같아요(변수 버튼은 건너뛰어요)','TokenPicker'],
+['오른쪽 패널','o','fix','칠 · 선 단축키','[⇧X] 맞바꾸기, [⌥/] 칠 지우기, [⇧/] 선 지우기','같아요','EditorCanvas paintKey'],
+['오른쪽 패널','o','fix','내보내기 섹션','배율 · 형식 · 접미사, [Esc] 되돌리기','같아요','InspectorExport'],
+['오른쪽 패널','n','','프레임(화면) 회전 · 선 그라디언트 · 칠마다 블렌드 · Diamond 그라디언트 · 문서 색','각 기능','Iris에 없는 기능',''],
+
+// 편집 명령
+['편집 명령','o','','기본 편집','[⌘C] [⌘X] [⌘V] [⌘D], [⌘G] [⇧⌘G] [⌥⌘G], [⇧A] [⌥⇧A], [⇧⌘H] [⇧⌘L], {⌘]} {⌘[} {]} {[}, [⇧H] [⇧V], [⌘Z] [⇧⌘Z]','같아요','EditorCanvas onKeyDown'],
+['편집 명령','o','','정렬 · 분배','[⌥A] [⌥D] [⌥W] [⌥S] [⌥H] [⌥V], [⌃⌥H] [⌃⌥V], [⌃⌥T]','같아요','EditorCanvas onKeyDown'],
+['편집 명령','o','fix','위에 붙여넣기 [⇧⌘V]','고른 것과 같은 자리 · 바로 위','같아요','store.pasteOnSelection'],
+['편집 명령','o','code','[⌘V] 붙는 자리','하나 고른 레이어 바로 위, 원래 자리가 안 보이면 보이는 곳 가운데','같아요','store.paste · bringIntoView'],
+['편집 명령','o','code','PNG로 복사 [⇧⌘C] · 내보내기 [⇧⌘E]','2배 PNG를 클립보드로 · Export 설정대로 내려받기','같아요(클립보드 · 내려받기는 브라우저 권한에 따라)','EditorCanvas copyPng · exportNow'],
+['편집 명령','o','code','속성 복사 · 붙여넣기 [⌥⌘C] [⌥⌘V]','레이어 · 프레임 모두','같아요','store.copyStyle · pasteStyle'],
+['편집 명령','o','fix','실행취소 범위','문서 내용 변경만','같아요(보기 설정은 빠져요)','onPageSettings'],
+['편집 명령','o','fix','메뉴 · 툴팁 단축키 표시','실제 키와 같아요','맞췄어요(중복 Rename 제거, Hide · Lock 표시, ↵ [ ] \\ 표시)','useLayerMenu · tooltip'],
+['편집 명령','i','','섹션으로 감싸기 [⌥⌘S]','단축키 없음(메뉴로만). [⌥⌘S]는 버전 기록','Iris에는 버전 기록이 없어 [⌥⌘S]를 섹션 감싸기로 써요',''],
+['편집 명령','i','','[⌘K]','Actions(명령 · 도구 검색)','프로젝트 · 컴포넌트 · 문서 검색',''],
+['편집 명령','n','','오토 레이아웃 제안 [⌃⇧A] · 단축키 안내 창 [⌃⇧?]','각 기능','Iris에 없는 기능',''],
+
+// 컴포넌트
+['컴포넌트','o','','인스턴스 속성','Variant · Boolean · Text','같아요','InspectorInstance'],
+['컴포넌트','n','','컴포넌트 만들기 [⌥⌘K] · 분리 [⌥⌘B] · Instance swap · 메인으로 가기','각 기능','Iris는 코드 디자인 시스템에서 가져오는 구조라 없는 기능',''],
+
+// 탭 막대(피그마 데스크톱 앱)
+['탭 막대','o','fix','탭 우클릭 메뉴','Pin · Copy Link [⌘L] · Rename File · Reload · Move to New Window · Open in Browser · Close · Close Other Tabs · Close All Tabs','같아요(데스크톱 앱에서만: [⌘L] · 브라우저에서 열기). 홈 탭은 링크 복사 · 새로 고침 · 모든 탭 닫기','AppTabs.vue tabMenu'],
+['탭 막대','o','fix','탭 고정(Pin)','고정한 탭은 맨 앞에 고정한 순서대로','같아요. 이름 앞 핀 아이콘(아이콘 안 여백만큼 왼쪽 2 당겨 시각 보정), 끌어서 옮길 수 없어요. × · 가운데 클릭으로는 닫히고, 다른 탭 닫기 · 모든 탭 닫기로는 남아요','useTabs togglePin'],
+['탭 막대','o','fix','탭 너비 · 개수','제목이 다 보이는 너비','제목만큼(최대 240). 막대를 넘으면 모든 탭이 같은 너비로 함께 줄어 최소 72(그 뒤로는 가로로 밀기). 고정은 5개까지, 탭은 20개까지(넘으면 고정 안 한 가장 왼쪽 탭을 닫고 알려요)','AppTabs .proj · useTabs MAX_PINNED · MAX_TABS'],
+['탭 막대','o','fix','고정 탭 핀 아이콘','바드림 pin(45° 기운 압정)','같아요. 피그마 Iris Editor Icons(위 탭)에 Iris 규칙으로 넣고 내려받았어요','PRD/icons/*/pin.svg · irisIcons.ts'],
+['탭 막대','o','fix','탭 끌어서 순서 바꾸기','좌우로 끌어 순서','같아요. 끄는 탭은 손에 들려 따라오고, 놓일 자리에 옅은 잔상 · 다른 탭은 잔상 너비만큼 부드럽게 비켜요(.24s). 놓으면 잔상 자리로 스르륵(.2s). 고정 탭 앞으로는 못 가요','AppTabs tabDown · shown · TransitionGroup tabmv · useTabs move'],
+['탭 막대','o','fix','탭 이름 바꾸기 · 연동','탭 두 번 누르기 · 메뉴, 어디서 바꿔도 같은 이름','같아요(왼쪽 사이드바에서 바꿔도 탭이 바로 따라가요)','AppTabs nameOf · commitRename'],
+['탭 막대','o','fix','불러오는 중 표시','탭에 도는 표시','고른 탭의 × 자리에 도는 고리(0.15초 넘게 걸릴 때만, 옅게 나타나요). 새로 고칠 때 탭 막대가 비었다 채워지지 않게','AppTabs spinning · useTabs'],
+['탭 막대','o','fix','편집기 로딩 화면','새로 고침 · 처음 여는 파일에 가운데 아이콘 + 차오르는 막대, 이미 연 탭은 바로','같아요. Iris 심볼이 입체로 2초에 한 바퀴 돌고(CSS 3D, 두께 층) 막대가 단계별로 차요(화면 붙이기 → 글꼴 → 보던 자리). 최소 2초(한 바퀴가 끝날 때) 보여 주고 .35s 로 사라져요. 이미 불러온 탭으로 옮길 땐 안 뜨고 다시 받지도 않아요(이 창에서 들고 있어요). 페이지를 바꿀 땐 캔버스만 .28s 로 나타나요','components/app/IrisLoading.vue(공용 — 다른 화면에서도 씀) · index.vue booting · IRIS_LOADING_MIN · useEditor editorCache'],
+['탭 막대','n','','Add to Tab Group · Open in Split Tab','탭 묶음 · 나란히 보기','Iris에 없는 기능',''],
+// 보기
+['보기 · 화면 이동','o','','팬 · 확대','두 손가락 팬, [⇧]휠, [⌘]휠 · 핀치, [Space] · 가운데 버튼, [H]','같아요','EditorCanvas'],
+['보기 · 화면 이동','o','fix','줌 단축키','[1] 모두 · [2] 선택 · [⌘0] 100% · [⌘+] [⌘−] · [+] [−] 2배씩(직접 확인)','같아요','EditorCanvas onKeyDown'],
+['보기 · 화면 이동','o','fix','보기 토글','[⇧R] 눈금자, [⇧G] 레이아웃 그리드, [⇧\'] 픽셀 격자, [⇧⌘\'] 픽셀 스냅','같아요','EditorCanvas onKeyDown'],
+['보기 · 화면 이동','o','fix','[N] [⇧N] · [Home] [End]','다음 · 이전 프레임으로 맞춤 · 찾아가기','같아요','EditorCanvas stepScreen'],
+['보기 · 화면 이동','o','fix','UI 숨기기 [⌘\\]','패널 · 도구 막대 모두 숨기기(직접 확인)','같아요','pages/p/[projectId] uiHidden'],
+['보기 · 화면 이동','o','code','선택 없을 때 방향키','캔버스 옮기기','같아요','EditorCanvas onKeyDown'],
+['보기 · 화면 이동','n','','[Z] 확대 도구 · 아웃라인 [⇧⌘O] · 픽셀 미리보기 [⇧⌘P] · 멀티플레이어 커서 [⌥⌘\\]','각 기능','Iris에 없는 기능',''],
+]
+
+// [분류, 키, 하는 일, 출처, Iris 상태]
+const REF = [
+['꼭 알아둘 것','₩ · ⌘\\','UI 숨기기','앱','o'],['꼭 알아둘 것','⌃C','색 추출(스포이트)','앱','o'],['꼭 알아둘 것','⌘K','Actions(명령 · 도구 검색)','앱','i'],['꼭 알아둘 것','⌃⇧?','단축키 패널','앱','n'],
+['도구','V','이동','앱','o'],['도구','K','스케일','문서','o'],['도구','H','손','문서','o'],['도구','F (A)','프레임','앱','o'],['도구','⇧S','섹션','문서','o'],
+['도구','R · O · L · ⇧L','사각형 · 타원 · 선 · 화살표','앱','o'],['도구','P · ⇧P','펜 · 연필','앱','o'],['도구','T','텍스트','앱','o'],['도구','⇧⌘K','이미지 넣기','앱','o'],
+['도구','C','코멘트 보기','앱','n'],['도구','Y','주석','앱','n'],['도구','S','슬라이스','앱','n'],
+['보기','⇧R','눈금자','앱','o'],['보기','⇧G','레이아웃 가이드','앱','o'],["보기","⇧'",'픽셀 그리드','앱','o'],["보기","⇧⌘'",'픽셀 그리드에 맞추기','문서','o'],
+['보기','⇧⌘O','아웃라인','앱','n'],['보기','⇧⌘P','픽셀 미리보기','앱','n'],['보기','⌥⌘\\','멀티플레이어 커서','앱','n'],
+['보기','⌥1 · ⌥2 · ⌥8','레이어 · 에셋 · 디자인 패널','앱','o'],['보기','⌥3 · ⌥9','라이브러리 · 프로토타입 패널','앱','n'],
+['줌','Space 끌기','화면 옮기기','앱','o'],['줌','⌘+ · ⌘− (+ · −)','확대 · 축소(2배씩)','앱 · 직접','o'],['줌','⌘0','100%','앱','o'],['줌','1 · 2','모두 보이게 · 선택에 맞추기','앱','o'],
+['줌','N · ⇧N','다음 · 이전 프레임','앱','o'],['줌','fn↑ · fn↓ (PageUp · PageDown)','이전 · 다음 페이지','앱','o'],['줌','Home · End','이전 · 다음 프레임 찾기','앱','o'],
+['텍스트','⌘B · ⌘I','굵게 · 기울임(Iris는 굵게만)','앱','o'],['텍스트','⌘U · ⇧⌘X','밑줄 · 취소선','앱','o'],['텍스트','⇧⌘U','링크','앱','n'],['텍스트','⇧⌘7 · ⇧⌘8','번호 · 글머리 목록','앱','o'],
+['텍스트','⌥⌘L · T · R · J','정렬','앱','o'],['텍스트','⇧⌘< >','글자 크기','앱','o'],['텍스트','⌥⌘< >','굵기','앱','o'],['텍스트','⌥< >','자간','앱','o'],['텍스트','⌥⇧< >','행간','앱','o'],
+['도형','⌥/ · ⇧/ · ⇧X','칠 지우기 · 선 지우기 · 맞바꾸기','앱','o'],['도형','⌥⇧F','평탄화','앱','o'],['도형','⌥⌘O','선 외곽선','앱','n'],
+['도형','점 편집: ⇧B · ⌘ · ⌘J · ⇧⌘J','페인트 · 굽히기 · 합치기 · 부드럽게 합치기','앱','n'],['도형','점 편집: ⇧⌫','지우고 이어 붙이기','앱','o'],
+['선택','⌘A · ⇧⌘A · ⌥⌘A','모두 · 반전 · 같은 레이어','앱','o'],['선택','Esc','선택 모두 풀기','앱 · 직접','o'],['선택','⌘클릭 · ⌘끌기','깊은 선택 · 깊은 범위','앱','o'],
+['선택','↵ · \\ · ⇥ · ⇧⇥','자식 · 부모 · 다음 · 이전 형제','앱','o'],['선택','⌘G · ⌘⌫ · ⌥⌘G','그룹 · 그룹 풀기 · 프레임으로 감싸기','앱','o'],['선택','⇧⌘H · ⇧⌘L','숨기기 · 잠그기','앱','o'],
+['마우스','⌥ 올리기','거리 재기','앱','o'],['마우스','⌥ 끌기','복제','앱','o'],['마우스','크기 ⌥ · ⇧ · ⌘','가운데 · 비율 · 제약 무시(이미지는 자르기)','앱','o'],
+['편집','⌘C · ⌘X · ⌘V · ⌘D','복사 · 잘라내기 · 붙여넣기 · 복제','앱','o'],['편집','⇧⌘R · ⇧⌘V','바꿔 붙여넣기 · 위에 붙여넣기','앱','o'],['편집','⌘R','이름 바꾸기','앱','o'],
+['편집','⇧⌘E · ⇧⌘C','내보내기 · PNG로 복사','앱','o'],['편집','⌥⌘C · ⌥⌘V','속성 복사 · 붙여넣기','앱','o'],['편집','⌘F','찾기','앱','n'],
+['변형','⇧H · ⇧V','뒤집기','앱','o'],['변형','⌃⌘M','마스크','앱','o'],['변형','↵','도형 · 이미지 편집','앱','o'],['변형','⇧1 … ⇧0, ⇧0 ⇧0','불투명도 10% … 100%, 0%','앱 · 직접','o'],
+['변형','⌘→ · ⇧⌘→','크기 1 · 10','직접','o'],['변형','⌥⇧⌘R','내용에 맞게 크기','문서','o'],
+['배치','⌘] · ⌘[','한 칸 앞 · 뒤로','앱','o'],['배치','] · [','맨 앞 · 맨 뒤로','앱','o'],['배치','⌥A · D · W · S · H · V','정렬','앱','o'],['배치','⌃⌥H · ⌃⌥V · ⌃⌥T','간격 고르게 · 정돈','앱','o'],
+['배치','⇧A · ⌥⇧A','오토 레이아웃 추가 · 제거','앱','o'],['배치','⌃⇧A','오토 레이아웃 제안','앱','n'],
+['컴포넌트','⌥⌘K · ⌥⌘B','컴포넌트 만들기 · 분리','앱','n'],['컴포넌트','⇧I','컴포넌트 찾기','앱','n'],
+]
+
+const AREAS = [...new Set(ROWS.map((r) => r[0]))]
+const state = { view: 'first', st: null, area: null, q: '', rq: '' }
+try { const v = localStorage.getItem('iris-parity-view'); if (v) state.view = v } catch (e) {}
+const badge = (s) => `<span class="badge ${ST[s].c}">${ST[s].t}</span>`
+const esc = (t) => t.replace(/&(?!lt;|gt;)/g, '&amp;').replace(/<(?!\/?kbd)/g, '&lt;')
+const fmt = (t) => K(esc(t))
+function rowHtml(r) {
+  const [, s, f, fn, fig, now, src] = r
+  const tag = f && FLAG[f] ? `<span class="flag ${FLAG[f][1]}">${FLAG[f][0]}</span>` : ''
+  return `<tr><td class="st" data-l="상태">${badge(s)}</td><td class="fn" data-l="기능">${fmt(fn)}<br>${tag}</td><td data-l="피그마">${fmt(fig)}</td><td data-l="Iris">${fmt(now)}</td><td class="src" data-l="코드 위치">${(src || '—').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td></tr>`
+}
+const table = (rows) => `<div class="tbl-wrap"><table><thead><tr><th>상태</th><th>기능</th><th>피그마</th><th>Iris</th><th>코드 위치</th></tr></thead><tbody>${rows.map(rowHtml).join('')}</tbody></table></div>`
+function renderCounts() {
+  const n = (s) => ROWS.filter((r) => r[1] === s).length
+  document.getElementById('counts').innerHTML = ['o', 'q', 'w', 'i', 'n'].map((s) =>
+    `<button class="count" data-s="${s}" aria-pressed="${state.st === s}"><b>${n(s)}</b><span>${ST[s].t}</span></button>`).join('')
+  document.querySelectorAll('.count').forEach((b) => b.onclick = () => { state.st = state.st === b.dataset.s ? null : b.dataset.s; state.view = 'all'; render() })
+}
+function renderFirst() {
+  const fixed = ROWS.filter((r) => r[2] === 'fix' || r[2] === 'code').length
+  const same = ROWS.filter((r) => r[2] === 'same').length
+  const rest = ROWS.filter((r) => r[1] === 'q' || r[1] === 'w')
+  document.getElementById('view-first').innerHTML = `
+    <div class="note"><h3>2026-11-25 정리</h3><ul>
+      <li>${fixed}개 항목을 피그마와 같게 고쳤어요. 고친 뒤 Iris 미리보기에서 눌러 확인했고, 파일 창 · IME · 클립보드처럼 자동으로 누를 수 없는 건 ‘코드로 확인’으로 표시했어요.</li>
+      <li>${same}개는 피그마에서 직접 눌러 보니 Iris가 원래 같았어요(처음 점검에서 다르다고 했던 것).</li>
+      <li>피그마에 있지만 Iris에 아직 없는 기능은 만들지 않고 ‘보류’로 모았어요. 새 기능을 정할 때 이 목록에서 고르면 돼요.</li>
+      <li>‘일부러 다름’은 Iris 사정으로 피그마와 다르게 둔 것(사용자 요청 · 디자인 시스템 · 없는 기능과 겹치는 키)이에요.</li>
+    </ul></div>
+    <div class="group"><div class="ghead"><h2>남은 것</h2><span>${rest.length}개 · 직접 확인하거나 더 맞출 것</span></div>${table(rest)}</div>
+    <div class="group"><div class="ghead"><h2>위험했던 것</h2><span>새로고침 · 내용 지움 등</span></div>${table(ROWS.filter((r) => r[0] === '위험했던 것'))}</div>`
+}
+function renderAll() {
+  document.getElementById('areaBar').innerHTML = [`<button class="chip" data-a="" aria-pressed="${!state.area}">전체 영역</button>`]
+    .concat(AREAS.map((a) => `<button class="chip" data-a="${a}" aria-pressed="${state.area === a}">${a}</button>`)).join('')
+    + (state.st ? ` <button class="chip" data-clear="1" aria-pressed="true">${ST[state.st].t}만 보기 ✕</button>` : '')
+  document.querySelectorAll('#areaBar .chip').forEach((b) => b.onclick = () => { if (b.dataset.clear) state.st = null; else state.area = b.dataset.a || null; render() })
+  const q = state.q.trim().toLowerCase()
+  const rows = ROWS.filter((r) => (!state.st || r[1] === state.st) && (!state.area || r[0] === state.area) && (!q || r.slice(3).join(' ').toLowerCase().includes(q)))
+  const order = { q: 0, w: 1, o: 2, i: 3, n: 4 }
+  const html = AREAS.filter((a) => rows.some((r) => r[0] === a)).map((a) => {
+    const rs = rows.filter((r) => r[0] === a).sort((p, n) => order[p[1]] - order[n[1]])
+    return `<div class="group"><div class="ghead"><h2>${a}</h2><span>${rs.length}개</span></div>${table(rs)}</div>`
+  }).join('')
+  document.getElementById('allList').innerHTML = html || '<p class="empty">맞는 항목이 없어요</p>'
+}
+function renderRef() {
+  const q = state.rq.trim().toLowerCase()
+  const rows = REF.filter((r) => !q || r.join(' ').toLowerCase().includes(q))
+  const cats = [...new Set(rows.map((r) => r[0]))]
+  const e2 = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  document.getElementById('refList').innerHTML = cats.map((c) => {
+    const rs = rows.filter((r) => r[0] === c)
+    return `<div class="group"><div class="ghead"><h2>${c}</h2><span>${rs.length}개</span></div><div class="tbl-wrap"><table><thead><tr><th>키 · 조작</th><th>하는 일</th><th>출처</th><th>Iris</th></tr></thead><tbody>
+      ${rs.map((r) => `<tr><td class="fn" data-l="키 · 조작"><kbd>${e2(r[1])}</kbd></td><td data-l="하는 일">${e2(r[2])}</td><td data-l="출처"><span class="cert">${r[3]}</span></td><td class="st" data-l="Iris">${badge(r[4])}</td></tr>`).join('')}
+    </tbody></table></div></div>`
+  }).join('') || '<p class="empty">맞는 항목이 없어요</p>'
+}
+function render() {
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.v === state.view)))
+  for (const v of ['first', 'all', 'ref']) document.getElementById('view-' + v).hidden = state.view !== v
+  try { localStorage.setItem('iris-parity-view', state.view) } catch (e) {}
+  renderCounts()
+  if (state.view === 'first') renderFirst()
+  if (state.view === 'all') renderAll()
+  if (state.view === 'ref') renderRef()
+}
+document.querySelectorAll('.tab').forEach((t) => t.onclick = () => { state.view = t.dataset.v; render() })
+document.getElementById('q').oninput = (e) => { state.q = e.target.value; renderAll() }
+document.getElementById('rq').oninput = (e) => { state.rq = e.target.value; renderRef() }
+render()
+</script>

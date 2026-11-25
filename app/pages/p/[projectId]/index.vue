@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { fmtNum } from '~/canvas/num'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
 import { Button, Skeleton, TextButton } from '@ba-dream/design-system'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
-import ContextMenu from '~/components/editor/ContextMenu.vue'
 import { importSvg } from '~/canvas/vector'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
 import InspectorScale from '~/components/editor/InspectorScale.vue'
@@ -155,6 +155,8 @@ async function onPageSettings(patch: PageSettings) {
   const before = { ...(p.viewport ?? {}) }
   try {
     await updatePageSettings(p.id, patch)
+    // 보기 설정(픽셀 격자 · 픽셀에 맞추기)은 문서 내용이 아니라 실행취소에 넣지 않아요(피그마와 같아요)
+    if (Object.keys(patch).every((k) => k === 'pixelGrid' || k === 'snapPixel')) return
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
   } catch { say(tr('Couldn\'t save page settings')) }
 }
@@ -188,23 +190,106 @@ function say(text: string) {
 // ---------------------------------------------------------------------------
 // 페이지 · 화면
 // ---------------------------------------------------------------------------
-const views = new Map<string, Viewport>() // 페이지마다 보던 위치 기억
+// 탭 막대의 도는 표시: 페이지 · 화면을 다 읽을 때까지
+const tabBusy = useState<boolean>('iris-tab-busy', () => false)
+watch(() => [pages.status.value, screens.status.value] as const, ([a, b]) => { tabBusy.value = a === 'pending' || b === 'pending' || a === 'idle' }, { immediate: true })
+onBeforeUnmount(() => { tabBusy.value = false })
+const views = new Map<string, Viewport>() // 페이지마다 보던 위치 기억(이 브라우저에 저장 — 다시 열어도 그 자리, 피그마와 같아요)
+const VIEW_KEY = (pid: string) => `iris-view:${projectId}:${pid}`
+function savedView(pid: string): Viewport | undefined {
+  if (views.has(pid)) return views.get(pid)
+  try { const v = JSON.parse(localStorage.getItem(VIEW_KEY(pid)) ?? 'null'); return v && Number.isFinite(v.zoom) ? v : undefined } catch { return undefined }
+}
+let viewTimer: ReturnType<typeof setTimeout> | null = null
+watch(vp, (v) => {
+  const pid = pageId.value
+  if (!pid || !import.meta.client) return
+  views.set(pid, { ...v })
+  if (viewTimer) clearTimeout(viewTimer)
+  viewTimer = setTimeout(() => { try { localStorage.setItem(VIEW_KEY(pid), JSON.stringify(v)) } catch { /* 기억만 못 해요 */ } }, 300)
+}, { deep: true })
 let fitted: string | null = null
+/**
+ * 캔버스는 보던 자리(저장한 보기)를 놓은 뒤에 부드럽게 나타나요 — 새로 고칠 때 서버가 그린 기본 자리에서 툭 옮겨 가지 않게,
+ * 페이지를 바꿀 때도 이전 페이지 화면이 새 자리로 튀지 않게(사라질 땐 바로, 나타날 땐 .28s)
+ */
+/** 탭을 옮겨 다시 왔을 때(이미 불러온 프로젝트): 로딩 화면 · 나타나기 없이 바로 */
+const tabReload = useTabReload()
+/** ⌘R · 탭 메뉴 Reload 로 새로 고친 경우: 로딩 화면을 띄우고 프로젝트 · 페이지 · 화면을 다시 받아요(같은 열쇠의 데이터를 그대로 쓰지 않게) */
+const forced = import.meta.client && tabReload.consume(projectId)
+if (forced) { project.refresh(); pages.refresh(); screens.refresh() }
+const warm = !forced && import.meta.client && !useNuxtApp().isHydrating && pages.status.value === 'success' && screens.status.value === 'success'
+const viewReady = ref(warm)
+let mounted = false
+let revealT: ReturnType<typeof setTimeout> | null = null
+function revealCanvas() {
+  if (revealT) { clearTimeout(revealT); revealT = null }
+  nextTick(() => requestAnimationFrame(() => { viewReady.value = true }))
+}
 watch(pageId, (next, prev) => {
+  if (prev && import.meta.client) { viewReady.value = false; if (revealT) clearTimeout(revealT); revealT = setTimeout(revealCanvas, 800) }
   if (prev) views.set(prev, { ...vp.value })
   store.selectScreen(null)
-  const v = next ? views.get(next) : undefined
+  const v = next ? savedView(next) : undefined
   if (v) { vp.value = v; fitted = next }
 })
 watch(() => [pageId.value, screens.status.value] as const, ([pid, st]) => {
-  if (!import.meta.client || st !== 'success' || !pid || fitted === pid) return
-  fitted = pid
-  nextTick(() => canvas.value?.fit())
+  if (!import.meta.client || st !== 'success' || !pid) return
+  if (fitted !== pid) {
+    fitted = pid
+    const v = savedView(pid)
+    if (v) vp.value = { ...v }
+    else nextTick(() => canvas.value?.fit())
+  }
+  if (mounted) revealCanvas()
 }, { immediate: true })
-onMounted(() => { if (screens.status.value === 'success' && fitted !== pageId.value) { fitted = pageId.value; canvas.value?.fit() } })
+onMounted(() => {
+  mounted = true
+  if (screens.status.value === 'success' && fitted !== pageId.value) { fitted = pageId.value; const v = pageId.value ? savedView(pageId.value) : undefined; if (v) vp.value = { ...v }; else canvas.value?.fit() }
+  revealCanvas()
+})
+onBeforeUnmount(() => { if (revealT) clearTimeout(revealT) })
+/**
+ * 로딩 화면(새로 고침 · 처음 여는 프로젝트 — 피그마처럼): 서버가 그린 첫 화면부터 덮고, 단계마다 막대가 차요. 이미 불러온 탭으로 옮길 땐 안 떠요
+ * 화면 붙이기 55% → 글꼴 85% → 보던 자리 놓기 · 최소 2초 → 100% → 다 찬 막대를 잠깐 보여 주고 .35s 로 사라져요
+ */
+const booting = ref(!warm)
+const hydrated = import.meta.client && useNuxtApp().isHydrating
+const bootP = ref(0)
+onMounted(async () => {
+  if (!booting.value) return
+  // 로고가 돌기 시작한 때: 새로 고침이면 첫 그림(서버가 그린 로딩 화면), 탭에서 처음 열면 지금 — 2초 뒤 한 바퀴가 딱 끝날 때 사라져요
+  const paint = performance.getEntriesByName('first-contentful-paint')[0]?.startTime
+  const t0 = hydrated && paint != null ? paint : performance.now()
+  bootP.value = 0.55
+  await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1500))])
+  bootP.value = 0.85
+  if (!viewReady.value) await new Promise<void>((r) => { const stop = watch(viewReady, (v) => { if (v) { stop(); r() } }); setTimeout(() => { stop(); r() }, 3000) })
+  // 아무리 빨라도 최소 2초는 보여요(로고가 딱 한 바퀴 — IrisLoading 의 회전 2s · IRIS_LOADING_MIN 과 같아요). 막대는 그 끝에 맞춰 다 차요
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)))
+  await wait(IRIS_LOADING_MIN - 500 - (performance.now() - t0))
+  bootP.value = 1
+  await wait(500)
+  booting.value = false
+})
 
 async function onAddPage() {
-  try { await addPage() } catch { say(tr('Couldn\'t add a page. Try again')) }
+  try {
+    const prev = pageId.value
+    const row = await addPage()
+    // 실행취소: 방금 만든 빈 페이지를 지우고 원래 페이지로(피그마와 같아요)
+    if (row) {
+      let cur = row.id
+      store.pushAction(null, async () => { await removePage(cur); if (prev) pageId.value = prev }, async () => { const r = await addPage(); if (r) { cur = r.id; await renamePage(r.id, row.name) } })
+    }
+  } catch { say(tr('Couldn\'t add a page. Try again')) }
+}
+/** 페이지 이름 바꾸기(실행취소 가능) */
+async function renamePageUndoable(id: string, name: string) {
+  const before = pages.data.value?.find((x) => x.id === id)?.name
+  if (!before || !name.trim() || name.trim() === before) return
+  await renamePage(id, name)
+  store.pushAction(null, () => renamePage(id, before), () => renamePage(id, name))
 }
 const renaming = ref<string | null>(null)
 async function onRename(id: string, e: Event) {
@@ -214,7 +299,7 @@ async function onRename(id: string, e: Event) {
   const name = (e.target as HTMLInputElement).value.trim()
   const before = pages.data.value?.find((x) => x.id === id)?.name
   if (!name || name === before) return
-  try { await renamePage(id, name) } catch { say(tr('Couldn\'t rename')) }
+  try { await renamePageUndoable(id, name) } catch { say(tr('Couldn\'t rename')) }
 }
 /** 프로젝트 이름: 왼쪽 위 이름을 두 번 누르면 바로 고쳐요(피그마 파일 이름과 같아요). Enter · 바깥 누르기 = 저장, Esc = 취소 */
 const projRenaming = ref(false)
@@ -295,11 +380,19 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
     }
   } catch { say(tr('Couldn\'t create the frame. Try again')) }
 }
+/** 값이 서로 다른(Mixed) 프레임들의 칸에서 ↑ ↓: 각자 값에 더해요(실행취소 한 번) */
+function onStepMany(key: 'x' | 'y' | 'width' | 'height', d: number) {
+  const min = key === 'width' || key === 'height' ? 1 : -1e9
+  store.batch(() => { for (const s of multiList.value) onUpdate({ [key]: Math.max(min, s[key] + d) }, s) })
+}
 /** 프레임 여러 개를 한꺼번에(실행취소 한 번) */
 function onUpdateMany(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
   const rows = multiList.value
   store.batch(() => { for (const s of rows) onUpdate(patch, s) })
 }
+/** 프레임 값 칸을 끄는 동안(scrub): 화면에는 바로 보이고, 손을 뗄 때 한 번 저장 · 실행취소 한 번(레이어 칸과 같아요) */
+let scrubbing = false
+const frameScrub = new Map<string, Record<string, unknown>>()
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>, target?: ScreenRow) {
   const s = target ?? current.value
   if (!s) return
@@ -307,6 +400,13 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
   const fail = () => say(tr('Couldn\'t save. Try again'))
   // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요(실행취소는 레이어 기록이 따로)
   if (s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
+  if (scrubbing) {
+    const b = frameScrub.get(s.id) ?? {}
+    for (const [k, v] of Object.entries(before)) if (!(k in b)) b[k] = v
+    frameScrub.set(s.id, b)
+    Object.assign(s, patch)
+    return
+  }
   updateScreen(s.id, patch).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
 }
@@ -542,8 +642,14 @@ onMounted(async () => {
 // ---------------------------------------------------------------------------
 watch(tool, (t, prev) => {
   if (t === 'move' && prev !== 'move' && prev !== 'hand' && prev !== 'image' && store.layerIds.value.length) tab.value = 'design'
-  if (t === 'image') { tool.value = 'move'; pickImage() }
+  // 이미지 넣기(⇧⌘K, 피그마와 같아요): 파일을 여러 개 고르고, 캔버스를 누를 때마다 하나씩 놓아요(끌면 그 크기로). Esc · 다른 도구면 그만
+  if (t === 'image' && !placing.value.length) pickImage()
+  if (t !== 'image') placing.value = []
 })
+/** ⌘\ 로 UI 를 모두 숨겼는지 */
+const uiHidden = ref(false)
+/** 놓을 차례를 기다리는 이미지들 */
+const placing = ref<File[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 let replaceId: string | null = null
 function pickImage(replace?: string) {
@@ -554,15 +660,26 @@ function pickImage(replace?: string) {
 }
 async function onImageFile(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = [...(input.files ?? [])]
   input.value = ''
-  if (file) await insertImage(file)
+  if (!files.length) { if (tool.value === 'image') tool.value = 'move'; return }
+  // 칠 바꾸기(Replace)는 바로, 새로 넣기는 캔버스를 눌러 놓기
+  if (replaceId) { await insertImage(files[0]!); return }
+  placing.value = files
+  tool.value = 'image'
+  say(files.length > 1 ? tr('Click to place {n} images', { n: files.length }) : tr('Click to place the image'))
+}
+/** 캔버스를 눌러 이미지 놓기: 누른 점이 가운데, 끌었으면 그 너비로(비율 그대로) */
+async function onPlaceImage(at: { x: number; y: number }, width: number | null, place?: { sid: string; parentId: string | null }) {
+  const f = placing.value.shift()
+  if (!placing.value.length) tool.value = 'move'
+  if (f) await insertImage(f, at, place, width)
 }
 /**
  * 이미지 넣기(도구 · 끌어 놓기 · 붙여넣기 공용). at 이 있으면 그 캔버스 좌표에, 없으면 고른 화면 가운데(없으면 보이는 캔버스 가운데)에.
  * at 이 Iris 화면 위면 그 화면 안으로, 아니면 캔버스 위로 들어가요.
  */
-async function insertImage(file: File, at?: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
+async function insertImage(file: File, at?: { x: number; y: number }, place?: { sid: string; parentId: string | null }, width?: number | null) {
   if (!isMediaFile(file)) return say(tr('Only image or video files can be added'))
   const tooLarge = () => say(isVideoFile(file) ? tr('Videos must be smaller than 50MB') : tr('Images must be smaller than 10MB'))
   // 영상은 바로 잽니다. 이미지는 4096px 로 줄인 뒤의 크기로 uploadImage 가 잽니다
@@ -576,7 +693,9 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
     const onCanvas = isPageCanvas(s.id)
     // 원래 픽셀 크기 그대로(피그마와 같아요). 프레임보다 크면 프레임이 잘라 보여요
     const parentId = place?.sid === s.id ? place.parentId : null
-    const w = Math.max(1, Math.round(img.w)), h = Math.max(1, Math.round(img.h))
+    // 끌어서 놓았으면 그 너비로(비율 그대로)
+    const k = width && img.w ? width / img.w : 1
+    const w = Math.max(1, Math.round(img.w * k)), h = Math.max(1, Math.round(img.h * k))
     let cx: number, cy: number
     if (at) { cx = Math.round(at.x - (onCanvas ? 0 : s.x)); cy = Math.round(at.y - (onCanvas ? 0 : s.y)) }
     else if (onCanvas) { cx = Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom); cy = Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
@@ -594,7 +713,12 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
 async function onDropFiles(files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
   const media = files.filter(isMediaFile)
   if (!media.length) return say(tr('Only image or video files (PNG, JPG, SVG, MP4…) can be added'))
-  for (const [i, f] of media.entries()) await insertImage(f, { x: at.x + i * 24, y: at.y + i * 24 }, place)
+  for (const [i, f] of media.entries()) {
+    const p = { x: at.x + i * 24, y: at.y + i * 24 }
+    // SVG 파일은 고칠 수 있는 벡터로(SVG 코드 붙여넣기와 같아요 — 피그마와 같아요). 읽지 못하면 이미지로
+    if (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name)) { const text = await f.text().catch(() => ''); if (text && importSvgVectors(text, p, place?.sid)) continue }
+    await insertImage(f, p, place)
+  }
 }
 /** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
 function onPaste(e: ClipboardEvent) {
@@ -617,15 +741,16 @@ function onPaste(e: ClipboardEvent) {
   canvas.value?.paste()
 }
 /** SVG 코드 → 'svg' 프레임 안 벡터 레이어들. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false */
-function importSvgVectors(text: string, at?: { x: number; y: number }): boolean {
+function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?: string): boolean {
   const r = importSvg(text)
   if (!r) return false
-  const s = (at ? null : current.value?.source === 'native' ? current.value : null) ?? canvasScreen.value
+  const into = intoSid ? canvasList.value.find((v) => v.id === intoSid && v.source === 'native') : undefined
+  const s = into ?? (at ? null : current.value?.source === 'native' ? current.value : null) ?? canvasScreen.value
   if (!s) return false
   const onCanvas = isPageCanvas(s.id)
   const k = 1 // SVG 도 원래 크기 그대로
   const w = r.w * k, h = r.h * k
-  const c = at ?? (onCanvas ? { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) } : { x: s.width / 2, y: s.height / 2 })
+  const c = at ? (onCanvas ? at : { x: at.x - s.x, y: at.y - s.y }) : (onCanvas ? { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) } : { x: s.width / 2, y: s.height / 2 })
   const r2 = (v: number) => Math.round(v * 100) / 100
   store.insertTree(s.id, null, { type: 'frame', name: 'svg', x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w: r2(w), h: r2(h), style: { fill: undefined, clip: false } },
     r.layers.map((l) => ({ type: 'vector' as const, name: l.name, x: r2(l.x * k), y: r2(l.y * k), w: r2(l.w * k), h: r2(l.h * k), vnet: l.vnet, evenodd: l.evenodd || undefined, style: { fill: l.fill, stroke: l.stroke, strokeWidth: l.strokeWidth ? r2(l.strokeWidth * k) : undefined, opacity: l.opacity } })))
@@ -641,7 +766,8 @@ onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnloa
 
 /** 화면 단축키(피그마와 같아요): ⌘\\ UI 숨기기 · ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭 · PageUp · PageDown 이전 · 다음 페이지 */
 function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev-page' | 'next-page') {
-  if (k === 'toggle-ui') { togglePanel(); return }
+  // ⌘\ UI 숨기기(피그마와 같아요): 양쪽 패널 · 도구 막대를 모두 숨기고 캔버스만 — 다시 누르면 돌아와요
+  if (k === 'toggle-ui') { uiHidden.value = !uiHidden.value; return }
   if (k === 'left-file' || k === 'left-assets') { left.value = k === 'left-file' ? 'file' : 'assets'; expandPanels(); return }
   if (k === 'design') { tab.value = 'design'; expandPanels(); return }
   const ps = pages.data.value ?? []
@@ -696,8 +822,24 @@ useMathInputs()
 // 수치 칸 앞쪽을 좌우로 끌어 값 바꾸기: 끄는 동안은 기록 하나로 묶어요
 let scrubSids: string[] = []
 useScrub(
-  () => { scrubSids = [...new Set([current.value?.id, canvasScreen.value?.id].filter((v): v is string => !!v))]; scrubSids.forEach((s) => store.hold(s)) },
-  () => { scrubSids.forEach((s) => store.release(s)); scrubSids = [] },
+  () => { scrubbing = true; frameScrub.clear(); scrubSids = [...new Set([current.value?.id, canvasScreen.value?.id, ...multiList.value.map((v) => v.id)].filter((v): v is string => !!v))]; scrubSids.forEach((s) => store.hold(s)) },
+  () => {
+    scrubbing = false
+    const fail = () => say(tr('Couldn\'t save. Try again'))
+    // 레이어 기록 + 프레임 값 기록을 실행취소 한 번으로
+    store.batch(() => {
+      scrubSids.forEach((s) => store.release(s))
+      for (const [id, before] of frameScrub) {
+        const s = canvasList.value.find((v) => v.id === id)
+        if (!s) continue
+        const after = Object.fromEntries(Object.keys(before).map((k) => [k, s[k as keyof ScreenRow]])) as Partial<ScreenRow>
+        updateScreen(id, after).catch(fail)
+        store.pushAction(id, () => updateScreen(id, before as Partial<ScreenRow>).catch(fail), () => updateScreen(id, after).catch(fail))
+      }
+    })
+    frameScrub.clear()
+    scrubSids = []
+  },
 )
 
 // 문서는 왼쪽 사이드바 Docs 탭에서 열어요(오른쪽 위 '문서' 토글은 뺐어요)
@@ -707,7 +849,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </script>
 
 <template>
-  <div class="editor">
+  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady }]">
+    <Transition name="ld"><IrisLoading v-if="booting" :progress="bootP" /></Transition>
     <EditorCanvas
       ref="canvas"
       v-model:tool="tool"
@@ -733,7 +876,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @hint="say"
       @screen-action="onScreenAction"
       @drop-files="onDropFiles"
+      @place-image="onPlaceImage"
       @ui="onUiKey"
+      @reload="tabReload.reload(projectId)"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
@@ -889,7 +1034,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             </template>
             <!-- 프레임 여러 개: 한 개일 때와 같은 패널(값이 다르면 Mixed) — 고치면 모두에 한꺼번에(피그마와 같아요) -->
             <template v-else-if="multiList.length > 1">
-              <InspectorDesign :screen="multiList[0]!" :multi="multiList" @update="onUpdateMany" @arrange="onArrangeScreens" />
+              <InspectorDesign :screen="multiList[0]!" :multi="multiList" @update="onUpdateMany" @step="onStepMany" @arrange="onArrangeScreens" />
               <InspectorExport :sid="multiList[0]!.id" :ids="[]" :screen="multiList[0]" :screens="multiList" @toast="say" />
             </template>
             <template v-else>
@@ -909,7 +1054,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
         <div v-else-if="tab === 'design' && currentPage" class="scroll insp">
-          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
+          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePageUndoable(currentPage.id, n).catch(() => say(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
           <span class="tx-head">{{ tr('Select a frame') }}</span>
@@ -925,13 +1070,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <Transition name="toast"><div v-if="toast" class="sq toast">{{ toast }}</div></Transition>
     </div>
 
-    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" @change="onImageFile">
+    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" multiple @change="onImageFile" @cancel="tool === 'image' && (tool = 'move')">
     <AppCommandPalette />
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
-    <ContextMenu />
     <div v-if="confirmPage" class="pg-dim" @click.self="confirmPage = null">
       <div class="sq float pg-confirm" role="alertdialog" aria-modal="true" aria-labelledby="pg-del-t" aria-describedby="pg-del-d">
         <span id="pg-del-t" class="tx-head">{{ tr('Delete "{name}"?', { name: confirmPage.name }) }}</span>
@@ -944,6 +1088,11 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
 <style scoped>
 .editor { height: calc(100vh - var(--iris-tabs-h, 0px)); position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
+/* 캔버스 나타나기: 보던 자리를 놓은 뒤 .28s 로 옅게 → 또렷이. 페이지를 바꿀 땐 바로 감췄다가 다시 나타나요 */
+.editor :deep(.canvas) { transition: opacity .28s cubic-bezier(.2, .7, .2, 1); }
+.editor.unready :deep(.canvas) { opacity: 0; transition: none; }
+.ld-leave-active { transition: opacity .35s ease; }
+.ld-leave-to { opacity: 0; }
 .canvas-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 280px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10) var(--ref-spacing-11); text-align: center; pointer-events: none; }
 .ce-sub { color: var(--sys-color-neutral-600); }
 .canvas-empty .row { display: flex; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-06); pointer-events: auto; }
@@ -964,6 +1113,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .panel-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 4; overflow: visible; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
 /* 접기: 아래 변이 위로 올라가서 맨 위 줄(40) + 탭 줄(42)만 남아요 */
+.editor.ui-hidden .panel-left, .editor.ui-hidden .panel-right, .editor.ui-hidden :deep(.bar[role="toolbar"]) { display: none; }
 .panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - var(--iris-gap) - 40px - 42px); }
 .fold { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
 .panel-left .fold { margin-left: auto; }

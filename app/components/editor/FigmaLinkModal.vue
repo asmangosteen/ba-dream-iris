@@ -3,7 +3,6 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 // 피그마 화면 가져오기 — 시안: design/iris-canvas/FigmaLink.dc.html, 위계: PRD/05_UI_GUIDE.md
 // 프레임 링크 → 서버(/api/figma/frame)가 피그마에서 이름 · 크기 · 썸네일 · 컴포넌트 요약을 받아오고,
 // "화면 추가"를 누르면 screens · screen_component_usages 에 저장합니다. 미리보기 모드에서는 저장하지 않아요.
-import { Button, TextButton, TextInput } from '@ba-dream/design-system'
 // Nuxt 내장 useDevPreview 와 이름이 겹쳐 자동 import 가 내장 쪽으로 잡히므로 직접 가져옵니다
 import { useDevPreview } from '~/composables/usePreview'
 
@@ -204,73 +203,77 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div v-if="open" class="backdrop" @mousedown.self="close">
-      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog">
+      <!-- 편집기 창 양식(이름 바꾸기 · 스타일 만들기와 같아요): 제목 줄 40 / 본문 12 · 16 / 칸 28 / 아래 줄(위 선) -->
+      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog editor">
         <header class="head">
-          <h2 id="figmaTitle" class="tx-title">{{ tr('Import from Figma') }}</h2>
-          <button type="button" class="ib s24" :aria-label="tr('Close')" :title="tr('Close')" @click="close"><EditorIcon name="close" /></button>
+          <h2 id="figmaTitle" class="ttl">{{ tr('Import from Figma') }}</h2>
+          <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </header>
 
-        <div class="body">
-          <div class="row">
-            <TextInput
-              v-model:value="url"
-              size="s"
-              :label="tr('Figma link')"
-              :label-props="{ htmlFor: 'figmaUrl' }"
-              placeholder="figma.com/design/…?node-id=…"
-              :show-left-icon="false"
-              :show-right-icon="false"
-              :show-button="false"
-              :show-supporting-text="false"
-              :destructed="error?.code === 'invalid_url' || error?.code === 'no_node'"
-              :input-props="{ id: 'figmaUrl', type: 'text', inputmode: 'url', autocomplete: 'off', 'aria-describedby': 'figmaHint', 'aria-invalid': error?.code === 'invalid_url' || error?.code === 'no_node', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); load() } } }"
-              class="grow"
-            />
-            <Button size="m" type="tertiary" stroke :loading="loading" :disabled="loading || !url.trim()" @click="load">{{ tr('Import') }}</Button>
-          </div>
-          <p id="figmaHint" class="tx-meta">{{ tr('Select a frame in Figma, choose Copy link to selection, and paste the URL here') }}</p>
-        </div>
-
-        <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
-          <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
-          <span>{{ tr(error.message) }}</span>
-        </p>
-
-        <div v-if="result" class="result" aria-live="polite">
-          <div class="sq card">
-            <div class="sq thumb" data-preview>
-              <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="tr('{name} thumbnail', { name: result.name })" @error="thumbFailed = true">
-              <EditorIcon v-else name="image" :size="20" class="dim" />
+        <div v-ovscroll class="scroll">
+          <div class="body">
+            <label for="figmaUrl" class="lb">{{ tr('Figma link') }}</label>
+            <div class="row">
+              <label :class="['sq', 'fld', 'grow', { bad: error?.code === 'invalid_url' || error?.code === 'no_node' }]">
+                <input
+                  id="figmaUrl"
+                  v-model="url"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="figma.com/design/…?node-id=…"
+                  aria-describedby="figmaHint"
+                  :aria-invalid="error?.code === 'invalid_url' || error?.code === 'no_node'"
+                  @keydown.enter="!$event.isComposing && ($event.preventDefault(), load())"
+                >
+              </label>
+              <button type="button" class="sq act gray" :disabled="loading || !url.trim()" @click="load">{{ loading ? tr('Importing…') : tr('Import') }}</button>
             </div>
-            <div class="info">
-              <div class="col">
-                <span class="tx-body name">{{ result.name }}</span>
-                <span class="tx-meta num">{{ result.width }} × {{ result.height }}</span>
-              </div>
-              <TextButton size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" class="self-start" @click="openFigma(result.url)">{{ tr('Open in Figma') }}</TextButton>
+            <p id="figmaHint" class="hint">{{ tr('Select a frame in Figma, choose Copy link to selection, and paste the URL here') }}</p>
 
-              <div class="divider" />
-              <div class="sum-h">
-                <span class="tx-head">{{ tr('Components found') }}</span>
-                <span class="tx-meta num">{{ tr('{n} types · {m} instances', { n: result.components.length, m: total }) }}<template v-if="!preview && result.components.length"> · {{ tr('{n} in design system', { n: matched }) }}</template></span>
-              </div>
-              <ul v-if="result.components.length" v-ovscroll class="list">
-                <li v-for="c in result.components" :key="c.name" class="item">
-                  <EditorIcon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" />
-                  <span v-else class="dot" aria-hidden="true" />
-                  <span class="tx-body ellipsis">{{ c.name }}</span>
-                  <span class="tx-meta num">{{ c.count }}</span>
-                </li>
-              </ul>
-              <p v-else class="tx-meta">{{ tr('This frame has no component instances') }}</p>
-            </div>
+            <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
+              <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
+              <span>{{ tr(error.message) }}</span>
+            </p>
           </div>
-          <p v-if="preview" class="tx-meta">{{ tr('Preview mode: nothing is saved when you close') }}</p>
+
+          <div v-if="result" class="result" aria-live="polite">
+            <div class="sq card">
+              <div class="sq thumb" data-preview>
+                <img v-if="result.thumbnailUrl && !thumbFailed" :src="result.thumbnailUrl" :alt="tr('{name} thumbnail', { name: result.name })" @error="thumbFailed = true">
+                <EditorIcon v-else name="image" :size="20" class="dim" />
+              </div>
+              <div class="info">
+                <div class="col">
+                  <span class="name">{{ result.name }}</span>
+                  <span class="meta num">{{ result.width }} × {{ result.height }}</span>
+                </div>
+                <button type="button" class="lnk" @click="openFigma(result.url)">{{ tr('Open in Figma') }}<EditorIcon name="arrow_up_right" :size="12" /></button>
+
+                <div class="divider" />
+                <div class="sum-h">
+                  <span class="sub">{{ tr('Components found') }}</span>
+                  <span class="meta num">{{ tr('{n} types · {m} instances', { n: result.components.length, m: total }) }}<template v-if="!preview && result.components.length"> · {{ tr('{n} in design system', { n: matched }) }}</template></span>
+                </div>
+                <ul v-if="result.components.length" v-ovscroll class="list">
+                  <li v-for="c in result.components" :key="c.name" class="item">
+                    <EditorIcon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" />
+                    <span v-else class="dot" aria-hidden="true" />
+                    <span class="ellipsis">{{ c.name }}</span>
+                    <span class="meta num">{{ c.count }}</span>
+                  </li>
+                </ul>
+                <p v-else class="meta">{{ tr('This frame has no component instances') }}</p>
+              </div>
+            </div>
+            <p v-if="preview" class="meta">{{ tr('Preview mode: nothing is saved when you close') }}</p>
+          </div>
         </div>
 
         <footer class="foot">
-          <Button size="m" type="tertiary" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
-          <Button size="m" type="primary" :loading="saving" :disabled="!result || saving" @click="add">{{ tr('Add frame') }}</Button>
+          <button type="button" class="sq act gray" :disabled="saving" @click="close">{{ tr('Cancel') }}</button>
+          <button type="button" class="sq act pri" :disabled="!result || saving" @click="add">{{ saving ? tr('Adding…') : tr('Add frame') }}</button>
         </footer>
       </section>
     </div>
@@ -278,37 +281,49 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-/* 모달 바탕: 사이드바(.float)와 같은 선 · 그림자 */
-.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); border-radius: var(--ref-radius-08); }
-.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-11) var(--ref-spacing-10) var(--ref-spacing-08) var(--ref-spacing-12); }
-.body { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); }
-.row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }
-.self-start { align-self: flex-start; }
+.backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-08); background: rgb(0 0 0 / 0.24); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+/* 창: 편집기 떠 있는 창과 같은 바탕 · 선 · 그림자 · 둥글기. 창 자체는 스크롤하지 않고 가운데만(스크롤 막대가 창 가장자리에 붙지 않게) */
+.dialog { width: min(440px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; text-align: left; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
+.ttl { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.s24 { width: 28px; height: 28px; }
+.scroll { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08); }
+.lb { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
+.row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .grow { flex: 1; min-width: 0; }
+.fld { height: 28px; }
+.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+.fld.bad { --sq-line: var(--sys-color-theme-destructed-default); --sq-line-w: 1px; }
+.hint { margin: 0; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
+.act { height: 28px; }
+.act:disabled { opacity: 0.4; }
 .dim { color: var(--sys-color-neutral-500); flex: none; }
-.tx-meta { margin: 0; }
 
-.note { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); margin: 0 var(--ref-spacing-12) var(--ref-spacing-10); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
+.note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-04) 0 0; padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
 .note.warn { color: var(--sys-color-theme-destructed-default); }
 .note-ic { flex: none; margin-top: 1px; }
 
-.result { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-10) var(--ref-spacing-12); box-shadow: inset 0 1px 0 var(--iris-line-strong), inset 0 -1px 0 var(--iris-line-strong); }
-.card { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: var(--ref-spacing-10); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.thumb { height: 200px; display: grid; place-items: center; overflow: hidden; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
+.result { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-08) var(--ref-spacing-08); }
+.card { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.thumb { height: 180px; display: grid; place-items: center; overflow: hidden; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .thumb img { width: 100%; height: 100%; object-fit: contain; object-position: top center; }
 .info { min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .col { display: flex; flex-direction: column; }
-.name { font-weight: 500; overflow-wrap: anywhere; }
-.divider { height: 1px; margin: var(--ref-spacing-04) 0; background: var(--iris-line); }
+.name { font-weight: 600; overflow-wrap: anywhere; }
+.meta { margin: 0; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
+.sub { font-weight: 600; }
+.lnk { align-self: flex-start; display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--sys-color-brand-primary-default); cursor: pointer; }
+.lnk:hover { text-decoration: underline; }
+.divider { height: 1px; margin: var(--ref-spacing-02) 0; background: var(--iris-line); }
 .sum-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 132px; overflow-x: hidden; overflow-y: auto; }
-.item { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 22px; }
-.item .tx-meta { margin-left: auto; flex: none; }
+.item { display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 22px; }
+.item .meta { margin-left: auto; flex: none; }
 .ok { color: var(--sys-color-brand-primary-default); flex: none; }
 .dot { width: 12px; height: 12px; flex: none; display: grid; place-items: center; }
 .dot::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-400); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); }
+.foot { flex: none; display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); box-shadow: inset 0 1px 0 var(--iris-line); }
 </style>

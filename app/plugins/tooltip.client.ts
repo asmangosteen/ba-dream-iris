@@ -6,7 +6,7 @@
 const DELAY = 1000
 const WARM = 500
 const GAP = 6
-const KEY_RE = /^(?:[⌃⌥⇧⌘]+\S+|[A-Z0-9]|F\d{1,2}|Esc|⎋|⌫|Space|Enter|↩)$/
+const KEY_RE = /^(?:[⌃⌥⇧⌘]+\S+|[A-Z0-9]|F\d{1,2}|Esc|⎋|⌫|Space|Enter|↩|↵|\[|\]|\\)$/
 
 function splitTitle(t: string): { label: string; key?: string } {
   const p = t.match(/^(.*\S)\s*\(([^()]+)\)\s*$/)

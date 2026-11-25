@@ -439,7 +439,8 @@ export function createLayerStore(opts: {
     }))
   }
   /** 레이어 목록에서 끌어 놓기: target 바로 위(그리는 순서로는 다음)에 놓고, target 이 프레임이면 into 일 때 그 안으로 */
-  function moveTo(sid: string, id: string, targetId: string | null, into = false) {
+  /** below: 목록에서 그 줄 아래(그리는 순서로는 바로 뒤)에 — 끌어서 아래 가장자리에 놓을 때 */
+  function moveTo(sid: string, id: string, targetId: string | null, into = false, below = false) {
     if (id === targetId) return
     const d = doc(sid)
     if (targetId && descendants(d, id).includes(targetId)) return // 자기 안으로는 못 넣음
@@ -451,7 +452,7 @@ export function createLayerStore(opts: {
       const parentId = into && isContainer(t) ? t!.id : t ? t.parentId : null
       const sib = siblings(dd, parentId)
       if (into && isContainer(t)) sib.push(id)
-      else sib.splice(t ? sib.indexOf(t.id) + 1 : sib.length, 0, id)
+      else sib.splice(t ? sib.indexOf(t.id) + (below ? 0 : 1) : sib.length, 0, id)
       n.parentId = parentId
       // 화면에서 보이는 위치는 그대로
       const p = parentId ? absPos(dd, parentId) : { x: 0, y: 0 }
@@ -487,6 +488,8 @@ export function createLayerStore(opts: {
       const sel = layerIds.value.length === 1 ? d.nodes[layerIds.value[0]!] : undefined
       // 고른 프레임 · 섹션 안으로(그룹 · 불리언은 아니에요 — 피그마와 같아요)
       const into = sel && isContainer(sel) && !isGroupNode(sel) && sel.type !== 'boolean' && !cb.rootIds.includes(sel.id) ? sel.id : null
+      // 프레임이 아닌 레이어 하나를 골랐으면 그 레이어 바로 위에(같은 부모 — 피그마와 같아요)
+      const beside = sel && !into && !cb.rootIds.includes(sel.id) ? sel : null
       const fresh: string[] = []
       const same = cb.sid === sid
       const so = geo?.origin(cb.sid), to = geo?.origin(sid)
@@ -503,8 +506,8 @@ export function createLayerStore(opts: {
       for (const n of cb.nodes) {
         const id = map.get(n.id)!
         const root = cb.rootIds.includes(n.id)
-        const keep = !into && !!n.parentId && !!d.nodes[n.parentId]
-        const parentId = root ? (into ?? (keep ? n.parentId : null)) : map.get(n.parentId!)!
+        const keep = !into && !beside && !!n.parentId && !!d.nodes[n.parentId]
+        const parentId = root ? (into ?? (beside ? beside.parentId : keep ? n.parentId : null)) : map.get(n.parentId!)!
         let x = n.x, y = n.y
         if (root && into) {
           // 고른 프레임 안으로(피그마와 같아요): 원래 화면 위 자리가 프레임 안에 들어오면 그 자리, 아니면 프레임 가운데
@@ -514,6 +517,11 @@ export function createLayerStore(opts: {
           const fits = lx >= 0 && ly >= 0 && lx + n.w <= f.w && ly + n.h <= f.h
           x = (fits ? lx : Math.round((f.w - n.w) / 2)) + offset
           y = (fits ? ly : Math.round((f.h - n.h) / 2)) + offset
+        } else if (root && beside) {
+          // 화면 위 같은 자리 그대로(새 부모 기준으로 바꿔서)
+          const a = same ? cb.abs[n.id] ?? { x: n.x, y: n.y } : spot(n)
+          const pa = parentId ? absPos(d, parentId) : { x: 0, y: 0 }
+          x = a.x - pa.x + offset; y = a.y - pa.y + offset
         } else if (root) {
           if (keep) { x = n.x + offset; y = n.y + offset }
           else if (same) { const a = cb.abs[n.id] ?? { x: n.x, y: n.y }; x = a.x + offset; y = a.y + offset } // 원래 부모가 없어졌으면 화면 위 같은 자리
@@ -533,7 +541,8 @@ export function createLayerStore(opts: {
           const flowParent = parentId && !into && d.nodes[parentId]?.style.layout
           // 기준: 이번에 방금 붙인 것 → 지금 고른 것(같은 부모) 중 마지막 → 원본
           let at = -1
-          if (flowParent) {
+          if (beside) at = lastAfter.has('') ? sib.indexOf(lastAfter.get('')!) : sib.indexOf(beside.id)
+          else if (flowParent) {
             const selIdx = layerIds.value.filter((k) => d.nodes[k]?.parentId === parentId).map((k) => sib.indexOf(k)).filter((i) => i >= 0)
             at = lastAfter.has('') ? sib.indexOf(lastAfter.get('')!) : selIdx.length ? Math.max(...selIdx) : sib.indexOf(n.id)
           }
@@ -859,7 +868,7 @@ export function createLayerStore(opts: {
         Object.assign(n, fn(n))
         if (isContainer(n) && !n.style.layout && (ow !== n.w || oh !== n.h)) {
           const kids = (n.children ?? []).map((c) => d.nodes[c]!).filter(Boolean)
-          constrain(kids, boxes0(kids), ow, oh, n.w, n.h)
+          constrain(kids, boxes0(kids), ow, oh, n.w, n.h, isGroupNode(n) ? { h: 'scale', v: 'scale' } : undefined)
         }
       }
     })

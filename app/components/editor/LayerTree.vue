@@ -14,7 +14,9 @@ const props = defineProps<{ screens: ScreenRow[]; multi?: string[]; canvasId?: s
 const emit = defineEmits<{ 'pick-screen': [id: string]; 'toggle-screen': [id: string]; 'screen-order': [ids: string[]]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'front' | 'back' | 'forward' | 'backward' | 'section'] }>()
 const store = useLayerStore()
 
-const closed = ref<Set<string>>(new Set()) // 접은 화면 · 프레임
+/** 펼친 화면 · 프레임(피그마처럼 처음엔 접혀 있어요 — 캔버스에서 고르면 그 레이어까지 펼치고 목록을 그 줄로 옮겨요) */
+const expanded = ref<Set<string>>(new Set())
+const closed = computed(() => ({ has: (k: string) => !expanded.value.has(k) }))
 /** 불리언은 기본 접힘(한 면으로 — 피그마와 같아요): 화살표로 펼치거나, 안쪽 도형을 고르면(캔버스 두 번 누르기 등) 펼쳐져요 */
 const opened = ref<Set<string>>(new Set()) // 펼친 불리언
 const holdsSel = (k: string) => {
@@ -24,10 +26,45 @@ const holdsSel = (k: string) => {
   return store.layerIds.value.some((x) => x !== id && kids.includes(x))
 }
 const shut = (k: string, n?: LayerNode | null) => (n?.type === 'boolean' ? !opened.value.has(k) && !holdsSel(k) : closed.value.has(k))
-const toggle = (k: string, n?: LayerNode | null) => {
-  if (n?.type === 'boolean') { const o = new Set(opened.value); if (shut(k, n)) o.add(k); else o.delete(k); opened.value = o; return }
-  const s = new Set(closed.value); if (s.has(k)) s.delete(k); else s.add(k); closed.value = s
+/** 접기 · 펼치기. deep(⌥ 클릭): 안쪽 프레임 · 그룹까지 모두 함께(피그마와 같아요) */
+const toggle = (k: string, n?: LayerNode | null, deep = false) => {
+  if (n?.type === 'boolean' && !deep) { const o = new Set(opened.value); if (shut(k, n)) o.add(k); else o.delete(k); opened.value = o; return }
+  const open = shut(k, n)
+  const keys = [k]
+  if (deep) {
+    // 화면 줄이면 그 화면 전체, 레이어 줄이면 그 레이어 아래(캔버스 id 'page:…' 에도 ':' 가 있어 화면 목록으로 가려요)
+    const sid = props.screens.some((v) => v.id === k) ? k : k.slice(0, k.lastIndexOf(':'))
+    const d = store.doc(sid)
+    const roots = k === sid ? d.rootIds : [k.slice(k.lastIndexOf(':') + 1)]
+    for (const r of roots) for (const id of descendants(d, r)) if (isContainer(d.nodes[id])) keys.push(sid + ':' + id)
+  }
+  const s = new Set(expanded.value), o = new Set(opened.value)
+  for (const x of keys) { if (open) { s.add(x); o.add(x) } else { s.delete(x); o.delete(x) } }
+  expanded.value = s; opened.value = o
 }
+/** 고른 레이어까지 펼치기 + 목록을 그 줄로(피그마와 같아요) */
+function reveal(sid: string, ids: string[]) {
+  const d = store.doc(sid)
+  const s = new Set(expanded.value)
+  const before = s.size
+  if (!sid.startsWith('page:')) s.add(sid)
+  for (const id of ids) for (let p = d.nodes[id]?.parentId; p; p = d.nodes[p]?.parentId) s.add(sid + ':' + p)
+  if (s.size !== before) expanded.value = s
+  nextTick(() => document.querySelector<HTMLElement>(`.tree [data-key="${sid}:${ids[ids.length - 1]}"]`)?.scrollIntoView({ block: 'nearest' }))
+}
+watch(() => [store.screenId.value, store.layerIds.value.join()] as const, ([sid]) => { if (sid && store.layerIds.value.length) reveal(sid, [...store.layerIds.value]) })
+/** ⌥L 모든 레이어 접기(피그마와 같아요) */
+function onWinKey(e: KeyboardEvent) {
+  if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey || e.code !== 'KeyL') return
+  if ((e.target as HTMLElement).closest?.('input, textarea, [contenteditable="true"]')) return
+  e.preventDefault()
+  expanded.value = new Set()
+  opened.value = new Set()
+}
+onMounted(() => window.addEventListener('keydown', onWinKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWinKey))
+/** 줄에 마우스를 올리면 캔버스에도 테두리(피그마와 같아요) */
+const hover = useState<{ sid: string; id: string | null } | null>('iris-hover', () => null)
 
 interface Row { sid: string; n: LayerNode; depth: number; under: boolean }
 const isCanvasRow = (s: { id: string }) => s.id.startsWith('page:')
@@ -126,11 +163,7 @@ watch(renameReq, async (req) => {
   if (live.length === 1) {
     const { sid, id } = live[0]!
     // 접힌 부모 · 화면 펼치기
-    const d = store.doc(sid)
-    const s = new Set(closed.value)
-    s.delete(sid)
-    for (let p = d.nodes[id]?.parentId; p; p = d.nodes[p]?.parentId) s.delete(sid + ':' + p)
-    closed.value = s
+    reveal(sid, [id])
     renaming.value = id
     await nextTick()
     document.querySelector('.tree .ren')?.scrollIntoView({ block: 'nearest' })
@@ -139,6 +172,68 @@ watch(renameReq, async (req) => {
   const at = new Map(items.value.map((it, k) => [it.kind === 'layer' ? it.r.sid + ':' + it.r.n.id : '', k]))
   renameMany.value = [...live].sort((a, b) => (at.get(a.sid + ':' + a.id) ?? 1e9) - (at.get(b.sid + ':' + b.id) ?? 1e9))
 })
+/** 이름 바꾸는 중 Tab · ⇧Tab: 지금 이름을 저장하고 다음 · 이전 레이어 이름 바꾸기로(피그마와 같아요) */
+function renameNext(r: Row, dir: 1 | -1, e: KeyboardEvent) {
+  const v = (e.target as HTMLInputElement).value.trim()
+  renaming.value = null
+  if (v && v !== r.n.name) store.update(r.sid, [r.n.id], { name: v })
+  const rows = layerRows()
+  const nx = rows[rows.findIndex((x) => x.sid === r.sid && x.n.id === r.n.id) + dir]
+  if (!nx) return
+  store.selectLayer(nx.sid, nx.n.id)
+  nextTick(() => (renaming.value = nx.n.id))
+}
+const layerRows = () => items.value.filter((it) => it.kind === 'layer').map((it) => (it as { r: Row }).r)
+/**
+ * 목록에 초점이 있을 때 키(피그마와 같아요): ↑ ↓ 위 · 아래 줄 고르기(⇧ 더하기), ← → 접기 · 펼치기(← 를 한 번 더 누르면 부모로), Enter · Space 고르기.
+ * 캔버스 단축키(방향키로 옮기기 · Enter 안으로)로 새지 않게 막아요
+ */
+function rowKey(it: Item, e: KeyboardEvent) {
+  const k = e.key
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(k) || e.metaKey || e.ctrlKey || e.altKey) return
+  e.preventDefault()
+  e.stopPropagation()
+  const key = itemKey(it)
+  if (k === 'Enter' || k === ' ') { if (it.kind === 'layer') pick(it.r, e); else emit('pick-screen', it.s.id); return }
+  if (k === 'ArrowUp' || k === 'ArrowDown') {
+    const list = items.value
+    const nx = list[list.findIndex((x) => itemKey(x) === key) + (k === 'ArrowDown' ? 1 : -1)]
+    if (!nx) return
+    if (nx.kind === 'layer') { if (e.shiftKey && store.screenId.value === nx.r.sid) store.selectLayer(nx.r.sid, nx.r.n.id, true); else store.selectLayer(nx.r.sid, nx.r.n.id) }
+    else emit('pick-screen', nx.s.id)
+    nextTick(() => document.querySelector<HTMLElement>(`.tree [data-key="${itemKey(nx).replace(/^s:/, '')}"]`)?.focus())
+    return
+  }
+  const tk = it.kind === 'screen' ? it.s.id : it.r.sid + ':' + it.r.n.id
+  const n = it.kind === 'layer' ? it.r.n : null
+  const can = it.kind === 'screen' ? store.doc(it.s.id).rootIds.length > 0 : !!n && isContainer(n) && !!n.children?.length
+  const isShut = it.kind === 'screen' ? closed.value.has(it.s.id) : shut(tk, n)
+  if (k === 'ArrowRight') { if (can && isShut) toggle(tk, n); return }
+  if (can && !isShut) { toggle(tk, n); return }
+  // 이미 접혀 있으면 부모 줄로
+  if (it.kind === 'layer') {
+    const p = it.r.n.parentId
+    if (p) store.selectLayer(it.r.sid, p); else if (!it.r.sid.startsWith('page:')) emit('pick-screen', it.r.sid)
+    nextTick(() => document.querySelector<HTMLElement>(`.tree [data-key="${p ? it.r.sid + ':' + p : it.r.sid}"]`)?.focus())
+  }
+}
+/** 눈 · 자물쇠를 누른 채 위아래로 끌면 지나간 줄도 같은 상태로(피그마와 같아요) — 한 번에 되돌려요 */
+const paint = ref<{ key: 'hidden' | 'locked'; val: boolean; sids: string[] } | null>(null)
+function paintStart(r: Row, key: 'hidden' | 'locked', e: PointerEvent) {
+  if (e.button !== 0) return
+  const val = !r.n[key]
+  store.hold(r.sid)
+  paint.value = { key, val, sids: [r.sid] }
+  store.update(r.sid, [r.n.id], { [key]: val || undefined })
+  const end = () => { const p = paint.value; paint.value = null; p?.sids.forEach((x) => store.release(x)) }
+  window.addEventListener('pointerup', end, { once: true })
+}
+function paintOver(r: Row, key: 'hidden' | 'locked') {
+  const p = paint.value
+  if (!p || p.key !== key || !!r.n[key] === p.val) return
+  if (!p.sids.includes(r.sid)) { store.hold(r.sid); p.sids.push(r.sid) }
+  store.update(r.sid, [r.n.id], { [key]: p.val || undefined })
+}
 function rename(r: Row, e: Event) {
   // Esc 로 취소한 뒤 따라오는 blur 는 무시해요
   if (renaming.value !== r.n.id) return
@@ -152,7 +247,15 @@ function rename(r: Row, e: Event) {
  * 줄 위쪽 = 그 앞(위)에, 프레임 · 그룹 · 화면 줄 가운데 = 그 안으로. 화면에서 보이던 자리는 그대로(대상 밖이면 대상 가운데로)
  */
 const dragging = ref<{ sid: string; id: string } | null>(null)
-const over = ref<{ id: string; into: boolean; y?: number } | null>(null)
+const over = ref<{ id: string; into: boolean; below?: boolean; y?: number } | null>(null)
+/** 끄는 줄: 고른 줄을 끌면 같은 문서에서 고른 것 전부(목록 순서대로) — 피그마와 같아요 */
+function dragIds(dg: { sid: string; id: string }): string[] {
+  if (store.screenId.value !== dg.sid || !store.layerIds.value.includes(dg.id) || store.layerIds.value.length < 2) return [dg.id]
+  const d = store.doc(dg.sid)
+  const top = store.layerIds.value.filter((id) => !store.layerIds.value.some((o) => o !== id && descendants(d, o).includes(id)))
+  const order = new Map(layerRows().map((x, i) => [x.sid + ':' + x.n.id, i]))
+  return top.sort((a, b) => (order.get(dg.sid + ':' + a) ?? 0) - (order.get(dg.sid + ':' + b) ?? 0))
+}
 /** 목록 안 줄 번호(줄 높이 28) */
 const rowIdx = (key: string) => items.value.findIndex((it) => itemKey(it) === key)
 /** 놓을 자리 구분선: 두 줄 사이에 따로 그리는 일자 선(줄 모서리에 잘리지 않게) */
@@ -166,7 +269,9 @@ function onDragOver(e: DragEvent, r: Row) {
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const into = isContainer(r.n) && e.clientY > rect.top + rect.height * 0.3 && e.clientY < rect.bottom - rect.height * 0.3
-  over.value = { id: r.n.id, into, y: rowIdx(r.sid + ':' + r.n.id) * 28 }
+  // 아래쪽이면 그 줄 아래에(피그마와 같아요) — 펼친 프레임의 아래쪽은 그 안 맨 위
+  const below = !into && e.clientY > rect.top + rect.height / 2 && !(isContainer(r.n) && !shut(r.sid + ':' + r.n.id, r.n) && r.n.children?.length)
+  over.value = { id: r.n.id, into, below, y: (rowIdx(r.sid + ':' + r.n.id) + (below ? 1 : 0)) * 28 }
 }
 /**
  * 화면(프레임) 끌어서 순서 바꾸기(레이어처럼): 화면 줄 위쪽 반이면 그 위로, 아래쪽 반이면 그 아래로.
@@ -226,7 +331,12 @@ function onDrop(r: Row) {
   dragging.value = null
   over.value = null
   if (!dg || !ov) return
-  if (dg.sid === r.sid) { store.moveTo(r.sid, dg.id, r.n.id, ov.into); return }
+  if (dg.sid === r.sid) {
+    const ids = dragIds(dg).filter((id) => id !== r.n.id)
+    // 목록 순서를 지키며 한 번에(실행취소 한 번): 위 → 아래로 하나씩 대상 바로 위(아래면 거꾸로)에 끼워요
+    store.batch(() => { for (const id of ov.below ? [...ids].reverse() : ids) store.moveTo(r.sid, id, r.n.id, ov.into, !!ov.below) })
+    return
+  }
   // 다른 화면 · 캔버스: 먼저 그 문서로 옮기고, 그 안에서 자리(앞 · 안으로)를 맞춰요
   const target = store.doc(r.sid).nodes[r.n.id]
   moveAcross(dg.sid, dg.id, r.sid, ov.into ? r.n.id : target?.parentId ?? null)
@@ -313,7 +423,9 @@ function pick(r: Row, e: MouseEvent | KeyboardEvent) {
   }
   // ⌘: 하나씩 더하기 · 빼기 — 다른 문서(캔버스 ↔ 프레임 안)의 레이어도 함께(피그마와 같아요)
   if (e.metaKey || e.ctrlKey) { store.toggleX(r.sid, r.n.id); anchor = { sid: r.sid, id: r.n.id }; return }
-  const a = anchor
+  // ⇧ 범위의 시작: 목록에서 마지막으로 누른 줄 — 그 뒤 캔버스에서 골랐으면 지금 고른 것 중 마지막(피그마와 같아요)
+  const sidNow = store.screenId.value
+  const a = anchor && sidNow === anchor.sid && store.layerIds.value.includes(anchor.id) ? anchor : sidNow && store.layerIds.value.length ? { sid: sidNow, id: store.layerIds.value[store.layerIds.value.length - 1]! } : anchor
   if (e.shiftKey && a && store.layerIds.value.length) {
     const rows = items.value.filter((it) => it.kind === 'layer').map((it) => (it as { r: Row }).r)
     const i = rows.findIndex((x) => x.sid === a.sid && x.n.id === a.id), j = rows.findIndex((x) => x.sid === r.sid && x.n.id === r.n.id)
@@ -393,8 +505,8 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
     <div v-if="dropY !== null" class="drop-line" :style="{ top: dropY - 1 + 'px' }" aria-hidden="true" />
     <div v-for="(g, i) in groups" :key="'g' + i" class="sqc grp-bg" :style="{ top: g.top * 28 + 'px', height: g.on.length * 28 + 'px', background: groupBg(g.on) }" aria-hidden="true" />
     <template v-for="it in items" :key="itemKey(it)">
-      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id && over.into }]" :style="{ '--d': it.depth }" :draggable="!isCanvasRow(s)" @dragstart="screenDrag = s.id; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')" @dragend="screenDrag = null; over = null" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
-        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(s.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
+      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id && over.into }]" :style="{ '--d': it.depth }" :draggable="!isCanvasRow(s)" @dragstart="screenDrag = s.id; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')" @dragend="screenDrag = null; over = null" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" :data-key="s.id" @keydown.self="rowKey(it, $event)" @mouseenter="hover = { sid: s.id, id: null }" @mouseleave="hover = null">
+        <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(s.id, null, $event.altKey)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <EditorIcon name="frame" :size="16" class="ic" />
         <span class="name">{{ s.name }}</span>
@@ -410,10 +522,12 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         draggable="true"
         :class="['sq', 'nav-item', 's', 'row', 'lr', { on: isSel(r), under: !isSel(r) && r.under, comp: r.n.type === 'instance', faded: r.n.hidden, 'drop-above': over?.id === r.n.id && !over.into, 'drop-into': over?.id === r.n.id && over.into }]"
         :style="{ paddingLeft: `calc(var(--ref-spacing-06) + ${r.depth * 18}px)` }"
+        :data-key="r.sid + ':' + r.n.id"
         @click="pick(r, $event)"
         @contextmenu="rowMenu(r, $event)"
-        @keydown.enter.self.prevent="pick(r, $event)"
-        @keydown.space.self.prevent="pick(r, $event)"
+        @keydown.self="rowKey(it, $event)"
+        @mouseenter="hover = { sid: r.sid, id: r.n.id }"
+        @mouseleave="hover = null"
         @keydown.f2.self.prevent="renameReq = isSel(r) ? pickedLayers(store, store.screenId.value!, [...store.layerIds.value]) : [{ sid: r.sid, id: r.n.id }]"
         @dblclick="renaming = r.n.id"
         @dragstart="dragging = { sid: r.sid, id: r.n.id }; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')"
@@ -422,7 +536,7 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         @drop.prevent="onDrop(r)"
         @dragend="dragging = null; over = null"
       >
-        <button v-if="(isContainer(r.n) && r.n.children?.length) || (r.n.type === 'section' && hasScreens(r.n.id))" class="sq chev" :aria-label="shut(r.sid + ':' + r.n.id, r.n) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(r.sid + ':' + r.n.id, r.n)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: shut(r.sid + ':' + r.n.id, r.n) }" /></button>
+        <button v-if="(isContainer(r.n) && r.n.children?.length) || (r.n.type === 'section' && hasScreens(r.n.id))" class="sq chev" :aria-label="shut(r.sid + ':' + r.n.id, r.n) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(r.sid + ':' + r.n.id, r.n, $event.altKey)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: shut(r.sid + ':' + r.n.id, r.n) }" /></button>
         <span v-else class="chev" />
         <span class="icw">
         <!-- 마스크(피그마와 같아요): 마스크 레이어는 마스크 아이콘, 그 위 가려지는 레이어는 아래로 ↓ 표시 -->
@@ -437,14 +551,14 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         <span v-else class="ic ic-box"><EditorIcon name="image" :size="12" /></span>
         <svg v-if="maskSpans.get(r.sid + ':' + r.n.id)" v-for="sp in [maskSpans.get(r.sid + ':' + r.n.id)!]" :key="'mk' + sp" class="mk-arrow" :class="{ up: sp < 0 }" width="7" :height="arrowLen(sp)" :viewBox="`0 0 7 ${arrowLen(sp)}`" aria-hidden="true"><path :d="`M3.5 0V${arrowLen(sp) - 0.5}M0.5 ${arrowLen(sp) - 3.5}L3.5 ${arrowLen(sp) - 0.5}L6.5 ${arrowLen(sp) - 3.5}`" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </span>
-        <input v-if="renaming === r.n.id" v-select class="sqc txt-in ren" :value="r.n.name" :aria-label="tr('Layer name')" @click.stop @dblclick.stop @keydown.stop @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null" @blur="rename(r, $event)">
+        <input v-if="renaming === r.n.id" v-select class="sqc txt-in ren" :value="r.n.name" :aria-label="tr('Layer name')" @click.stop @dblclick.stop @keydown.stop @keydown.tab.prevent="renameNext(r, $event.shiftKey ? -1 : 1, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null" @blur="rename(r, $event)">
         <span v-else class="name">{{ r.n.name }}</span>
         <span v-if="r.n.isMask && renaming !== r.n.id" class="mk-lab">{{ tr('Mask') }}</span>
         <span class="tools" :class="{ keep: r.n.hidden || r.n.locked }">
-          <button class="sq mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? tr('Unlock') : tr('Lock')" :title="r.n.locked ? tr('Unlock') : tr('Lock')" @click.stop="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
+          <button class="sq mini" :class="{ act2: r.n.locked }" :aria-label="r.n.locked ? tr('Unlock') : tr('Lock')" :title="r.n.locked ? tr('Unlock') : tr('Lock')" @click.stop @pointerdown.stop="paintStart(r, 'locked', $event)" @pointerenter="paintOver(r, 'locked')" @keydown.enter.stop.prevent="store.update(r.sid, [r.n.id], { locked: !r.n.locked })">
             <EditorIcon :name="r.n.locked ? 'lock' : 'unlock'" />
           </button>
-          <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? tr('Show') : tr('Hide')" :title="r.n.hidden ? tr('Show') : tr('Hide')" @click.stop="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
+          <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? tr('Show') : tr('Hide')" :title="r.n.hidden ? tr('Show') : tr('Hide')" @click.stop @pointerdown.stop="paintStart(r, 'hidden', $event)" @pointerenter="paintOver(r, 'hidden')" @keydown.enter.stop.prevent="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
             <EditorIcon :name="r.n.hidden ? 'eye_off' : 'eye'" />
           </button>
         </span>
@@ -495,6 +609,8 @@ button.chev:active { --sq-fill: var(--interaction-light-gray-pressed); }
 .tools { display: none; gap: 0; flex: none; }
 /* 🔒 👁: 호버 · 키보드 포커스(행 또는 버튼)일 때만. 마우스로 고른 뒤 남는 포커스로는 계속 보이지 않아요 */
 .row:hover .tools, .row:focus-visible .tools, .tools:focus-within, .tools.keep { display: flex; }
+/* 숨김 · 잠금 중인 줄: 켜진 것만 늘 보이고, 나머지는 올렸을 때만(피그마와 같아요) */
+.row:not(:hover):not(:focus-visible) .tools.keep:not(:focus-within) .mini:not(.act2) { visibility: hidden; }
 /* 행 토글 아이콘: 버튼 24(누르기 좋은 크기) · 아이콘 16 · 누르는 아이콘 색 neutral-700(호버 800) — PRD/08 */
 .mini { width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-600); }
 .mini:hover { --sq-fill: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-700); }

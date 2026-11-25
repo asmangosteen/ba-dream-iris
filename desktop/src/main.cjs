@@ -1,7 +1,7 @@
 // Iris 데스크탑 앱 — 배포된 Iris 웹(Vercel)을 앱 창 안에서 엽니다.
 // 웹을 배포하면 앱에도 바로 반영되므로, 이 파일은 창 · 메뉴 · 링크 처리만 맡습니다.
 // 개발 서버를 열려면: IRIS_URL=http://localhost:3000 npm start (npm run dev 와 같음)
-const { app, BrowserWindow, Menu, shell, session, screen } = require('electron')
+const { app, BrowserWindow, Menu, shell, session, screen, ipcMain } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 
@@ -38,6 +38,9 @@ function openOutside(url) {
     if (protocol === 'https:' || protocol === 'http:' || protocol === 'mailto:') shell.openExternal(url)
   } catch { /* 잘못된 주소는 열지 않음 */ }
 }
+
+// 탭 우클릭 '브라우저에서 열기': Iris 주소일 때만 기본 브라우저로
+ipcMain.on('iris:open-external', (_e, url) => { if (isIris(url)) shell.openExternal(url) })
 
 function wireContents(win) {
   const wc = win.webContents
@@ -115,8 +118,10 @@ function buildMenu() {
     {
       label: 'View',
       submenu: [
-        // ⌘R · ⇧⌘R 은 편집기의 이름 바꾸기 · 바꿔 붙여넣기(피그마와 같아요) — 새로고침은 ⌥⌘R · ⌥⇧⌘R 로 옮겨요
-        { role: 'reload', accelerator: 'CmdOrCtrl+Alt+R' }, { role: 'forceReload', accelerator: 'CmdOrCtrl+Alt+Shift+R' }, { role: 'toggleDevTools' },
+        // ⌘R · ⇧⌘R 은 편집기의 이름 바꾸기 · 바꿔 붙여넣기(피그마와 같아요 — 고른 게 없으면 ⌘R 은 탭 새로 고침).
+        // ⌥⌘R: 지금 탭만 새로 고침(탭 막대는 그대로 — 웹 화면이 처리). ⌥⇧⌘R: 창 전체를 강제로 새로 고침
+        { label: 'Reload Tab', accelerator: 'CmdOrCtrl+Alt+R', click: (_item, win) => win?.webContents.send('iris:reload-tab') },
+        { role: 'forceReload', accelerator: 'CmdOrCtrl+Alt+Shift+R' }, { role: 'toggleDevTools' },
         { type: 'separator' }, { role: 'togglefullscreen' },
       ],
     },

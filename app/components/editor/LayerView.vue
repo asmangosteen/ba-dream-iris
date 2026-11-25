@@ -68,8 +68,8 @@ const style = computed(() => {
     left: v.x + 'px',
     top: v.y + 'px',
     width: v.type === 'text' && s.autoWidth ? 'max-content' : v.w + 'px',
-    height: v.type === 'text' ? 'auto' : v.h + 'px',
-    minHeight: v.type === 'text' ? v.h + 'px' : undefined,
+    // 글자: Fixed size(높이 고정)면 그 높이, 아니면 내용 높이(Auto height · Auto width — 늘고 줄어요, 피그마와 같아요)
+    height: v.type === 'text' && !(v.sizeV === 'fixed' && !s.autoWidth) ? 'auto' : v.h + 'px',
     opacity: s.opacity ?? 1,
     borderRadius: radius.value,
     transform: transform(v.rotation, v.flipX, v.flipY),
@@ -294,7 +294,7 @@ function onInput() {
   if (!el || !v) return
   const sz = textSize(el)
   if (v.style.autoWidth) store.setMeasured(props.screenId, props.id, sz.w, sz.h)
-  else store.setMeasured(props.screenId, props.id, v.w, Math.max(orig?.h ?? v.h, sz.h))
+  else if (v.sizeV !== 'fixed') store.setMeasured(props.screenId, props.id, v.w, sz.h)
   // 함께 고른 글자에도 바로 보이게(기록 없이 — 끝낼 때 한 번에 기록)
   const t = typed(el)
   for (const p of peers) { const pn = store.doc(p.sid).nodes[p.id]; if (pn) pn.text = t }
@@ -308,9 +308,12 @@ let textRo: ResizeObserver | null = null
 function syncTextSize() {
   const v = n.value
   const el = textEl.value ?? blockEl.value
-  if (!v || v.type !== 'text' || !v.style.autoWidth || !el || editingThis.value) return
+  if (!v || v.type !== 'text' || !el || editingThis.value) return
+  if (!v.style.autoWidth && v.sizeV === 'fixed') return
   const sz = textSize(el)
-  store.setMeasured(props.screenId, props.id, sz.w, sz.h)
+  // Auto width: 너비 · 높이 모두, Auto height: 높이만(글자를 지우면 줄어요)
+  if (v.style.autoWidth) store.setMeasured(props.screenId, props.id, sz.w, sz.h)
+  else store.setMeasured(props.screenId, props.id, v.w, sz.h)
 }
 watch([textEl, blockEl], ([a, b]) => {
   textRo?.disconnect()
@@ -341,7 +344,7 @@ function finish() {
   const r2 = (v: number) => Math.round(v * 100) / 100
   const sz = textSize(el)
   if (n.value.style.autoWidth) { patch.w = r2(sz.w); patch.h = r2(sz.h) }
-  else patch.h = Math.max(n.value.h, r2(sz.h))
+  else if (n.value.sizeV !== 'fixed') patch.h = r2(sz.h)
   const self = () => { if (text !== n.value?.text || patch.w !== n.value?.w || patch.h !== n.value?.h) store.update(props.screenId, [props.id], patch) }
   const others = ps.filter((p) => p.text !== text)
   if (!others.length) { self(); return }

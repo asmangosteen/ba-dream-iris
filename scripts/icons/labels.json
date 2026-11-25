@@ -187,5 +187,6 @@
  "mask_arrow": "마스크 연결(가려지는 레이어)",
  "flatten": "평탄화(Flatten)",
  "arc_sweep": "원 호: 쓸어 간 정도",
- "arc_ratio": "원 호: 안쪽 구멍 비율"
+ "arc_ratio": "원 호: 안쪽 구멍 비율",
+ "pin": "고정 탭"
 }

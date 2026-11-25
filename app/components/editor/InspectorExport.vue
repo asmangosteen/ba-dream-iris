@@ -56,6 +56,18 @@ function setSuffix(i: number, ev: Event) {
   setAt(i, { suffix: v === '' ? undefined : v })
 }
 
+/** 입력칸 Esc: 고치던 값을 버리고 칸에서 나가요(다른 패널 칸과 같아요) */
+function exFocus(e: FocusEvent) { const t = e.target as HTMLInputElement; if (t.tagName === 'INPUT') { t.dataset.orig = t.value; delete t.dataset.esc } }
+function exEsc(e: KeyboardEvent) {
+  const t = e.target as HTMLInputElement
+  if (e.key !== 'Escape' || t.tagName !== 'INPUT') return
+  e.stopPropagation()
+  t.dataset.esc = '1'
+  t.value = t.dataset.orig ?? t.value
+  t.blur()
+  delete t.dataset.esc
+}
+function exChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.stopPropagation() }
 /** 내보낼 대상: 캔버스에 그려진 그 요소 */
 function targets(): { el: HTMLElement; name: string }[] {
   const world = document.querySelector('.canvas .world')
@@ -91,7 +103,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 </script>
 
 <template>
-  <section ref="dragBox" class="s ex drag-box">
+  <section ref="dragBox" class="s ex drag-box" @focusin="exFocus" @keydown="exEsc" @change.capture="exChangeCap">
     <div :class="['sec-h', 'h24', { empty: !list.length && !mixed }]">
       <span>{{ tr('Export') }}</span>
       <button class="ib s24" :aria-label="tr('Add export setting')" :title="tr('Add export setting')" @click="add"><EditorIcon name="plus" :size="16" /></button>
