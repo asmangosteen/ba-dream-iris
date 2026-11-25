@@ -4,7 +4,7 @@ import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
 import { readCompStroke, type CompStroke } from '~/canvas/compStroke'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
-import { normAngle, ratioLocked, TYPE_LABEL, type BindKey, type LayerNode, type LayerStyle } from '~/canvas/schema'
+import { normAngle, ratioLocked, STAR_INNER, TYPE_LABEL, type BindKey, type LayerNode, type LayerStyle } from '~/canvas/schema'
 import { colorLabel, parseColor, useTokenCatalog, WEIGHT_LABEL, type CatalogToken } from '~/canvas/tokens'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import TextDetails from '~/components/editor/TextDetails.vue'
@@ -23,7 +23,7 @@ import StrokeSettings from '~/components/editor/StrokeSettings.vue'
 import { isPageCanvas } from '~/composables/useEditor'
 import type { Constraints, Sizing } from '~/canvas/schema'
 import { BLEND_MODES, defaultAlign } from '~/canvas/paint'
-import { isContainer, isGroupNode, isVector } from '~/canvas/schema'
+import { clipsContent, isContainer, isGroupNode, isVector } from '~/canvas/schema'
 import { useContextMenu } from '~/composables/useContextMenu'
 import { denorm, shapeVnet } from '~/canvas/vector'
 import { vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
@@ -42,7 +42,8 @@ const catalog = useTokenCatalog()
 const sid = computed(() => props.screen.id)
 const ids = computed(() => store.layerIds.value)
 const nodes = computed(() => ids.value.map((id) => store.node(sid.value, id)).filter((n): n is LayerNode => !!n))
-const one = computed(() => (nodes.value.length === 1 ? nodes.value[0]! : null))
+// 다른 문서(캔버스 ↔ 프레임 안)에서 함께 고른 것이 있으면 하나가 아니에요(여러 개 패널 — 칠 · 선 등은 함께 고쳐져요)
+const one = computed(() => (nodes.value.length === 1 && !store.xsel.value.length ? nodes.value[0]! : null))
 const types = computed(() => new Set(nodes.value.map((n) => n.type)))
 const has = (...t: LayerNode['type'][]) => t.some((x) => types.value.has(x))
 /** 고른 레이어들의 값이 모두 같으면 그 값, 다르면 'Mixed' */
@@ -51,16 +52,18 @@ function same<T>(get: (n: LayerNode) => T): T | 'Mixed' {
   return v.every((x) => x === v[0]) ? v[0]! : 'Mixed'
 }
 const show = (v: unknown) => (v === 'Mixed' ? '' : v === undefined || v === null ? '' : String(typeof v === 'number' ? Math.round(v * 100) / 100 : v))
-/** 위치 · 크기 · 각도: 피그마처럼 정수로 보여 줘요(실제 값은 소수 그대로) — app/canvas/num.ts */
+/** 위치 · 크기 · 각도: 소수가 있으면 둘째 자리까지 — app/canvas/num.ts */
 const showG = (v: unknown) => (typeof v === 'number' ? fmtNum(v) : show(v))
 
 /** 크기 바꾸기: 비율을 고정했으면 다른 쪽도 같은 비율로 */
 function sized(n: LayerNode, key: 'w' | 'h', v: number): Partial<LayerNode> {
-  const val = Math.max(1, Math.round(v))
+  // 입력한 소수도 그대로(둘째 자리까지) — 피그마와 같아요
+  const r2 = (x: number) => Math.max(0.01, Math.round(x * 100) / 100)
+  const val = r2(v)
   const patch: Partial<LayerNode> = { [key]: val }
   if (ratioLocked(n) && n.w > 0 && n.h > 0) {
-    if (key === 'w') patch.h = Math.max(1, Math.round((n.h * val) / n.w))
-    else patch.w = Math.max(1, Math.round((n.w * val) / n.h))
+    if (key === 'w') patch.h = r2((n.h * val) / n.w)
+    else patch.w = r2((n.w * val) / n.h)
   }
   if (n.type === 'text' && patch.w !== undefined) n.style.autoWidth = false
   return patch
@@ -70,7 +73,7 @@ function setNum(key: 'x' | 'y' | 'w' | 'h', e: Event) {
   const v = Number(input.value)
   if (!input.value.trim() || !Number.isFinite(v)) { input.value = showG(same((n) => (key === 'w' || key === 'h' ? dim(n, key) : n[key]))); return }
   if (key === 'w' || key === 'h') store.sizeTo(sid.value, ids.value, (n) => ({ ...sized(n, key, v), ...(key === 'w' ? (n.sizeH && n.sizeH !== 'fixed' ? { sizeH: 'fixed' as const } : {}) : (n.sizeV && n.sizeV !== 'fixed' ? { sizeV: 'fixed' as const } : {})) }))
-  else store.update(sid.value, ids.value, { [key]: Math.max(-1e6, Math.round(v)) })
+  else store.update(sid.value, ids.value, { [key]: Math.max(-1e6, Math.round(v * 100) / 100) })
 }
 /** 화면에 그려진 크기: 글자는 내용에 맞춰 늘고 줄어서(Hug · Auto width) 캔버스처럼 DOM 에서 재요(EditorCanvas layerSize 와 같아요) */
 const measureTick = ref(0)
@@ -284,12 +287,14 @@ const weights = computed(() => {
 const weightNow = computed(() => same((n) => n.style.fontWeight ?? 400))
 // --- v7: 불리언 · 마스크 ---
 /** 선택 머리의 순서 버튼(16 그리드): 맨 앞 · 앞 · 뒤 · 맨 뒤 */
+// 불리언 아이콘: 아이콘 세트(boolean_*) 이름
 const BOOL_OPS = [
-  { k: 'union' as const, label: 'Union selection', key: '⌥⇧U', d: 'M2.5 2.5h7v4h4v7h-7v-4h-4z' },
-  { k: 'subtract' as const, label: 'Subtract selection', key: '⌥⇧S', d: 'M2.5 2.5h7v4h-3v3h-4z' },
-  { k: 'intersect' as const, label: 'Intersect selection', key: '⌥⇧I', d: 'M6.5 6.5h3v3h-3z' },
-  { k: 'exclude' as const, label: 'Exclude selection', key: '⌥⇧E', d: 'M2.5 2.5h7v4h-3v3h-4zM9.5 6.5h4v7h-7v-4h3z' },
+  { k: 'union' as const, label: 'Union selection', key: '⌥⇧U', icon: 'boolean_union' },
+  { k: 'subtract' as const, label: 'Subtract selection', key: '⌥⇧S', icon: 'boolean_subtract' },
+  { k: 'intersect' as const, label: 'Intersect selection', key: '⌥⇧I', icon: 'boolean_intersect' },
+  { k: 'exclude' as const, label: 'Exclude selection', key: '⌥⇧E', icon: 'boolean_exclude' },
 ]
+const boolNow = computed(() => BOOL_OPS.find((b) => b.k === (one.value?.type === 'boolean' ? one.value.op : 'union'))!)
 // --- 점 편집 칸(캔버스 EditorCanvas 와 같은 상태) ---
 const vedit = useState<VEdit | null>('iris-vedit', () => null)
 const mirror = useState<'none' | 'angle' | 'both'>('iris-mirror', () => 'both')
@@ -366,15 +371,22 @@ function setPt(axis: 'x' | 'y', e: Event) {
   if (Number.isFinite(v)) vptSet.value = { [axis]: v, t: Date.now() }
 }
 const MIRROR = [
-  { k: 'none' as const, label: 'No mirroring', d: 'M2.5 11.5L8 7l3-3.5M8 7h5.5' },
-  { k: 'angle' as const, label: 'Mirror angle', d: 'M3.5 7h4.5M8 7h6' },
-  { k: 'both' as const, label: 'Mirror angle and length', d: 'M2.5 7h11' },
+  { k: 'none' as const, label: 'No mirroring', icon: 'mirror_none' },
+  { k: 'angle' as const, label: 'Mirror angle', icon: 'mirror_angle' },
+  { k: 'both' as const, label: 'Mirror angle and length', icon: 'mirror_angle_length' },
 ]
 // --- 머리(피그마 UI3): 종류 이름 · 마스크 · 불리언 ▾ · 점 편집 · 프레임 ⋯ 메뉴 ---
 const ctxMenu = useContextMenu()
 /** 그룹(⌘G) — 레이어 목록 아이콘과 같은 기준(schema isGroupNode) */
 const isGroupLike = (n: LayerNode) => isGroupNode(n)
-const headTitle = computed(() => (one.value ? (isGroupLike(one.value) ? tr('Group') : tr(TYPE_LABEL[one.value.type])) : tr('{n} layers', { n: nodes.value.length })))
+/** 머리 제목(피그마와 같아요): 여러 개면 'N selected', 불리언은 적용한 연산 이름(Union · Subtract · Intersect · Exclude) */
+const BOOL_NAME: Record<string, string> = { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' }
+const headTitle = computed(() => {
+  const o = one.value
+  if (!o) return tr('{n} selected', { n: nodes.value.length + store.xsel.value.length })
+  if (o.type === 'boolean') return tr(BOOL_NAME[o.op ?? 'union'] ?? 'Union')
+  return isGroupLike(o) ? tr('Group') : tr(TYPE_LABEL[o.type])
+})
 const maskOn = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.isMask))
 const EDITABLE = new Set(['vector', 'line', 'path', 'polygon', 'star', 'ellipse', 'rect'])
 const editable = computed(() => !!one.value && EDITABLE.has(one.value.type) && !one.value.locked)
@@ -382,9 +394,9 @@ const editable = computed(() => !!one.value && EDITABLE.has(one.value.type) && !
 const under = (e: MouseEvent) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); return { clientX: r.left, clientY: r.bottom + 4, preventDefault() {}, stopPropagation() {} } as unknown as MouseEvent }
 const boolItems = () => {
   const isBool = one.value?.type === 'boolean'
-  // 이름 왼쪽에 그 연산 아이콘(겹친 두 네모 + 결과 칠, 머리 버튼과 같은 그림) — 체크 표시는 없어요
-  const ops = BOOL_OPS.map((b) => ({ label: tr(b.label.replace(' selection', '')), icon: { fill: b.d, stroke: 'M2.5 2.5h7v7h-7zM6.5 6.5h7v7h-7z' }, shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
-  return [...ops, 'sep' as const, { label: tr('Flatten'), icon: { stroke: 'M3 12.5L6.5 4l3 5.5 3.5-5M3 12.5h0M12.5 4.5h0' }, shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
+  // 이름 왼쪽에 그 연산 아이콘(머리 버튼과 같은 그림) — 체크 표시는 없어요
+  const ops = BOOL_OPS.map((b) => ({ label: tr(b.label.replace(' selection', '')), icon: { name: b.icon }, shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
+  return [...ops, 'sep' as const, { label: tr('Flatten'), icon: { name: 'flatten' }, shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
 }
 function boolMenu(e: MouseEvent) { ctxMenu.open(under(e), boolItems()) }
 /** 프레임 ↔ 그룹(피그마 머리의 'Frame ▾'): 그룹으로 바꾸면 칠 · 자르기 · 오토 레이아웃을 빼요 */
@@ -477,10 +489,9 @@ const strokeOpen = ref(false)
 const strokeBtn = ref<HTMLElement | null>(null)
 watch(() => ids.value.join(), () => { strokeOpen.value = false })
 /** 변마다 두께는 상자 도형(사각형 · 프레임 · 이미지)만 */
-const boxSides = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'rect' || n.type === 'frame' || n.type === 'image'))
+const boxSides = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'rect' || n.type === 'frame' || n.type === 'section' || n.type === 'image'))
 const SIDE_KEYS = ['top', 'right', 'bottom', 'left'] as const
 const SIDE_LABEL = ['Top', 'Right', 'Bottom', 'Left']
-const SIDE_PATH: Record<string, string> = { top: 'M3 3h10', right: 'M13 3v10', bottom: 'M3 13h10', left: 'M3 3v10' }
 type SideMode = 'all' | 'top' | 'right' | 'bottom' | 'left' | 'custom'
 /** 첫 레이어 기준: 비어 있으면 All, 한 변만 있으면 그 변, 아니면 Custom */
 const sideMode = computed<SideMode>(() => {
@@ -489,6 +500,14 @@ const sideMode = computed<SideMode>(() => {
   const on = sd.map((x) => x > 0)
   return on.filter(Boolean).length === 1 ? SIDE_KEYS[on.indexOf(true)]! : 'custom'
 })
+/** ▢ 버튼 아이콘: 선이 있는 변(위 · 오른쪽 · 아래 · 왼쪽)에 맞춰 stroke_all · stroke_top … · stroke_sides_TRBL */
+const sidesIconOf = (sd?: readonly number[]) => {
+  if (!sd) return 'stroke_all'
+  const on = sd.map((x) => x > 0)
+  if (on.filter(Boolean).length === 1) return `stroke_${SIDE_KEYS[on.indexOf(true)]!}`
+  return `stroke_sides_${on.map((b) => (b ? 1 : 0)).join('')}`
+}
+const sidesIcon = computed(() => sidesIconOf(nodes.value[0]?.style.strokeSides))
 const sidesNow = computed(() => { const n = nodes.value[0]; const w = n?.style.strokeWidth ?? 1; return n?.style.strokeSides ?? [w, w, w, w] })
 function setSideMode(m: SideMode) {
   store.update(sid.value, ids.value, (n) => {
@@ -498,7 +517,9 @@ function setSideMode(m: SideMode) {
   })
 }
 function sidesMenu(e: MouseEvent) {
-  const item = (m: SideMode, label: string) => ({ label: (sideMode.value === m ? '✓ ' : '') + tr(label), action: () => setSideMode(m) })
+  // Custom 아이콘은 지금 켜진 변 모양(Custom 이 아니면 네 변 다)
+  const icon = (m: SideMode) => (m === 'all' ? 'stroke_all' : m === 'custom' ? (sideMode.value === 'custom' ? sidesIcon.value : 'stroke_sides_1111') : `stroke_${m}`)
+  const item = (m: SideMode, label: string) => ({ label: (sideMode.value === m ? '✓ ' : '') + tr(label), icon: { name: icon(m) }, action: () => setSideMode(m) })
   ctxMenu.open(under(e), [item('all', 'All'), item('top', 'Top'), item('bottom', 'Bottom'), item('left', 'Left'), item('right', 'Right'), 'sep' as const, item('custom', 'Custom')])
 }
 /** 두께를 바꾸면 켜진 변들도 같은 두께로(꺼진 변은 그대로 0) */
@@ -538,10 +559,12 @@ function setCount(key: 'sides' | 'points', e: Event) {
   const v = Math.round(Number((e.target as HTMLInputElement).value))
   if (Number.isFinite(v)) setStyle(key, Math.max(3, Math.min(60, v)))
 }
-function setRatio(e: Event) {
-  const v = Number((e.target as HTMLInputElement).value.replace('%', ''))
-  if (Number.isFinite(v)) setStyle('inner', Math.max(1, Math.min(100, v)) / 100)
+/** 별 안쪽 반지름 비율 — 피그마처럼 소수 한 자리 % (기본 38.2%) */
+const ratioText = (inner?: number) => String(Math.round((inner ?? STAR_INNER) * 1000) / 10)
+function setRatioVal(pct: number) {
+  if (Number.isFinite(pct)) setStyle('inner', Math.round(Math.max(1, Math.min(100, pct)) * 10) / 1000)
 }
+function setRatio(e: Event) { setRatioVal(Number((e.target as HTMLInputElement).value.replace('%', ''))) }
 const fitNow = computed(() => same((n) => n.style.fit ?? 'fill'))
 const cropNow = computed(() => one.value?.style.crop ?? { scale: 1, x: 50, y: 50 })
 function setCrop(key: 'scale' | 'x' | 'y', e: Event) {
@@ -579,7 +602,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     <section v-if="editing && one" class="s first">
       <div class="head">
         <span class="ttl ell">{{ one.type === 'vector' ? tr('Vector') : tr(TYPE_LABEL[one.type]) }}</span>
-        <button class="ib s24" :aria-label="tr('Done editing') + ' (Esc)'" :title="tr('Done editing') + ' Esc'" @click="vedit = null"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button class="ib s24" :aria-label="tr('Done editing') + ' (Esc)'" :title="tr('Done editing') + ' Esc'" @click="vedit = null"><EditorIcon name="check" /></button>
       </div>
       <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       <div class="ig">
@@ -590,7 +613,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <div class="ig-l"><span>{{ tr('Mirroring') }}</span></div>
       <div class="ig">
         <div class="grp span2" role="radiogroup" :aria-label="tr('Mirroring')">
-          <button v-for="m in MIRROR" :key="m.k" role="radio" :aria-checked="mirror === m.k" :class="['ib', { on: mirror === m.k }]" :aria-label="tr(m.label)" :title="tr(m.label)" @click="mirror = m.k"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="m.d" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="8" cy="7" r="1.4" fill="currentColor" /></svg></button>
+          <button v-for="m in MIRROR" :key="m.k" role="radio" :aria-checked="mirror === m.k" :class="['ib', { on: mirror === m.k }]" :aria-label="tr(m.label)" :title="tr(m.label)" @click="mirror = m.k"><EditorIcon :name="m.icon" /></button>
         </div>
         <span />
       </div>
@@ -606,9 +629,9 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <template v-if="one.type === 'polygon' || one.type === 'star'">
         <div class="ig-l"><span>{{ tr('Count') }}</span><span v-if="one.type === 'star'">{{ tr('Ratio') }}</span></div>
         <div class="ig">
-          <label v-if="one.type === 'polygon'" class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l5.5 10h-11z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'p' + one.style.sides" :value="one.style.sides ?? 3" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('sides', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('sides', Math.max(3, Math.min(60, (one!.style.sides ?? 3) + Math.sign(d)))))"></label>
-          <label v-else class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l1.7 3.6 3.8.4-2.9 2.6.8 3.9L8 11l-3.4 2 .8-3.9-2.9-2.6 3.8-.4z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'s' + one.style.points" :value="one.style.points ?? 5" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('points', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('points', Math.max(3, Math.min(60, (one!.style.points ?? 5) + Math.sign(d)))))"></label>
-          <label v-if="one.type === 'star'" class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" stroke="currentColor" stroke-width="1.25" fill="none" /></svg><input :key="'r' + one.style.inner" :value="Math.round((one.style.inner ?? 0.38) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setRatio" @keydown="blurOnEnter($event); step($event, (d) => setStyle('inner', Math.max(0.01, Math.min(1, Math.round((one!.style.inner ?? 0.38) * 100 + d) / 100))))"><span class="unit">%</span></label>
+          <label v-if="one.type === 'polygon'" class="sq fld" :title="tr('Point count')"><EditorIcon name="point_count_polygon" /><input :key="'p' + one.style.sides" :value="one.style.sides ?? 3" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('sides', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('sides', Math.max(3, Math.min(60, (one!.style.sides ?? 3) + Math.sign(d)))))"></label>
+          <label v-else class="sq fld" :title="tr('Point count')"><EditorIcon name="point_count_star" /><input :key="'s' + one.style.points" :value="one.style.points ?? 5" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('points', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('points', Math.max(3, Math.min(60, (one!.style.points ?? 5) + Math.sign(d)))))"></label>
+          <label v-if="one.type === 'star'" class="sq fld u" :title="tr('Ratio')"><EditorIcon name="star_ratio" /><input :key="'r' + one.style.inner" :value="ratioText(one.style.inner)" inputmode="decimal" :aria-label="tr('Ratio')" @change="setRatio" @keydown="blurOnEnter($event); step($event, (d) => setRatioVal((one!.style.inner ?? STAR_INNER) * 100 + d))"><span class="unit">%</span></label>
           <span v-else />
           <span />
         </div>
@@ -623,13 +646,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <template v-if="one.type === 'ellipse'">
         <div class="ig-l"><span>{{ tr('Start') }}</span><span>{{ tr('Sweep') }}</span></div>
         <div class="ig">
-          <label class="sq fld u" :title="tr('Start')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M8 8h5.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
-          <label class="sq fld u" :title="tr('Sweep')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8V2.5A5.5 5.5 0 1 1 2.5 8z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Start')"><EditorIcon name="angle" /><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
+          <label class="sq fld u" :title="tr('Sweep')"><EditorIcon name="arc_sweep" /><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
           <span />
         </div>
         <div class="ig-l"><span>{{ tr('Ratio') }}</span></div>
         <div class="ig">
-          <label class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" fill="none" stroke="currentColor" stroke-width="1.25" /></svg><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Ratio')"><EditorIcon name="arc_ratio" /><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
           <span /><span />
         </div>
       </template>
@@ -642,11 +665,11 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <span v-else class="ttl ell">{{ headTitle }}</span>
         <span class="acts">
           <!-- 같은 레이어 모두 고르기(⌥⌘A): 종류 · 모양이 같은 것(인스턴스는 같은 컴포넌트) -->
-          <button class="ib s24" :aria-label="tr('Select matching layers') + ' (⌥⌘A)'" :title="tr('Select matching layers') + ' ⌥⌘A'" @click="store.selectMatching(sid)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.25" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.25" stroke-dasharray="1.5 1.25" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.25" stroke-dasharray="1.5 1.25" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.25" stroke-dasharray="1.5 1.25" /></svg></button>
+          <button class="ib s24" :aria-label="tr('Select matching layers') + ' (⌥⌘A)'" :title="tr('Select matching layers') + ' ⌥⌘A'" @click="store.selectMatching(sid)"><EditorIcon name="select_matching" /></button>
           <template v-if="nodes.length">
-            <button :class="['ib', 's24', 'tog', { on: maskOn }]" :aria-pressed="maskOn" :aria-label="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' (⌃⌘M)'" :title="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' ⌃⌘M'" @click="store.toggleMask(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" /></svg></button>
-            <button type="button" class="ib boolbtn" :aria-label="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" :title="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" @click="boolMenu"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="BOOL_OPS.find((b) => b.k === (one?.type === 'boolean' ? one.op : 'union'))!.d" fill="currentColor" fill-rule="evenodd" /><path d="M2.5 2.5h7v7h-7zM6.5 6.5h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1.25" /></svg><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
-            <button v-if="editable" class="ib s24" :aria-label="tr('Edit object') + ' (↵)'" :title="tr('Edit object') + ' ↵'" @click="editObject"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4h8v8H4z" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M2.5 2.5h3v3h-3zM10.5 2.5h3v3h-3zM2.5 10.5h3v3h-3zM10.5 10.5h3v3h-3z" fill="var(--iris-panel, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button>
+            <button :class="['ib', 's24', 'tog', { on: maskOn }]" :aria-pressed="maskOn" :aria-label="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' (⌃⌘M)'" :title="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' ⌃⌘M'" @click="store.toggleMask(sid, ids)"><EditorIcon name="mask" /></button>
+            <button type="button" class="ib boolbtn" :aria-label="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" :title="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" @click="boolMenu"><EditorIcon :name="boolNow.icon" /><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
+            <button v-if="editable" class="ib s24" :aria-label="tr('Edit object') + ' (↵)'" :title="tr('Edit object') + ' ↵'" @click="editObject"><EditorIcon name="edit_object" /></button>
           </template>
         </span>
       </div>
@@ -657,14 +680,14 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 
     <section v-if="!editing" class="s">
       <div class="sec-h h24"><span>{{ tr('Position') }}</span>
-        <button v-if="inFlow" :class="['ib', 's24', 'tog', { on: same((n) => !!n.absolute) === true }]" :aria-pressed="same((n) => !!n.absolute) === true" :aria-label="tr('Ignore auto layout')" :title="tr('Ignore auto layout')" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 4V2.5a1 1 0 0 1 1-1H4M10 1.5h1.5a1 1 0 0 1 1 1V4M12.5 10v1.5a1 1 0 0 1-1 1H10M4 12.5H2.5a1 1 0 0 1-1-1V10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /><rect x="4.5" y="4.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2" fill="none" /></svg></button>
+        <button v-if="inFlow" :class="['ib', 's24', 'tog', { on: same((n) => !!n.absolute) === true }]" :aria-pressed="same((n) => !!n.absolute) === true" :aria-label="tr('Ignore auto layout')" :title="tr('Ignore auto layout')" @click="store.update(sid, ids, (n) => ({ absolute: n.absolute ? undefined : true }))"><EditorIcon name="autolayout_ignore" /></button>
       </div>
       <ArrangeControls :count="nodes.length" :gap="gap" :axis="axis" @op="onArrange" />
       <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       <div class="ig">
-        <label class="sq fld"><span>X</span><input v-if="!vb('x')" :value="showG(same((n) => n.x))" :placeholder="same((n) => n.x) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('x')" reveal label="X" @pick="(t) => pickNum('x', t)" @unbind="unbind('x')" @step="(d) => stepNum('x', d)" /></label>
-        <label class="sq fld"><span>Y</span><input v-if="!vb('y')" :value="showG(same((n) => n.y))" :placeholder="same((n) => n.y) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('y')" reveal label="Y" @pick="(t) => pickNum('y', t)" @unbind="unbind('y')" @step="(d) => stepNum('y', d)" /></label>
-        <button v-if="showConstraints" :class="['ib', 's24', 'tog', { on: consShown }]" :aria-pressed="consShown" :aria-label="consShown ? tr('Hide constraints') : tr('Show constraints')" :title="consShown ? tr('Hide constraints') : tr('Show constraints')" @click="setConsShown(!consShown)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".55" /><path d="M9.25 7.25v4M7.25 9.25h4" stroke="currentColor" stroke-width="1" opacity=".55" stroke-linecap="round" /><path d="M5.5 2.5h7.5M2.5 5.5v7.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" /></svg></button>
+        <label class="sq fld"><span>X</span><input v-if="!vb('x')" :value="showG(same((n) => n.x))" :placeholder="same((n) => n.x) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('x')" reveal label="X" @pick="(t) => pickNum('x', t)" @unbind="unbind('x')" @step="(d) => stepNum('x', d)" /></label>
+        <label class="sq fld"><span>Y</span><input v-if="!vb('y')" :value="showG(same((n) => n.y))" :placeholder="same((n) => n.y) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('y')" reveal label="Y" @pick="(t) => pickNum('y', t)" @unbind="unbind('y')" @step="(d) => stepNum('y', d)" /></label>
+        <button v-if="showConstraints" :class="['ib', 's24', 'tog', { on: consShown }]" :aria-pressed="consShown" :aria-label="consShown ? tr('Hide constraints') : tr('Show constraints')" :title="consShown ? tr('Hide constraints') : tr('Show constraints')" @click="setConsShown(!consShown)"><EditorIcon name="constraints" /></button>
         <span v-else />
       </div>
       <!-- Constraints: 피그마처럼 Position 안 X · Y 바로 아래 -->
@@ -683,17 +706,17 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
             <button type="button" :class="['ct', 'cv', { on: consNow('v') === 'center' || consNow('v') === 'scale' }]" :aria-label="tr('Center vertically')" :title="tr('Center vertically')" @click="consClick('v', 'center', $event)"><i /></button>
             <button type="button" class="ct cc" :aria-label="tr('Center both')" :title="tr('Center (double-click the diagram too)')" @click="consCenter" />
           </div>
-          <EditorSelect :model-value="consNow('h') === 'Mixed' ? null : String(consNow('h'))" :options="CONS_H.map(([value, label]) => ({ value, label }))" aria-label="Horizontal constraint" placeholder="Mixed" @update:model-value="(v) => setCons('h', v)"><template #lead><svg class="cons-ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5v5M13.5 5.5v5M2.5 8h11" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></template></EditorSelect>
-          <EditorSelect :model-value="consNow('v') === 'Mixed' ? null : String(consNow('v'))" :options="CONS_V.map(([value, label]) => ({ value, label }))" aria-label="Vertical constraint" placeholder="Mixed" class="c2" @update:model-value="(v) => setCons('v', v)"><template #lead><svg class="cons-ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2.5h5M5.5 13.5h5M8 2.5v11" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></template></EditorSelect>
+          <EditorSelect :model-value="consNow('h') === 'Mixed' ? null : String(consNow('h'))" :options="CONS_H.map(([value, label]) => ({ value, label }))" aria-label="Horizontal constraint" placeholder="Mixed" @update:model-value="(v) => setCons('h', v)"><template #lead><EditorIcon name="constraint_horizontal" class="cons-ic" /></template></EditorSelect>
+          <EditorSelect :model-value="consNow('v') === 'Mixed' ? null : String(consNow('v'))" :options="CONS_V.map(([value, label]) => ({ value, label }))" aria-label="Vertical constraint" placeholder="Mixed" class="c2" @update:model-value="(v) => setCons('v', v)"><template #lead><EditorIcon name="constraint_vertical" class="cons-ic" /></template></EditorSelect>
         </div>
       </template>
       <div class="ig-l"><span>{{ tr('Rotation') }}</span></div>
       <div class="ig">
-        <label class="sq fld u" :title="tr('Rotation')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13h11M2.5 13l7-8.5M7.4 13a4.9 4.9 0 0 0-1.8-3.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input :value="showG(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span v-if="same((n) => n.rotation ?? 0) !== 'Mixed'" class="unit">°</span></label>
+        <label class="sq fld u" :title="tr('Rotation')"><EditorIcon name="rotation" /><input :value="showG(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span v-if="same((n) => n.rotation ?? 0) !== 'Mixed'" class="unit">°</span></label>
         <div class="grp" role="group" :aria-label="tr('Rotate and flip')">
-          <button class="ib" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="store.rotateBy(sid, ids, 90)"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M7.5 5.2L11 8.7L7.5 12.2L4 8.7z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /><path d="M5.2 4.6A4.6 4.6 0 0 1 12.4 5.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M12.6 3.2v2.4h-2.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-          <button class="ib" :aria-label="tr('Flip horizontal') + ' (⇧H)'" :data-tip="tr('Flip horizontal') + ' ⇧H'" @click="store.flip(sid, ids, 'x')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M2.5 4.8v6.4L5.8 8zM13.5 4.8v6.4L10.2 8z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg></button>
-          <button class="ib" :aria-label="tr('Flip vertical') + ' (⇧V)'" :data-tip="tr('Flip vertical') + ' ⇧V'" @click="store.flip(sid, ids, 'y')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M4.8 2.5h6.4L8 5.8zM4.8 13.5h6.4L8 10.2z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg></button>
+          <button class="ib" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="store.rotateBy(sid, ids, 90)"><EditorIcon name="rotate_90" class="keep" /></button>
+          <button class="ib" :aria-label="tr('Flip horizontal') + ' (⇧H)'" :data-tip="tr('Flip horizontal') + ' ⇧H'" @click="store.flip(sid, ids, 'x')"><EditorIcon name="flip_horizontal" class="keep" /></button>
+          <button class="ib" :aria-label="tr('Flip vertical') + ' (⇧V)'" :data-tip="tr('Flip vertical') + ' ⇧V'" @click="store.flip(sid, ids, 'y')"><EditorIcon name="flip_vertical" class="keep" /></button>
         </div>
         <span />
       </div>
@@ -706,15 +729,15 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <div class="ig-l"><span>{{ sizingNow('w') === 'fixed' && sizingNow('h') === 'fixed' ? tr('Dimensions') : tr('Resizing') }}</span></div>
         <div class="ig">
           <!-- 피그마처럼 W/H 칸 안에는 숫자 + Hug · Fill ▾ 만: 변수 연결은 ▾ 메뉴의 'Apply variable…' 로(칸에 버튼이 더 나오면 숫자가 잘려요) -->
-          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1 }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="Mixed" @update:model-value="(v) => onSizing(k, v)" /></label>
+          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1 }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="Mixed" @update:model-value="(v) => onSizing(k, v)" /></label>
           <button :class="['ib', 's24', 'tog', { on: locked }]" :aria-pressed="locked" :aria-label="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" :title="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" @click="toggleRatio">
-            <svg v-if="locked" width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M6 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8 9.5l-1 1A2.5 2.5 0 0 1 3.5 7l1-1M5.5 8.5l3-3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
-            <svg v-else width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M6 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8 9.5l-1 1A2.5 2.5 0 0 1 3.5 7l1-1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg>
+            <EditorIcon :name="locked ? 'ratio_locked' : 'ratio_unlocked'" />
           </button>
         </div>
       </template>
       <template #clip>
-        <button v-if="has('frame')" :class="['cb', { on: same((n) => n.style.clip !== false) === true }]" @click="setStyle('clip', same((n) => n.style.clip !== false) !== true)"><i class="sq" />{{ tr('Clip content') }}</button>
+        <!-- 프레임은 기본 켬, 섹션은 기본 끔(clipsContent) -->
+        <button v-if="has('frame', 'section')" :class="['cb', { on: same((n) => clipsContent(n)) === true }]" @click="setStyle('clip', same((n) => clipsContent(n)) !== true)"><i class="sq" />{{ tr('Clip content') }}</button>
       </template>
     </InspectorAutoLayout>
 
@@ -725,7 +748,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <button :class="['ib', 's24', 'tog', { on: same((n) => !!n.hidden) === true }]" :aria-pressed="same((n) => !!n.hidden) === true" :aria-label="(same((n) => !!n.hidden) === true ? tr('Show') : tr('Hide')) + ' (⇧⌘H)'" :title="(same((n) => !!n.hidden) === true ? tr('Show') : tr('Hide')) + ' ⇧⌘H'" @click="store.update(sid, ids, { hidden: same((n) => !!n.hidden) !== true })">
             <EditorIcon :name="same((n) => !!n.hidden) === true ? 'eye_off' : 'eye'" :size="16" />
           </button>
-          <EditorSelect variant="icon" class="blend" :model-value="blendNow === 'Mixed' ? null : String(blendNow)" :options="BLEND_MODES.map((b) => ({ value: b.k, label: b.label, sep: b.sep }))" aria-label="Blend mode" @update:model-value="(v) => setStyle('blend', v === 'normal' ? undefined : v)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5C6.2 5.1 4 7.4 4 10a4 4 0 0 0 8 0c0-2.6-2.2-4.9-4-7.5z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg></EditorSelect>
+          <EditorSelect variant="icon" class="blend" :model-value="blendNow === 'Mixed' ? null : String(blendNow)" :options="BLEND_MODES.map((b) => ({ value: b.k, label: b.label, sep: b.sep }))" aria-label="Blend mode" @update:model-value="(v) => setStyle('blend', v === 'normal' ? undefined : v)"><EditorIcon name="blend_mode" /></EditorSelect>
         </span>
       </div>
       <div class="ig-l"><span>{{ tr('Opacity') }}</span><span v-if="!noRadius">{{ tr('Corner radius') }}</span></div>
@@ -737,21 +760,21 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <label v-else-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="show(allCorners)" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setCorner($event)" @keydown="blurOnEnter"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbind([...CORNER_KEYS, 'radius'])" /></label>
           <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :value="show(same((n) => n.style.radius ?? 0))" :placeholder="same((n) => n.style.radius ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setStyleNum('radius', $event)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('radius', d))"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbind('radius')" @step="(d) => stepStyle('radius', d)" /></label>
           <span v-if="one?.type === 'vector'" />
-          <button v-else :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+          <button v-else :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><EditorIcon name="corner_independent" /></button>
         </template>
         <template v-else><span /><span /></template>
       </div>
       <template v-if="!noRadius && separate">
         <!-- 피그마 순서: ┌ ┐ / └ ┘ (CORNER_KEYS: 0 왼쪽 위 · 1 오른쪽 위 · 2 오른쪽 아래 · 3 왼쪽 아래) -->
-        <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :value="show(corner(i))" :placeholder="corner(i) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="blurOnEnter($event); step($event, (d) => stepCorner(i, d))"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickNum(CORNER_KEYS[i]!, t)" @unbind="unbind(CORNER_KEYS[i]!)" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || (smoothNow !== 'Mixed' && smoothNow > 0) }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
+        <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :value="show(corner(i))" :placeholder="corner(i) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="blurOnEnter($event); step($event, (d) => stepCorner(i, d))"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickNum(CORNER_KEYS[i]!, t)" @unbind="unbind(CORNER_KEYS[i]!)" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || (smoothNow !== 'Mixed' && smoothNow > 0) }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><EditorIcon name="corner_smoothing" /></button><span v-else /></div>
       </template>
       <CornerSmoothing v-if="smoothOpen && separate && !noRadius" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="store.hold(sid)" @end="store.release(sid)" @close="smoothOpen = false" />
       <template v-if="one?.type === 'polygon' || one?.type === 'star'">
         <div class="ig-l"><span>{{ tr('Count') }}</span><span v-if="one.type === 'star'">{{ tr('Ratio') }}</span></div>
         <div class="ig">
-          <label v-if="one.type === 'polygon'" class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l5.5 10h-11z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'p' + one.style.sides" :value="one.style.sides ?? 3" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('sides', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('sides', Math.max(3, Math.min(60, (one!.style.sides ?? 3) + Math.sign(d)))))"></label>
-          <label v-else class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l1.7 3.6 3.8.4-2.9 2.6.8 3.9L8 11l-3.4 2 .8-3.9-2.9-2.6 3.8-.4z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'s' + one.style.points" :value="one.style.points ?? 5" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('points', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('points', Math.max(3, Math.min(60, (one!.style.points ?? 5) + Math.sign(d)))))"></label>
-          <label v-if="one.type === 'star'" class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" stroke="currentColor" stroke-width="1.25" fill="none" /></svg><input :key="'r' + one.style.inner" :value="Math.round((one.style.inner ?? 0.38) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setRatio" @keydown="blurOnEnter($event); step($event, (d) => setStyle('inner', Math.max(0.01, Math.min(1, Math.round((one!.style.inner ?? 0.38) * 100 + d) / 100))))"><span class="unit">%</span></label>
+          <label v-if="one.type === 'polygon'" class="sq fld" :title="tr('Point count')"><EditorIcon name="point_count_polygon" /><input :key="'p' + one.style.sides" :value="one.style.sides ?? 3" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('sides', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('sides', Math.max(3, Math.min(60, (one!.style.sides ?? 3) + Math.sign(d)))))"></label>
+          <label v-else class="sq fld" :title="tr('Point count')"><EditorIcon name="point_count_star" /><input :key="'s' + one.style.points" :value="one.style.points ?? 5" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('points', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('points', Math.max(3, Math.min(60, (one!.style.points ?? 5) + Math.sign(d)))))"></label>
+          <label v-if="one.type === 'star'" class="sq fld u" :title="tr('Ratio')"><EditorIcon name="star_ratio" /><input :key="'r' + one.style.inner" :value="ratioText(one.style.inner)" inputmode="decimal" :aria-label="tr('Ratio')" @change="setRatio" @keydown="blurOnEnter($event); step($event, (d) => setRatioVal((one!.style.inner ?? STAR_INNER) * 100 + d))"><span class="unit">%</span></label>
           <span v-else />
           <span />
         </div>
@@ -766,13 +789,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <template v-if="one?.type === 'ellipse'">
         <div class="ig-l"><span>{{ tr('Start') }}</span><span>{{ tr('Sweep') }}</span></div>
         <div class="ig">
-          <label class="sq fld u" :title="tr('Start')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M8 8h5.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
-          <label class="sq fld u" :title="tr('Sweep')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8V2.5A5.5 5.5 0 1 1 2.5 8z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Start')"><EditorIcon name="angle" /><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
+          <label class="sq fld u" :title="tr('Sweep')"><EditorIcon name="arc_sweep" /><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
           <span />
         </div>
         <div class="ig-l"><span>{{ tr('Ratio') }}</span></div>
         <div class="ig">
-          <label class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" fill="none" stroke="currentColor" stroke-width="1.25" /></svg><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Ratio')"><EditorIcon name="arc_ratio" /><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
           <span /><span />
         </div>
       </template>
@@ -804,8 +827,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </div>
         <div class="ig-l"><span>{{ tr('Line height') }}</span><span>{{ tr('Letter spacing') }}</span></div>
         <div class="ig">
-        <label class="sq fld" :title="tr('Line height')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h11M2.5 13.5h11M5.8 11l2.2-6 2.2 6M6.6 9h2.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb('lineHeight')" :value="show(same((n) => n.style.lineHeight ?? ''))" :placeholder="same((n) => n.style.lineHeight ?? '') === 'Mixed' ? tr('Mixed') : tr('Auto')" inputmode="decimal" :aria-label="tr('Line height')" @change="setStyleNum('lineHeight', $event, 1)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
-        <label class="sq fld u" :title="tr('Letter spacing')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3v10M13.5 3v10M5.8 11l2.2-6 2.2 6M6.6 9h2.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><template v-if="!vb('letterSpacing')"><input :value="show(same((n) => n.style.letterSpacing ?? 0))" :placeholder="same((n) => n.style.letterSpacing ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Letter spacing')" @change="setStyleNum('letterSpacing', $event, -100)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('letterSpacing', d / 10, -100))"><span v-if="same((n) => n.style.letterSpacing ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['letterSpacing']" :bound="vb('letterSpacing')" reveal label="Letter spacing" @pick="(t) => pickNum('letterSpacing', t)" @unbind="unbind('letterSpacing')" @step="(d) => stepStyle('letterSpacing', d / 10, -100)" /></label>
+        <label class="sq fld" :title="tr('Line height')"><EditorIcon name="line_height" /><input v-if="!vb('lineHeight')" :value="show(same((n) => n.style.lineHeight ?? ''))" :placeholder="same((n) => n.style.lineHeight ?? '') === 'Mixed' ? tr('Mixed') : tr('Auto')" inputmode="decimal" :aria-label="tr('Line height')" @change="setStyleNum('lineHeight', $event, 1)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
+        <label class="sq fld u" :title="tr('Letter spacing')"><EditorIcon name="letter_spacing" /><template v-if="!vb('letterSpacing')"><input :value="show(same((n) => n.style.letterSpacing ?? 0))" :placeholder="same((n) => n.style.letterSpacing ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Letter spacing')" @change="setStyleNum('letterSpacing', $event, -100)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('letterSpacing', d / 10, -100))"><span v-if="same((n) => n.style.letterSpacing ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['letterSpacing']" :bound="vb('letterSpacing')" reveal label="Letter spacing" @pick="(t) => pickNum('letterSpacing', t)" @unbind="unbind('letterSpacing')" @step="(d) => stepStyle('letterSpacing', d / 10, -100)" /></label>
           <span />
         </div>
       </template>
@@ -840,17 +863,17 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <div class="ig-l ig4"><span v-if="closedShape && !has('text')">{{ tr('Position') }}</span><span>{{ tr('Weight') }}</span></div>
         <div class="ig ig4">
           <EditorSelect v-if="closedShape && !has('text')" :model-value="alignNow === 'Mixed' ? null : String(alignNow)" :options="[{ value: 'center', label: 'Center' }, { value: 'inside', label: 'Inside' }, { value: 'outside', label: 'Outside' }]" ariaLabel="Stroke position" placeholder="Mixed" @update:model-value="(v) => setStyle('strokeAlign', v)" />
-          <label class="sq fld u" :title="tr('Stroke weight')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :value="show(same((n) => n.style.strokeWidth ?? 0))" :placeholder="same((n) => n.style.strokeWidth ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Stroke weight')" @change="onStrokeWeight($event)" @keydown="blurOnEnter($event); step($event, stepStrokeWeight)"><span v-if="same((n) => n.style.strokeWidth ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Stroke weight" @pick="(t) => store.batch(() => { pickNum('strokeWidth', t); syncSides() })" @unbind="unbind('strokeWidth')" @step="stepStrokeWeight" /></label>
+          <label class="sq fld u" :title="tr('Stroke weight')"><EditorIcon name="stroke_weight" class="keep" /><template v-if="!vb('strokeWidth')"><input :value="show(same((n) => n.style.strokeWidth ?? 0))" :placeholder="same((n) => n.style.strokeWidth ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Stroke weight')" @change="onStrokeWeight($event)" @keydown="blurOnEnter($event); step($event, stepStrokeWeight)"><span v-if="same((n) => n.style.strokeWidth ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Stroke weight" @pick="(t) => store.batch(() => { pickNum('strokeWidth', t); syncSides() })" @unbind="unbind('strokeWidth')" @step="stepStrokeWeight" /></label>
           <span v-if="!(closedShape && !has('text'))" />
           <span class="ig4-acts">
-          <button ref="strokeBtn" type="button" :class="['ib', 's24', 'tog', { on: strokeOpen }]" :aria-expanded="strokeOpen" aria-haspopup="dialog" :aria-label="tr('Stroke settings')" :data-tip="tr('Stroke settings')" @click="strokeOpen = !strokeOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button>
-          <button v-if="boxSides" type="button" :class="['ib', 's24', 'tog', { on: sideMode !== 'all' }]" aria-haspopup="menu" :aria-label="tr('Individual strokes')" :data-tip="tr('Individual strokes')" @click="sidesMenu"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1" fill="none" stroke="currentColor" :stroke-width="sideMode === 'all' ? 1.25 : 1" :stroke-dasharray="sideMode === 'all' ? undefined : '1.5 1.5'" /><path v-if="sideMode !== 'all'" :d="SIDE_PATH[sideMode]" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><rect v-else x="5.5" y="5.5" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.25" /></svg></button>
+          <button ref="strokeBtn" type="button" :class="['ib', 's24', 'tog', { on: strokeOpen }]" :aria-expanded="strokeOpen" aria-haspopup="dialog" :aria-label="tr('Stroke settings')" :data-tip="tr('Stroke settings')" @click="strokeOpen = !strokeOpen"><EditorIcon name="filter" /></button>
+          <button v-if="boxSides" type="button" :class="['ib', 's24', 'tog', { on: sideMode !== 'all' }]" aria-haspopup="menu" :aria-label="tr('Individual strokes')" :data-tip="tr('Individual strokes')" @click="sidesMenu"><EditorIcon :name="sidesIcon" class="keep" /></button>
           </span>
         </div>
         <!-- Custom: 변마다 두께 [왼쪽 · 위] [오른쪽 · 아래](피그마 순서) -->
         <template v-if="boxSides && sideMode === 'custom'">
           <div v-for="row in ([[3, 0], [1, 2]] as const)" :key="row[0]" class="ig">
-            <label v-for="i in row" :key="i" class="sq fld" :title="tr(SIDE_LABEL[i]!)"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1.5" opacity=".6" /><path :d="SIDE_PATH[SIDE_KEYS[i]!]" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg><input :key="'sd' + i + sidesNow[i]" :value="sidesNow[i]" inputmode="decimal" :aria-label="tr(SIDE_LABEL[i]!)" @change="setSide(i, $event)" @keydown="blurOnEnter($event); step($event, (d) => stepSide(i, d))"></label>
+            <label v-for="i in row" :key="i" class="sq fld" :title="tr(SIDE_LABEL[i]!)"><EditorIcon :name="`stroke_${SIDE_KEYS[i]!}`" class="keep" /><input :key="'sd' + i + sidesNow[i]" :value="sidesNow[i]" inputmode="decimal" :aria-label="tr(SIDE_LABEL[i]!)" @change="setSide(i, $event)" @keydown="blurOnEnter($event); step($event, (d) => stepSide(i, d))"></label>
             <span />
           </div>
         </template>
@@ -869,7 +892,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     <!-- 여러 개 · 프레임 · 그룹을 고르면: 안에 쓰인 색 모아 보기 · 한꺼번에 바꾸기(피그마 Selection colors) -->
     <InspectorSelectionColors v-if="!editing && (nodes.length > 1 || (one && isContainer(one) && !!one.children?.length))" :targets="[{ sid, ids }]" />
 
-    <InspectorGrids v-if="one?.type === 'frame' && !editing" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
+    <InspectorGrids v-if="(one?.type === 'frame' || one?.type === 'section') && !editing" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
 
     <section v-if="one?.type === 'image' && !editing" class="s">
       <div class="sec-h h24"><span>{{ tr('Image') }}</span></div>
@@ -887,8 +910,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </div>
         <div class="ig-l"><span>{{ tr('Position') }}</span></div>
         <div class="ig">
-          <label class="sq fld u" :title="tr('Horizontal position')"><span>X</span><input :key="'cx' + cropNow.x" :value="Math.round(cropNow.x)" inputmode="numeric" :aria-label="tr('Crop X')"@change="setCrop('x', $event)" @keydown="blurOnEnter"><span class="unit">%</span></label>
-          <label class="sq fld u" :title="tr('Vertical position')"><span>Y</span><input :key="'cy' + cropNow.y" :value="Math.round(cropNow.y)" inputmode="numeric" :aria-label="tr('Crop Y')"@change="setCrop('y', $event)" @keydown="blurOnEnter"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Horizontal position')"><span>X</span><input :key="'cx' + cropNow.x" :value="Math.round(cropNow.x * 100) / 100" inputmode="numeric" :aria-label="tr('Crop X')"@change="setCrop('x', $event)" @keydown="blurOnEnter"><span class="unit">%</span></label>
+          <label class="sq fld u" :title="tr('Vertical position')"><span>Y</span><input :key="'cy' + cropNow.y" :value="Math.round(cropNow.y * 100) / 100" inputmode="numeric" :aria-label="tr('Crop Y')"@change="setCrop('y', $event)" @keydown="blurOnEnter"><span class="unit">%</span></label>
           <span />
         </div>
       </template>
@@ -914,14 +937,14 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .ttl { min-width: 0; font-size: 14px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .kind { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); min-width: 0; height: 28px; margin-left: calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); }
 .kind:hover { --sq-fill: var(--sys-color-neutral-200); }
-.acts .ib.boolbtn { display: inline-flex; align-items: center; gap: 1px; width: auto; height: 24px; padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-04); }
+.acts .ib.boolbtn { display: inline-flex; align-items: center; gap: 1px; width: auto; height: 28px; padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-04); }
 .ell { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 머리 아이콘 버튼: 24 × 24, 사이 4 (Fill · Stroke 머리와 같아요) */
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-04); flex: none; }
-.acts :deep(.ib) { width: 24px; height: 24px; }
+.acts :deep(.ib) { width: 28px; height: 28px; }
 .sec-h.h24 > .ib { margin-left: auto; }
-.h24 { height: 24px; padding: 0; }
-.s24 { width: 24px; height: 24px; }
+.h24 { height: 28px; padding: 0; }
+.s24 { width: 28px; height: 28px; }
 /* 단위(° % px)는 숫자 바로 뒤에 붙고, 남는 자리는 단위 뒤로(피그마: "0°" · "100%") */
 .li .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }
 .fld.u > .unit { flex: 1 1 0; min-width: 0; margin-left: calc(var(--ref-spacing-03) * -1); color: var(--sys-color-neutral-500); }
@@ -972,7 +995,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .wt { min-width: 0; display: flex; }
 .wt > :deep(.esel) { flex: 1; min-width: 0; }
 .wt :deep(.vb) { display: none !important; }
-.blend :deep(.ib) { width: 24px; height: 24px; }
+.blend :deep(.ib) { width: 28px; height: 28px; }
 /* Replace image: 패널 폭 보조 버튼(피그마 Export 버튼처럼 1px 선 · 28h) */
 .wide { display: flex; align-items: center; justify-content: center; gap: var(--ref-spacing-04); height: 28px; border-radius: var(--ref-radius-03); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-size: 12px; color: var(--sys-color-neutral-800); }
 .wide:hover { --sq-overlay: var(--interaction-light-gray-hover); }
@@ -989,7 +1012,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .cs-a { margin-left: auto; color: var(--sys-color-neutral-500); }
 .cstroke-meta { display: flex; justify-content: space-between; padding: 0 var(--ref-spacing-02); }
 /* Stroke 줄: [Position][Weight][⚙ 24 · ▢ 24] — 글자 줄과 같은 격자, ⚙ · ▢ 는 Fill 행의 👁 · − 자리(사이 0) */
-.ig4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px !important; }
+.ig4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 56px !important; }
 .ig4-acts { display: flex; align-items: center; }
 /* Position ▾: Constraints 드롭다운처럼 흰 바탕 + 테두리(피그마와 같아요) */
 .ig4 > :deep(.esel) > .dd { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }

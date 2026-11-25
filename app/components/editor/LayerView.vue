@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
+import { clipsContent, isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
 import { GHOST_KEY } from '~/canvas/ghost'
@@ -82,11 +82,11 @@ const style = computed(() => {
   if (shadow.length) css.boxShadow = shadow.join(', ')
   // smoothing: 그림자(drop-shadow)는 .smw 가 그려서 여기선 흐림(blur)만
   // 내용을 자르는 프레임(overflow)은 .smw 그림자까지 잘라서, 그땐 그림자를 레이어 자체 filter 로(자기 filter 는 안 잘려요)
-  const clipFrame = !!sq && isContainer(v) && s.clip !== false && v.type === 'frame'
+  const clipFrame = !!sq && clipsContent(v)
   const filters = sq && v.type !== 'image' && !clipFrame ? e.filter.filter((x) => !x.startsWith('drop-shadow')) : e.filter // 이미지는 잘린 그림에 그대로 그림자가 따라가요
   if (filters.length) css.filter = filters.join(' ')
   if (e.backdrop && !sq) { css.backdropFilter = e.backdrop; css.WebkitBackdropFilter = e.backdrop }
-  if (isContainer(v) && s.clip !== false && v.type === 'frame') {
+  if (clipsContent(v)) {
     // 내용 자르기도 같은 squircle 모양으로(바깥 그림자가 없을 때 — 있으면 둥근 모서리로 자르고 그림자는 살려요)
     if (sq && !smoothShadow.value) css.clipPath = `path('${sq.path}')`
     else css.overflow = 'hidden'
@@ -186,7 +186,7 @@ const smoothBg = computed(() => {
   return { ...backgroundCss(v.style, color, imageSrc), clipPath: `path('${sq.path}')`, boxShadow: e.inner.length ? e.inner.join(', ') : undefined, backdropFilter: e.backdrop, WebkitBackdropFilter: e.backdrop }
 })
 /** 내용을 자르는 smoothing 프레임: 그림자는 레이어 자체 filter 가 그려요 */
-const clipsContent = computed(() => { const v = n.value; return !!v && !!smooth.value && v.type === 'frame' && v.style.clip !== false })
+const clipsSmooth = computed(() => { const v = n.value; return !!v && !!smooth.value && clipsContent(v) })
 /** smoothing 그림자: 바탕 층 바깥에 모양을 따라(drop-shadow) */
 const smoothShadow = computed(() => {
   const v = n.value
@@ -235,8 +235,25 @@ function secKey(e: KeyboardEvent) {
 }
 const textEl = ref<HTMLElement | null>(null)
 let orig: { w: number; h: number } | null = null // 고치기 전 크기(실행 취소가 이 크기로 돌아가게)
+/**
+ * 여러 글자를 함께 고른 채 고치기: 같이 고른 다른 글자(다른 프레임 것도)에 치는 대로 똑같이 — 끝낼 때 한 번에 기록(실행 취소 한 번)
+ */
+let peers: { sid: string; id: string; text: string }[] = []
+function peerList() {
+  const out: { sid: string; id: string; text: string }[] = []
+  const add = (sid: string, id: string) => {
+    if (sid === props.screenId && id === props.id) return
+    const p = store.doc(sid).nodes[id]
+    if (p?.type === 'text' && !p.locked) out.push({ sid, id, text: p.text ?? '' })
+  }
+  if (store.screenId.value) for (const id of store.layerIds.value) add(store.screenId.value, id)
+  for (const x of store.xsel.value) add(x.sid, x.id)
+  return out
+}
+const typed = (el: HTMLElement) => el.innerText.replace(/\n$/, '')
 watch(editingThis, async (on) => {
   if (!on) return
+  peers = peerList()
   if (n.value) orig = { w: n.value.w, h: n.value.h }
   await nextTick()
   const el = textEl.value
@@ -256,6 +273,9 @@ function onInput() {
   const sz = textSize(el)
   if (v.style.autoWidth) store.setMeasured(props.screenId, props.id, sz.w, sz.h)
   else store.setMeasured(props.screenId, props.id, v.w, Math.max(orig?.h ?? v.h, sz.h))
+  // 함께 고른 글자에도 바로 보이게(기록 없이 — 끝낼 때 한 번에 기록)
+  const t = typed(el)
+  for (const p of peers) { const pn = store.doc(p.sid).nodes[p.id]; if (pn) pn.text = t }
 }
 /**
  * 너비 자동(Auto width · Hug) 글자는 그려진 글자 크기를 늘 레이어 크기로 맞춰요 — 치는 동안만이 아니라 불러온 글자 · 글꼴이 바뀐 글자도.
@@ -288,15 +308,27 @@ function finish() {
   if (!el || !n.value) return
   // 치는 동안 맞춘 크기는 되돌려 두고, 아래 update 한 번으로 기록해요(실행 취소하면 처음 크기로)
   if (orig) { n.value.w = orig.w; n.value.h = orig.h; orig = null }
-  const text = el.innerText.replace(/\n$/, '')
+  const text = typed(el)
   store.editing.value = null
+  // 함께 고른 글자: 원래 글자로 돌려 둔 뒤 아래에서 한 번에 기록
+  const ps = peers
+  peers = []
+  for (const p of ps) { const pn = store.doc(p.sid).nodes[p.id]; if (pn) pn.text = p.text }
   if (!text.trim()) { store.remove(props.screenId, [props.id]); return }
   const patch: Record<string, unknown> = { text }
   const r2 = (v: number) => Math.round(v * 100) / 100
   const sz = textSize(el)
   if (n.value.style.autoWidth) { patch.w = r2(sz.w); patch.h = r2(sz.h) }
   else patch.h = Math.max(n.value.h, r2(sz.h))
-  if (text !== n.value.text || patch.w !== n.value.w || patch.h !== n.value.h) store.update(props.screenId, [props.id], patch)
+  const self = () => { if (text !== n.value?.text || patch.w !== n.value?.w || patch.h !== n.value?.h) store.update(props.screenId, [props.id], patch) }
+  const others = ps.filter((p) => p.text !== text)
+  if (!others.length) { self(); return }
+  store.batch(() => {
+    self()
+    const bySid = new Map<string, string[]>()
+    for (const p of others) bySid.set(p.sid, [...(bySid.get(p.sid) ?? []), p.id])
+    for (const [sid, ids] of bySid) store.mutate(sid, (d) => { for (const id of ids) { const pn = d.nodes[id]; if (pn) pn.text = text } })
+  })
 }
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); (e.target as HTMLElement).blur() }
@@ -306,7 +338,7 @@ function onKey(e: KeyboardEvent) {
 
 <template>
   <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="ghosted ? { ...style, visibility: 'hidden' } : style">
-    <i v-if="smoothBg" class="smw" :style="{ filter: (!clipsContent && smoothShadow) || undefined }"><i class="smb" :style="smoothBg" /></i>
+    <i v-if="smoothBg" class="smw" :style="{ filter: (!clipsSmooth && smoothShadow) || undefined }"><i class="smb" :style="smoothBg" /></i>
     <span v-if="n.type === 'section'" class="sec-name" :data-sec="n.id">
       <!-- 섹션 이름 두 번 누르기: 그 자리에서 고치기(화면 이름표 · 레이어 목록과 같아요 — Enter 저장 · Esc 취소 · 바깥 누르면 저장) -->
       <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">

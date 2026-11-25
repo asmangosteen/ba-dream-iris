@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
 import { KIND_LABEL, groupLabel, nameFromId, parseColor, useTokenCatalog, type CatalogToken, type TokenKind } from '~/canvas/tokens'
 
 /**
@@ -113,7 +114,8 @@ async function show(focusSearch = true) {
   const cur = props.bound && !mixed.value ? items.value.findIndex((t) => t.id === props.bound) : -1
   active.value = cur >= 0 ? cur + (hasDetach.value ? 1 : 0) : hasDetach.value ? 1 : 0
   await nextTick()
-  if (focusSearch) search.value?.focus()
+  // 검색칸은 눌러야 켜져요(사용자 요청) — 대신 창에 포커스를 둬서 ↑↓ · Enter · Esc 는 바로 돼요
+  if (focusSearch) menu.value?.focus({ preventScroll: true })
   scrollActive('center')
 }
 function close(refocus = false) {
@@ -182,10 +184,11 @@ function scrollActive(block: ScrollLogicalPosition = 'nearest') {
   nextTick(() => list.value?.querySelector<HTMLElement>(`[data-i="${active.value}"]`)?.scrollIntoView({ block }))
 }
 function onKey(e: KeyboardEvent) {
-  if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) e.stopPropagation()
+  // 창 안에서 누른 키는 캔버스 단축키로 가지 않게(창에 포커스가 있을 때 ⌫ 가 레이어를 지우지 않게)
+  e.stopPropagation()
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault()
-    if (!count.value) return
+    if (!count.value || !libOpen.value) return
     active.value = (active.value + (e.key === 'ArrowDown' ? 1 : -1) + count.value) % count.value
     scrollActive()
   } else if (e.key === 'Enter') { e.preventDefault(); choose(active.value) }
@@ -212,15 +215,17 @@ onBeforeUnmount(() => {
 
 /** 색 행 이름: 묶음 머리(System · brand …)가 위에 있으니 마지막 조각만 — 값 열 없이 이름이 잘리지 않게 */
 const leaf = (n: string) => n.split('/').pop() || n
+/** 피그마 변수 창처럼: 라이브러리 고르기(지금은 바드림 디자인 시스템 하나) · 라이브러리 묶음은 접고 펼 수 있어요 */
+const LIB_NAME = '바드림 Design System'
+const LIB_OPTS = [{ value: 'all', label: 'All libraries' }, { value: 'bd', label: LIB_NAME, raw: true }]
+const libSel = ref('all')
+const libOpen = ref(true)
 const alpha = (c?: string) => (parseColor(c)?.a ?? 1) < 1
 const sampleSize = (n: number) => Math.min(n, 20)
 /** 글자 스타일 행의 Ag: 피그마처럼 크기는 고르게(16), 굵기만 스타일대로 */
 const boundWeight = computed(() => boundToken.value?.text?.weight ?? 400)
 const title = computed(() => (boundToken.value ? `${boundToken.value.name} · ${boundToken.value.value}` : boundName.value))
 /** 숫자 변수 행 앞 아이콘(피그마 변수 목록처럼 종류가 먼저 보이게) */
-/** 16 그리드 선 아이콘(EditorIcon 규칙 — 1.25px · round). 끊긴 고리 = 변수 연결 끊기, 둥근 사각 + ◇ = 변수 연결 */
-const UNLINK = 'M6 10l4-4M7.3 4l.3-.35a3.3 3.3 0 0 1 4.7 4.7l-.35.3M8.7 12l-.27.36a3.4 3.4 0 0 1-4.75 0a3.3 3.3 0 0 1 0-4.7l.35-.31M11.3 14.5v-1.3M13.2 11.3h1.3M1.5 4.7h1.3M4.7 1.5v1.3'
-const VARIABLE = 'M4.5 2.5h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM8 5.2L10.8 8 8 10.8 5.2 8z'
 const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', radius: 'var_radius', borderWidth: 'var_border', opacity: 'var_opacity', fontSize: 'var_number', lineHeight: 'var_number', letterSpacing: 'var_number' }
 </script>
 
@@ -265,7 +270,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     ><span class="tchip-t"><bdi>{{ chipName }}</bdi></span></button>
     <!-- 칩 오른쪽 커서: 누르면 여기로. Backspace = 연결 끊기, 글자 = 새 토큰 찾기 -->
     <input v-show="caretOn" ref="caret" class="tchip-caret" :aria-label="tr('{label}: Backspace to detach, type to search', { label: lbl })" @keydown="caretKey" @blur="caretOn = false">
-    <button v-if="!short" type="button" class="ib tchip-x" :aria-label="tr('Detach variable: {label}', { label: lbl })" :title="tr('Detach variable')" @click.prevent="emit('unbind')"><svg class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+    <button v-if="!short" type="button" class="ib tchip-x" :aria-label="tr('Detach variable: {label}', { label: lbl })" :title="tr('Detach variable')" @click.prevent="emit('unbind')"><EditorIcon name="unlink" /></button>
   </span>
   <button
     v-else
@@ -277,18 +282,24 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     :aria-expanded="open"
     :aria-controls="open ? uid : undefined"
     @click.prevent="toggle"
-  ><EditorIcon v-if="icon" :name="icon" :size="16" /><svg v-else class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="VARIABLE" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+  ><EditorIcon v-if="icon" :name="icon" :size="16" /><EditorIcon v-else name="variable" /></button>
 
   <Teleport to="body">
-    <div v-if="open" ref="menu" v-front :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
-      <div class="tsp-h"><span>{{ isTS ? tr('Text styles') : tr('{kind} variables', { kind: kindLabel }) }}</span><button type="button" class="ib tsp-x" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button></div>
-      <label class="sq tp-s"><EditorIcon name="search" :size="16" class="muted" /><input ref="search" v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search {kind} variables', { kind: kindLabel.toLowerCase() })" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
-      <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="tr('{kind} variables', { kind: kindLabel })">
+    <div v-if="open" ref="menu" v-front tabindex="-1" :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
+      <!-- 피그마 변수 창: 머리 줄 = 검색(눌러야 켜져요) + 닫기 / 라이브러리 줄 / 목록(라이브러리 묶음 ▾ → 모음 이름 → 행) -->
+      <div class="tp-h" :aria-label="isTS ? tr('Text styles') : tr('{kind} variables', { kind: kindLabel })" role="group" @click="!($event.target as HTMLElement).closest('button') && search?.focus()">
+        <EditorIcon name="search" :size="16" class="tp-hi" />
+        <input ref="search" v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search {kind} variables', { kind: kindLabel.toLowerCase() })" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false">
+        <button type="button" class="ib tsp-x" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button>
+      </div>
+      <div class="tp-top"><EditorSelect class="tp-lib" :model-value="libSel" :options="LIB_OPTS" ariaLabel="Library" @update:model-value="(v) => (libSel = v)" /></div>
+      <div :id="uid" ref="list" v-ovscroll class="tp-l" role="listbox" :aria-label="tr('{kind} variables', { kind: kindLabel })">
         <button v-if="hasDetach" :id="`${uid}-0`" data-i="0" role="option" :aria-selected="active === 0" :class="['sq', 'menu-item', { cur: active === 0 }]" @click="choose(0)" @pointermove="active = 0">
-          <svg class="pv" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="UNLINK" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <EditorIcon class="pv" name="unlink" />
           <span class="nm">{{ tr('Detach variable') }}</span>
         </button>
-        <template v-for="g in groups" :key="g.name">
+        <button v-if="groups.length" type="button" class="sq tp-libh" :aria-expanded="libOpen" @click="libOpen = !libOpen"><EditorIcon name="chevron_down" :size="12" :class="['tp-chev', { rot: !libOpen }]" /><span>{{ LIB_NAME }}</span></button>
+        <template v-for="g in libOpen ? groups : []" :key="g.name">
           <div class="tp-g" role="presentation">{{ groupLabel(g.name) }}</div>
           <button
             v-for="{ t, i } in g.items"
@@ -309,7 +320,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
             <EditorIcon v-else :name="KIND_ICON[t.kind] ?? 'var_number'" :size="16" class="pv" />
             <span v-if="t.kind === 'textStyle'" class="nm">{{ leaf(t.name) }}<span class="tsv"> · {{ t.value }}</span></span>
             <template v-else>
-              <span class="nm">{{ t.kind === 'color' ? leaf(t.name) : t.name }}</span>
+              <span class="nm">{{ leaf(t.name) }}</span>
               <span v-if="t.kind !== 'color'" class="vl">{{ t.value }}</span>
             </template>
           </button>
@@ -359,23 +370,34 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 .ph { color: var(--sys-color-neutral-600); }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
 
-/* 목록 카드 — 피그마 변수 목록: 폭 240 · 안쪽 4 · 검색 28 · 묶음 라벨 11/16 · 행 28 (body 로 옮겨져서 .editor 규칙을 받지 않아요: 값을 여기서 모두 정해요) */
-.tp { position: fixed; right: auto; top: auto; width: 240px; z-index: 50; padding: var(--ref-spacing-06) var(--ref-spacing-04) var(--ref-spacing-04); gap: var(--ref-spacing-04); box-sizing: border-box; border-radius: var(--ref-radius-06); /* 테두리 · 그림자는 .menu 공통(= 사이드바 .float) 그대로 */ }
-.tp-s { flex: none; margin: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); cursor: text; }
-.tp-s input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; color: var(--sys-color-neutral-800); }
-.tp-s input::placeholder { color: var(--sys-color-neutral-500); }
-.tp-s:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.tp-l { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; scroll-padding: 28px 0 0; }
+/* 목록 카드 — 피그마 변수 창 그대로: 폭 240
+   머리 40(검색 아이콘 16 · 글자 · 닫기 24, 아래 선) / 라이브러리 줄 44(아래 선) / 목록 위아래 8
+   라이브러리 묶음 32(회색 바탕 · ▾ · 진하게) / 모음 이름 32(x 16) / 행 32(아이콘 x 24 · 이름 x 48 · 값 오른쪽 16, 칠은 창 끝까지)
+   (body 로 옮겨져서 .editor 규칙을 받지 않아요: 값을 여기서 모두 정해요) */
+.tp:focus { outline: none; }
+.tp { position: fixed; right: auto; top: auto; width: 240px; z-index: 50; padding: 0; gap: 0; box-sizing: border-box; border-radius: var(--ref-radius-06); /* 테두리 · 그림자는 .menu 공통(= 사이드바 .float) 그대로 */ }
+.tp-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); box-shadow: inset 0 -1px 0 var(--iris-line); cursor: text; }
+.tp-hi { flex: none; color: var(--sys-color-neutral-700); }
+.tp-h input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; color: var(--sys-color-neutral-800); }
+.tp-h input::placeholder { color: var(--sys-color-neutral-500); }
+.tp-top { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 44px; box-sizing: border-box; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-06); box-shadow: inset 0 -1px 0 var(--iris-line); }
+.tp-lib { width: 120px; flex: none; }
+.tp-l { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: 360px; padding: var(--ref-spacing-06) 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .tp-l > * { flex: none; }
-.tp-g { position: sticky; top: 0; z-index: 1; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-02); font-size: 11px; line-height: 16px; font-weight: 400; color: var(--sys-color-neutral-500); background: var(--sys-color-common-white-emphasis); }
-.tp-e { padding: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); }
-.tp .menu-item { height: 28px; min-height: 28px; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); transition: none; }
+.tp-libh { display: flex; align-items: center; height: 32px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-02); border-radius: 0; --sq-fill: var(--sys-color-neutral-100); font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); text-align: left; }
+.tp-libh:hover { --sq-fill: var(--sys-color-neutral-200); }
+.tp-libh:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.tp-chev { flex: none; color: var(--sys-color-neutral-600); transition: transform 0.12s; }
+.tp-chev.rot { transform: rotate(-90deg); }
+.tp-g { display: flex; align-items: center; height: 32px; padding: 0 var(--ref-spacing-10); font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); }
+.tp-e { padding: var(--ref-spacing-06) var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); }
+.tp .menu-item { flex: none; height: 32px; min-height: 32px; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-10) 0 24px; border-radius: 0; font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); transition: none; }
 .tp .menu-item::before { transition: none; }
 .tp .menu-item:hover, .tp .menu-item.cur { --sq-fill: var(--sys-color-neutral-100); }
 /* 고른 행: 레이어 패널에서 고른 행과 같은 옅은 파랑(--iris-sel), 올려도 그대로 · 글자는 그대로 */
 .tp .menu-item.on, .tp .menu-item.on:hover, .tp .menu-item.on.cur { --sq-fill: var(--iris-sel); color: var(--sys-color-neutral-800); font-weight: 400; }
 .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vl { flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); font-variant-numeric: proportional-nums; }
+.vl { flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-500); font-variant-numeric: proportional-nums; }
 
 .pv { flex: none; width: 16px; height: 16px; display: grid; place-items: center; color: var(--sys-color-neutral-500); }
 .sw { position: relative; border-radius: var(--ref-radius-02); overflow: hidden; }
@@ -391,13 +413,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 .tsf-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tsf-v { color: var(--sys-color-neutral-600); }
 .tsf.open .tsf-v { color: inherit; }
-/* 편집기 팝오버 양식(Text styles 창 기준 — 변수 목록도 같아요): 제목 줄 40(제목 · 닫기) / 안쪽 4 · 검색 28 / 묶음 이름(진하게 12) / 행 32 */
-.tsp { padding-top: 0; }
-.tsp-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.tsp-x { width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
-.tsp .tp-l { max-height: none; }
-.tsp .tp-g { padding: var(--ref-spacing-08) var(--ref-spacing-06) var(--ref-spacing-02); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.tsp .menu-item { height: 32px; min-height: 32px; }
+.tsp-x { flex: none; width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
 .tsp .ts { width: 20px; font-size: 14px; line-height: 18px; }
 .tsv { color: var(--sys-color-neutral-500); }
 

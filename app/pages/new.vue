@@ -9,7 +9,7 @@ import { useTabs } from '~/composables/useTabs'
  * - 맨 위 종류 알약(App · Web · Detail page): 누르면 바로 'Untitled' 프로젝트를 만들어 이 탭에서 열어요(이름은 편집기에서 두 번 눌러 바꿔요)
  * - 검색 칸 + Recents(최근 고친 순): 행을 누르면 그 프로젝트를 이 탭에서 열어요
  * - 열거나 만들면 이 탭(New file)이 그 자리에서 프로젝트 탭으로 바뀌어요(useTabs.adopt)
- * 규격: 흰 면 · 내용 폭 최대 960 가운데 · 알약 48(아이콘 20 · 글자 14/500 · 크기 12) · 검색 44(neutral-100) · 행 72(썸네일 96 × 64 · 이름 14/500 · 시각 12 neutral-500)
+ * 규격: 흰 면 · 내용 폭 최대 960 가운데 · 알약 48(아이콘 20 · 글자 14/500) · 검색 44(neutral-100) · 행 72(썸네일 96 × 64 · 이름 14/500 · 시각 12 neutral-500)
  */
 useHead({ title: () => `${tr('New file')} · Iris` })
 
@@ -25,11 +25,11 @@ const recents = computed(() => {
   return s ? all.filter((p) => p.name.toLowerCase().includes(s)) : all
 })
 
-/** 종류 알약 아이콘(16 그리드 · 선 1.25 — 편집기 아이콘 규칙과 같게) */
+/** 종류 알약 아이콘(편집기 아이콘 이름) */
 const KIND_ICON: Record<ProjectKind, string> = {
-  app: 'M6.5 1.5h3a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 5 13V3a1.5 1.5 0 0 1 1.5-1.5zM7.25 12h1.5',
-  web: 'M3.5 3h9A1.5 1.5 0 0 1 14 4.5v6a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 10.5v-6A1.5 1.5 0 0 1 3.5 3zM5.5 14h5',
-  detail_page: 'M5.5 1.5h5A1.5 1.5 0 0 1 12 3v10a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 13V3a1.5 1.5 0 0 1 1.5-1.5zM6.5 5h3M6.5 7.5h3M6.5 10h3',
+  app: 'project_app',
+  web: 'project_web',
+  detail_page: 'project_detail_page',
 }
 
 const busy = ref<ProjectKind | null>(null)
@@ -66,9 +66,8 @@ function onSearchKey(e: KeyboardEvent) {
       <h1 class="sr">{{ tr('New file') }}</h1>
       <div class="kinds" role="group" :aria-label="tr('Start a new project')">
         <button v-for="(k, key) in KIND_INFO" :key="key" type="button" class="sq pill" :disabled="!!busy" :aria-busy="busy === key || undefined" :aria-label="tr('New {kind} project', { kind: tr(k.label) })" @click="create(key)">
-          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path :d="KIND_ICON[key]" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <EditorIcon :name="KIND_ICON[key]" :size="20" />
           <span class="pl">{{ tr(k.label) }}</span>
-          <span class="num ps">{{ k.w }} × {{ k.h }}</span>
         </button>
       </div>
       <p v-if="err" class="tx-meta err" role="alert">{{ err }}</p>
@@ -112,7 +111,6 @@ function onSearchKey(e: KeyboardEvent) {
 .pill:disabled { cursor: default; opacity: .5; }
 .pill[aria-busy] { opacity: 1; }
 .pl { font-weight: 500; }
-.ps { color: var(--sys-color-neutral-500); }
 .err { margin: var(--ref-spacing-06) 0 0; text-align: center; color: var(--sys-color-theme-error-default); }
 /* 검색 칸 44 · neutral-100 */
 .search { margin-top: var(--ref-spacing-14); height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-500); cursor: text; }

@@ -71,14 +71,14 @@ function stepDash(i: 0 | 1, e: KeyboardEvent) {
   emit('set', { dash: i ? [d, Math.max(0, g + k)] : [Math.max(1, d + k), g] })
 }
 const CAPS = [
-  { k: 'butt' as const, label: 'None', d: 'M3 8h7' },
-  { k: 'square' as const, label: 'Square', d: 'M3 8h7' },
-  { k: 'round' as const, label: 'Round', d: 'M3 8h7' },
+  { k: 'butt' as const, label: 'None', icon: 'cap_none' },
+  { k: 'square' as const, label: 'Square', icon: 'cap_square' },
+  { k: 'round' as const, label: 'Round', icon: 'cap_round' },
 ]
 const JOINS = [
-  { k: 'miter' as const, label: 'Miter' },
-  { k: 'bevel' as const, label: 'Bevel' },
-  { k: 'round' as const, label: 'Round' },
+  { k: 'miter' as const, label: 'Miter', icon: 'join_miter' },
+  { k: 'bevel' as const, label: 'Bevel', icon: 'join_bevel' },
+  { k: 'round' as const, label: 'Round', icon: 'join_round' },
 ]
 </script>
 
@@ -105,7 +105,7 @@ const JOINS = [
           <span class="lb">{{ style === 'dashed' && !openPath ? tr('Dash cap') : tr('Cap') }}</span>
           <div class="sq seg" role="radiogroup" :aria-label="tr('Cap')">
             <button v-for="c in CAPS" :key="c.k" type="button" role="radio" :aria-checked="cap === c.k" :class="['sq', 'seg-b', { on: cap === c.k }]" :aria-label="tr(c.label)" :data-tip="tr(c.label)" @click="emit('set', { cap: c.k })">
-              <svg class="keep" width="20" height="16" viewBox="0 0 20 16" aria-hidden="true"><path d="M3.5 4.5h13M3.5 11.5h13" stroke="currentColor" stroke-width="1" stroke-dasharray="2 1.5" opacity=".5" /><path d="M5 8h10" stroke="currentColor" stroke-width="4" :stroke-linecap="c.k" /></svg>
+              <EditorIcon :name="c.icon" class="keep" />
             </button>
           </div>
         </div>
@@ -113,7 +113,7 @@ const JOINS = [
           <span class="lb">{{ tr('Join') }}</span>
           <div class="sq seg" role="radiogroup" :aria-label="tr('Join')">
             <button v-for="j in JOINS" :key="j.k" type="button" role="radio" :aria-checked="join === j.k" :class="['sq', 'seg-b', { on: join === j.k }]" :aria-label="tr(j.label)" :data-tip="tr(j.label)" @click="emit('set', { join: j.k })">
-              <svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 14V5h9" fill="none" stroke="currentColor" stroke-width="3" :stroke-linejoin="j.k" /></svg>
+              <EditorIcon :name="j.icon" class="keep" />
             </button>
           </div>
         </div>
@@ -127,7 +127,7 @@ const JOINS = [
 .ss-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; text-align: left; }
 .pop-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
 .pop-t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .pop-b { padding: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 /* 줄: [이름 72 | 값] (피그마와 같아요) */
 .row { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-04); min-height: 28px; }

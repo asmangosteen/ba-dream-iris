@@ -1,6 +1,8 @@
 <script setup lang="ts">
-/** 편집기 아이콘 — 디자인 시스템 아이콘 대신 편집기 화면(툴바 · 패널 · 메뉴)에서 쓰는 선 아이콘.
-    규칙(PRD/08_EDITOR_ICONS.md): 16 그리드, 선은 화면에서 늘 1.25px(크기를 바꿔도 굵기 그대로), 끝 · 모서리 round, 색은 currentColor.
+import { IRIS_ICONS } from './irisIcons'
+/** 편집기 아이콘 — 편집기 화면(툴바 · 패널 · 메뉴)에서 쓰는 아이콘.
+    새 세트(PRD/08_EDITOR_ICONS.md · PRD/icons): 24 그리드 면 아이콘(선 2px 를 면으로), currentColor. irisIcons.ts 에 있는 이름이면 그걸 그려요.
+    아래 P 는 예전 16 그리드 선 아이콘 — 새 세트에 없는 이름만 이걸로 그려요.
     크기: 20 툴바 도구 · 16 패널 아이콘 버튼 · 칸 앞 · 레이어 행 · 메뉴 · 12 ▾ ▸ ✓ 같은 보조 표시 */
 const props = withDefaults(defineProps<{ name: string; size?: number }>(), { size: 16 })
 
@@ -60,12 +62,19 @@ const P: Record<string, string> = {
   refresh: 'M12.5 6A5 5 0 0 0 3.6 5.2M3.5 2.5v2.8h2.8M3.5 10a5 5 0 0 0 8.9.8M12.5 13.5v-2.8H9.7',
 }
 
+/** 새 아이콘 세트(PRD/icons · 24 그리드 면 아이콘) 이름으로 바꿔 읽기 — 옛 이름도 그대로 쓸 수 있게 */
+const ALIAS: Record<string, string> = {
+  view_grid: 'menu_bento', view_list: 'list', eye: 'visibility_on', eye_off: 'visibility_off', sliders: 'filter',
+}
+const iris = computed(() => IRIS_ICONS[ALIAS[props.name] ?? props.name])
 const d = computed(() => P[props.name] ?? P.info!)
-if (import.meta.dev && !P[props.name]) console.warn(`[EditorIcon] unknown icon: ${props.name}`)
+if (import.meta.dev && !iris.value && !P[props.name]) console.warn(`[EditorIcon] unknown icon: ${props.name}`)
 </script>
 
 <template>
-  <svg class="eic" :width="size" :height="size" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path :d="d" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
+  <!-- eslint-disable-next-line vue/no-v-html -- 우리가 만든 아이콘 사전(irisIcons.ts)만 넣어요 -->
+  <svg v-if="iris" class="eic" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true" focusable="false" v-html="iris" />
+  <svg v-else class="eic" :width="size" :height="size" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path :d="d" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg>
 </template>
 
 <style scoped>

@@ -131,8 +131,8 @@ function onParaKey(e: KeyboardEvent) {
             <span class="td-l">{{ tr('Decoration') }}</span>
             <div class="grp" role="group" :aria-label="tr('Decoration')">
               <button :class="['ib', { on: decoNow === null }]" :aria-pressed="decoNow === null" :aria-label="tr('None')" :data-tip="tr('None')" @click="pick('decoration', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button :class="['ib', { on: decoNow === 'underline' }]" :aria-pressed="decoNow === 'underline'" :aria-label="tr('Underline')" :data-tip="tr('Underline')" data-tip-key="⌘U" @click="pick('decoration', 'underline')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v5a3 3 0 0 0 6 0v-5M3.5 13.5h9" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
-              <button :class="['ib', { on: decoNow === 'strike' }]" :aria-pressed="decoNow === 'strike'" :aria-label="tr('Strikethrough')" :data-tip="tr('Strikethrough')" data-tip-key="⇧⌘X" @click="pick('decoration', 'strike')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11M10.8 4.6C10.2 3.4 9.1 2.8 8 2.8c-1.7 0-3 .9-3 2.3 0 1 .7 1.7 1.8 2.1M5.2 11.2c.6 1.4 1.7 2 2.9 2 1.8 0 3.1-1 3.1-2.4 0-.7-.2-1.2-.7-1.6" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg></button>
+              <button :class="['ib', { on: decoNow === 'underline' }]" :aria-pressed="decoNow === 'underline'" :aria-label="tr('Underline')" :data-tip="tr('Underline')" data-tip-key="⌘U" @click="pick('decoration', 'underline')"><EditorIcon name="underline" /></button>
+              <button :class="['ib', { on: decoNow === 'strike' }]" :aria-pressed="decoNow === 'strike'" :aria-label="tr('Strikethrough')" :data-tip="tr('Strikethrough')" data-tip-key="⇧⌘X" @click="pick('decoration', 'strike')"><EditorIcon name="strikethrough" /></button>
             </div>
           </div>
           <div class="td-r">
@@ -150,8 +150,8 @@ function onParaKey(e: KeyboardEvent) {
             <span class="td-l">{{ tr('List style') }}</span>
             <div class="grp" role="group" :aria-label="tr('List style')">
               <button :class="['ib', { on: listNow === null }]" :aria-pressed="listNow === null" :aria-label="tr('None')" :data-tip="tr('None')" @click="pick('list', undefined)"><EditorIcon name="minus" :size="16" /></button>
-              <button :class="['ib', { on: listNow === 'bullet' }]" :aria-pressed="listNow === 'bullet'" :aria-label="tr('Bulleted list')" :data-tip="tr('Bulleted list')" @click="pick('list', 'bullet')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="4" r="1" fill="currentColor" /><circle cx="3.5" cy="8" r="1" fill="currentColor" /><circle cx="3.5" cy="12" r="1" fill="currentColor" /><path d="M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
-              <button :class="['ib', { on: listNow === 'number' }]" :aria-pressed="listNow === 'number'" :aria-label="tr('Numbered list')" :data-tip="tr('Numbered list')" @click="pick('list', 'number')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 2.8h1v3M2.6 9.3c.2-.5.6-.8 1.1-.8.6 0 1 .4 1 .9 0 .8-2.1 1.5-2.1 2.6h2.1M6.5 4h7M6.5 8h7M6.5 12h7" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <button :class="['ib', { on: listNow === 'bullet' }]" :aria-pressed="listNow === 'bullet'" :aria-label="tr('Bulleted list')" :data-tip="tr('Bulleted list')" @click="pick('list', 'bullet')"><EditorIcon name="list" /></button>
+              <button :class="['ib', { on: listNow === 'number' }]" :aria-pressed="listNow === 'number'" :aria-label="tr('Numbered list')" :data-tip="tr('Numbered list')" @click="pick('list', 'number')"><EditorIcon name="list_numbered" /></button>
             </div>
           </div>
           <div class="td-r">

@@ -81,8 +81,12 @@ button:active{cursor:grabbing}
 .float.s{border-radius:var(--ref-radius-06)}
 .seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
 /* 탭 · 세그먼트 · 버튼 묶음의 고른 칸이 스르륵 옮겨 가요(plugins/slide.client.ts). 고른 칸은 이웃 글자 · 아이콘 밑으로 지나가게 한 층 아래(묶음 안에서만 — 묶음이 쌓임 맥락) */
-.seg,.grp,.pp-tabs,.pp-types,.td-tabs{isolation:isolate}
-.seg>.seg-item.on,.grp>.ib.on,.pp-tabs>.pp-tab.on,.pp-types>.pp-type.on,.td-tabs>.td-tab.on{z-index:-1}
+.grp,.pp-tabs,.pp-types,.td-tabs{isolation:isolate}
+.grp>.ib.on,.pp-tabs>.pp-tab.on,.pp-types>.pp-type.on,.td-tabs>.td-tab.on{z-index:-1}
+/* .seg(탭 줄)는 안에 펼침 메뉴(줌 · 보기 설정 등)가 들어 있어 쌓임 맥락을 만들면 메뉴가 아래 내용 밑으로 깔려요 —
+   그래서 묶음은 그대로 두고 칸끼리만: 고른 칸은 0, 나머지 칸은 1(고른 칸 바탕이 이웃 글자 밑으로 지나가요) */
+.seg>.seg-item{z-index:1}
+.seg>.seg-item.on{z-index:0}
 /* 디자인 시스템 세그먼트처럼: 글자 색도 같은 시간 · 곡선으로 바뀌고(편집기의 '즉시 호버' 규칙보다 앞서요), 고른 칸도 글자 굵기는 그대로(굵기가 바뀌면 이웃 칸이 밀려요) */
 :is(.seg>.seg-item,.seg>.seg-b,.grp>.ib,.pp-tabs>.pp-tab,.pp-types>.pp-type,.td-tabs>.td-tab){transition:color var(--iris-slide,.16s) var(--bd-motion-slide-easing,cubic-bezier(.32,.72,0,1))!important}
 .seg>.seg-item.on{font-weight:500}
@@ -136,7 +140,7 @@ button:active{cursor:grabbing}
 .cb:hover>i{--sq-line:var(--sys-color-neutral-600)}
 .cb.on>i{--sq-fill:var(--sys-color-brand-primary-default);--sq-line:transparent}
 .cb.on:hover>i{--sq-overlay:rgb(13 45 87 / 15%)}
-.cb.on>i::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.8 6.3l2.2 2.2 4.2-4.8' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),linear-gradient(var(--sq-overlay),var(--sq-overlay));background-position:center,0 0;background-size:12px,auto;background-repeat:no-repeat}
+.cb.on>i::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19.5 6.646C19.664 6.811 19.747 6.893 19.796 6.979C19.93 7.211 19.93 7.496 19.796 7.729C19.747 7.814 19.664 7.896 19.5 8.061L11.197 16.364C10.603 16.958 10.306 17.255 9.964 17.366C9.662 17.464 9.338 17.464 9.037 17.366C8.694 17.255 8.397 16.958 7.803 16.364L4.5 13.061C4.336 12.896 4.253 12.814 4.204 12.729C4.07 12.497 4.07 12.211 4.204 11.979C4.253 11.893 4.336 11.811 4.5 11.646C4.664 11.482 4.747 11.4 4.832 11.351C5.064 11.217 5.35 11.217 5.582 11.351C5.668 11.4 5.75 11.482 5.914 11.646L9.5 15.232L18.086 6.646C18.25 6.482 18.332 6.4 18.418 6.35C18.65 6.217 18.936 6.217 19.168 6.35C19.253 6.4 19.336 6.482 19.5 6.646Z' fill-rule='evenodd' clip-rule='evenodd' fill='white'/%3E%3C/svg%3E"),linear-gradient(var(--sq-overlay),var(--sq-overlay));background-position:center,0 0;background-size:16px,auto;background-repeat:no-repeat}
 /* 켜짐: 브랜드 파랑 + 흰 체크(라이트 · 다크 같음) */
 .sw{width:12px;height:12px;flex:none;border-radius:3px;--sq-line:var(--ref-color-gray-900-20);--sq-line-w:0.5px}
 
@@ -217,7 +221,7 @@ button:active{cursor:grabbing}
 
 /* 인스펙터 격자 — 피그마 UI3 열 구성: [칸 | 칸 | 아이콘 24], 사이 8. 아이콘이 없는 줄도 오른쪽 24 를 비워 끝선을 맞춰요
    .ig-l: 칸 위 보조 라벨(11/16 neutral-500), 라벨 → 칸 4 · 줄 → 줄 8 */
-.editor .ig{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 24px;gap:var(--ref-spacing-06);align-items:center;min-width:0}
+.editor .ig{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px;gap:var(--ref-spacing-06);align-items:center;min-width:0}
 .editor .ig.w1{grid-template-columns:minmax(0,1fr) 24px}
 .editor .ig>.span2{grid-column:span 2;min-width:0}
 .editor .ig>*{min-width:0}
@@ -231,20 +235,22 @@ button:active{cursor:grabbing}
 .editor .ig-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 24px;gap:0 var(--ref-spacing-06);margin-bottom:calc(-1 * var(--ref-spacing-04))}
 .editor .ig-l>span{font-size:11px;line-height:16px;color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 켜진 아이콘 토글(오토 레이아웃 · 비율 잠금 · 개별 모서리 · 절대 위치): 옅은 파랑 + 파란 아이콘(피그마 #E5F4FF) */
-.editor .ib.tog{color:var(--sys-color-neutral-700)}
-.editor .ib.s24{width:24px;height:24px}
+.editor .ib.tog{color:var(--sys-color-neutral-600)}
+.editor .ib.s24{width:28px;height:28px}
+/* 아이콘 버튼 안 기본(16) 아이콘은 18 로 — 입력창 높이 28 칸에 맞춰 조금 크게 */
+.editor .ib:not(.fld .ib)>svg[width="16"]{width:18px;height:18px}
 .editor .ib.tog.on{--sq-fill:var(--sys-color-brand-primary-lightest);color:var(--sys-color-brand-primary-default)}
 
 /* ============================================================
    편집기 아이콘 규칙 (PRD/08_EDITOR_ICONS.md §규칙)
    크기: 20 툴바 도구(32 버튼) · 16 패널 아이콘 버튼(24·28) · 칸 앞 표시 · 레이어 행 · 메뉴 항목 · 12 ▾ ▸ ✓ 보조 표시
    선: 화면에서 늘 1.25px — 그린 그리드(12 · 14 · 16)와 표시 크기가 달라도 굵기가 같아요(non-scaling-stroke)
-   색: 누르는 아이콘 neutral-700(호버 800) · 상태 표시(칸 앞 · 레이어 종류 · ▾ ▸) neutral-500 · 켜짐 brand · 비활성 neutral-400
+   색: 누르는 아이콘 neutral-600(호버 700) · 칸 앞 표시 · 레이어 종류 · ▾ ▸ neutral-500 · 켜짐 brand · 비활성 neutral-400
    예외(선 굵기 자체가 뜻인 아이콘: 선 두께 표시 등)는 svg 에 class="keep"
    ============================================================ */
 .editor :is(.ib,.rail-btn,.fld,.menu-item,.dd,.inl,.chev,.mini,.more,.cb,.home,.fold,.zoom,.act,.seg-item,.sec-h,.row,.grp,.tools,.nav-item,.label)>svg:not(.keep) :is(path,line,polyline,polygon,rect,circle,ellipse)[stroke]{vector-effect:non-scaling-stroke;stroke-width:1.25px}
-.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom){color:var(--sys-color-neutral-700)}
-.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom):hover{color:var(--sys-color-neutral-800)}
+.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom){color:var(--sys-color-neutral-600)}
+.editor :is(.ib,.rail-btn,.more,.mini,.fold,.home,.zoom):hover{color:var(--sys-color-neutral-700)}
 .editor :is(.ib,.rail-btn,.mini):disabled{color:var(--sys-color-neutral-400)}
 .editor .fld>svg:not(.keep),.editor .fld>.eic,.editor .dd>.eic,.editor .dd>svg{color:var(--sys-color-neutral-500)}
 .editor .rail-btn.on,.editor .rail-btn.on:hover{color:var(--sys-color-common-white-default)}
@@ -346,3 +352,21 @@ html,body{background:var(--iris-canvas)}
 .row-dragging,.row-dragging *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
 /* 스타일 · 변수 적용 버튼(⁘): 섹션에 올리거나 포커스가 있을 때만(피그마와 같아요) — 연 동안은 그대로 */
 section:not(:hover):not(:focus-within) .styl:not(.on){opacity:0}
+
+/* 스크롤바(피그마처럼): 얇고 여린 막대가 가장자리에서 떨어져 있고, 내용은 막대 자리만큼 안쪽에 — 막대가 글자 · 값을 가리지 않아요.
+   폭 8px 칸 안에 2px 투명 테두리 → 보이는 막대 4px. 모든 스크롤 영역 공통.
+   팝오버 목록은 v-ovscroll(내용 위에 뜨는 막대 — 자리를 차지하지 않아 행 칠이 창 끝까지)을 써요 */
+::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; background-color: color-mix(in srgb, var(--sys-color-neutral-800) 16%, transparent); }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--sys-color-neutral-800) 30%, transparent); }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--sys-color-neutral-800) 16%, transparent) transparent; } }
+/* 사이드바(왼쪽 · 오른쪽 패널) · 메뉴(검은 메뉴 · 드롭다운)는 스크롤바를 안 보여요 — 스크롤은 그대로(트랙패드 · 휠) */
+:is(.panel-left, .panel-right, .menu:not(.tp), .esel-m), :is(.panel-left, .panel-right, .menu:not(.tp), .esel-m) * { scrollbar-width: none; }
+:is(.panel-left, .panel-right, .menu:not(.tp), .esel-m)::-webkit-scrollbar, :is(.panel-left, .panel-right, .menu:not(.tp), .esel-m) *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+/* v-ovscroll: 기본 막대는 숨기고 내용 위에 뜨는 4px 막대(목록에 올리거나 스크롤할 때만) — plugins/ovscroll.ts */
+.ovs { scrollbar-width: none; }
+.ovs::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.ovs-thumb { position: absolute; z-index: 3; width: 4px; border-radius: 999px; background: color-mix(in srgb, var(--sys-color-neutral-800) 22%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.3s linear; }
+.ovs-thumb.on { opacity: 1; transition-duration: 0s; }

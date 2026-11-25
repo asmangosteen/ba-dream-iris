@@ -9,6 +9,18 @@ import type { MenuItem } from './useContextMenu'
 export const useLastCopy = () => useState<'layers' | 'screen' | 'mixed' | null>('iris-last-copy', () => null)
 /** 레이어와 함께 고른 화면들(피그마처럼 한 화면 안 자식 레이어 + 다른 화면을 같이 고를 때). 레이어 선택이 비거나 바뀌면 비워요 */
 export const useMixScreens = () => useState<string[]>('iris-mix-screens', () => [])
+/**
+ * 이름 바꾸기 요청(우클릭 'Rename' · ⌘R): 레이어 목록이 받아서 — 하나면 그 줄에서 바로 고치기, 여러 개면 'Rename N layers' 창
+ */
+/**
+ * 오토 레이아웃 간격 표시(피그마와 같아요): 오른쪽 패널의 간격 · 안쪽 여백 칸에 마우스를 올리거나 고치는 동안 캔버스에 그 자리를 칠해 보여요.
+ * gap = 항목 사이, rowGap = 줄 사이, padH · padV = 좌우 · 위아래 여백, 0 · 1 · 2 · 3 = 위 · 오른 · 아래 · 왼 여백 하나
+ */
+export type AlHint = 'gap' | 'rowGap' | 'padH' | 'padV' | 0 | 1 | 2 | 3
+export const useAlHint = () => useState<AlHint | null>('iris-al-hint', () => null)
+export const useRenameReq = () => useState<{ sid: string; id: string }[] | null>('iris-rename-req', () => null)
+/** 지금 고른 레이어 전부(이 문서 + 다른 프레임에서 함께 고른 것) */
+export const pickedLayers = (store: LayerStore, sid: string, ids: string[]) => [...ids.map((id) => ({ sid, id })), ...store.xsel.value]
 
 /** 레이어 우클릭 메뉴 항목(피그마 순서). 캔버스 · 레이어 목록 공용 */
 /** 레이어 → CSS(피그마 'Copy as CSS') */
@@ -77,6 +89,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     // 섹션은 캔버스 맨 위에만(피그마와 같아요)
     ...(sid.startsWith('page:') && nodes.every((n) => !n.parentId) ? [{ label: tr('Section selection'), shortcut: '⌥⌘S', action: () => store.wrap(sid, ids, 'section') }] : []),
     ...(nodes.some((n) => isContainer(n)) ? [{ label: tr('Ungroup'), shortcut: '⇧⌘G', action: () => store.unwrap(sid, ids) }] : []),
+    { label: tr('Rename'), shortcut: '⌘R', action: () => { useRenameReq().value = pickedLayers(store, sid, ids) } },
     hasLayout ? { label: tr('Remove auto layout'), shortcut: '⌥⇧A', action: () => store.removeAutoLayout(sid, ids) } : { label: tr('Add auto layout'), shortcut: '⇧A', action: () => store.addAutoLayout(sid, ids) },
     'sep',
     ...(nodes.length > 1 ? [

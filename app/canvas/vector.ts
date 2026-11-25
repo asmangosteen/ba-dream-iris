@@ -1,5 +1,5 @@
 import type { LayerDoc, LayerNode, VPath, VPoint } from './schema'
-import { arcPath, bakeCorners, hasArc, polygonPoints, radiiOf, starPoints, vnetPath } from './paint'
+import { arcPath, bakeCorners, hasArc, polygonPoints, radiiOf, STAR_INNER, starPoints, vnetPath } from './paint'
 import { booleanLoops, loopsD } from './boolean'
 import { translate } from './geom'
 
@@ -41,7 +41,7 @@ export function shapeVnet(n: LayerNode): VPath[] {
     ] }]
     // 다각형 · 별: 모서리 둥글기(radius)가 있으면 곡선 점으로 굳혀서
     case 'polygon': return bakeCorners(N(polygonPoints(n.style.sides ?? 3, w, h).map(([x, y]) => ({ x, y }))).map((p) => ({ ...p, pts: p.pts.map((q) => ({ ...q, ...(n.style.radius ? { r: n.style.radius } : {}) })) })), w, h)
-    case 'star': return bakeCorners(N(starPoints(n.style.points ?? 5, n.style.inner ?? 0.38, w, h).map(([x, y]) => ({ x, y }))).map((p) => ({ ...p, pts: p.pts.map((q) => ({ ...q, ...(n.style.radius ? { r: n.style.radius } : {}) })) })), w, h)
+    case 'star': return bakeCorners(N(starPoints(n.style.points ?? 5, n.style.inner ?? STAR_INNER, w, h).map(([x, y]) => ({ x, y }))).map((p) => ({ ...p, pts: p.pts.map((q) => ({ ...q, ...(n.style.radius ? { r: n.style.radius } : {}) })) })), w, h)
     case 'line': { const p = n.pts ?? [0, 0, 1, 0]; return [{ closed: false, pts: [{ x: p[0]!, y: p[1]! }, { x: p[2]!, y: p[3]! }] }] }
     case 'path': {
       // 연필은 점 사이를 2차 곡선(가운데점)으로 그려요 → 같은 모양의 3차 곡선으로

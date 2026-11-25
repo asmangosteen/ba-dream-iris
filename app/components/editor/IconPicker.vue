@@ -37,7 +37,8 @@ function place() {
 function onDown(e: MouseEvent) { if (el.value && !el.value.contains(e.target as Node) && !props.anchor?.contains(e.target as Node)) emit('close') }
 function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { e.stopPropagation(); emit('close') } }
 onMounted(async () => {
-  await nextTick(); place(); qEl.value?.focus()
+  // 검색칸은 눌러야 켜져요(사용자 요청) — 창에 포커스만
+  await nextTick(); place(); el.value?.focus({ preventScroll: true })
   document.addEventListener('mousedown', onDown, true); window.addEventListener('keydown', onKey, true); window.addEventListener('resize', place)
 })
 onBeforeUnmount(() => { document.removeEventListener('mousedown', onDown, true); window.removeEventListener('keydown', onKey, true); window.removeEventListener('resize', place) })
@@ -46,7 +47,7 @@ function pick(n: string) { emit('update:modelValue', n); emit('close') }
 
 <template>
   <Teleport to="body">
-    <div ref="el" v-front class="sq float ip editor" role="dialog" :aria-label="tr('Icons')" :style="pos">
+    <div ref="el" v-front tabindex="-1" class="sq float ip editor" role="dialog" :aria-label="tr('Icons')" :style="pos" @keydown.stop>
       <div class="ip-h">
         <h3 class="ip-t">{{ tr('Icons') }}</h3>
         <button type="button" class="sq ib s24" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
@@ -56,7 +57,7 @@ function pick(n: string) { emit('update:modelValue', n); emit('close') }
           <EditorIcon name="search" :size="16" />
           <input ref="qEl" v-model="q" type="search" :placeholder="tr('Search icons')" :aria-label="tr('Search icons')">
         </label>
-        <div class="ip-grid" role="listbox" :aria-label="tr('Icons')">
+        <div v-ovscroll class="ip-grid" role="listbox" :aria-label="tr('Icons')">
           <button v-for="x in list" :key="x.n" type="button" role="option" :aria-selected="x.n === modelValue" :aria-label="x.n" :class="['sq', 'ip-cell', { on: x.n === modelValue }]" :data-tip="x.n" @click="pick(x.n)">
             <Icon :name="x.n" :category="x.c" :size="20" />
           </button>
@@ -68,16 +69,17 @@ function pick(n: string) { emit('update:modelValue', n); emit('close') }
 </template>
 
 <style scoped>
+.ip:focus { outline: none; }
 .ip { position: fixed; z-index: 70; width: 240px; max-height: min(480px, calc(100vh - 16px)); display: flex; flex-direction: column; border-radius: var(--ref-radius-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .ip-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: 0 1px 0 var(--iris-line); }
 .ip-t { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; }
 .s24 { width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); }
-.ip-b { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04); }
-.ip-q { flex: none; height: 28px; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-500); }
+.ip-b { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-08); }
+.ip-q { flex: none; height: 28px; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); color: var(--sys-color-neutral-500); }
 .ip-q input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--sys-color-neutral-800); -webkit-appearance: none; appearance: none; }
 .ip-q input::-webkit-search-cancel-button { display: none; }
 /* 한 줄 4칸 정사각(약 50) · 칸 사이 4 · 칸마다 옅은 1px 테두리 · 호버는 회색 면 + 진한 테두리 · 고른 칸은 옅은 파랑 + 파란 테두리 */
-.ip-grid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-content: start; padding: 1px; }
+.ip-grid { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-04); align-content: start; padding: 1px; }
 .ip-cell { display: grid; place-items: center; aspect-ratio: 1; min-width: 0; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-800); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .ip-cell:hover { --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--ref-color-gray-900-20); }
 .ip-cell.on { --sq-fill: var(--iris-sel); --sq-line: var(--iris-select); }

@@ -99,7 +99,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
     <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed export settings') }}</p>
     <template v-if="list.length">
       <div v-for="(e, i) in list" :key="i" class="erow" data-drag-row :class="{ dragging: drag?.from === i }">
-        <button v-if="list.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, list.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+        <button v-if="list.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, list.length)"><EditorIcon class="keep" name="menu_hamburger" :size="10" /></button>
         <!-- 배율: 직접 입력 + ▾ 고르기. SVG · PDF 는 피그마처럼 배율 없음 -->
         <label :class="['sq', 'fld', 'esc', { off: isVectorFormat(e.format) }]">
           <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" :aria-label="tr('Export scale')" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
@@ -107,11 +107,11 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
         </label>
         <EditorSelect :model-value="e.format" :options="FORMAT_OPTS" aria-label="Export format" @update:model-value="(v) => setAt(i, { format: v as ExportSetting['format'] })" />
         <button :class="['ib', 's24', { on: menu === i }]" :aria-label="tr('Export settings')" :title="tr('Export settings')" @click="menu = menu === i ? null : i">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" fill="currentColor" /><circle cx="8" cy="8" r="1.2" fill="currentColor" /><circle cx="12.5" cy="8" r="1.2" fill="currentColor" /></svg>
+          <EditorIcon name="menu_meatball" />
         </button>
-        <button class="ib s24" :aria-label="tr('Remove export setting')" :title="tr('Remove export setting')" @click="removeAt(i)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+        <button class="ib s24" :aria-label="tr('Remove export setting')" :title="tr('Remove export setting')" @click="removeAt(i)"><EditorIcon name="minus" /></button>
         <div v-if="menu === i" class="sq float emenu" role="dialog" :aria-label="tr('Export settings')">
-          <div class="em-h"><span>{{ tr('Export') }}</span><button class="ib s24" :aria-label="tr('Close')" @click="menu = null"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button></div>
+          <div class="em-h"><span>{{ tr('Export') }}</span><button class="ib s24" :aria-label="tr('Close')" @click="menu = null"><EditorIcon name="close" /></button></div>
           <div class="em-r"><span class="tx-meta">{{ tr('Suffix') }}</span><label class="sq fld"><input :value="e.suffix ?? ''" :placeholder="fileNameOf('', e).replace(/^Untitled|\.\w+$/g, '') || tr('None')" :aria-label="tr('Suffix')" @change="setSuffix(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label></div>
           <div class="em-r"><span class="tx-meta">{{ tr('Color profile') }}</span><span class="sq fld ro">sRGB</span></div>
           <button class="cb on dis" disabled :title="tr('Only this layer is exported — layers on top aren\'t included')"><i class="sq" />{{ tr('Ignore overlapping layers') }}</button>
@@ -130,14 +130,14 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 /* 패널 맨 끝 칸: 아래 여백(다른 패널과 같은 12) */
 .ex:last-child { margin-bottom: var(--ref-spacing-12); }
 /* 한 줄: [배율] [형식] [⋯] [−] */
-.erow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px 24px; gap: var(--ref-spacing-04); align-items: center; }
+.erow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px 28px; gap: var(--ref-spacing-04); align-items: center; }
 .esc input { flex: 1; min-width: 0; }
 .esc.off { opacity: .5; }
 .ib.on { --sq-fill: var(--sys-color-neutral-200); }

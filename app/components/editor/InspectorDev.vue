@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fmtNum } from '~/canvas/num'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import { nameFromId, useTokenCatalog } from '~/canvas/tokens'
 import { Button, TextButton } from '@ba-dream/design-system'
@@ -27,7 +28,7 @@ const total = computed(() => (usages.data.value ?? []).reduce((n, u) => n + u.co
 
 const code = computed(() => {
   const names = matched.value.map((m) => m.comp.code_name ?? m.comp.name)
-  const lines = [`<!-- ${props.screen.name} · ${Math.round(props.screen.width)}×${Math.round(props.screen.height)} -->`, `<script setup lang="ts">`, `import { ${names.join(', ') || '…'} } from '@ba-dream/design-system'`, `<` + `/script>`]
+  const lines = [`<!-- ${props.screen.name} · ${fmtNum(props.screen.width)}×${fmtNum(props.screen.height)} -->`, `<script setup lang="ts">`, `import { ${names.join(', ') || '…'} } from '@ba-dream/design-system'`, `<` + `/script>`]
   return lines.join('\n')
 })
 // 사용 토큰: Iris 캔버스 화면의 레이어에 연결한 변수(style.vars · 옛 'token:<이름>')와 직접 넣은 색을 모읍니다
@@ -127,13 +128,13 @@ async function copy() {
     <section class="s">
       <div class="sec-h h24"><span>{{ tr('Properties') }}</span></div>
       <div class="ig">
-        <span class="sq fld"><span>X</span><span class="v num">{{ Math.round(screen.x) }}</span></span>
-        <span class="sq fld"><span>Y</span><span class="v num">{{ Math.round(screen.y) }}</span></span>
+        <span class="sq fld"><span>X</span><span class="v num">{{ fmtNum(screen.x) }}</span></span>
+        <span class="sq fld"><span>Y</span><span class="v num">{{ fmtNum(screen.y) }}</span></span>
         <span />
       </div>
       <div class="ig">
-        <span class="sq fld"><span>W</span><span class="v num">{{ Math.round(screen.width) }}</span></span>
-        <span class="sq fld"><span>H</span><span class="v num">{{ Math.round(screen.height) }}</span></span>
+        <span class="sq fld"><span>W</span><span class="v num">{{ fmtNum(screen.width) }}</span></span>
+        <span class="sq fld"><span>H</span><span class="v num">{{ fmtNum(screen.height) }}</span></span>
         <span />
       </div>
     </section>
@@ -157,8 +158,8 @@ async function copy() {
 .dev { padding-bottom: var(--ref-spacing-12); display: flex; flex-direction: column; }
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:first-child { box-shadow: none; }
-.h24 { height: 24px; padding: 0; }
-.s24 { width: 24px; height: 24px; }
+.h24 { height: 28px; padding: 0; }
+.s24 { width: 28px; height: 28px; }
 .meta5 { font-weight: 500; color: var(--sys-color-neutral-500); }
 .comp { display: flex; align-items: center; gap: var(--ref-spacing-06); margin: 0 calc(-1 * var(--ref-spacing-04)); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-04); text-align: left; }
 /* 아이콘은 이름(첫 줄)에 맞춰요 */

@@ -80,8 +80,8 @@ const blur = (e: KeyboardEvent) => {
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 /* 첫 섹션 제목은 Frame · 레이어 인스펙터의 첫 제목과 같은 자리(위 12) */
 .s.first { box-shadow: none; }
-.h24 { height: 24px; padding: 0; }
-.s24 { width: 24px; height: 24px; }
+.h24 { height: 28px; padding: 0; }
+.s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
 .presets { display: flex; gap: var(--ref-spacing-04); }
 .pre { width: 24px; height: 24px; border-radius: var(--ref-radius-03); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }

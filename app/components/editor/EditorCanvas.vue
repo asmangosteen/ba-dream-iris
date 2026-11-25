@@ -10,7 +10,7 @@ import { booleanPath } from '~/canvas/boolean'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
-import { layerMenuItems, svgOf, useLastCopy, useMixScreens } from '~/composables/useLayerMenu'
+import { layerMenuItems, pickedLayers, svgOf, useAlHint, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize, shapeVnet } from '~/canvas/vector'
@@ -33,7 +33,7 @@ import { useImageSrc } from '~/canvas/images'
  */
 export interface Viewport { x: number; y: number; zoom: number }
 
-const props = defineProps<{ screens: ScreenRow[]; highlight?: string[]; background?: string | null; pixelGrid?: boolean; guides?: { x: number[]; y: number[] } }>()
+const props = defineProps<{ screens: ScreenRow[]; highlight?: string[]; background?: string | null; pixelGrid?: boolean; snapPixel?: boolean; guides?: { x: number[]; y: number[] } }>()
 const tool = defineModel<Tool>('tool', { required: true })
 const vp = defineModel<Viewport>('viewport', { required: true })
 const emit = defineEmits<{
@@ -53,6 +53,8 @@ const emit = defineEmits<{
   'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge' | 'front' | 'back' | 'forward' | 'backward', dx?: number, dy?: number]
   /** 가이드선 바뀜 */
   guides: [g: { x: number[]; y: number[] }]
+  /** 보기 설정 단축키: ⇧' 픽셀 격자 · ⇧⌘' 픽셀에 맞추기 */
+  view: [k: 'pixelGrid' | 'snapPixel']
   /** ⌥ 끌어서 화면 복제(놓은 자리) */
   'clone-screen': [id: string, x: number, y: number]
   /** 레이어와 섞어 고른 화면들 — 복제해서 놓기 · 복사 · 붙여넣기(새 화면들은 레이어 선택과 함께 골라 둬요) */
@@ -137,7 +139,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string; dup?: boolean; canDup?: boolean }
   | { kind: 'draw'; wx: number; wy: number; moved: boolean }
-  | { kind: 'layers'; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean }
+  | { kind: 'layers'; xcarry?: { sid: string; id: string; x: number; y: number; inv: Mat }[]; xbefore?: [string, string][]; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
@@ -476,6 +478,15 @@ const vmarq = ref<{ x: number; y: number; w: number; h: number } | null>(null)
  */
 const RAD_TYPES = new Set(['rect', 'frame', 'image'])
 const radDrag = ref<{ x: number; y: number; v: number } | null>(null)
+/** 화면 좌표의 마우스(ptr)가 돌린 선택 상자 안인지(margin 만큼 바깥도) */
+function ptrInBox(g: { cx: number; cy: number; w: number; h: number; angle: number }, margin = 0) {
+  const p = ptr.value
+  if (!p) return false
+  const z = vp.value.zoom, cx = g.cx * z + vp.value.x, cy = g.cy * z + vp.value.y
+  const a = (-(g.angle || 0) * Math.PI) / 180, dx = p.x - cx, dy = p.y - cy
+  const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a)
+  return Math.abs(lx) <= (g.w * z) / 2 + margin && Math.abs(ly) <= (g.h * z) / 2 + margin
+}
 const radHandles = computed(() => {
   void tick.value
   const sg = single.value
@@ -485,7 +496,8 @@ const radHandles = computed(() => {
   if (!n || !RAD_TYPES.has(n.type)) return null
   const z = vp.value.zoom, W = sg.w * z, H = sg.h * z
   if (W < 40 || H < 40) return null
-  if (!radDrag.value && !(hover.value?.sid === s.id && hover.value?.id === sg.id)) return null
+  // 마우스가 선택 상자 안(바깥 8px 여유 포함)이면 보여요 — 손잡이 위로 올라가도 사라지지 않게(깜박이다 레이어가 잡히던 문제)
+  if (!radDrag.value && !(hover.value?.sid === s.id && hover.value?.id === sg.id) && !ptrInBox(sg, 8)) return null
   const r = radiiOf(n.style)
   return (['nw', 'ne', 'se', 'sw'] as const).map((c, i) => {
     const off = Math.min(Math.max(12, (r[i] ?? 0) * z), W / 2, H / 2)
@@ -498,14 +510,17 @@ function startRadius(e: PointerEvent, c: number) {
   const n = sg && s ? store.node(s.id, sg.id) : undefined
   if (!sg || !s || !n) return
   const sid = s.id, id = n.id, z = vp.value.zoom
-  const r0 = radiiOf(n.style)[c] ?? 0, max = Math.min(n.w, n.h) / 2
+  const max = Math.min(n.w, n.h) / 2, r0 = Math.min(max, radiiOf(n.style)[c] ?? 0)
+  // 끝까지 둥글면 손잡이가 짧은 변 가운데로 모여 겹쳐요 — 그때는 긴 쪽 방향으로만 재요(겹친 다른 모서리 손잡이를 잡아도 끌리게)
+  const pinned = r0 >= max - 0.5
   const sx0 = e.clientX, sy0 = e.clientY, t = (-sg.angle * Math.PI) / 180
   const inward = [[1, 1], [-1, 1], [-1, -1], [1, -1]][c]!
   store.hold(sid)
   const move = (ev: PointerEvent) => {
     const dx = ev.clientX - sx0, dy = ev.clientY - sy0
     const lx = dx * Math.cos(t) - dy * Math.sin(t), ly = dx * Math.sin(t) + dy * Math.cos(t)
-    const v = Math.round(Math.max(0, Math.min(max, r0 + (lx * inward[0]! + ly * inward[1]!) / 2 / z)))
+    const along = pinned ? (n.w >= n.h ? lx * inward[0]! : ly * inward[1]!) : (lx * inward[0]! + ly * inward[1]!) / 2
+    const v = Math.round(Math.max(0, Math.min(max, r0 + along / z)))
     store.update(sid, [id], (nn) => {
       if (ev.altKey) { const rr = [...radiiOf(nn.style)] as [number, number, number, number]; rr[c] = v; return { style: { ...nn.style, radii: rr } } }
       return { style: { ...nn.style, radius: v, radii: undefined } }
@@ -783,6 +798,8 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     // Shift+클릭은 여러 개 고르기. ⌥⇧ 는 복제해서 끌기(가로 · 세로로만)
     if (e.shiftKey && !e.altKey) {
       if (store.screenId.value === screen.id && store.layerIds.value.length) { store.selectLayer(screen.id, lid, true); return }
+      // 다른 문서(캔버스 ↔ 프레임 안)의 레이어를 고른 채 ⇧ 클릭: 함께 고르기(피그마와 같아요)
+      if (store.layerIds.value.length && store.screenId.value !== screen.id) { store.toggleX(screen.id, lid); return }
       // 화면(들)을 고른 채 다른 화면 안 레이어를 Shift 클릭: 화면은 그대로, 그 레이어를 함께(자식 선택 유지 — 부모 화면을 대신 고르지 않아요)
       const cur = store.layerIds.value.length ? mix.value : multi.value.length ? multi.value : store.screenId.value && !isPageCanvas(store.screenId.value) ? [store.screenId.value] : []
       const keep = cur.filter((id) => id !== screen.id)
@@ -791,12 +808,14 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       mix.value = keep
       return
     }
+    // 함께 고른 다른 문서의 레이어를 누르면: 그 문서를 지금 문서로(고른 것 전부 그대로 — 끌면 함께 옮겨요)
+    if (store.xsel.value.some((x) => x.sid === screen.id && x.id === lid)) store.promoteX(screen.id)
     const d0 = store.doc(screen.id)
     // 고른 프레임 안의 레이어를 끌면 프레임째(누르고 떼기만 하면 안쪽 레이어를 골라요)
     const anc = store.screenId.value === screen.id ? store.layerIds.value.find((id) => id !== lid && descendants(d0, id).includes(lid)) : undefined
     const wasSel = store.screenId.value === screen.id && store.layerIds.value.includes(lid)
     // 여러 개 중 하나를 누르면: 끌면 함께 옮기고, 그냥 떼면 그 하나만 골라요(피그마와 같아요)
-    const pickOne = wasSel && store.layerIds.value.length > 1 ? lid : undefined
+    const pickOne = wasSel && (store.layerIds.value.length > 1 || store.xsel.value.length > 0) ? lid : undefined
     if (!anc && !wasSel) store.selectLayer(screen.id, lid)
     if (e.altKey) keepMix(() => store.duplicateInPlace()) // ⌥ 끌기: 복제해서 옮기기
     const d = store.doc(screen.id)
@@ -816,6 +835,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       duped: e.altKey,
       mixIds: [...mix.value],
       carryDup: e.altKey && mix.value.length > 0,
+      ...xCarryStart(),
     }
     return
   }
@@ -1130,8 +1150,8 @@ function move(e: PointerEvent) {
       nx += r.dx; ny += r.dy; guides.value = r.guides
     } else guides.value = null
     // ⌥ 끌기: 원래 화면은 그대로 두고 복제될 자리를 보여 줘요(놓으면 복제)
-    if (drag.dup) { draft.value = { x: Math.round(nx), y: Math.round(ny), width: drag.w, height: drag.h }; return }
-    emit('move', drag.id, Math.round(nx), Math.round(ny), false)
+    if (drag.dup) { draft.value = { x: store.snapPx(nx), y: store.snapPx(ny), width: drag.w, height: drag.h }; return }
+    emit('move', drag.id, store.snapPx(nx), store.snapPx(ny), false) // 픽셀에 맞추기를 끄면 소수점까지
   } else if (drag.kind === 'layers') {
     let dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 3) return
@@ -1172,10 +1192,17 @@ function move(e: PointerEvent) {
       const v = applyVec(drag.inv[id]!, dx, dy) // 돌린 부모 안이면 부모 좌표로
       n.x = store.snapPx(drag.orig[id]!.x + v.x); n.y = store.snapPx(drag.orig[id]!.y + v.y) // 픽셀 그리드를 끄면 소수점까지
     }
+    // 함께 고른 다른 문서의 레이어도 같은 만큼
+    for (const c of drag.xcarry ?? []) {
+      const n = store.doc(c.sid).nodes[c.id]
+      if (!n) continue
+      const v = applyVec(c.inv, dx, dy)
+      n.x = store.snapPx(c.x + v.x); n.y = store.snapPx(c.y + v.y)
+    }
     const dupScreens = drag.carryDup ? drag.mixIds ?? [] : []
-    for (const c of drag.carry) if (!dupScreens.includes(c.id)) emit('move', c.id, Math.round(c.x + dx), Math.round(c.y + dy), false)
+    for (const c of drag.carry) if (!dupScreens.includes(c.id)) emit('move', c.id, store.snapPx(c.x + dx), store.snapPx(c.y + dy), false)
     // 복제로 끄는 화면들: 놓일 자리만 보여 줘요(놓으면 복제)
-    mixGhosts.value = drag.carry.filter((c) => dupScreens.includes(c.id)).map((c) => { const v = props.screens.find((x) => x.id === c.id)!; return { x: Math.round(c.x + dx), y: Math.round(c.y + dy), width: v.width, height: v.height } })
+    mixGhosts.value = drag.carry.filter((c) => dupScreens.includes(c.id)).map((c) => { const v = props.screens.find((x) => x.id === c.id)!; return { x: store.snapPx(c.x + dx), y: store.snapPx(c.y + dy), width: v.width, height: v.height } })
     retarget(drag, e, dx, dy)
   } else if (drag.kind === 'resize') {
     const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
@@ -1186,7 +1213,7 @@ function move(e: PointerEvent) {
     const c = apply(drag.pinv, r.cx, r.cy)
     const n = store.node(drag.sid, drag.id)
     if (n) {
-      Object.assign(n, { x: Math.round(c.x - r.w / 2), y: Math.round(c.y - r.h / 2), w: r.w, h: r.h })
+      Object.assign(n, { x: store.snapPx(c.x - r.w / 2), y: store.snapPx(c.y - r.h / 2), w: r.w, h: r.h })
       if (drag.sub0) scaleSubtree(drag.sid, drag.sub0, r.w / drag.g.w, n.x, n.y) // 스케일 도구(K): 안쪽까지 같은 비율로
       else {
         if (n.type === 'text') n.style.autoWidth = false
@@ -1212,9 +1239,10 @@ function move(e: PointerEvent) {
     for (const it of drag.items) {
       const n = d.nodes[it.id]
       if (!n) continue
-      n.x = Math.round(x1 + (it.b.x - u.x) * kx - it.p.x)
-      n.y = Math.round(y1 + (it.b.y - u.y) * ky - it.p.y)
-      n.w = Math.max(1, Math.round(it.b.w * kx)); n.h = Math.max(1, Math.round(it.b.h * ky))
+      n.x = store.snapPx(x1 + (it.b.x - u.x) * kx - it.p.x)
+      n.y = store.snapPx(y1 + (it.b.y - u.y) * ky - it.p.y)
+      const minS = store.pixelSnap.value ? 1 : 0.01
+      n.w = Math.max(minS, store.snapPx(it.b.w * kx)); n.h = Math.max(minS, store.snapPx(it.b.h * ky))
       if (n.type === 'text') n.style.autoWidth = false
     }
     store.relayout(drag.sid)
@@ -1225,7 +1253,7 @@ function move(e: PointerEvent) {
     const o = drag.o
     const r = resizeBox({ cx: o.x + o.w / 2, cy: o.y + o.h / 2, w: o.w, h: o.h, angle: 0 }, drag.handle, dx, dy, e, false, drag.targets)
     guides.value = r.guide
-    emit('resize-screen', drag.id, { x: Math.round(r.cx - r.w / 2), y: Math.round(r.cy - r.h / 2), width: r.w, height: r.h }, false)
+    emit('resize-screen', drag.id, { x: store.snapPx(r.cx - r.w / 2), y: store.snapPx(r.cy - r.h / 2), width: r.w, height: r.h }, false)
     if (drag.kids0 && !e.metaKey) store.constrainRoot(drag.id, o.w, o.h, r.w, r.h, drag.kids0, false)
   } else if (drag.kind === 'rotate') {
     drag.moved = true
@@ -1237,7 +1265,7 @@ function move(e: PointerEvent) {
     const w = toWorld(e.clientX, e.clientY)
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
-    draft.value = { x: Math.round(Math.min(w.x, drag.wx)), y: Math.round(Math.min(w.y, drag.wy)), width: Math.round(Math.abs(w.x - drag.wx)), height: Math.round(Math.abs(w.y - drag.wy)) }
+    draft.value = { x: store.snapPx(Math.min(w.x, drag.wx)), y: store.snapPx(Math.min(w.y, drag.wy)), width: store.snapPx(Math.abs(w.x - drag.wx)), height: store.snapPx(Math.abs(w.y - drag.wy)) }
   } else if (drag.kind === 'screens') {
     let dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && (Math.abs(dx) + Math.abs(dy)) * z < 3) return
@@ -1253,16 +1281,16 @@ function move(e: PointerEvent) {
     } else guides.value = null
     if (drag.dup) {
       const dg = drag
-      mixGhosts.value = dg.ids.map((id) => { const v = props.screens.find((x) => x.id === id)!; return { x: Math.round(dg.orig[id]!.x + dx), y: Math.round(dg.orig[id]!.y + dy), width: v.width, height: v.height } })
+      mixGhosts.value = dg.ids.map((id) => { const v = props.screens.find((x) => x.id === id)!; return { x: store.snapPx(dg.orig[id]!.x + dx), y: store.snapPx(dg.orig[id]!.y + dy), width: v.width, height: v.height } })
       return
     }
-    for (const id of drag.ids) emit('move', id, Math.round(drag.orig[id]!.x + dx), Math.round(drag.orig[id]!.y + dy), false)
+    for (const id of drag.ids) emit('move', id, store.snapPx(drag.orig[id]!.x + dx), store.snapPx(drag.orig[id]!.y + dy), false)
   } else if (drag.kind === 'marqueeCanvas') {
     const w = toWorld(e.clientX, e.clientY)
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
     const r = { x: Math.min(w.x, drag.wx), y: Math.min(w.y, drag.wy), width: Math.abs(w.x - drag.wx), height: Math.abs(w.y - drag.wy) }
-    draft.value = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
+    draft.value = { x: store.snapPx(r.x), y: store.snapPx(r.y), width: store.snapPx(r.width), height: store.snapPx(r.height) }
     const hitBox = (b: { x: number; y: number; w: number; h: number }) => b.x < r.x + r.width && b.x + b.w > r.x && b.y < r.y + r.height && b.y + b.h > r.y
     // 화면이 걸리면 화면들, 아니면 캔버스 위 레이어들
     const scr = [...new Set([...drag.baseScreens, ...realScreens.value.filter((v) => hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })).map((v) => v.id)])]
@@ -1283,7 +1311,7 @@ function move(e: PointerEvent) {
     if (!drag.moved && store.screenId.value !== drag.sid) store.selectScreen(drag.sid)
     drag.moved = true
     const r = { x: Math.min(w.x, drag.wx), y: Math.min(w.y, drag.wy), width: Math.abs(w.x - drag.wx), height: Math.abs(w.y - drag.wy) }
-    draft.value = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
+    draft.value = { x: store.snapPx(r.x), y: store.snapPx(r.y), width: store.snapPx(r.width), height: store.snapPx(r.height) }
     const msid = drag.sid
     const s = props.screens.find((v) => v.id === msid)
     if (!s) return
@@ -1332,7 +1360,7 @@ function move(e: PointerEvent) {
     if (e.shiftKey) { const m = Math.max(Math.abs(ww), Math.abs(hh)); ww = Math.sign(ww || 1) * m; hh = Math.sign(hh || 1) * m }
     if (ww < 0) { x0 += ww; ww = -ww }
     if (hh < 0) { y0 += hh; hh = -hh }
-    draft.value = { x: Math.round(s.x + x0), y: Math.round(s.y + y0), width: Math.round(ww), height: Math.round(hh) }
+    draft.value = { x: store.snapPx(s.x + x0), y: store.snapPx(s.y + y0), width: store.snapPx(ww), height: store.snapPx(hh) }
     draftType.value = drag.type
   }
 }
@@ -1352,7 +1380,8 @@ function end(e: PointerEvent) {
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('move', d.id, s.x, s.y, true)
   }
-  if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
+  if (d.kind === 'layers' && d.moved && d.xbefore?.length) { const xb = d.xbefore; store.batch(() => { store.commit(d.sid, d.before); for (const [s2, b2] of xb) store.commit(s2, b2) }) }
+  else if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
   // 여러 점을 고른 채 하나를 끌지 않고 눌렀다 떼면: 그 점만 남겨요(피그마와 같아요)
   if (d.kind === 'vpt' && !d.moved && d.collapse && vedit.value) { vedit.value.pts = [d.collapse]; vedit.value.segs = []; vedit.value.sel = d.collapse }
   dragOut.value = null
@@ -1398,7 +1427,7 @@ function end(e: PointerEvent) {
     emit('clone-screens', items)
   } else if (d.kind === 'screens' && d.moved) for (const id of d.ids) { const v = props.screens.find((x) => x.id === id); if (v) emit('move', id, v.x, v.y, true) }
   if (d.kind === 'draw') {
-    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: Math.round(d.wx), y: Math.round(d.wy), width: 390, height: 844 }
+    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: store.snapPx(d.wx), y: store.snapPx(d.wy), width: 390, height: 844 }
     draft.value = null
     emit('create', rect)
     tool.value = 'move'
@@ -1411,14 +1440,17 @@ function end(e: PointerEvent) {
     if (!s) return
     const big = d.moved && r && r.width >= 2 && r.height >= 2
     if (d.type === 'text') {
-      const id = store.add(d.sid, d.parentId, { type: 'text', text: 'Text', x: Math.round(d.lx - d.px), y: Math.round(d.ly - d.py), w: big ? r!.width : 60, h: 24, style: big ? { autoWidth: false } : {} })
+      const id = store.add(d.sid, d.parentId, { type: 'text', text: 'Text', x: store.snapPx(d.lx - d.px), y: store.snapPx(d.ly - d.py), w: big ? r!.width : 60, h: 24, style: big ? { autoWidth: false } : {} })
       store.editing.value = id
       return
     }
     const size = d.type === 'frame' ? { w: 200, h: 200 } : d.type === 'section' ? { w: 400, h: 300 } : { w: 100, h: 100 }
-    const x = big ? r!.x - s.x - d.px : Math.round(d.lx - d.px - size.w / 2)
-    const y = big ? r!.y - s.y - d.py : Math.round(d.ly - d.py - size.h / 2)
-    store.add(d.sid, d.parentId, { type: d.type, x, y, w: big ? r!.width : size.w, h: big ? r!.height : size.h })
+    const x = big ? r!.x - s.x - d.px : store.snapPx(d.lx - d.px - size.w / 2)
+    const y = big ? r!.y - s.y - d.py : store.snapPx(d.ly - d.py - size.h / 2)
+    const part = { type: d.type, x, y, w: big ? r!.width : size.w, h: big ? r!.height : size.h }
+    // 프레임 · 섹션을 끌어 그리면 그 안에 통째로 드는 레이어를 안으로(피그마와 같아요). 눌러서 만든 기본 크기는 그대로
+    if (big && (d.type === 'frame' || d.type === 'section')) store.addAround(d.sid, d.parentId, part)
+    else store.add(d.sid, d.parentId, part)
   }
 }
 
@@ -1434,7 +1466,7 @@ function finishPoints(d: Extract<Drag, { kind: 'drawLine' | 'pencil' }>) {
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0, h = Math.max(...ys) - y0
   const norm = pts.flatMap(([x, y]) => [w ? Math.round(((x - x0) / w) * 1e4) / 1e4 : 0, h ? Math.round(((y - y0) / h) * 1e4) / 1e4 : 0])
   const type = d.kind === 'pencil' ? 'path' : 'line'
-  store.add(d.sid, d.parentId, { type, x: Math.round((x0 - d.px) * 100) / 100, y: Math.round((y0 - d.py) * 100) / 100, w: Math.round(w * 100) / 100, h: Math.round(h * 100) / 100, pts: norm, ...(d.kind === 'drawLine' && d.arrow ? { name: `Arrow ${Object.values(store.doc(d.sid).nodes).filter((v) => v.name.startsWith('Arrow ')).length + 1}`, style: { arrowEnd: 'arrow' } } : {}) })
+  store.add(d.sid, d.parentId, { type, x: store.snapPx(x0 - d.px), y: store.snapPx(y0 - d.py), w: store.snapPx(w), h: store.snapPx(h), pts: norm, ...(d.kind === 'drawLine' && d.arrow ? { name: `Arrow ${Object.values(store.doc(d.sid).nodes).filter((v) => v.name.startsWith('Arrow ')).length + 1}`, style: { arrowEnd: 'arrow' } } : {}) })
 }
 
 /**
@@ -1486,9 +1518,29 @@ function onDblAny(e: MouseEvent) {
   if (sec?.dataset.sec && secScr?.dataset.screen) { renameSection.value = { sid: secScr.dataset.screen, id: sec.dataset.sec }; return }
   const scrEl = hit?.closest('[data-screen]') as HTMLElement | null
   const screen = scrEl ? props.screens.find((v) => v.id === scrEl.dataset.screen) : undefined
-  if (screen && hit) onDbl(hit, screen)
+  if (screen && hit) onDbl(hit, screen, e)
 }
-function onDbl(target: HTMLElement, screen: ScreenRow) {
+/**
+ * 불리언 안쪽 도형 찾기(두 번 누르기): 불리언은 결과 모양 하나로 그려서 안쪽 도형 요소가 없어요 — 누른 자리가 어느 도형 모양 안인지 경로로 재요(맨 위 것부터)
+ */
+let hitCtx: CanvasRenderingContext2D | null = null
+function booleanChildAt(screen: ScreenRow, bid: string, cx: number, cy: number, only?: (c: LayerNode) => boolean): string | null {
+  const d = store.doc(screen.id)
+  const b = d.nodes[bid]
+  if (!b?.children?.length) return null
+  hitCtx ??= document.createElement('canvas').getContext('2d')
+  const w = toWorld(cx, cy)
+  for (const k of [...b.children].reverse()) {
+    const c = d.nodes[k]
+    if (!c || c.hidden || (only && !only(c))) continue
+    const p = apply(invert(worldMat(screen, k)), w.x, w.y)
+    const path = nodePathIn(d, c, -c.x, -c.y)
+    if (path && hitCtx?.isPointInPath(new Path2D(path), p.x, p.y)) return k
+    if (!path && p.x >= 0 && p.y >= 0 && p.x <= c.w && p.y <= c.h) return k
+  }
+  return null
+}
+function onDbl(target: HTMLElement, screen: ScreenRow, ev?: MouseEvent) {
   const deepest = (target.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
   if (!deepest || !isNative(screen)) return
   // 판단은 '두 번 누르기 직전'(첫 누름 전) 선택 기준 — 빠르게 누르는 사이 첫 누름이 부모를, 둘째 누름이 안쪽을 골라도
@@ -1498,6 +1550,16 @@ function onDbl(target: HTMLElement, screen: ScreenRow) {
   if (!lid) return
   const n = store.node(screen.id, lid)
   if (!n) return
+  // 불리언(피그마와 같아요): 한 번 누르면 합친 면, 두 번 누르면 누른 자리의 안쪽 도형
+  if (n.type === 'boolean' && ev) {
+    const child = booleanChildAt(screen, lid, ev.clientX, ev.clientY)
+    if (child) { store.selectLayer(screen.id, child); return }
+  }
+  // 마스크 그룹(피그마와 같아요): 마스크는 그려지지 않아 요소로 안 잡혀요 — 보이는 내용이 없는 자리를 두 번 누르면, 그 자리가 마스크 모양 안일 때 마스크를 골라요
+  if (isContainer(n) && lid === deepest && ev) {
+    const m = booleanChildAt(screen, lid, ev.clientX, ev.clientY, (c) => !!c.isMask)
+    if (m) { store.selectLayer(screen.id, m); return }
+  }
   // 프레임 · 그룹(오토 레이아웃 포함): 한 단계만 안으로 — 누른 자리의 바로 아래 레이어를 골라요
   if (isContainer(n) && n.type !== 'section' && lid !== deepest) {
     const d = store.doc(screen.id)
@@ -1505,7 +1567,15 @@ function onDbl(target: HTMLElement, screen: ScreenRow) {
     while (c && d.nodes[c]?.parentId !== lid) c = d.nodes[c]?.parentId
     if (c) { store.selectLayer(screen.id, c); return }
   }
-  if (n.type === 'text' && !n.locked) { store.selectLayer(screen.id, lid); store.editing.value = lid; return }
+  if (n.type === 'text' && !n.locked) {
+    // 여러 글자를 함께 골라 둔 채면 선택은 그대로 — 고치는 글자가 함께 고른 글자에도 똑같이 들어가요(다른 프레임 것도)
+    const inX = store.xsel.value.some((x) => x.sid === screen.id && x.id === lid)
+    const many = store.layerIds.value.length + store.xsel.value.length > 1
+    const picked = inX || (store.screenId.value === screen.id && store.layerIds.value.includes(lid))
+    if (many && picked) { if (inX) store.promoteX(screen.id) } else store.selectLayer(screen.id, lid)
+    store.editing.value = lid
+    return
+  }
   // 도형: 이미 골라 둔 것이거나 맨 위 단계에서 바로 잡히는 것이면 편집, 막 안으로 들어가 골라진 것이면 고르기만
   const direct = before.includes(lid) || pickLayer(screen.id, deepest, false, []) === lid
   if (!direct) { store.selectLayer(screen.id, lid); return }
@@ -1540,6 +1610,7 @@ const selWorld = computed(() => {
   return isCanvas(s) ? null : rectOf(s)
 })
 const lastCopy = useLastCopy()
+const renameReq = useRenameReq()
 const ctx = useContextMenu()
 /** 붙여넣을 때 문서끼리 자리 환산: 화면 · 캔버스의 캔버스 좌표와 크기 */
 const pasteGeo = {
@@ -1727,7 +1798,11 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.shiftKey && !mod && e.code === 'Digit2' && sid) { fitSelection(); return }
   if (e.shiftKey && !mod && e.code === 'Digit0') { zoomAt(1); return }
   // 눈금자 ⇧R
+  // 이름 바꾸기 ⌘R(피그마와 같아요 — 브라우저 새로고침 대신): 하나면 레이어 목록에서 바로, 여러 개면 창
+  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyR') { if (layerMode) { stop(); renameReq.value = pickedLayers(store, sid!, ids) } return }
   if (e.shiftKey && !mod && !e.altKey && e.code === 'KeyR') { stop(); rulersShown.value = !rulersShown.value; return }
+  // ⇧' 픽셀 격자 보이기 · ⇧⌘' 픽셀에 맞추기(피그마와 같아요)
+  if (e.shiftKey && !e.altKey && e.code === 'Quote') { stop(); emit('view', mod ? 'snapPixel' : 'pixelGrid'); return }
   // 레이아웃 그리드 보이기 · 숨기기 ⌃G
   if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? tr('Layout grids shown') : tr('Layout grids hidden')); return }
   // 오토 레이아웃 ⇧A · 빼기 ⌥⇧A
@@ -1806,7 +1881,7 @@ function onKeyDown(e: KeyboardEvent) {
   }
   if (!sid) return
   // 지우기
-  if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) store.remove(sid, ids); else emit('screen-action', 'remove'); return }
+  if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) { if (mix.value.length) emit('screen-action', 'remove'); store.remove(sid, ids) } else emit('screen-action', 'remove'); return }
   // 순서
   // ⌥ 가 e.key 를 바꾸는 맥에서도 되게 e.code 로. 화면만 골랐으면 화면 순서
   if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
@@ -1821,7 +1896,10 @@ function onKeyDown(e: KeyboardEvent) {
     stop()
     if (e.shiftKey) { store.selectParent(sid); return }
     const n = ids.length === 1 ? store.node(sid, ids[0]!) : undefined
+    // 글자 여러 개(이 프레임 · 다른 프레임)를 골랐으면 첫 글자를 고치고, 치는 대로 나머지에도 똑같이
+    const texts = ids.map((id) => store.node(sid, id)).filter((v) => v?.type === 'text')
     if (n?.type === 'text') store.editing.value = n.id
+    else if (texts.length && texts.length === ids.length) store.editing.value = texts[0]!.id
     else if (n && EDITABLE.has(n.type)) enterVectorEdit(sid, n.id) // 도형 · 벡터: Enter = 편집(피그마와 같아요)
     else store.selectChildren(sid)
     return
@@ -1836,7 +1914,8 @@ function onKeyDown(e: KeyboardEvent) {
     // 오토 레이아웃 안이면 옮기지 않고 순서를 바꿔요(피그마와 같아요)
     const dirOf = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } as const
     if (layerMode && store.moveInFlow(sid, ids, dirOf[e.key as keyof typeof dirOf])) return
-    if (layerMode) store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k }))
+    // 함께 고른 다른 문서의 레이어도 같이(실행취소 한 번)
+    if (layerMode) store.batch(() => { store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k })); for (const [s2, ids2] of store.xGroups()) store.update(s2, store.topIds(s2, ids2), (n) => ({ x: n.x + a[0] * k, y: n.y + a[1] * k })) })
     else emit('screen-action', 'nudge', a[0] * k, a[1] * k)
   }
 }
@@ -1925,6 +2004,36 @@ watch(() => [store.docs, store.editing.value], () => nextTick(() => tick.value++
 const selScreen = computed(() => props.screens.find((s) => s.id === store.screenId.value) ?? null)
 const selFrame = computed(() => (selScreen.value && !isCanvas(selScreen.value) ? selScreen.value : null))
 const multiBoxes = computed(() => [...multi.value, ...mix.value].map((id) => props.screens.find((s) => s.id === id)).filter((s): s is ScreenRow => !!s))
+/** 함께 고른 다른 문서의 레이어(맨 위 것만)를 끌기 시작할 때의 자리 · 부모 행렬 · 기록 시작점 */
+function xCarryStart() {
+  const xcarry: { sid: string; id: string; x: number; y: number; inv: Mat }[] = []
+  const xbefore: [string, string][] = []
+  for (const [sid, ids] of store.xGroups()) {
+    const sc = props.screens.find((v) => v.id === sid)
+    if (!sc) continue
+    const d = store.doc(sid)
+    const top = store.topIds(sid, ids).filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
+    if (!top.length) continue
+    xbefore.push([sid, store.begin(sid)])
+    for (const id of top) xcarry.push({ sid, id, x: d.nodes[id]!.x, y: d.nodes[id]!.y, inv: invert(parentWorld(sc, id)) })
+  }
+  return xcarry.length ? { xcarry, xbefore } : {}
+}
+/** 함께 고른 것까지 감싸는 상자(캔버스 좌표) — 문서를 넘어 고르면 큰 상자 하나 + 크기(손잡이는 없어요) */
+const xAllWorld = computed(() => {
+  void tick.value
+  if (!store.xsel.value.length) return null
+  const s = selScreen.value
+  const bs: Rect[] = []
+  if (s) for (const id of store.layerIds.value) { const b = layerWorld(s, id); if (b) bs.push(b) }
+  for (const x of store.xsel.value) { const sc = props.screens.find((v) => v.id === x.sid); const b = sc ? layerWorld(sc, x.id) : null; if (b) bs.push(b) }
+  return bs.length ? union(bs) : null
+})
+/** 함께 고른 다른 문서 레이어의 선택선 */
+const xBoxes = computed<Geom[]>(() => {
+  void tick.value
+  return store.xsel.value.map((x) => { const sc = props.screens.find((v) => v.id === x.sid); return sc ? layerGeom(sc, x.id) : null }).filter((g): g is Geom => !!g)
+})
 type Geom = NonNullable<ReturnType<typeof layerGeom>>
 const selBoxes = computed<Geom[]>(() => {
   void tick.value
@@ -1932,11 +2041,75 @@ const selBoxes = computed<Geom[]>(() => {
   if (!s) return []
   return store.layerIds.value.map((id) => layerGeom(s, id)).filter((g): g is Geom => !!g)
 })
+/**
+ * 오토 레이아웃 간격 표시(피그마와 같아요): 오른쪽 패널의 간격 · 여백 칸에 올리면 고른 오토 레이아웃 프레임마다 그 자리를 분홍으로.
+ * 자리는 프레임 안 좌표(돌린 프레임은 상자째 돌려요) — 항목 사이 간격은 실제 놓인 자리로 재요(Auto 간격도 맞게)
+ */
+const alHint = useAlHint()
+type Zone = { x: number; y: number; w: number; h: number }
+const alZones = computed(() => {
+  void tick.value
+  const hint = alHint.value
+  if (hint === null) return []
+  const picks: { sid: string; id: string }[] = [...(selScreen.value ? store.layerIds.value.map((id) => ({ sid: selScreen.value!.id, id })) : []), ...store.xsel.value]
+  const out: { key: string; g: Geom; zones: Zone[] }[] = []
+  for (const p of picks) {
+    const sc = props.screens.find((v) => v.id === p.sid)
+    const d = store.doc(p.sid)
+    const n = d.nodes[p.id]
+    const l = n?.style.layout
+    const g = sc ? layerGeom(sc, p.id) : null
+    if (!n || !l || !g) continue
+    const [pt, pr, pb, pl] = l.padding
+    const zones: Zone[] = []
+    const W = n.w, H = n.h
+    if (hint === 'padH' || hint === 3) zones.push({ x: 0, y: 0, w: pl, h: H })
+    if (hint === 'padH' || hint === 1) zones.push({ x: W - pr, y: 0, w: pr, h: H })
+    if (hint === 'padV' || hint === 0) zones.push({ x: 0, y: 0, w: W, h: pt })
+    if (hint === 'padV' || hint === 2) zones.push({ x: 0, y: H - pb, w: W, h: pb })
+    if (hint === 'gap' || hint === 'rowGap') {
+      const kids = (n.children ?? []).map((k) => d.nodes[k]).filter((c): c is LayerNode => !!c && !c.hidden && !c.absolute)
+      const hz = l.mode === 'horizontal'
+      // 줄 나누기(줄바꿈일 때): 가로면 위쪽 자리로, 세로면 왼쪽 자리로 묶어요
+      const rows: LayerNode[][] = []
+      if (l.wrap) {
+        for (const c of [...kids].sort((a, b) => (hz ? a.y - b.y : a.x - b.x))) {
+          const row = rows.find((r) => Math.abs((hz ? r[0]!.y : r[0]!.x) - (hz ? c.y : c.x)) < 0.5)
+          if (row) row.push(c); else rows.push([c])
+        }
+      } else rows.push(kids)
+      if (hint === 'gap') {
+        for (const row of rows) {
+          const r = [...row].sort((a, b) => (hz ? a.x - b.x : a.y - b.y))
+          // 줄의 옆 방향 범위(줄바꿈이면 그 줄, 아니면 여백 안 전체)
+          const c0 = l.wrap ? Math.min(...r.map((c) => (hz ? c.y : c.x))) : hz ? pt : pl
+          const c1 = l.wrap ? Math.max(...r.map((c) => (hz ? c.y + c.h : c.x + c.w))) : hz ? H - pb : W - pr
+          for (let i = 0; i + 1 < r.length; i++) {
+            const a = r[i]!, b = r[i + 1]!
+            const s0 = hz ? a.x + a.w : a.y + a.h, s1 = hz ? b.x : b.y
+            if (s1 - s0 <= 0.01) continue
+            zones.push(hz ? { x: s0, y: c0, w: s1 - s0, h: c1 - c0 } : { x: c0, y: s0, w: c1 - c0, h: s1 - s0 })
+          }
+        }
+      } else {
+        const bands = rows.map((r) => ({ a: Math.min(...r.map((c) => (hz ? c.y : c.x))), b: Math.max(...r.map((c) => (hz ? c.y + c.h : c.x + c.w))) })).sort((p, q) => p.a - q.a)
+        for (let i = 0; i + 1 < bands.length; i++) {
+          const s0 = bands[i]!.b, s1 = bands[i + 1]!.a
+          if (s1 - s0 <= 0.01) continue
+          zones.push(hz ? { x: pl, y: s0, w: W - pl - pr, h: s1 - s0 } : { x: s0, y: pt, w: s1 - s0, h: H - pt - pb })
+        }
+      }
+    }
+    const shown = zones.filter((z) => z.w > 0.01 && z.h > 0.01)
+    if (shown.length) out.push({ key: p.sid + ':' + p.id, g, zones: shown })
+  }
+  return out
+})
 /** 고른 컴포넌트(인스턴스): 피그마처럼 선택선 · 손잡이 · 크기 표시를 보라색으로 */
 const compIds = computed(() => { const s = selScreen.value; return new Set(s ? store.layerIds.value.filter((id) => store.node(s.id, id)?.type === 'instance') : []) })
 const selComp = computed(() => selBoxes.value.length > 0 && selBoxes.value.every((b) => compIds.value.has(b.id)))
 const single = computed(() => {
-  if (selBoxes.value.length !== 1 || store.editing.value) return null
+  if (selBoxes.value.length !== 1 || store.editing.value || store.xsel.value.length) return null
   const b = selBoxes.value[0]!
   const n = store.node(selScreen.value!.id, b.id)
   return { ...b, locked: !!n?.locked, rotation: n?.rotation ?? 0 }
@@ -2383,8 +2556,8 @@ const gridStyle = computed(() => (props.background ? { backgroundColor: props.ba
  */
 const PX_FROM = 4, PX_FULL = 8
 /** 격자가 보이는 정도: 400% 에서 0 → 800% 에서 1 (꺼져 있거나 400% 미만이면 0) */
-// 페이지 설정 Pixel grid 를 끄면 픽셀에 맞추기도 꺼져요(소수점 움직임) — 피그마의 Snap to pixel grid 와 같은 역할
-watch(() => props.pixelGrid, (v) => { store.pixelSnap.value = v !== false }, { immediate: true })
+// 픽셀에 맞추기(Snap to pixel grid ⇧⌘', 피그마와 같아요): 격자 보이기(Pixel grid)와 따로 — 끄면 소수점 이동 · 크기
+watch(() => props.snapPixel, (v) => { store.pixelSnap.value = v !== false }, { immediate: true })
 const pxAlpha = computed(() => (props.pixelGrid === false ? 0 : Math.max(0, Math.min(1, (vp.value.zoom - PX_FROM) / (PX_FULL - PX_FROM)))))
 /**
  * 픽셀 격자는 <canvas> 에 직접 그려요: 선마다 기기 픽셀 1칸에 딱 맞춰서(피그마와 같아요) — 배율이 딱 떨어지지 않아도 선 진하기가 고르게.
@@ -2658,7 +2831,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :style="{ left: `calc(${box(s).left} + ${box(s).width})`, top: `calc(${box(s).top} - 20px)` }"
         @pointerdown.stop
       >
-        <svg width="8" height="12" viewBox="0 0 38 57" aria-hidden="true"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1ABCFE" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0ACF83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#FF7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#F24E1E" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#A259FF" /></svg>
+        <!-- 피그마 표시 7 × 10.5(로고 비율 2:3) --><svg width="7" height="10.5" viewBox="0 0 38 57" aria-hidden="true"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1ABCFE" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0ACF83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#FF7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#F24E1E" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#A259FF" /></svg>
       </component>
       <div v-if="parentOutline" class="parent" :style="parentOutline" />
       <template v-if="gapHot || bandDrag?.kind === 'gap'"><div v-for="(b, i) in gapBands" :key="'gap' + i" class="gap" :class="{ v: b.v }" :style="{ left: b.left, top: b.top, width: b.width, height: b.height }"><i :style="{ cursor: b.v ? 'ns-resize' : 'ew-resize' }" @pointerdown="startBand($event, 'gap')" /></div></template>
@@ -2685,8 +2858,14 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </template>
       </div>
       <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
+      <div v-for="b in xBoxes" :key="'x' + b.id" class="sel" :style="rbox(b)" />
+      <!-- 오토 레이아웃 간격 · 여백 표시(오른쪽 패널 칸에 올렸을 때) -->
+      <div v-for="a in alZones" :key="'al' + a.key" class="al-hint" :style="rbox(a.g)" aria-hidden="true">
+        <span v-for="(z, k) in a.zones" :key="k" class="al-zone" :style="{ left: z.x * vp.zoom + 'px', top: z.y * vp.zoom + 'px', width: z.w * vp.zoom + 'px', height: z.h * vp.zoom + 'px' }" />
+      </div>
       <!-- 여러 개 고름: 전체를 감싸는 상자(손잡이로 함께 크기 바꾸기) + 크기 -->
-      <div v-if="selBoxes.length > 1 && selWorld && !multi.length" class="sel group" :class="{ comp: selComp }" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
+      <div v-if="xAllWorld && !multi.length" class="sel group" :style="box({ x: xAllWorld.x, y: xAllWorld.y, width: xAllWorld.w, height: xAllWorld.h })"><span class="sq size">{{ fmt(xAllWorld.w) }} × {{ fmt(xAllWorld.h) }}</span></div>
+      <div v-else-if="selBoxes.length > 1 && selWorld && !multi.length" class="sel group" :class="{ comp: selComp }" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
         <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startResizeMany($event, h)" />
         <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, 0) }" @pointerdown.stop.prevent="startResizeMany($event, c)" />
         <span class="sq size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
@@ -2801,6 +2980,9 @@ a.fig-tag { cursor: pointer; }
 a.fig-tag:hover svg { transform: scale(1.15); }
 .fig-tag svg { flex: none; transition: transform .12s ease; }
 .sel { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 오토 레이아웃 간격 표시(피그마와 같아요): 분홍 칠 + 테두리 */
+.al-hint { position: absolute; pointer-events: none; transform-origin: center; }
+.al-zone { position: absolute; box-sizing: border-box; background: color-mix(in srgb, var(--iris-spacing, #E5399F) 16%, transparent); box-shadow: inset 0 0 0 1px var(--iris-spacing, #E5399F); }
 /* 컴포넌트(인스턴스) 선택 · 마우스 올림: 피그마 보라 */
 .comp { --iris-select: var(--iris-component); }
 /* ⌘ + 마우스 올림: 요소 1px 테두리 · 글자 밑줄 1px */

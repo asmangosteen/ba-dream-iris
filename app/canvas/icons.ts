@@ -1,17 +1,17 @@
 import type { LayerType } from './schema'
 
-/** 레이어 종류 아이콘(12 × 12, 선 1.2). 이미지는 디자인 시스템 아이콘을 써요 */
+/** 레이어 종류 아이콘 — 편집기 아이콘 이름(EditorIcon · irisIcons.ts). 이미지는 따로 image 아이콘을 써요 */
 export const LAYER_ICON: Partial<Record<LayerType, string>> = {
-  frame: 'M3.5 1v10M8.5 1v10M1 3.5h10M1 8.5h10',
-  section: 'M1.6 3.5V2.6a1 1 0 0 1 1-1h2.2M7.2 1.6h2.2a1 1 0 0 1 1 1v6.8a1 1 0 0 1-1 1H2.6a1 1 0 0 1-1-1V6',
-  rect: 'M3.1 1.6h5.8a1.5 1.5 0 0 1 1.5 1.5v5.8a1.5 1.5 0 0 1-1.5 1.5H3.1a1.5 1.5 0 0 1-1.5-1.5V3.1a1.5 1.5 0 0 1 1.5-1.5z',
-  text: 'M2 3V2h8v1M6 2v8M4.5 10h3',
-  ellipse: 'M6 1.6a4.4 4.4 0 1 0 0 8.8a4.4 4.4 0 1 0 0-8.8z',
-  line: 'M2 10L10 2',
-  polygon: 'M6 1.6l4.6 8.4H1.4z',
-  star: 'M6 1.3l1.4 3 3.3.4-2.4 2.3.6 3.3L6 8.7 3.1 10.3l.6-3.3L1.3 4.7l3.3-.4z',
-  path: 'M1.8 9.6c1.6-4.4 3.2-6.6 4.6-6.4 1.6.2.4 4.6 1.8 4.8.8.1 1.4-.9 2-2',
-  vector: 'M6 1.5l3.6 5L7.4 10.5H4.6L2.4 6.5zM6 1.5V6.5M4.6 10.5h2.8',
-  instance: 'M6 1.4l4.6 4.6L6 10.6 1.4 6z',
-  boolean: 'M1.8 1.8h5.4v3h3v5.4H4.8v-3h-3z',
+  frame: 'frame',
+  section: 'section',
+  rect: 'rectangle',
+  text: 'text',
+  ellipse: 'ellipse',
+  line: 'line',
+  polygon: 'polygon',
+  star: 'star',
+  path: 'pencil',
+  vector: 'pen',
+  instance: 'component',
+  boolean: 'boolean',
 }

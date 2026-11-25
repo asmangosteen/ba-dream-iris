@@ -6,23 +6,23 @@ export type Tool = 'move' | 'hand' | 'scale' | 'pen' | 'frame' | 'section' | 're
 const tool = defineModel<Tool>({ default: 'move' })
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
-interface Item { key: Tool; label: string; key2?: string; d?: string; icon?: string; fill?: boolean }
+interface Item { key: Tool; label: string; key2?: string; icon: string }
 const ITEMS: Record<Tool, Item> = {
-  move: { key: 'move', label: 'Move', key2: 'V', d: 'M3.5 2.5l9 4.4-3.9 1.5-1.5 3.9z' },
-  scale: { key: 'scale', label: 'Scale', key2: 'K', d: 'M2.5 9.5v4h4M2.5 13.5l5-5M13.5 6.5v-4h-4M13.5 2.5l-5 5M9.5 13.5h4v-4' },
-  hand: { key: 'hand', label: 'Hand tool', key2: 'H', d: 'M5.5 8V4.2a1 1 0 0 1 2 0V7.5M7.5 7V3.2a1 1 0 0 1 2 0V7M9.5 7V4.2a1 1 0 0 1 2 0V9.5c0 2.6-1.7 4.5-4.2 4.5-1.6 0-2.6-.7-3.5-2.1L2.4 9.6a1 1 0 0 1 1.6-1.2l1.5 1.6' },
-  frame: { key: 'frame', label: 'Frame', key2: 'F', d: 'M5.5 2v12M10.5 2v12M2 5.5h12M2 10.5h12' },
-  section: { key: 'section', label: 'Section', key2: '⇧S', d: 'M2.5 5.5V4a1.5 1.5 0 0 1 1.5-1.5h3M10 2.5h2a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 12V8.5' },
-  rect: { key: 'rect', label: 'Rectangle', key2: 'R', d: 'M4.5 2.5h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z' },
-  line: { key: 'line', label: 'Line', key2: 'L', d: 'M2.5 13.5l11-11' },
-  arrow: { key: 'arrow', label: 'Arrow', key2: '⇧L', d: 'M2.5 13.5l11-11M7 2.5h6.5V9' },
-  ellipse: { key: 'ellipse', label: 'Ellipse', key2: 'O', d: 'M8 2.5a5.5 5.5 0 1 0 0 11A5.5 5.5 0 1 0 8 2.5z' },
-  polygon: { key: 'polygon', label: 'Polygon', d: 'M8 2.5l5.8 10.5H2.2z' },
-  star: { key: 'star', label: 'Star', d: 'M8 1.6l1.9 4 4.4.6-3.2 3 .8 4.4L8 11.5l-3.9 2.1.8-4.4-3.2-3 4.4-.6z' },
+  move: { key: 'move', label: 'Move', key2: 'V', icon: 'cursor_move' },
+  scale: { key: 'scale', label: 'Scale', key2: 'K', icon: 'scale' },
+  hand: { key: 'hand', label: 'Hand tool', key2: 'H', icon: 'hand' },
+  frame: { key: 'frame', label: 'Frame', key2: 'F', icon: 'frame' },
+  section: { key: 'section', label: 'Section', key2: '⇧S', icon: 'section' },
+  rect: { key: 'rect', label: 'Rectangle', key2: 'R', icon: 'rectangle' },
+  line: { key: 'line', label: 'Line', key2: 'L', icon: 'line' },
+  arrow: { key: 'arrow', label: 'Arrow', key2: '⇧L', icon: 'arrow_line' },
+  ellipse: { key: 'ellipse', label: 'Ellipse', key2: 'O', icon: 'ellipse' },
+  polygon: { key: 'polygon', label: 'Polygon', icon: 'polygon' },
+  star: { key: 'star', label: 'Star', icon: 'star' },
   image: { key: 'image', label: 'Image/video…', key2: '⇧⌘K', icon: 'image' },
-  pen: { key: 'pen', label: 'Pen', key2: 'P', d: 'M8 1.8l4.6 6.4L9.5 13H6.5L3.4 8.2zM8 1.8V8M6.5 13h3v1.5h-3z' },
-  pencil: { key: 'pencil', label: 'Pencil', key2: '⇧P', d: 'M2.5 13.5l1-3.5 7.6-7.6a1.4 1.4 0 0 1 2 2L5.5 12z M9.8 3.7l2.5 2.5' },
-  text: { key: 'text', label: 'Text', key2: 'T', d: 'M3 4.5V3h10v1.5M8 3v10M6 13h4' },
+  pen: { key: 'pen', label: 'Pen', key2: 'P', icon: 'pen' },
+  pencil: { key: 'pencil', label: 'Pencil', key2: '⇧P', icon: 'pencil' },
+  text: { key: 'text', label: 'Text', key2: 'T', icon: 'text' },
 }
 const GROUPS: { id: string; tools: Tool[] }[] = [
   { id: 'move', tools: ['move', 'hand', 'scale'] },
@@ -98,8 +98,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
         @click="pick(shown(g).key)"
       >
         <template v-for="it in [shown(g)]" :key="it.key">
-          <svg v-if="it.d" width="20" height="20" viewBox="0 0 16 16" aria-hidden="true"><path :d="it.d" :fill="it.fill ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.33" stroke-linejoin="round" stroke-linecap="round" /></svg>
-          <EditorIcon v-else :name="it.icon!" :size="20" />
+          <EditorIcon :name="it.icon" :size="20" />
         </template>
       </button>
       <button v-if="g.tools.length > 1" type="button" class="sq more" :class="{ open: open === g.id }" :data-grp="g.id" :aria-label="tr(GROUP_LABEL[g.id]!)" :data-tip="tr(GROUP_LABEL[g.id]!)" data-tip-at="top" aria-haspopup="menu" :aria-expanded="open === g.id" @click="toggle(g.id, $event.detail === 0)" @keydown="onChevKey($event, g.id)">
@@ -107,9 +106,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
       </button>
       <div v-if="open === g.id" class="sq menu pop" role="menu" :aria-label="tr(GROUP_LABEL[g.id]!)" @keydown="onMenuKey($event, g.id)">
         <button v-for="t in g.tools" :key="t" type="button" role="menuitemradio" :aria-checked="tool === t" :class="['sq', 'menu-item', { on: tool === t }]" @click="pick(t)">
-          <svg class="ck" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path v-if="t === shown(g).key" d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
-          <svg v-if="ITEMS[t].d" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="ITEMS[t].d" :fill="ITEMS[t].fill ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.33" stroke-linejoin="round" stroke-linecap="round" /></svg>
-          <EditorIcon v-else :name="ITEMS[t].icon!" :size="16" />
+          <EditorIcon name="check" :size="12" class="ck" :style="{ visibility: t === shown(g).key ? 'visible' : 'hidden' }" />
+          <EditorIcon :name="ITEMS[t].icon" :size="16" />
           <span class="grow">{{ tr(ITEMS[t].label) }}</span><span v-if="ITEMS[t].key2" class="key">{{ ITEMS[t].key2 }}</span>
         </button>
       </div>

@@ -247,7 +247,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
       <span>{{ tr(title) }}</span>
       <span class="acts">
         <!-- Create color style 은 뺐어요: 로컬 스타일은 고르는 목록에 나오지 않아요(디자인 시스템 변수만) -->
-        <button class="ib s24 styl" :aria-label="tr('Apply styles and variables')" :data-tip="tr('Apply styles and variables')" @click="openLibraries"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="5" cy="5" r="2" /><circle cx="11" cy="5" r="2" /><circle cx="5" cy="11" r="2" /><circle cx="11" cy="11" r="2" /></g></svg></button>
+        <button class="ib s24 styl" :aria-label="tr('Apply styles and variables')" :data-tip="tr('Apply styles and variables')" @click="openLibraries"><EditorIcon name="apply_styles" /></button>
         <button class="ib s24" :aria-label="tr(`Add ${title.toLowerCase()}`)" :data-tip="tr(`Add ${title.toLowerCase()}`)" @click="add"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
@@ -255,7 +255,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
     <template v-for="(i, vi) in rows" :key="i">
       <!-- 바탕 칠: [견본 + 값] · 👁 · − (피그마 Fill 행) -->
       <div v-if="i < 0" class="prow" data-drag-row :class="{ dragging: drag?.from === vi }">
-        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><EditorIcon class="keep" name="menu_hamburger" :size="10" /></button>
         <div :class="['sq', 'fld', 'pf', { open: open === -1, bound: !!bound }]">
           <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="tr(`Edit ${title.toLowerCase()} color`)" :aria-expanded="open === -1" @click="openAt(-1)" />
           <template v-if="!bound">
@@ -271,7 +271,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
       </div>
       <!-- 덧붙인 칠 -->
       <div v-else-if="extras[i]" class="prow" data-drag-row :class="{ off: extras[i]!.visible === false, dragging: drag?.from === vi }">
-        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><EditorIcon class="keep" name="menu_hamburger" :size="10" /></button>
         <div :class="['sq', 'fld', 'pf', { open: open === i, bound: !!(extras[i] as { token?: string }).token }]">
           <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="tr(`Edit ${title.toLowerCase()}`)" :aria-expanded="open === i" @click="openAt(i)" />
           <TokenPicker v-if="extras[i]!.type === 'solid' && (extras[i] as { token?: string }).token" :kinds="['color']" :bound="(extras[i] as { token?: string }).token" :label="`${title} color`" @pick="(t) => bindExtra(i, t)" @unbind="unbindExtra(i)" />
@@ -313,15 +313,15 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 /* 비어 있는 섹션: 머리 줄만, 제목은 보통 굵기(피그마 §2.4) */
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
 /* 피그마 Fill · Stroke 행: [견본 16 · 값 | 불투명도 48 %] 8 [👁 24][− 24] */
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
 .prow > .fld { margin-right: var(--ref-spacing-06); }
 .prow.off .fld { opacity: 0.45; }
 /* 칸 하나: 왼쪽 [견본 + 이름 · hex](안쪽 8, 사이 8) · 1px 칸막이(패널 색) · 오른쪽 불투명도(48, 안쪽 8, 오른쪽 정렬). 열림 · 포커스는 칸 전체에 1px 파란 선만 */

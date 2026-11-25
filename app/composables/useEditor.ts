@@ -1,10 +1,13 @@
 /** 페이지 설정(pages.viewport jsonb): 캔버스 배경색 · 픽셀 격자 */
-export interface PageSettings { background?: string | null; pixelGrid?: boolean; /** 가이드선(캔버스 좌표) */ guides?: { x: number[]; y: number[] } }
+/** pixelGrid: 픽셀 격자 보이기(⇧'), snapPixel: 픽셀에 맞추기(⇧⌘' — 끄면 소수점 이동 · 크기). 둘 다 기본 켬 */
+export interface PageSettings { background?: string | null; pixelGrid?: boolean; snapPixel?: boolean; /** 가이드선(캔버스 좌표) */ guides?: { x: number[]; y: number[] } }
 export interface PageRow { id: string; name: string; sort_order: number; layers?: unknown; viewport?: PageSettings | null }
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId
 export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
 export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown }
+
+import { moveOrder } from '~/canvas/order'
 
 /** 에디터 데이터: 프로젝트 · 페이지 · 선택한 페이지의 화면 */
 export function useEditor(projectId: string) {
@@ -66,6 +69,19 @@ export function useEditor(projectId: string) {
     if (error) { p.viewport = before; throw error }
   }
 
+  /** 페이지 순서를 통째로 정해 저장(레이어처럼 끌어서 바꾸기 · 실행취소에도 써요) */
+  async function setPageOrder(order: string[]) {
+    const cur = pages.data.value ?? []
+    const at = new Map(order.map((v, k) => [v, k]))
+    const list = [...cur].sort((a, b) => (at.get(a.id) ?? 1e9) - (at.get(b.id) ?? 1e9)).map((p, k) => ({ ...p, sort_order: k }))
+    if (list.every((x, k) => x.id === cur[k]?.id)) return
+    pages.data.value = list
+    if (preview) return
+    const results = await Promise.all(list.map((x) => supabase.from('pages').update({ sort_order: x.sort_order }).eq('id', x.id)))
+    const err = results.find((r) => r.error)?.error
+    if (err) throw err
+  }
+
   async function renamePage(id: string, name: string) {
     const p = pages.data.value?.find((x) => x.id === id)
     if (!p || !name.trim() || p.name === name.trim()) return
@@ -89,14 +105,19 @@ export function useEditor(projectId: string) {
     if (pageId.value === id) pageId.value = next[0]?.id ?? null
   }
 
-  /** 화면(프레임) 앞뒤 순서: 뒤에 있을수록 위에 그려져요. sort_order 를 다시 매겨 저장 */
-  async function reorderScreen(id: string, to: 'front' | 'back' | 'forward' | 'backward') {
-    const list = [...(screens.data.value ?? [])]
-    const i = list.findIndex((x) => x.id === id)
-    if (i < 0) return
-    const [s] = list.splice(i, 1)
-    const j = to === 'front' ? list.length : to === 'back' ? 0 : Math.max(0, Math.min(list.length, i + (to === 'forward' ? 1 : -1)))
-    list.splice(j, 0, s!)
+  /**
+   * 화면(프레임) 앞뒤 순서: 뒤에 있을수록 위에 그려져요(레이어 목록에선 위쪽). 여러 개를 고르면 함께, 서로의 순서는 그대로(피그마와 같아요)
+   */
+  async function reorderScreen(id: string | string[], to: 'front' | 'back' | 'forward' | 'backward') {
+    const ids = new Set(Array.isArray(id) ? id : [id])
+    await setScreenOrder(moveOrder((screens.data.value ?? []).map((x) => x.id), ids, to))
+  }
+  /** 화면 순서를 통째로 정해 저장(실행취소에도 써요) */
+  async function setScreenOrder(order: string[]) {
+    const cur = screens.data.value ?? []
+    const at = new Map(order.map((v, k) => [v, k]))
+    const list = [...cur].sort((a, b) => (at.get(a.id) ?? 1e9) - (at.get(b.id) ?? 1e9))
+    if (list.every((x, k) => x.id === cur[k]?.id)) return
     screens.data.value = list
     if (preview) { if (pageId.value) PREVIEW_SCREENS[pageId.value] = list as never; return }
     const results = await Promise.all(list.map((x, k) => supabase.from('screens').update({ sort_order: k }).eq('id', x.id)))
@@ -121,7 +142,7 @@ export function useEditor(projectId: string) {
       if (error) throw error
       Object.assign(row, data)
     } else (PREVIEW_SCREENS[pageId.value] ??= []).push(row)
-    screens.data.value = preview ? [...(PREVIEW_SCREENS[pageId.value] ?? [])] : [...list, row]
+    screens.data.value = preview ? [...(PREVIEW_SCREENS[pageId.value] ?? [])] : [...(screens.data.value ?? []), row] // 여러 개를 한꺼번에 더할 때도 맞게 최신 목록에
     return row
   }
 
@@ -153,13 +174,13 @@ export function useEditor(projectId: string) {
   }
 
   async function removeScreen(id: string) {
-    const list = screens.data.value ?? []
     if (!preview) {
       const { error } = await supabase.from('screens').delete().eq('id', id)
       if (error) throw error
     } else if (pageId.value) PREVIEW_SCREENS[pageId.value] = (PREVIEW_SCREENS[pageId.value] ?? []).filter((x) => x.id !== id)
-    screens.data.value = list.filter((x) => x.id !== id)
+    // 여러 개를 한꺼번에 지울 때도 맞게: 지운 뒤의 최신 목록에서 빼요
+    screens.data.value = (screens.data.value ?? []).filter((x) => x.id !== id)
   }
 
-  return { project, pages, pageId, screens, addPage, renamePage, removePage, reorderScreen, updatePageSettings, addScreen, updateScreen, removeScreen }
+  return { project, pages, pageId, screens, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen }
 }

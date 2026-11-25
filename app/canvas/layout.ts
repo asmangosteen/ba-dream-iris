@@ -1,5 +1,7 @@
 import type { AutoLayout, Constraints, LayerDoc, LayerNode } from './schema'
 import { fitBoolean } from './boolean'
+import { apply, localMatrix } from './geom'
+import { isGroupNode } from './schema'
 
 /**
  * 오토 레이아웃 계산 (v6). 자식 x · y · w · h 를 직접 써 넣어서 선택 상자 · 측정 · 내보내기는 레이아웃을 몰라도 돼요.
@@ -18,6 +20,8 @@ export function relayout(d: LayerDoc) {
     for (const c of n.children ?? []) visit(c)
     // 불리언: 상자를 결과 모양에 맞춰요(안쪽 도형이 바뀌면 곧바로)
     if (n.type === 'boolean') fitBoolean(d, n)
+    // 마스크 그룹: 상자를 마스크 모양에 맞춰요(피그마와 같아요 — 그룹 크기 = 마스크 크기)
+    else if (isGroupNode(n)) fitMaskGroup(d, n)
     if (n.style.layout && !done.has(id)) { layoutFrame(d, n); done.add(id) }
   }
   for (const id of d.rootIds) visit(id)
@@ -140,3 +144,21 @@ export function constrain(kids: LayerNode[], kids0: Record<string, { x: number; 
   }
 }
 export const boxes0 = (kids: LayerNode[]) => Object.fromEntries(kids.map((k) => [k.id, { x: k.x, y: k.y, w: k.w, h: k.h }]))
+
+/** 마스크 그룹(맨 아래 마스크 + 위 내용): 그룹 상자를 마스크 상자에 맞춰요 — 내용이 마스크 밖으로 나가 있어도 보이는 건 마스크 안이라서 */
+function fitMaskGroup(d: LayerDoc, g: LayerNode) {
+  const m = (g.children ?? []).map((c) => d.nodes[c]).find((c) => c?.isMask && !c.hidden)
+  if (!m) return
+  // 돌린 마스크도: 네 꼭짓점을 그룹 안 좌표로
+  const M = localMatrix(m, m.w, m.h)
+  const ps = [[0, 0], [m.w, 0], [m.w, m.h], [0, m.h]].map(([x, y]) => apply(M, x!, y!))
+  const bx = r2(Math.min(...ps.map((p) => p.x))), by = r2(Math.min(...ps.map((p) => p.y)))
+  const w = Math.max(0.01, r2(Math.max(...ps.map((p) => p.x)) - bx)), h = Math.max(0.01, r2(Math.max(...ps.map((p) => p.y)) - by))
+  if (Math.abs(bx) < 0.01 && Math.abs(by) < 0.01 && Math.abs(w - g.w) < 0.01 && Math.abs(h - g.h) < 0.01) return
+  const G = localMatrix(g, g.w, g.h)
+  const o = apply(G, bx, by)
+  g.x = r2(o.x - w / 2 + (G.a * w) / 2 + (G.c * h) / 2)
+  g.y = r2(o.y - h / 2 + (G.b * w) / 2 + (G.d * h) / 2)
+  g.w = w; g.h = h
+  for (const c of g.children ?? []) { const k = d.nodes[c]; if (k) { k.x = r2(k.x - bx); k.y = r2(k.y - by) } }
+}

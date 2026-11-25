@@ -21,6 +21,8 @@ const stub = {
   },
   remove: () => {},
   update: () => {},
+  // 그려진 크기 맞추기(너비 자동 글자 · 인스턴스 Hug)는 썸네일에선 하지 않아요
+  setMeasured: () => {},
 } as unknown as LayerStore
 provide(LAYER_STORE, stub)
 

@@ -2,7 +2,7 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-import { backgroundCss, effectCss, radiiOf, strokeColors, strokeShadows } from './paint'
+import { backgroundCss, effectCss, radiiOf, STAR_INNER, strokeColors, strokeShadows } from './paint'
 import { squirclePath } from './squircle'
 
 export const SCHEMA_VERSION = 7
@@ -62,6 +62,8 @@ export interface LayoutGrid {
 }
 
 /** 자식을 담는 레이어 */
+/** 내용 자르기(Clip content): 프레임은 기본 켬, 섹션은 기본 끔(피그마와 같아요) — 켜려면 clip: true */
+export const clipsContent = (n?: Pick<LayerNode, 'type' | 'style'> | null) => !!n && (n.type === 'frame' ? n.style.clip !== false : n.type === 'section' ? n.style.clip === true : false)
 export const isContainer = (n?: Pick<LayerNode, 'type'> | null) => !!n && (n.type === 'frame' || n.type === 'section' || n.type === 'boolean')
 /** 점으로 그리는 레이어(SVG) */
 export const isVector = (t: LayerType) => t === 'line' || t === 'polygon' || t === 'star' || t === 'path' || t === 'vector'
@@ -291,6 +293,7 @@ export function descendants(doc: LayerDoc, id: string): string[] {
 }
 
 /** 비율 고정: 값이 없으면 이미지만 고정 */
+export { STAR_INNER }
 export const ratioLocked = (n: Pick<LayerNode, 'lockRatio' | 'type'>) => n.lockRatio ?? n.type === 'image'
 
 /** 각도를 -180 < r ≤ 180 으로 */
@@ -309,7 +312,7 @@ export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
   ellipse: { fill: '#E9EBED' },
   line: { stroke: '#202837', strokeWidth: 1 },
   polygon: { fill: '#E9EBED', sides: 3 },
-  star: { fill: '#E9EBED', points: 5, inner: 0.38 },
+  star: { fill: '#E9EBED', points: 5, inner: STAR_INNER },
   path: { stroke: '#202837', strokeWidth: 2, cap: 'round' },
   section: { fill: '#F2F3F5', radius: 2 },
   vector: { stroke: '#000000', strokeWidth: 1 },

@@ -70,7 +70,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
         <div class="thead">
           <span>{{ tr('Name') }}</span><span>{{ tr('Value') }}</span><span>{{ tr('CSS variable') }}</span>
         </div>
-        <div class="tbody">
+        <div v-ovscroll class="tbody">
           <template v-for="g in groups" :key="g.g">
             <div class="vgrp"><span>{{ groupLabel(g.g) }}</span><span class="num">{{ g.items.length }}</span></div>
             <div v-for="t in g.items" :key="t.id" class="row">

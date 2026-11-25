@@ -2,6 +2,7 @@
 import type { CatalogToken } from '~/canvas/tokens'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import { fromRgba, hslToRgb, hsvToRgb, normHex, rgbToHsl, rgbToHsv, toRgba, type HSVA } from '~/canvas/color'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 
 /**
@@ -141,7 +142,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
     </div>
     <div class="cp-row">
       <button v-if="canPick" class="ib s24" :aria-label="tr('Pick color from screen')" :data-tip="tr('Pick color from screen')" @click="eyedrop">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="M6.95 5.45l3.6 3.6" /><path d="M7.95 6.45l2.6-2.6a1.13 1.13 0 0 1 1.6 1.6l-2.6 2.6" /><path d="M8.25 6.75l-5 5-.65 1.65 1.65-.65 5-5" /></g></svg>
+        <EditorIcon name="eyedropper" />
       </button>
       <div class="cp-bars">
         <div class="bar hue" :style="{ backgroundImage: HUE_BG }" role="slider" tabindex="0" :aria-label="tr('Hue')" :aria-valuenow="Math.round(hsv.h)" aria-valuemin="0" aria-valuemax="360" @pointerdown.prevent="drag($event, 'hue')" @keydown="key($event, 'hue')">
@@ -178,7 +179,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 /* 조준점: 16 원 = 흰 테 4 + 가운데 지금 색, 그림자 .2 — 중심이 판 안쪽 8 안에서만 움직여요 */
 .cp-sv .knob { position: absolute; width: 16px; height: 16px; box-sizing: border-box; border: 4px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 .5px rgb(0 0 0 / 20%), 0 1px 3px rgb(0 0 0 / 20%), inset 0 0 0 .5px rgb(0 0 0 / 15%); pointer-events: none; }
 .cp-row { display: flex; align-items: center; gap: var(--ref-spacing-06); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .cp-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-02) 0; }
 .bar { position: relative; height: 12px; border-radius: 999px; cursor: default; touch-action: none; outline: none; }
 .bar:focus-visible { box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default); }

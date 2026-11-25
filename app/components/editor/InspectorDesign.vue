@@ -25,7 +25,8 @@ const all = computed<ScreenRow[]>(() => (props.multi && props.multi.length > 1 ?
 const isMulti = computed(() => all.value.length > 1)
 const ids = computed(() => all.value.map((s) => s.id))
 /** 위치 · 크기: 모두 같으면 그 값, 다르면 null(Mixed) */
-const same = (key: 'x' | 'y' | 'width' | 'height') => { const v = all.value.map((s) => Math.round(s[key])); return v.every((x) => x === v[0]) ? v[0]! : null }
+/** 소수는 둘째 자리까지(픽셀에 맞추기를 끄면 소수로 움직여요) */
+const same = (key: 'x' | 'y' | 'width' | 'height') => { const v = all.value.map((s) => Math.round(s[key] * 100) / 100); return v.every((x) => x === v[0]) ? v[0]! : null }
 // 여러 프레임 정렬 · 균등 분배 · 간격(Alignment)
 const rects = computed<Rect[]>(() => all.value.map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height })))
 const axis = computed(() => guessAxis(rects.value))
@@ -36,7 +37,8 @@ function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
   if (!input.value.trim() || !Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = same(key) === null ? '' : String(same(key)); return }
-  if (Math.round(v) !== same(key)) emit('update', { [key]: Math.round(v) })
+  const r = Math.round(v * 100) / 100 // 소수도 그대로(둘째 자리까지)
+  if (r !== same(key)) emit('update', { [key]: r })
 }
 /** 화살표 키로 1씩(Shift 는 10씩) 바꾸기 */
 function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
@@ -177,8 +179,8 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       </template>
       <div class="ig">
-        <label class="sq fld"><span>X</span><input :key="'x' + same('x')" :value="same('x') ?? ''" :placeholder="same('x') === null ? tr('Mixed') : ''" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>Y</span><input :key="'y' + same('y')" :value="same('y') ?? ''" :placeholder="same('y') === null ? tr('Mixed') : ''" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>X</span><input :key="'x' + same('x')" :value="same('x') ?? ''" :placeholder="same('x') === null ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>Y</span><input :key="'y' + same('y')" :value="same('y') ?? ''" :placeholder="same('y') === null ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <span />
       </div>
     </section>
@@ -202,11 +204,11 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
           <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity') + mixOpacity" :value="mixOpacity ? '' : numText('opacity')" :placeholder="mixOpacity ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame opacity')" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
           <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="allCorners === 'Mixed' ? '' : allCorners" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setCorner($event, null)" @keydown="cornerKey(null, $event)"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Frame corner radius" @pick="(t) => pickCorner(null, t)" @unbind="fstyle({}, cornerVars(null, null))" @step="(d) => stepCorner(null, d)" /></label>
           <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius') + mixRadius" :value="mixRadius ? '' : numText('radius')" :placeholder="mixRadius ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
-          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><EditorIcon name="corner_independent" /></button>
         </div>
         <template v-if="separate">
           <!-- 피그마 순서: ┌ ┐ / └ ┘ -->
-          <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
+          <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><EditorIcon name="corner_smoothing" /></button><span v-else /></div>
         </template>
         <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="holdAll" @end="releaseAll" @close="smoothOpen = false" />
       </section>
@@ -226,7 +228,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
           </div>
           <div class="ig-l"><span>{{ tr('Weight') }}</span></div>
           <div class="ig">
-            <label class="sq fld u" :title="tr('Stroke weight')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" :aria-label="tr('Frame stroke weight')" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
+            <label class="sq fld u" :title="tr('Stroke weight')"><EditorIcon name="stroke_weight" class="keep" /><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" :aria-label="tr('Frame stroke weight')" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
             <span /><span />
           </div>
         </template>
@@ -255,11 +257,11 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:first-child { box-shadow: none; }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 /* Stroke 행: Fill 행(InspectorPaints)과 같아요 — [견본 + 값 | 8 | 변수 24 | − 24] */
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
 .prow > .fld { margin-right: var(--ref-spacing-06); }
 /* 단위(% px)는 숫자 바로 뒤에 */
 .design .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }

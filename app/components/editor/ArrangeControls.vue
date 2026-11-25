@@ -22,13 +22,13 @@ function onMenuKey(e: KeyboardEvent) {
 onMounted(() => document.addEventListener('pointerdown', onDoc, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 
-const ALIGN: { k: AlignKind; label: string; key: string; d: string }[] = [
-  { k: 'l', label: 'Align left', key: '⌥A', d: 'M2.5 2v12M5.5 5h8M5.5 11h4.5' },
-  { k: 'c', label: 'Align horizontal centers', key: '⌥H', d: 'M8 2v12M4 5h8M5.5 11h5' },
-  { k: 'r', label: 'Align right', key: '⌥D', d: 'M13.5 2v12M2.5 5h8M6 11h4.5' },
-  { k: 't', label: 'Align top', key: '⌥W', d: 'M2 2.5h12M5 5.5v8M11 5.5v4.5' },
-  { k: 'm', label: 'Align vertical centers', key: '⌥V', d: 'M2 8h12M5 4v8M11 5.5v5' },
-  { k: 'b', label: 'Align bottom', key: '⌥S', d: 'M2 13.5h12M5 2.5v8M11 6v4.5' },
+const ALIGN: { k: AlignKind; label: string; key: string; icon: string }[] = [
+  { k: 'l', label: 'Align left', key: '⌥A', icon: 'align_left' },
+  { k: 'c', label: 'Align horizontal centers', key: '⌥H', icon: 'align_center_horizontal' },
+  { k: 'r', label: 'Align right', key: '⌥D', icon: 'align_right' },
+  { k: 't', label: 'Align top', key: '⌥W', icon: 'align_top' },
+  { k: 'm', label: 'Align vertical centers', key: '⌥V', icon: 'align_center_vertical' },
+  { k: 'b', label: 'Align bottom', key: '⌥S', icon: 'align_bottom' },
 ]
 function setGap(e: Event) {
   const input = e.target as HTMLInputElement
@@ -53,29 +53,29 @@ function onKey(e: KeyboardEvent) {
   <div ref="root" class="ig">
     <div class="grp" role="group" :aria-label="tr('Horizontal alignment')">
       <button v-for="a in ALIGN.slice(0, 3)" :key="a.k" class="ib" :aria-label="`${tr(a.label)} (${a.key})`" :title="`${tr(a.label)} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="a.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg>
+        <EditorIcon :name="a.icon" />
       </button>
     </div>
     <div class="grp" role="group" :aria-label="tr('Vertical alignment')">
       <button v-for="a in ALIGN.slice(3)" :key="a.k" class="ib" :aria-label="`${tr(a.label)} (${a.key})`" :title="`${tr(a.label)} ${a.key}`" @click="emit('op', { kind: 'align', k: a.k })">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="a.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" /></svg>
+        <EditorIcon :name="a.icon" />
       </button>
     </div>
     <div class="more" @keydown="onMenuKey">
       <button ref="btn" :class="['ib', 's24', { on: open }]" :aria-label="tr('More alignment options')" :title="tr('More alignment options')" aria-haspopup="menu" :aria-expanded="open" @click="open = !open">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M5 8h6M3 12h10" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg>
+        <EditorIcon name="menu_hamburger" />
       </button>
       <div v-if="open" class="sq menu more-m" role="menu">
         <button class="sq menu-item" role="menuitem" :disabled="count < 3" @click="open = false; emit('op', { kind: 'distribute', axis: 'y' })">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h11M2.5 13.5h11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><rect x="5" y="6" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
+          <EditorIcon name="distribute_vertical" />
           <span class="grow">{{ tr('Distribute vertical spacing') }}</span><span class="key">⌃⌥V</span>
         </button>
         <button class="sq menu-item" role="menuitem" :disabled="count < 3" @click="open = false; emit('op', { kind: 'distribute', axis: 'x' })">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5v11M13.5 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><rect x="6" y="5" width="4" height="6" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
+          <EditorIcon name="distribute_horizontal" />
           <span class="grow">{{ tr('Distribute horizontal spacing') }}</span><span class="key">⌃⌥H</span>
         </button>
         <button class="sq menu-item" role="menuitem" :disabled="count < 2" @click="open = false; emit('op', { kind: 'tidy' })">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.25" fill="none" /></svg>
+          <EditorIcon name="tidy_up" />
           <span class="grow">{{ tr('Tidy up') }}</span><span class="key">⌃⌥T</span>
         </button>
       </div>

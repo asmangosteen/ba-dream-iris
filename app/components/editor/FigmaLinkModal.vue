@@ -254,7 +254,7 @@ onBeforeUnmount(() => {
                 <span class="tx-head">{{ tr('Components found') }}</span>
                 <span class="tx-meta num">{{ tr('{n} types · {m} instances', { n: result.components.length, m: total }) }}<template v-if="!preview && result.components.length"> · {{ tr('{n} in design system', { n: matched }) }}</template></span>
               </div>
-              <ul v-if="result.components.length" class="list">
+              <ul v-if="result.components.length" v-ovscroll class="list">
                 <li v-for="c in result.components" :key="c.name" class="item">
                   <EditorIcon v-if="!preview && matchId(c)" name="check" :size="12" class="ok" />
                   <span v-else class="dot" aria-hidden="true" />
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 /* 모달 바탕: 사이드바(.float)와 같은 선 · 그림자 */
-.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); border-radius: var(--ref-radius-08); }
+.dialog { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); border-radius: var(--ref-radius-08); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); padding: var(--ref-spacing-11) var(--ref-spacing-10) var(--ref-spacing-08) var(--ref-spacing-12); }
 .body { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-12) var(--ref-spacing-10); }
 .row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }
@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
 .name { font-weight: 500; overflow-wrap: anywhere; }
 .divider { height: 1px; margin: var(--ref-spacing-04) 0; background: var(--iris-line); }
 .sum-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
-.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 132px; overflow: auto; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 132px; overflow-x: hidden; overflow-y: auto; }
 .item { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 22px; }
 .item .tx-meta { margin-left: auto; flex: none; }
 .ok { color: var(--sys-color-brand-primary-default); flex: none; }

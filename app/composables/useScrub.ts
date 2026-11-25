@@ -3,6 +3,7 @@
  * - 마우스를 올리면 ↔ 커서, 1px = 1 (⇧ 를 누르면 10씩)
  * - 칸마다 있는 ↑↓ 처리(여러 레이어는 각자 · 토큰 칩은 연결을 풀고)를 그대로 써요. 그게 없는 칸은 숫자를 바꿔 change 를 보내요
  * - 끄는 동안의 변경은 실행 취소 한 번으로 돌아가요(onStart · onEnd 로 hold · release)
+ * - ↑↓ 처리가 없는 숫자 칸도 ↑↓ 로 1씩(⇧ 10씩) 바뀌어요
  */
 const NUM = /^\s*-?\d*\.?\d+/
 /** 칸 전체가 숫자(+ % · ° · px · x)일 때만 — 검색칸 등은 빼요 */
@@ -93,6 +94,35 @@ export function useScrub(onStart: () => void, onEnd: () => void) {
     const f = fieldOf(e.target)
     if (f) f.firstElementChild?.setAttribute('data-scrub', '')
   }
-  onMounted(() => { document.addEventListener('pointerdown', down, true); document.addEventListener('pointerover', over, true) })
-  onBeforeUnmount(() => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerover', over, true) })
+  // ↑↓ 처리가 따로 없는 숫자 칸도 1씩(⇧ 10씩) — 칸마다 있는 처리가 먼저 받고, 안 받은(막지 않은) 것만 여기서
+  function arrowKey(e: KeyboardEvent) {
+    if (!e.isTrusted || e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    const t = e.target
+    if (!(t instanceof HTMLInputElement) || t.type === 'search' || t.readOnly || t.disabled) return
+    if (!(t.inputMode === 'numeric' || t.inputMode === 'decimal' || FULL.test(t.value))) return
+    const m = NUM.exec(t.value)
+    if (!m) return
+    e.preventDefault()
+    const n = parseFloat(m[0]) + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+    t.value = String(Math.round(n * 100) / 100) + t.value.slice(m[0].length)
+    const label = t.getAttribute('aria-label'), r = t.getBoundingClientRect()
+    t.dispatchEvent(new Event('input', { bubbles: true }))
+    t.dispatchEvent(new Event('change', { bubbles: true }))
+    t.select()
+    // 값이 바뀌며 칸이 다시 그려지면(포커스가 빠지면) 같은 자리의 같은 칸으로 돌아가요 — 연달아 눌러도 이어지게
+    requestAnimationFrame(() => {
+      if (t.isConnected && document.activeElement === t) return
+      if (!label) return
+      let best: HTMLInputElement | null = null, bd = Infinity
+      for (const c of document.querySelectorAll<HTMLInputElement>('input[aria-label]')) {
+        if (c.getAttribute('aria-label') !== label) continue
+        const q = c.getBoundingClientRect(), dd = Math.abs(q.x - r.x) + Math.abs(q.y - r.y)
+        if (dd < bd) { bd = dd; best = c }
+      }
+      if (best && bd < 40) { best.focus(); best.select() }
+    })
+  }
+  onMounted(() => { document.addEventListener('pointerdown', down, true); document.addEventListener('pointerover', over, true); document.addEventListener('keydown', arrowKey) })
+  onBeforeUnmount(() => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerover', over, true); document.removeEventListener('keydown', arrowKey) })
 }

@@ -80,7 +80,7 @@ function key(e: KeyboardEvent, axis?: 'w' | 'h') {
 
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 /* 기준점: 3×3 점. 고른 점은 파랑 */
 .anchor { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 52px; height: 52px; padding: 4px; box-sizing: border-box; border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); }
 .dot { display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer; }

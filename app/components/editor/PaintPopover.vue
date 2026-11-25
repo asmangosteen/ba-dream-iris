@@ -366,7 +366,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
         <button class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
       </div>
 
-      <div class="pp-scroll">
+      <div v-ovscroll class="pp-scroll">
         <template v-if="tab === 'custom'">
           <div v-if="kinds.length > 1" class="pp-types" role="radiogroup" :aria-label="tr('Paint type')">
             <button
@@ -379,9 +379,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
               :class="['sq', 'ib', 'pp-type', { on: kindOf(paint.type) === k }]"
               @click="pickKind(k)"
             >
-              <svg v-if="k === 'solid'" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.25" /><rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor" /></svg>
-              <svg v-else-if="k === 'gradient'" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.25" /><g fill="currentColor"><circle cx="5.5" cy="5.5" r=".75" /><circle cx="8" cy="5.5" r=".75" /><circle cx="10.5" cy="5.5" r=".75" /><circle cx="6.75" cy="8" r=".75" /><circle cx="9.25" cy="8" r=".75" /><circle cx="10.5" cy="10.5" r=".75" /><circle cx="8" cy="10.5" r=".5" /><circle cx="5.5" cy="10.5" r=".35" /></g></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.25" /><circle cx="10.25" cy="5.75" r="1" fill="currentColor" /><path d="M3 11.5l3.2-3.3 2.6 2.6 1.4-1.3 2.8 2.7" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg>
+              <EditorIcon :name="k === 'solid' ? 'paint_solid' : k === 'gradient' ? 'paint_gradient' : 'paint_image'" />
             </button>
           </div>
 
@@ -394,12 +392,12 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
               <div class="gr-tools">
                 <EditorSelect class="gr-kind" :model-value="paint.type" :options="gradKinds" ariaLabel="Gradient type" @update:model-value="(v) => emit('type', v as Paint['type'])" />
                 <label v-if="paint.type !== 'radial'" class="sq fld ang" :data-tip="tr('Angle')">
-                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10M3 12.5L10 4.5M7.2 7.7a4.5 4.5 0 0 1 1.3 4.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  <EditorIcon name="angle" />
                   <input :key="'g' + angle" :value="angle + '°'" inputmode="numeric" :aria-label="tr('Angle')" @change="setAngle(Number(($event.target as HTMLInputElement).value.replace('°', '')) || 0)" @keydown="blur" @focus="sel">
                 </label>
                 <span class="grow" />
-                <button class="ib s24" :aria-label="tr('Flip gradient')" :data-tip="tr('Flip gradient')" @click="flip"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h10M10.5 3l2.5 2.5L10.5 8M13 10.5H3M5.5 8L3 10.5 5.5 13" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-                <button v-if="paint.type !== 'radial'" class="ib s24" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="setAngle(angle + 90)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /><path d="M11.5 1.5a3 3 0 0 1 3 3M14.5 4.5l-1.3-.6M14.5 4.5l.6-1.3" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg></button>
+                <button class="ib s24" :aria-label="tr('Flip gradient')" :data-tip="tr('Flip gradient')" @click="flip"><EditorIcon name="flip_gradient" /></button>
+                <button v-if="paint.type !== 'radial'" class="ib s24" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="setAngle(angle + 90)"><EditorIcon name="rotate_90" /></button>
               </div>
               <!-- 막대: 지점 핀은 막대 위에(피그마와 같아요), 고른 핀은 파랗게. 막대를 누르면 그 자리에 지점 더하기 -->
               <div ref="bar" class="gr-bar" :title="tr('Click to add a color stop')" @pointerdown="onBar($event)">
@@ -513,7 +511,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 /* 피그마 칠 팝오버: 폭 240 · 머리 40(아래 선) · 안쪽 16 · 줄 사이 8. 화면보다 길면 안쪽이 스크롤 */
 .paint-pop { position: fixed; z-index: 60; width: 240px; max-height: min(600px, calc(100vh - 16px)); display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; }
 .pp-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); box-shadow: inset 0 -1px 0 var(--iris-line); }
-.pp-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.pp-scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
 /* Libraries: 목록이 길어도 창은 440 까지만(안쪽 스크롤) — 피그마와 비슷한 크기 */
 .paint-pop.lib { max-height: min(440px, calc(100vh - 16px)); }
 /* 안쪽 묶음은 줄어들지 않게 — 줄면 스크롤 끝에서 아래 여백이 잘려요 */
@@ -522,7 +520,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 .pp-tab { height: 24px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-size: 12px; line-height: 24px; font-weight: 500; color: var(--sys-color-neutral-500); }
 .pp-tab:hover { color: var(--sys-color-neutral-800); }
 .pp-tab.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 /* 오른쪽 끝 아이콘 버튼: 버튼(24) 안 아이콘(16)의 오른쪽이 칸들과 같은 선(안쪽 12)에 오게 4 밖으로 */
 .st-h > .ib, .gr-tools > .ib:last-child, .lib-top > .ib { margin-right: calc(-1 * var(--ref-spacing-04)); }
 /* 격자 칸 안에서는 margin 이 안 먹어서 자리만 4 옮겨요 */

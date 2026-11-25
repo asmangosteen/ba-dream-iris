@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { setSmoothDefault, smoothDefault } from '~/canvas/prefs'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * Corner smoothing 창(피그마와 같아요): 개별 모서리 줄 끝 버튼을 누르면 패널 왼쪽에 떠요.
@@ -71,7 +72,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true)
     <div ref="root" v-front class="sq float cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
       <div class="cs-h">
         <span>{{ tr('Corner smoothing') }}</span>
-        <button class="ib s24" :aria-label="tr('Close')" @click="emit('close')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>
+        <button class="ib s24" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" /></button>
       </div>
       <div class="cs-b">
         <div class="cs-row">

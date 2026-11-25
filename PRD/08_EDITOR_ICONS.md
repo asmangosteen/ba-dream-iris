@@ -1,4 +1,316 @@
-# 08. 편집기 아이콘 목록
+# 08. 편집기 아이콘
+
+## 새 아이콘 세트 (2026-11-25)
+
+Iris 편집기 아이콘을 **바드림 디자인 시스템 아이콘 가이드**로 다시 그렸어요. 아래 "예전 목록"은 기록으로 남겨둬요.
+
+- **원본:** 피그마 바드림 Design System · Iconography 페이지 · `Iris Editor Icons` 프레임
+- **파일:** `PRD/icons/<크기>/<이름>.svg` — 크기 24 · 20 · 16 · 12, 모두 같은 그림이고 크기만 달라요
+- **미리보기:** `PRD/icons/index.html` — 묶음별로 네 크기를 나란히 보여줘요
+- **서비스:** `app/components/editor/irisIcons.ts`(자동 생성) → `<EditorIcon name size>`가 이 사전을 먼저 읽어요
+
+### 그리는 규칙
+
+| 항목 | 값 |
+|---|---|
+| 그리드 | 24 × 24 프레임, 키라인은 피그마 아이콘 가이드(정사각 18 · 원/대각 20 · 세로/가로 20 × 16 이하) |
+| 선 | 2px, 모두 면으로 바꿔요(Outline stroke). 겹친 조각은 Union 한 뒤 Flatten — 꼭짓점만 남게 |
+| 끝 | 반원이 아닌 둥근 직사각형. 일부러 둥근 아이콘(손, 둥근 끝 · 둥근 이음새 보기)만 예외 |
+| 모서리 곡률 | 바깥으로 볼록한 꼭짓점만: 큰 상자 모서리 2, 나머지 1.5, 짧은 변(선 끝 · 점선)은 그 변 길이의 35%까지. 안쪽(오목한) 꼭짓점과 구멍 모서리는 0 |
+| Corner smoothing | 60% |
+| 간격 | 떨어진 선 사이, 구멍 폭 모두 2px 이상 |
+| 투명 칠 | 불리언 · 마스크처럼 "결과 면"을 보여줄 때만 40% |
+| 색 | `currentColor`(피그마는 neutral/800 변수). 화면에서는 누르는 아이콘 neutral-600(호버 700, 예전보다 한 단계 옅게) · 칸 앞 표시 neutral-500 · 레이어 종류 neutral-500(고른 행 700) |
+| 예외 두께 | 변마다 선(stroke_sides_*)은 1.5px — 점선 · 속 빈 막대가 보이게 |
+
+### 크기와 쓰는 곳
+
+| 크기 | 쓰는 곳 |
+|---|---|
+| 24 | 피그마 원본 · 문서 |
+| 20 | 툴바 도구 |
+| 16 | 패널 아이콘 버튼(28 × 28 버튼 안에서는 18로 조금 키워요), 입력칸 앞, 레이어 행, 메뉴 |
+| 12 | 보조 표시(▾ ▸ ✓) |
+
+- 면 아이콘이라 크기에 따라 선 굵기도 함께 바뀌어요(16에서 약 1.33px).
+- 아이콘 버튼의 호버 · 선택 영역은 같은 줄 입력칸 높이(28)에 맞춘 정사각형이에요. 탭 줄 버튼은 탭 높이(26)에 맞춰요.
+
+### 고치는 법
+
+1. 피그마 `Iris Editor Icons`에서 고쳐요(컴포넌트가 아닌 프레임, 이름 `Icon / Default / 24px / <이름>`).
+2. 묶음별 SVG를 내려받아 다시 뽑아요 → `PRD/icons/*` · `irisIcons.ts`가 함께 바뀌어요.
+3. 새 아이콘은 사전에 이름이 생기면 바로 `<EditorIcon name="…">`으로 쓸 수 있어요.
+
+### 아이콘 목록
+
+### 툴바 도구
+
+| 이름 | 뜻 |
+|---|---|
+| `cursor_move` | 이동 |
+| `scale` | 크기 조정 |
+| `hand` | 손 도구 |
+| `frame` | 프레임 |
+| `section` | 섹션 |
+| `rectangle` | 사각형 |
+| `line` | 선 |
+| `arrow_line` | 화살표 |
+| `ellipse` | 원 |
+| `polygon` | 다각형 |
+| `star` | 별 |
+| `pen` | 펜 |
+| `pencil` | 연필 |
+| `text` | 텍스트 |
+| `chevron_down` | 도구 묶음 펼치기 ▾ |
+
+### 레이어 목록 · 종류
+
+| 이름 | 뜻 |
+|---|---|
+| `boolean` | 불리언 |
+| `autolayout_vertical` | 오토 레이아웃 프레임(세로) |
+| `autolayout_horizontal` | 오토 레이아웃 프레임(가로) |
+| `autolayout_wrap` | 오토 레이아웃 프레임(줄바꿈) |
+| `group` | 그룹(점선 네모) |
+| `chevron_right` | 펼치기 |
+
+### 공통 아이콘
+
+| 이름 | 뜻 |
+|---|---|
+| `plus` | 더하기 |
+| `minus` | 빼기 |
+| `close` | 닫기 |
+| `check` | 체크 |
+| `search` | 검색 |
+| `trashbin` | 휴지통 |
+| `copy` | 복사 |
+| `link` | 링크 |
+| `image` | 이미지 |
+| `comment` | 댓글 |
+| `arrow_up_right` | 바깥으로 열기 |
+| `warning` | 경고 |
+| `info` | 정보 |
+| `document` | 문서 |
+| `document_add` | 문서 추가 |
+| `clip` | 첨부 |
+| `menu_bento` | 격자로 보기 |
+| `list` | 목록으로 보기 |
+| `var_spacing` | 변수: 간격 |
+| `var_radius` | 변수: 모서리 |
+| `var_number` | 변수: 숫자 |
+| `var_opacity` | 변수: 투명도 |
+| `var_border` | 변수: 선 두께 |
+| `var_size` | 변수: 크기 |
+| `unlink` | 연결 풀기 |
+| `variable` | 변수 |
+| `table` | 표 |
+| `component` | 컴포넌트 |
+| `visibility_on` | 보이기 |
+| `visibility_off` | 숨기기 |
+| `lock` | 잠금 |
+| `unlock` | 잠금 풀기 |
+| `menu_kebab` | 세로 점 메뉴 |
+| `menu_meatball` | 가로 점 메뉴 |
+| `setting` | 설정 |
+| `filter` | 조절 |
+| `styles` | 스타일 |
+| `text_box` | 글자 상자 |
+| `text_settings` | 글자 설정 |
+| `valign_top` | 세로 정렬 위 |
+| `valign_middle` | 세로 정렬 가운데 |
+| `valign_bottom` | 세로 정렬 아래 |
+| `text_align_left` | 글자 왼쪽 정렬 |
+| `text_align_center` | 글자 가운데 정렬 |
+| `text_align_right` | 글자 오른쪽 정렬 |
+| `text_align_justify` | 글자 양쪽 정렬 |
+| `folder` | 폴더 |
+| `home` | 홈 |
+| `refresh` | 새로고침 |
+
+### 정렬 · 위치
+
+| 이름 | 뜻 |
+|---|---|
+| `align_left` | 왼쪽 정렬 |
+| `align_center_horizontal` | 가로 가운데 정렬 |
+| `align_right` | 오른쪽 정렬 |
+| `align_top` | 위 정렬 |
+| `align_center_vertical` | 세로 가운데 정렬 |
+| `align_bottom` | 아래 정렬 |
+| `menu_hamburger` | 정렬 더보기 |
+| `distribute_vertical` | 세로 간격 균등 분배 |
+| `distribute_horizontal` | 가로 간격 균등 분배 |
+| `tidy_up` | 정돈하기 |
+
+### 오토 레이아웃
+
+| 이름 | 뜻 |
+|---|---|
+| `layout_free` | 자유 배치 |
+| `layout_vertical` | 세로 배치 |
+| `layout_horizontal` | 가로 배치 |
+| `layout_grid_wrap` | 격자(줄바꿈) |
+| `gap_vertical` | 항목 사이 간격(세로) |
+| `gap_horizontal` | 항목 사이 간격(가로) |
+| `autolayout_add` | 자동 레이아웃 추가 |
+| `autolayout_on` | 오토 레이아웃 켜짐(체크) |
+| `padding_top` | 위 안쪽 여백 |
+| `padding_right` | 오른쪽 안쪽 여백 |
+| `padding_bottom` | 아래 안쪽 여백 |
+| `padding_left` | 왼쪽 안쪽 여백 |
+| `resize_to_fit` | 내용에 맞게 크기 조정 |
+| `wrap` | 줄바꿈 |
+| `padding_horizontal` | 가로 안쪽 여백 |
+| `padding_vertical` | 세로 안쪽 여백 |
+| `padding_individual` | 안쪽 여백 따로 |
+
+### 불리언 · 점 편집
+
+| 이름 | 뜻 |
+|---|---|
+| `boolean_union` | 합치기 |
+| `boolean_subtract` | 빼기 |
+| `boolean_intersect` | 교차 |
+| `boolean_exclude` | 겹친 부분 빼기 |
+| `mirror_none` | 미러링 없음 |
+| `mirror_angle` | 각도 미러링 |
+| `mirror_angle_length` | 각도와 길이 미러링 |
+| `mask_layer` | 마스크 레이어 |
+| `mask_arrow` | 마스크 연결(가려지는 레이어) |
+| `flatten` | 평탄화(Flatten) |
+
+### 선(Stroke)
+
+| 이름 | 뜻 |
+|---|---|
+| `stroke_all` | 변마다 선: 모든 변 |
+| `stroke_top` | 변마다 선: 위 변만 |
+| `stroke_right` | 변마다 선: 오른쪽 변만 |
+| `stroke_bottom` | 변마다 선: 아래 변만 |
+| `stroke_left` | 변마다 선: 왼쪽 변만 |
+| `stroke_sides_0000` | 변마다 선: 모두 꺼짐 |
+| `stroke_sides_0011` | 변마다 선: 아래 · 왼쪽 |
+| `stroke_sides_0101` | 변마다 선: 오른쪽 · 왼쪽 |
+| `stroke_sides_0110` | 변마다 선: 오른쪽 · 아래 |
+| `stroke_sides_0111` | 변마다 선: 오른쪽 · 아래 · 왼쪽 |
+| `stroke_sides_1001` | 변마다 선: 위 · 왼쪽 |
+| `stroke_sides_1010` | 변마다 선: 위 · 아래 |
+| `stroke_sides_1011` | 변마다 선: 위 · 아래 · 왼쪽 |
+| `stroke_sides_1100` | 변마다 선: 위 · 오른쪽 |
+| `stroke_sides_1101` | 변마다 선: 위 · 오른쪽 · 왼쪽 |
+| `stroke_sides_1110` | 변마다 선: 위 · 오른쪽 · 아래 |
+| `stroke_sides_1111` | 변마다 선: 모두 켜짐 |
+| `cap_none` | 선 · 점선 끝: 끝 모양 없음 |
+| `cap_square` | 선 · 점선 끝: 네모 끝 |
+| `cap_round` | 선 · 점선 끝: 둥근 끝 |
+| `join_miter` | 이음새: 각지게 |
+| `join_bevel` | 이음새: 깎아서 |
+| `join_round` | 이음새: 둥글게 |
+
+### 효과(Effects)
+
+| 이름 | 뜻 |
+|---|---|
+| `shadow_inner` | 내부 그림자 |
+| `shadow_drop` | 드롭 섀도 |
+| `blur_layer` | 레이어 흐림 |
+| `blur_background` | 배경 흐림 |
+| `blur` | 흐림 |
+| `apply_styles` | 스타일 적용 |
+| `effect_style` | 효과 스타일 바꾸기 |
+| `spread` | 확산 |
+
+### 레이아웃 격자
+
+| 이름 | 뜻 |
+|---|---|
+| `grid_columns` | 레이아웃 격자: 세로 칸(Columns) |
+| `grid_rows` | 레이아웃 격자: 가로 줄(Rows) |
+| `grid_square` | 레이아웃 격자: 격자(Grid) |
+
+### 홈 · 프로젝트
+
+| 이름 | 뜻 |
+|---|---|
+| `project_app` | 새 프로젝트: 앱 |
+| `project_web` | 새 프로젝트: 웹 |
+| `project_detail_page` | 새 프로젝트: 상세 페이지 |
+| `renew` | 처음 모습으로(홈 3D) |
+| `theme_light` | 화면 모드: 밝게 |
+| `theme_dark` | 화면 모드: 어둡게 |
+| `theme_system` | 화면 모드: 시스템 |
+
+### 위 탭
+
+| 이름 | 뜻 |
+|---|---|
+| `tab_new` | 새 탭 |
+
+### 칠 창
+
+| 이름 | 뜻 |
+|---|---|
+| `eyedropper` | 화면에서 색 가져오기 |
+| `paint_solid` | 칠 종류: 단색 |
+| `paint_gradient` | 칠 종류: 그라디언트 |
+| `paint_image` | 칠 종류: 이미지 |
+| `angle` | 각도 |
+| `flip_gradient` | 그라디언트 뒤집기 |
+| `rotate_90` | 90° 회전 |
+
+### 프레임 패널
+
+| 이름 | 뜻 |
+|---|---|
+| `corner_independent` | 모서리 따로 |
+| `corner_smoothing` | 모서리 다듬기 |
+| `stroke_weight` | 프레임 선 두께 |
+
+### 레이어 패널
+
+| 이름 | 뜻 |
+|---|---|
+| `sidebar_collapse` | 사이드바 접기 |
+| `sidebar_expand` | 사이드바 펴기 |
+| `select_matching` | 같은 레이어 모두 선택 |
+| `mask` | 마스크 해제 |
+| `edit_object` | 오브젝트 편집 |
+| `autolayout_ignore` | 자동 레이아웃 무시 |
+| `constraints` | 제약 조건 숨기기 |
+| `constraint_horizontal` | 가로 제약 조건 |
+| `constraint_vertical` | 세로 제약 조건 |
+| `rotation` | 회전 |
+| `flip_horizontal` | 가로로 뒤집기 |
+| `flip_vertical` | 세로로 뒤집기 |
+| `ratio_unlocked` | 비율 고정 해제 |
+| `ratio_locked` | 비율 고정 해제 |
+| `blend_mode` | 혼합 모드 |
+| `point_count_polygon` | 꼭짓점 개수(다각형) |
+| `point_count_star` | 꼭짓점 개수(별) |
+| `star_ratio` | 비율(별 안쪽 반지름) |
+| `line_height` | 줄 높이 |
+| `letter_spacing` | 자간 |
+| `arc_sweep` | 원 호: 쓸어 간 정도 |
+| `arc_ratio` | 원 호: 안쪽 구멍 비율 |
+
+### 스타일 만들기
+
+| 이름 | 뜻 |
+|---|---|
+| `style_create` | 스타일 만들기 |
+
+### 글자 세부 설정
+
+| 이름 | 뜻 |
+|---|---|
+| `underline` | 밑줄 |
+| `strikethrough` | 취소선 |
+| `list_numbered` | 번호 목록 |
+
+---
+
+## 예전 목록 (2026-11-24, 기록용)
 
 Iris 편집기를 피그마 UI3 수준으로 맞출 때 필요한 아이콘을 정리했어요. 화면 규격은 [07_FIGMA_UI_REFERENCE.md](07_FIGMA_UI_REFERENCE.md)에 있어요.
 

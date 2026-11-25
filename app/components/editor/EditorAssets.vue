@@ -117,7 +117,7 @@ async function copyCode() {
       <section class="dsec">
         <div class="sec-h h24 p0"><span>{{ tr('Used in this file') }}</span><span class="tx-meta">{{ uses.reduce((n, u) => n + u.count, 0) }}</span></div>
         <button v-for="u in uses" :key="u.id" class="sq menu-item" @click="emit('pick-screen', u.screen_id)">
-          <svg width="16" height="16" viewBox="0 0 12 12" aria-hidden="true" class="dia"><path :d="LAYER_ICON.instance" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linejoin="round" fill="none" /></svg>
+          <EditorIcon :name="LAYER_ICON.instance!" :size="16" class="dia" />
           <span class="ell f1" :title="screenName(u.screen_id)">{{ screenName(u.screen_id) }}</span><span class="tx-meta num">{{ u.count }}</span>
         </button>
         <span v-if="!uses.length" class="tx-meta">{{ tr('Not used on this page yet') }}</span>
@@ -125,7 +125,7 @@ async function copyCode() {
       <section class="dsec">
         <div class="sec-h h24 p0"><span>{{ tr('Used elsewhere') }}</span><span class="tx-meta">{{ otherUses.reduce((n, u) => n + u.n, 0) }}</span></div>
         <NuxtLink v-for="u in otherUses" :key="u.screenId" :to="otherScreens.data.value?.[u.screenId]?.projectId ? `/p/${otherScreens.data.value[u.screenId]!.projectId}?screen=${u.screenId}` : ''" class="sq menu-item" :title="[otherScreens.data.value?.[u.screenId]?.name, otherScreens.data.value?.[u.screenId]?.project, otherScreens.data.value?.[u.screenId]?.page].filter(Boolean).join(' · ')">
-          <svg width="16" height="16" viewBox="0 0 12 12" aria-hidden="true" class="dia"><path :d="LAYER_ICON.instance" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linejoin="round" fill="none" /></svg>
+          <EditorIcon :name="LAYER_ICON.instance!" :size="16" class="dia" />
           <span class="one f1"><span class="ell nm">{{ otherScreens.data.value?.[u.screenId]?.name ?? '…' }}</span><span class="tx-meta ell">{{ otherScreens.data.value?.[u.screenId]?.page }}</span></span>
           <span class="tx-meta num">{{ u.n }}</span>
         </NuxtLink>
@@ -157,7 +157,7 @@ async function copyCode() {
 .qx:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -1px; }
 /* 묶음 라벨: Docs 묶음 라벨과 같은 12 · 500 · neutral-500 */
 .glabel { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-500); }
-.list { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
+.list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
 .grp-sec { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .p2 { padding: 0; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ref-spacing-08) var(--ref-spacing-06); }
@@ -172,7 +172,7 @@ async function copyCode() {
 .tname { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 상세 머리: 왼쪽 섹션 머리와 같은 32 높이, 위 4 · 뒤로 버튼은 패널 안쪽 8 */
 .dhead { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 32px; box-sizing: content-box; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-04) var(--ref-spacing-06); min-width: 0; }
-.dbody { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.dbody { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; }
 .pad { padding: 0 var(--ref-spacing-10) var(--ref-spacing-10); }
 .big :deep(.pv) { position: absolute; left: 0; top: 0; width: 133.33%; height: 133.33%; transform: scale(.75); transform-origin: 0 0; }
 .big { overflow: hidden; height: 128px; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: grid; place-items: center; }
@@ -207,5 +207,5 @@ async function copyCode() {
 .lnk:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 /* 편집기 아이콘에 ‹ 가 없어서 › 를 뒤집어요 */
 .flip { transform: scaleX(-1); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 </style>

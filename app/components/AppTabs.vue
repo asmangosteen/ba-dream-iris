@@ -66,7 +66,7 @@ function onEmptyDbl(e: MouseEvent) { if (e.target === e.currentTarget) openNew()
         <div v-for="t in tabs" :key="t.id" :class="['sq', 'tab', 'proj', { on: activeId === t.id }]" @mousedown.middle.prevent @auxclick="onAux($event, t.id)">
           <i class="sep" aria-hidden="true" />
           <NuxtLink :to="t.path" class="lnk" :title="nameOf(t.id) || undefined" :aria-current="activeId === t.id ? 'page' : undefined">
-            <svg v-if="t.id === NEW_TAB_ID" class="nf" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3.5" y="2.5" width="9" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" /></svg>
+            <EditorIcon v-if="t.id === NEW_TAB_ID" name="tab_new" :size="16" class="nf" />
             <span class="nm">{{ nameOf(t.id) || (status === 'success' ? tr('Untitled') : '…') }}</span>
           </NuxtLink>
           <button type="button" class="sq x" :aria-label="tr('Close {name}', { name: nameOf(t.id) || tr('Untitled') })" @click="close(t.id, activeId)"><EditorIcon name="close" :size="12" /></button>

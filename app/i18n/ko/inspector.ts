@@ -39,6 +39,7 @@ export default {
   'Instance': '인스턴스',
   'Boolean': '불리언',
   '{n} layers': '레이어 {n}개',
+  '{n} selected': '{n}개 선택',
   '{name} — change type': '{name} — 종류 바꾸기',
   'Change type': '종류 바꾸기',
   'Done editing': '편집 끝내기',

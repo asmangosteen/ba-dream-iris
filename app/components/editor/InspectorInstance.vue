@@ -232,7 +232,7 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
         <span class="ell">{{ name || tr('Instance') }}</span>
       </span>
       <button v-if="changed" class="ib s24" :aria-label="tr('Reset all changes')" :title="tr('Reset all changes')" @click="reset">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.3-3.2M3.5 2.5v2.8h2.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <EditorIcon name="renew" />
       </button>
     </div>
 
@@ -273,8 +273,8 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
 
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; padding: 0; }
-.s24 { width: 24px; height: 24px; }
+.h24 { height: 28px; padding: 0; }
+.s24 { width: 28px; height: 28px; }
 .ttl { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 /* 컴포넌트 이름 줄은 섹션 제목보다 한 단계 크게: 글자 14/22 · 아이콘 20 · 줄 28 */
 .inst-h { height: 28px; font-size: 14px; line-height: 22px; }

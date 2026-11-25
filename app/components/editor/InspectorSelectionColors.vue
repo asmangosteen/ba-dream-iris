@@ -167,7 +167,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 /* Fill 행과 같은 칸, 오른쪽 아이콘 자리(24 + 24 + 8)만큼 비워 같은 폭으로 */
 .srow { display: grid; grid-template-columns: minmax(0, 1fr) 56px; align-items: center; min-width: 0; }
 .pf { gap: var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); min-width: 0; }

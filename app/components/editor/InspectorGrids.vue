@@ -76,10 +76,10 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
     <div v-for="(g, i) in mixed ? [] : grids" :key="i">
       <!-- 피그마 Layout guide 행: [설정 + 이름] [👁 24] [− 24] -->
       <div :ref="rowRef(i)" class="prow" data-drag-row :class="{ off: g.visible === false, dragging: drag?.from === i }">
-        <button v-if="grids.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, grids.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+        <button v-if="grids.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, grids.length)"><EditorIcon class="keep" name="menu_hamburger" :size="10" /></button>
         <div class="ef">
           <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" :aria-label="tr('Layout grid settings')" :data-tip="tr('Layout grid settings')" @click="open = open === i ? null : i">
-            <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path :d="g.type === 'columns' ? 'M2.5 2v10M7 2v10M11.5 2v10' : g.type === 'rows' ? 'M2 2.5h10M2 7h10M2 11.5h10' : 'M2 4.5h10M2 9.5h10M4.5 2v10M9.5 2v10'" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
+            <EditorIcon :name="g.type === 'columns' ? 'grid_columns' : g.type === 'rows' ? 'grid_rows' : 'grid_square'" />
           </button>
           <button class="name" @click="open = open === i ? null : i">{{ label(g) }}</button>
         </div>
@@ -141,11 +141,11 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 /* 피그마 Layout guide 행: [설정 24 + 이름] 8 [👁 24][− 24] — Fill 행과 같은 열 */
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
 .prow > .ef { margin-right: var(--ref-spacing-06); }
 .prow.off .ef { opacity: 0.45; }
 .ef { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }

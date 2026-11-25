@@ -139,7 +139,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 .dd .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd .v.ph { color: var(--sys-color-neutral-500); }
 .dd .cv { flex: none; color: var(--sys-color-neutral-500); }
-.esel-m { font-weight: 400; text-align: left; bottom: auto; height: auto; left: 0; right: auto; min-width: 100%; width: max-content; max-width: 240px; max-height: 320px; overflow: auto; }
+.esel-m { font-weight: 400; text-align: left; bottom: auto; height: auto; left: 0; right: auto; min-width: 100%; width: max-content; max-width: 240px; max-height: 320px; overflow-x: hidden; overflow-y: auto; }
 .esel-m.up { top: auto; bottom: calc(100% + 4px); }
 .esel-m.right { left: auto; right: 0; min-width: 160px; }
 /* 칸 안 글자 버튼의 메뉴는 칸(.fld) 왼쪽 끝 · 아래에 맞춰 열려요 */

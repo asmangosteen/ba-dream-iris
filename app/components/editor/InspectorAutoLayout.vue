@@ -2,14 +2,22 @@
 import type { AutoLayout, BindKey, LayerNode } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import type { CatalogToken } from '~/canvas/tokens'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
+import { useAlHint, type AlHint } from '~/composables/useLayerMenu'
 
 /**
  * Layout 칸(피그마 UI3와 같아요): 기본은 [Flow(프레임만) · Dimensions · Clip content], 오토 레이아웃이면 같은 칸이 'Auto layout' 으로 바뀌어
  * [Flow · Dimensions · Alignment | Gap · Padding · Clip content]. Dimensions · Clip content 는 InspectorLayer 가 슬롯으로 넣어요
  */
 const props = defineProps<{ sid: string; ids: string[] }>()
+/** 간격 · 여백 칸에 올리거나(호버) 고치는 동안(포커스) 캔버스에 그 자리 표시 */
+const alHint = useAlHint()
+const hovH = ref<AlHint | null>(null), focH = ref<AlHint | null>(null)
+watchEffect(() => { alHint.value = hovH.value ?? focH.value })
+onBeforeUnmount(() => { alHint.value = null })
+const hintOn = (h: AlHint) => ({ onPointerenter: () => (hovH.value = h), onPointerleave: () => { if (hovH.value === h) hovH.value = null }, onFocusin: () => (focH.value = h), onFocusout: () => { if (focH.value === h) focH.value = null } })
 const store = useLayerStore()
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
 /** 고른 것이 모두 오토 레이아웃일 때만 조절 칸, 아니면 + (여러 개 · 프레임 아닌 것은 새 프레임으로 감싸서 걸어요) */
@@ -17,13 +25,14 @@ const l = computed(() => (nodes.value.length && nodes.value.every((n) => n.style
 const sepPad = ref(false)
 watch(() => props.ids.join(), () => { const p = l.value?.padding; sepPad.value = !!p && !(p[0] === p[2] && p[1] === p[3]) }, { immediate: true })
 
-const allFrames = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'frame'))
+// 섹션도 프레임처럼 오토 레이아웃을 넣을 수 있어요
+const allFrames = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'frame' || n.type === 'section'))
 /** Flow 줄: 프레임이거나 이미 오토 레이아웃일 때 */
 const flowOk = computed(() => !!l.value || allFrames.value)
 /** 오토 레이아웃 넣기 버튼: 프레임 · 여러 개(새 프레임으로 감싸요) */
 const addOk = computed(() => !!l.value || allFrames.value || nodes.value.length > 1)
 /** 내용에 맞추기: 안에 레이어가 있는 일반 프레임 */
-const fitOk = computed(() => !l.value && nodes.value.some((n) => n.type === 'frame' && !!n.children?.length))
+const fitOk = computed(() => !l.value && nodes.value.some((n) => (n.type === 'frame' || n.type === 'section') && !!n.children?.length))
 type Flow = 'free' | 'vertical' | 'horizontal' | 'grid'
 const flowNow = computed<Flow>(() => (!l.value ? 'free' : l.value.wrap ? 'grid' : l.value.mode))
 /** Flow 고르기: Freeform = 오토 레이아웃 빼기, 나머지는 (없으면 넣고) 방향 바꾸기. Grid 는 가로 줄바꿈 */
@@ -33,11 +42,11 @@ function setFlow(f: Flow) {
   if (f === 'grid') store.setWrap(props.sid, props.ids, true)
   else set({ mode: f, wrap: undefined })
 }
-const FLOW: { k: Flow; label: string; d: string }[] = [
-  { k: 'free', label: 'Freeform', d: 'M3 3.5h4v4H3zM9 9h4v4H9zM11 3.5a2 2 0 1 1 0 4a2 2 0 0 1 0-4z' },
-  { k: 'vertical', label: 'Vertical layout', d: 'M2.5 2.5h5v4.5h-5zM2.5 9h5v4.5h-5zM11.5 3v10M9.5 11l2 2 2-2' },
-  { k: 'horizontal', label: 'Horizontal layout', d: 'M2.5 3h4.5v5H2.5zM9 3h4.5v5H9zM3 11.5h10M11 9.5l2 2-2 2' },
-  { k: 'grid', label: 'Grid (wrap)', d: 'M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z' },
+const FLOW: { k: Flow; label: string; icon: string }[] = [
+  { k: 'free', label: 'Freeform', icon: 'layout_free' },
+  { k: 'vertical', label: 'Vertical layout', icon: 'layout_vertical' },
+  { k: 'horizontal', label: 'Horizontal layout', icon: 'layout_horizontal' },
+  { k: 'grid', label: 'Grid (wrap)', icon: 'layout_grid_wrap' },
 ]
 function set(patch: Partial<AutoLayout>) {
   store.update(props.sid, props.ids, (n) => (n.style.layout ? { style: { ...n.style, layout: { ...n.style.layout, ...patch } } } : {}))
@@ -53,10 +62,8 @@ const GAP_OPTS = [{ value: 'fixed', label: 'Fixed spacing', short: '' }, { value
 function setGapMode(v: string) { if (v === 'auto') set({ gap: 'auto' }); else if (l.value?.gap === 'auto') set({ gap: 10 }) }
 /** 개별 패딩 4칸: 피그마처럼 왼쪽 · 위 / 오른쪽 · 아래 (padding 순서는 위 · 오른 · 아래 · 왼) */
 const PAD4 = [[{ i: 3, nm: 'Left' }, { i: 0, nm: 'Top' }], [{ i: 1, nm: 'Right' }, { i: 2, nm: 'Bottom' }]] as const
-/** 변 아이콘(16 그리드): 그 변의 선 + 안쪽 상자 — 위 · 오른 · 아래 · 왼 */
-const PAD_ICON: Record<number, string> = { 0: 'M3 2.5h10M5.5 6h5v5.5h-5z', 1: 'M13.5 3v10M4.5 5.5H10v5H4.5z', 2: 'M3 13.5h10M5.5 4.5h5V10h-5z', 3: 'M2.5 3v10M6 5.5h5.5v5H6z' }
-/** 간격 아이콘: 두 막대 사이 양쪽 화살표(세로 흐름 · 가로 흐름) — 패딩 아이콘(막대 + 상자)과 구별돼요 */
-const GAP_ICON = { v: 'M3 2.5h10M3 13.5h10M8 5v6M6.5 6.5L8 5l1.5 1.5M6.5 9.5L8 11l1.5-1.5', h: 'M2.5 3v10M13.5 3v10M5 8h6M6.5 6.5L5 8l1.5 1.5M9.5 6.5L11 8l-1.5 1.5' }
+/** 변 아이콘 — 위 · 오른 · 아래 · 왼 */
+const PAD_ICON: Record<number, string> = { 0: 'padding_top', 1: 'padding_right', 2: 'padding_bottom', 3: 'padding_left' }
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 
 /**
@@ -133,9 +140,9 @@ const isOn = (col: number, row: number) => {
     <div class="sec-h h24">
       <span>{{ l ? tr('Auto layout') : tr('Layout') }}</span>
       <span class="hacts">
-        <button v-if="fitOk" class="ib s24" :aria-label="tr('Resize to fit')" :title="tr('Resize to fit')" @click="store.resizeToFit(sid, ids)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5L6 6M6 3.5V6H3.5M13.5 2.5L10 6M10 3.5V6h2.5M2.5 13.5L6 10M6 12.5V10H3.5M13.5 13.5L10 10M10 12.5V10h2.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button v-if="fitOk" class="ib s24" :aria-label="tr('Resize to fit')" :title="tr('Resize to fit')" @click="store.resizeToFit(sid, ids)"><EditorIcon name="resize_to_fit" /></button>
         <button v-if="addOk" :class="['ib', 's24', 'tog', { on: !!l }]" :aria-pressed="!!l" :aria-label="l ? tr('Remove auto layout') + ' (⌥⇧A)' : tr('Add auto layout') + ' (⇧A)'" :title="l ? tr('Remove auto layout') + ' ⌥⇧A' : tr('Add auto layout') + ' ⇧A'" @click="l ? store.removeAutoLayout(sid, ids) : store.addAutoLayout(sid, ids)">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h4v11h-4zM9.5 2.5h4v4.5h-4z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /><path v-if="!l" d="M11.5 9.5v4M9.5 11.5h4" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path v-else d="M9.5 11.5l1.5 1.5 2.5-3" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <EditorIcon :name="l ? 'autolayout_on' : 'autolayout_add'" />
         </button>
       </span>
     </div>
@@ -144,9 +151,9 @@ const isOn = (col: number, row: number) => {
       <div class="ig-l"><span>{{ tr('Flow') }}</span></div>
       <div class="ig">
         <div class="grp span2 flow" role="radiogroup" :aria-label="tr('Flow')">
-          <button v-for="f in FLOW" :key="f.k" role="radio" :aria-checked="flowNow === f.k" :class="['ib', { on: flowNow === f.k }]" :aria-label="tr(f.label)" :title="tr(f.label)" @click="setFlow(f.k)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="f.d" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <button v-for="f in FLOW" :key="f.k" role="radio" :aria-checked="flowNow === f.k" :class="['ib', { on: flowNow === f.k }]" :aria-label="tr(f.label)" :title="tr(f.label)" @click="setFlow(f.k)"><EditorIcon :name="f.icon" /></button>
         </div>
-        <button v-if="l" :class="['ib', 's24', 'tog', { on: !!l.wrap }]" :aria-pressed="!!l.wrap" :aria-label="tr('Wrap')" :title="tr('Wrap')" @click="store.setWrap(sid, ids, !l.wrap)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h8.5a2.75 2.75 0 0 1 0 5.5H5.5M8 7.5L5.5 10 8 12.5" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <button v-if="l" :class="['ib', 's24', 'tog', { on: !!l.wrap }]" :aria-pressed="!!l.wrap" :aria-label="tr('Wrap')" :title="tr('Wrap')" @click="store.setWrap(sid, ids, !l.wrap)"><EditorIcon name="wrap" /></button>
         <span v-else />
       </div>
     </template>
@@ -161,8 +168,8 @@ const isOn = (col: number, row: number) => {
           </template>
         </div>
         <div class="side">
-          <label class="sq fld" :title="tr('Gap between items')">
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="l.mode === 'horizontal' ? GAP_ICON.h : GAP_ICON.v" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <label class="sq fld" :title="tr('Gap between items')" v-bind="hintOn('gap')">
+            <EditorIcon :name="l.mode === 'horizontal' ? 'gap_horizontal' : 'gap_vertical'" />
             <template v-if="l.gap !== 'auto'">
               <input v-if="!vb(['gap'])" :key="'g' + l.gap" :value="l.gap" inputmode="decimal" :aria-label="tr('Gap between items')" @change="num($event, (v) => set({ gap: v }))" @keydown="blur($event); step($event, (d) => set({ gap: Math.max(0, (l!.gap === 'auto' ? 0 : l!.gap) + d) }))">
               <TokenPicker :kinds="['spacing']" :bound="vb(['gap'])" reveal short label="Gap between items" @pick="pickGap" @unbind="unbind(['gap'])" @step="(d) => set({ gap: Math.max(0, (l!.gap === 'auto' ? 0 : l!.gap) + d) })" />
@@ -170,8 +177,8 @@ const isOn = (col: number, row: number) => {
             <span v-else class="auto">{{ tr('Auto') }}</span>
             <EditorSelect variant="inline" :model-value="l.gap === 'auto' ? 'auto' : 'fixed'" :options="GAP_OPTS" ariaLabel="Gap mode" @update:model-value="setGapMode" />
           </label>
-          <label v-if="l.wrap" class="sq fld" :title="tr('Gap between rows')">
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="GAP_ICON.v" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <label v-if="l.wrap" class="sq fld" :title="tr('Gap between rows')" v-bind="hintOn('rowGap')">
+            <EditorIcon name="gap_vertical" />
             <input v-if="!vb(['rowGap'])" :key="'rg' + l.rowGap" :value="l.rowGap ?? (l.gap === 'auto' ? 0 : l.gap)" inputmode="decimal" :aria-label="tr('Gap between rows')" @change="num($event, (v) => set({ rowGap: v }))" @keydown="blur($event); step($event, (d) => set({ rowGap: Math.max(0, (l!.rowGap ?? (l!.gap === 'auto' ? 0 : l!.gap)) + d) }))">
             <!-- 줄 간격도 간격 · 패딩처럼 spacing 토큰(칩을 누르면 커서, 다시 누르면 토큰 창) -->
             <TokenPicker :kinds="['spacing']" :bound="vb(['rowGap'])" reveal short label="Gap between rows" @pick="pickRowGap" @unbind="unbind(['rowGap'])" @step="(d) => set({ rowGap: Math.max(0, (l!.rowGap ?? (l!.gap === 'auto' ? 0 : l!.gap)) + d) })" />
@@ -182,14 +189,14 @@ const isOn = (col: number, row: number) => {
       <!-- Padding: 가로 | 세로 + 개별 패딩 토글, 켜면 왼 · 위 / 오른 · 아래 -->
       <div class="ig-l"><span>{{ tr('Padding') }}</span></div>
       <div v-if="!sepPad" class="ig">
-        <label class="sq fld" :title="tr('Horizontal padding')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3v10M13.5 3v10M6 5.5h4v5H6z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([1, 3]))" :key="'ph' + l.padding[3]" :value="l.padding[3] === l.padding[1] ? l.padding[3] : ''" :placeholder="l.padding[3] === l.padding[1] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Horizontal padding')" @change="num($event, (v) => padHV('h', v))" @keydown="blur($event); step($event, (d) => padHV('h', Math.max(0, l!.padding[3] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([1, 3]))" reveal short label="Horizontal padding" @pick="(t) => pickPad([1, 3], t)" @unbind="unbind(padKeys([1, 3]))" @step="(d) => padHV('h', Math.max(0, l!.padding[3] + d))" /></label>
-        <label class="sq fld" :title="tr('Vertical padding')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10M3 13.5h10M5.5 6h5v4h-5z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([0, 2]))" :key="'pv' + l.padding[0]" :value="l.padding[0] === l.padding[2] ? l.padding[0] : ''" :placeholder="l.padding[0] === l.padding[2] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Vertical padding')" @change="num($event, (v) => padHV('v', v))" @keydown="blur($event); step($event, (d) => padHV('v', Math.max(0, l!.padding[0] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([0, 2]))" reveal short label="Vertical padding" @pick="(t) => pickPad([0, 2], t)" @unbind="unbind(padKeys([0, 2]))" @step="(d) => padHV('v', Math.max(0, l!.padding[0] + d))" /></label>
-        <button class="ib s24 tog" :aria-pressed="false" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <label class="sq fld" :title="tr('Horizontal padding')" v-bind="hintOn('padH')"><EditorIcon name="padding_horizontal" /><input v-if="!vb(padKeys([1, 3]))" :key="'ph' + l.padding[3]" :value="l.padding[3] === l.padding[1] ? l.padding[3] : ''" :placeholder="l.padding[3] === l.padding[1] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Horizontal padding')" @change="num($event, (v) => padHV('h', v))" @keydown="blur($event); step($event, (d) => padHV('h', Math.max(0, l!.padding[3] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([1, 3]))" reveal short label="Horizontal padding" @pick="(t) => pickPad([1, 3], t)" @unbind="unbind(padKeys([1, 3]))" @step="(d) => padHV('h', Math.max(0, l!.padding[3] + d))" /></label>
+        <label class="sq fld" :title="tr('Vertical padding')" v-bind="hintOn('padV')"><EditorIcon name="padding_vertical" /><input v-if="!vb(padKeys([0, 2]))" :key="'pv' + l.padding[0]" :value="l.padding[0] === l.padding[2] ? l.padding[0] : ''" :placeholder="l.padding[0] === l.padding[2] ? '' : tr('Mixed')" inputmode="decimal" :aria-label="tr('Vertical padding')" @change="num($event, (v) => padHV('v', v))" @keydown="blur($event); step($event, (d) => padHV('v', Math.max(0, l!.padding[0] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([0, 2]))" reveal short label="Vertical padding" @pick="(t) => pickPad([0, 2], t)" @unbind="unbind(padKeys([0, 2]))" @step="(d) => padHV('v', Math.max(0, l!.padding[0] + d))" /></label>
+        <button class="ib s24 tog" :aria-pressed="false" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = true"><EditorIcon name="padding_individual" /></button>
       </div>
       <template v-else>
         <div v-for="(pair, r) in PAD4" :key="r" class="ig">
-          <label v-for="p in pair" :key="p.nm" class="sq fld" :title="tr(`${p.nm} padding`)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="PAD_ICON[p.i]" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input v-if="!vb(padKeys([p.i]))" :key="p.nm + l.padding[p.i]" :value="l.padding[p.i]" inputmode="decimal" :aria-label="tr(`${p.nm} padding`)" @change="num($event, (v) => pad(p.i, v))" @keydown="blur($event); step($event, (d) => pad(p.i, Math.max(0, l!.padding[p.i] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([p.i]))" reveal short :label="`${p.nm} padding`" @pick="(t) => pickPad([p.i], t)" @unbind="unbind(padKeys([p.i]))" @step="(d) => pad(p.i, Math.max(0, l!.padding[p.i] + d))" /></label>
-          <button v-if="r === 0" class="ib s24 tog on" :aria-pressed="true" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11M6 6h4v4H6z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <label v-for="p in pair" :key="p.nm" class="sq fld" :title="tr(`${p.nm} padding`)" v-bind="hintOn(p.i as 0 | 1 | 2 | 3)"><EditorIcon :name="PAD_ICON[p.i]!" /><input v-if="!vb(padKeys([p.i]))" :key="p.nm + l.padding[p.i]" :value="l.padding[p.i]" inputmode="decimal" :aria-label="tr(`${p.nm} padding`)" @change="num($event, (v) => pad(p.i, v))" @keydown="blur($event); step($event, (d) => pad(p.i, Math.max(0, l!.padding[p.i] + d)))"><TokenPicker :kinds="['spacing']" :bound="vb(padKeys([p.i]))" reveal short :label="`${p.nm} padding`" @pick="(t) => pickPad([p.i], t)" @unbind="unbind(padKeys([p.i]))" @step="(d) => pad(p.i, Math.max(0, l!.padding[p.i] + d))" /></label>
+          <button v-if="r === 0" class="ib s24 tog on" :aria-pressed="true" :aria-label="tr('Individual padding')" :title="tr('Individual padding')" @click="sepPad = false"><EditorIcon name="padding_individual" /></button>
           <span v-else />
         </div>
       </template>
@@ -202,10 +209,10 @@ const isOn = (col: number, row: number) => {
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:has(> .sec-h:only-child) { padding-bottom: var(--ref-spacing-08); }
 .hacts { display: flex; align-items: center; gap: var(--ref-spacing-02); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 /* 꺼져 있으면 빈 섹션(Stroke · Effects)처럼 제목을 옅게 */
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .ig.top { align-items: start; }
 /* 정렬판: 왼쪽 칸 폭 × 64(칸 두 줄 높이), 점 3 × 3. 고른 칸 · 올린 칸은 흐름 방향 막대 3개로 미리 보여요(피그마) */
 .align { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 64px; padding: 4px; box-sizing: border-box; border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); }

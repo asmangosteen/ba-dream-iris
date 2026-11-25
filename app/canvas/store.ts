@@ -6,6 +6,7 @@ import { radiiOf } from './paint'
 import { booleanLoops, flattenLoops, flattenable, loopsVnet } from './boolean'
 import { scaledStyle } from './scale'
 import { newSmoothing } from './prefs'
+import { moveOrder } from './order'
 import { absPos, bindLiteral, descendants, isContainer, isGroupNode, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type ExportSetting, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
 import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, localMatrix, parentMatrix, spaceRects, tidyRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
@@ -28,6 +29,11 @@ export function createLayerStore(opts: {
   const docs = reactive<Record<string, LayerDoc>>({})
   const screenId = ref<string | null>(null) // 고른 화면
   const layerIds = ref<string[]>([]) // 고른 레이어(같은 화면 안)
+  /**
+   * 다른 문서(캔버스 · 다른 화면)에서 함께 고른 레이어(피그마처럼 캔버스 위 레이어와 프레임 안 레이어를 ⇧ · ⌘ 로 같이) — 레이어 목록 · 캔버스가 함께 표시하고
+   * 끌기 · 방향키 · 지우기 · 패널의 칠 · 선 · 모양 값 고치기가 같이 적용돼요. 보통 고르기(한 개 누르기 · 화면 고르기)를 하면 비워요
+   */
+  const xsel = ref<{ sid: string; id: string }[]>([])
   /** 픽셀에 맞추기: 켜져 있으면(픽셀 그리드 켬) 옮기기 · 크기가 정수, 끄면 소수 둘째 자리까지(페이지 설정 Pixel grid 와 함께 바뀌어요) */
   const pixelSnap = ref(true)
   const snapPx = (v: number) => (pixelSnap.value ? Math.round(v) : Math.round(v * 100) / 100)
@@ -158,6 +164,7 @@ export function createLayerStore(opts: {
   function restore(sid: string, json: string) {
     docs[sid] = JSON.parse(json)
     layerIds.value = layerIds.value.filter((id) => docs[sid]!.nodes[id])
+    xsel.value = xsel.value.filter((x) => x.sid !== sid || docs[sid]!.nodes[x.id])
     scheduleSave(sid)
   }
   /** 되돌린 문서에 있는 것만 다시 고르기 */
@@ -214,9 +221,11 @@ export function createLayerStore(opts: {
   function selectScreen(sid: string | null) {
     screenId.value = sid
     layerIds.value = []
+    xsel.value = []
     editing.value = null
   }
   function selectLayer(sid: string, id: string | null, additive = false) {
+    if (screenId.value !== sid || !additive) xsel.value = []
     if (screenId.value !== sid) layerIds.value = []
     screenId.value = sid
     if (!id) { layerIds.value = []; return }
@@ -224,10 +233,54 @@ export function createLayerStore(opts: {
     else layerIds.value = [id]
   }
 
+  /** 다른 문서의 레이어를 함께 고르기 · 빼기(⇧ · ⌘). 지금 고른 문서의 것이면 보통 더하기 · 빼기 */
+  function toggleX(sid: string, id: string) {
+    if (!screenId.value || !layerIds.value.length || sid === screenId.value) { selectLayer(sid, id, true); return }
+    const i = xsel.value.findIndex((x) => x.sid === sid && x.id === id)
+    xsel.value = i >= 0 ? xsel.value.filter((_, k) => k !== i) : [...xsel.value, { sid, id }]
+  }
+  /** 함께 고른 다른 문서를 '지금 문서'로 바꾸기(그 문서 레이어를 눌러 끌 때) — 지금 문서의 고른 것은 함께 고르기로 옮겨요 */
+  function promoteX(sid: string) {
+    if (sid === screenId.value || !xsel.value.some((x) => x.sid === sid)) return
+    const oldSid = screenId.value, oldIds = [...layerIds.value]
+    const mine = xsel.value.filter((x) => x.sid === sid).map((x) => x.id)
+    const rest = xsel.value.filter((x) => x.sid !== sid)
+    screenId.value = sid
+    layerIds.value = mine
+    xsel.value = [...rest, ...(oldSid ? oldIds.map((id) => ({ sid: oldSid, id })) : [])]
+  }
+  /** 다른 문서에서 함께 고른 것: 문서별로 묶어서 */
+  const xGroups = () => {
+    const m = new Map<string, string[]>()
+    for (const x of xsel.value) if (doc(x.sid).nodes[x.id]) m.set(x.sid, [...(m.get(x.sid) ?? []), x.id])
+    return [...m]
+  }
+  /** 지금 고른 것 전체(이 문서 + 함께 고른 다른 문서)에 같은 일을 — 실행취소 한 번 */
+  const GEOM_KEYS = ['x', 'y', 'w', 'h', 'rotation'] as const
+  const isPrimary = (sid: string, ids: string[]) => sid === screenId.value && ids.length === layerIds.value.length && ids.every((id) => layerIds.value.includes(id))
+  function withX(sid: string, ids: string[], fn: (sid: string, ids: string[]) => void) {
+    if (!xsel.value.length || !isPrimary(sid, ids)) { fn(sid, ids); return }
+    const groups = xGroups()
+    batch(() => { fn(sid, ids); for (const [s2, ids2] of groups) fn(s2, ids2) })
+  }
+
   // --- 만들기 · 고치기 · 지우기 ---
+  /**
+   * 새 레이어 이름(피그마와 같아요): '종류 N' — N 은 열려 있는 모든 문서(캔버스 · 화면들)에서 같은 이름 꼴의 가장 큰 번호 + 1.
+   * (개수 + 1 이면 지우고 다시 그리거나 캔버스 · 프레임에 나눠 그릴 때 'Rectangle 1' 이 겹쳤어요)
+   */
+  function nextLabel(label: string, d?: LayerDoc) {
+    const re = new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' (\\d+)$')
+    let max = 0
+    // 캔버스에 그린 프레임(화면)도 같은 번호 줄로 — 화면 · 캔버스 레이어가 'Frame 1' 로 겹치지 않게
+    for (const sc of opts.screens.value) { const m = re.exec(sc.name ?? ''); if (m) max = Math.max(max, Number(m[1])) }
+    for (const doc0 of new Set([...Object.values(docs), ...(d ? [d] : [])])) {
+      for (const v of Object.values(doc0.nodes)) { const m = re.exec(v.name ?? ''); if (m) max = Math.max(max, Number(m[1])) }
+    }
+    return `${label} ${max + 1}`
+  }
   function nextName(d: LayerDoc, type: LayerType) {
-    const n = Object.values(d.nodes).filter((v) => v.type === type).length + 1
-    return `${TYPE_LABEL[type]} ${n}`
+    return nextLabel(TYPE_LABEL[type], d)
   }
   function add(sid: string, parentId: string | null, part: Partial<LayerNode> & { type: LayerType }): string {
     return mutate(sid, (d) => {
@@ -242,6 +295,37 @@ export function createLayerStore(opts: {
       return id
     })
   }
+  /**
+   * 프레임 · 섹션을 그렸을 때(피그마와 같아요): 같은 부모 안에서 새 상자 안에 통째로 드는 레이어는 그 안으로 넣어요(보이는 자리 그대로).
+   * 새 프레임은 안에 넣은 것 중 맨 위 것 자리에 — 겹친 다른 레이어의 앞뒤 순서는 그대로. 실행취소 한 번
+   */
+  function addAround(sid: string, parentId: string | null, part: Partial<LayerNode> & { type: LayerType; x: number; y: number; w: number; h: number }): string {
+    return mutate(sid, (d) => {
+      const id = newId()
+      const sm = part.style?.smoothing === undefined ? newSmoothing(part.type) : undefined
+      d.nodes[id] = { id, name: nextName(d, part.type), parentId, ...part, style: { ...DEFAULT_STYLE[part.type], ...part.style, ...(sm ? { smoothing: sm } : {}) } }
+      d.nodes[id]!.children = []
+      const sib = siblings(d, parentId)
+      const inside = sib.filter((k) => {
+        const c = d.nodes[k]
+        if (!c || c.locked || c.hidden || (c.rotation ?? 0) % 360) return false
+        return c.x >= part.x - 0.01 && c.y >= part.y - 0.01 && c.x + c.w <= part.x + part.w + 0.01 && c.y + c.h <= part.y + part.h + 0.01
+      })
+      const at = inside.length ? Math.max(...inside.map((k) => sib.indexOf(k))) : sib.length - 1
+      sib.splice(at + 1, 0, id)
+      for (const k of inside) {
+        sib.splice(sib.indexOf(k), 1)
+        const c = d.nodes[k]!
+        c.parentId = id
+        c.x -= part.x
+        c.y -= part.y
+        d.nodes[id]!.children!.push(k)
+      }
+      layerIds.value = [id]
+      screenId.value = sid
+      return id
+    })
+  }
   /** 고른 것 중 맨 위 것만(부모가 같이 골라진 자식은 빼요) — 옮기기 · 정렬처럼 자리를 바꾸는 일은 부모째 움직이면 자식도 따라가요 */
   function topIds(sid: string, ids: string[]) {
     const d = doc(sid)
@@ -249,6 +333,25 @@ export function createLayerStore(opts: {
     return ids.filter((id) => { for (let p = d.nodes[id]?.parentId; p; p = d.nodes[p]?.parentId) if (set.has(p)) return false; return true })
   }
   function update(sid: string, ids: string[], patch: Partial<Omit<LayerNode, 'style'>> | ((n: LayerNode) => Partial<LayerNode>)) {
+    // 여러 프레임에 걸쳐 고른 것 전부에(피그마와 같아요): 글자 · 칠 · 선 · 효과 등 모든 속성.
+    // 자리 · 크기 · 회전은 부모마다 기준이 달라 값 하나로 고칠 때는 이 문서만(끌기 · 크기 조절이 이 길로 와요),
+    // 함수로 고칠 때는 다른 문서에선 자리 · 크기 값만 빼고 나머지를 적용해요
+    if (xsel.value.length && isPrimary(sid, ids)) {
+      if (typeof patch !== 'function') {
+        if (!GEOM_KEYS.some((k) => k in patch)) { withX(sid, ids, (s2, ids2) => mutate(s2, (d) => { for (const id of ids2) { const n = d.nodes[id]; if (n) Object.assign(n, patch) } })); return }
+      } else {
+        withX(sid, ids, (s2, ids2) => mutate(s2, (d) => {
+          for (const id of ids2) {
+            const n = d.nodes[id]
+            if (!n) continue
+            const r = { ...patch(n) }
+            if (s2 !== sid) for (const k of GEOM_KEYS) delete (r as Record<string, unknown>)[k]
+            Object.assign(n, r)
+          }
+        }))
+        return
+      }
+    }
     mutate(sid, (d) => {
       for (const id of ids) {
         const n = d.nodes[id]
@@ -257,7 +360,7 @@ export function createLayerStore(opts: {
     })
   }
   function style(sid: string, ids: string[], s: Partial<LayerStyle>) {
-    mutate(sid, (d) => { for (const id of ids) { const n = d.nodes[id]; if (n) n.style = { ...n.style, ...s } } })
+    withX(sid, ids, (s2, ids2) => mutate(s2, (d) => { for (const id of ids2) { const n = d.nodes[id]; if (n) n.style = { ...n.style, ...s } } }))
   }
   /**
    * 변수(토큰) 연결 · 풀기. patch 로 실제 값도 함께 써 넣습니다(연결해도 그리기 · 내보내기는 그 값을 씀).
@@ -265,7 +368,8 @@ export function createLayerStore(opts: {
    */
   function bind(sid: string, ids: string[], key: BindKey | BindKey[], tokenId: string | null, patch?: (n: LayerNode) => { node?: Partial<Omit<LayerNode, 'style'>>; style?: Partial<LayerStyle> }) {
     const keys = Array.isArray(key) ? key : [key]
-    mutate(sid, (d) => {
+    // 여러 프레임에 걸쳐 고른 것 전부에
+    withX(sid, ids, (sid, ids) => mutate(sid, (d) => {
       for (const id of ids) {
         const n = d.nodes[id]
         if (!n) continue
@@ -279,7 +383,7 @@ export function createLayerStore(opts: {
         n.style = { ...n.style, ...p?.style, vars: Object.keys(vars).length ? vars : undefined }
         if (!n.style.vars) delete n.style.vars
       }
-    })
+    }))
   }
   const unbind = (sid: string, ids: string[], key: BindKey | BindKey[], patch?: Parameters<typeof bind>[4]) => bind(sid, ids, key, null, patch)
   /** 화면(프레임) 자체의 모양 바꾸기. vars: 토큰 연결(키 → 토큰 id, null 이면 연결 끊기) */
@@ -297,6 +401,18 @@ export function createLayerStore(opts: {
   }
   function remove(sid: string, ids: string[]) {
     if (!ids.length) return
+    // 함께 고른 다른 문서의 레이어도 같이 지워요(실행취소 한 번)
+    if (xsel.value.length && isPrimary(sid, ids)) {
+      const groups = xGroups()
+      batch(() => { removeIn(sid, ids); for (const [s2, ids2] of groups) removeIn(s2, ids2) })
+      xsel.value = []
+      layerIds.value = []
+      return
+    }
+    removeIn(sid, ids)
+    layerIds.value = []
+  }
+  function removeIn(sid: string, ids: string[]) {
     mutate(sid, (d) => {
       for (const id of ids) {
         const n = d.nodes[id]
@@ -311,17 +427,16 @@ export function createLayerStore(opts: {
   }
   /** 같은 부모 안에서 앞(위)·뒤(아래)로. dir: 1 = 한 칸 위, -1 = 한 칸 아래, 'top' · 'bottom' */
   function arrange(sid: string, ids: string[], dir: 1 | -1 | 'top' | 'bottom') {
-    mutate(sid, (d) => {
-      for (const id of ids) {
-        const n = d.nodes[id]
-        if (!n) continue
-        const sib = siblings(d, n.parentId)
-        const i = sib.indexOf(id)
-        sib.splice(i, 1)
-        const j = dir === 'top' ? sib.length : dir === 'bottom' ? 0 : Math.max(0, Math.min(sib.length, i + dir))
-        sib.splice(j, 0, id)
+    // 여러 개를 고르면 부모별로 함께 옮기고, 고른 것끼리의 순서는 그대로(피그마와 같아요). 다른 프레임에서 함께 고른 것도
+    withX(sid, ids, (sid, ids) => mutate(sid, (d) => {
+      const byParent = new Map<string | null, Set<string>>()
+      for (const id of ids) { const n = d.nodes[id]; if (!n) continue; const p = n.parentId ?? null; if (!byParent.has(p)) byParent.set(p, new Set()); byParent.get(p)!.add(id) }
+      for (const [p, picked] of byParent) {
+        const sib = siblings(d, p)
+        const next = moveOrder(sib, picked, dir)
+        sib.splice(0, sib.length, ...next)
       }
-    })
+    }))
   }
   /** 레이어 목록에서 끌어 놓기: target 바로 위(그리는 순서로는 다음)에 놓고, target 이 프레임이면 into 일 때 그 안으로 */
   function moveTo(sid: string, id: string, targetId: string | null, into = false) {
@@ -407,7 +522,10 @@ export function createLayerStore(opts: {
             x = p.x - pa.x + offset; y = p.y - pa.y + offset
           }
         }
-        d.nodes[id] = { ...n, id, parentId, children: n.children?.map((c) => map.get(c)!), x, y }
+        // 이름(피그마와 같아요): 맨 위 레이어가 기본 이름('Rectangle 3' · 'Group 2' 처럼 종류 + 번호)이면 다음 번호로, 바꾼 이름은 그대로
+        const label = n.group ? 'Group' : TYPE_LABEL[n.type]
+        const name = root && label && new RegExp('^' + label + ' \\d+$').test(n.name ?? '') ? nextLabel(label, d) : n.name
+        d.nodes[id] = { ...n, id, name, parentId, children: n.children?.map((c) => map.get(c)!), x, y }
         if (root) {
           const sib = siblings(d, parentId)
           // 오토 레이아웃 안 같은 부모로 붙일 때는 원본 바로 다음에(피그마와 같아요) — 맨 끝이 아니라
@@ -584,7 +702,9 @@ export function createLayerStore(opts: {
     })
   }
   /** ⌃⌘M 마스크로 쓰기: 고른 것 중 맨 아래가 마스크, 모두 'Mask group' 으로. 마스크 하나만 고르고 다시 누르면 풀어요 */
-  function toggleMask(sid: string, ids: string[]) {
+  // 그룹으로 감싸기 + 마스크 지정을 실행취소 한 번으로 묶어요(⌘Z 한 번에 원래대로, 피그마와 같아요)
+  function toggleMask(sid: string, ids: string[]) { batch(() => toggleMaskIn(sid, ids)) }
+  function toggleMaskIn(sid: string, ids: string[]) {
     const d0 = doc(sid)
     if (ids.length >= 1 && ids.every((id) => d0.nodes[id]?.isMask)) { update(sid, ids, { isMask: undefined }); return }
     // 하나만: 그 자리에서 마스크로 — 같은 부모 안 위쪽 레이어들을 그 모양으로 가려요(피그마와 같아요)
@@ -607,7 +727,8 @@ export function createLayerStore(opts: {
    * ⇧A 오토 레이아웃 더하기(피그마와 같아요): 프레임 하나면 그 프레임에, 그룹 하나면 그 안의 레이어에, 아니면 고른 것들을 새 프레임으로 감싸서.
    * 방향 · 간격은 지금 놓인 모양에서 짐작하고, 크기는 내용에 맞춤(Hug)
    */
-  function addAutoLayout(sid: string, ids: string[]) {
+  function addAutoLayout(sid: string, ids: string[]) { batch(() => addAutoLayoutIn(sid, ids)) }
+  function addAutoLayoutIn(sid: string, ids: string[]) {
     const d0 = doc(sid)
     const one = ids.length === 1 ? d0.nodes[ids[0]!] : undefined
     // 그룹 하나를 고르면: 그룹은 그대로 두고 그 안의 레이어에 오토 레이아웃을 넣어요(안 레이어들을 오토 레이아웃 프레임으로 감싸기 —
@@ -616,7 +737,7 @@ export function createLayerStore(opts: {
       addAutoLayout(sid, [...one.children])
       return
     }
-    let fid = one && one.type === 'frame' && !one.style.layout ? one.id : null
+    let fid = one && (one.type === 'frame' || one.type === 'section') && !one.style.layout ? one.id : null
     if (!fid) {
       if (one?.style.layout) return
       wrap(sid, ids, 'frame')
@@ -632,7 +753,7 @@ export function createLayerStore(opts: {
       const grid = rs.length >= 3 ? rowsOf(rs) : null
       if (grid && grid.rows.length >= 2 && grid.rows.some((r) => r.length >= 2)) {
         const minX = Math.min(...rs.map((r) => r.x)), minY = Math.min(...rs.map((r) => r.y))
-        const pad = one?.type === 'frame' ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
+        const pad = one?.type === 'frame' || one?.type === 'section' ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
         const rowW = Math.max(...grid.rows.map((row) => row.reduce((a, i) => a + rs[i]!.w, 0) + grid.gapX * (row.length - 1)))
         f.children = grid.rows.flat().map((i) => kids[i]!.id)
         f.style = { ...f.style, layout: { mode: 'horizontal', wrap: true, gap: grid.gapX, rowGap: grid.gapY, padding: [pad, pad, pad, pad], align: 'start', cross: 'start' } }
@@ -644,7 +765,7 @@ export function createLayerStore(opts: {
       const axis = rs.length >= 2 ? guessAxis(rs) : 'y'
       const gap = rs.length >= 2 ? Math.max(0, currentGap(rs, axis) ?? 10) : 10
       const minX = Math.min(...rs.map((r) => r.x), f.w), minY = Math.min(...rs.map((r) => r.y), f.h)
-      const pad = one?.type === 'frame' && rs.length ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
+      const pad = (one?.type === 'frame' || one?.type === 'section') && rs.length ? Math.max(0, Math.round(Math.min(minX, minY))) : 0
       // 진행 방향 순서대로
       f.children = [...(f.children ?? [])].sort((a, b) => (axis === 'x' ? d.nodes[a]!.x - d.nodes[b]!.x : d.nodes[a]!.y - d.nodes[b]!.y))
       f.style = { ...f.style, layout: { mode: axis === 'x' ? 'horizontal' : 'vertical', gap, padding: [pad, pad, pad, pad], align: 'start', cross: 'start' } }
@@ -797,7 +918,7 @@ export function createLayerStore(opts: {
       const id = newId()
       const sib = siblings(d, parentId)
       const at = Math.max(...same.map((k) => sib.indexOf(k)))
-      d.nodes[id] = { ...(kind === 'group' ? { group: true } : {}), id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? `Group ${Object.values(d.nodes).filter((v) => v.name.startsWith('Group ')).length + 1}` : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { fill: '#FFFFFF', clip: true } }
+      d.nodes[id] = { ...(kind === 'group' ? { group: true } : {}), id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? nextLabel('Group', d) : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { fill: '#FFFFFF', clip: true } }
       sib.splice(at + 1, 0, id)
       for (const b of boxes.sort((a, c) => sib.indexOf(a.id) - sib.indexOf(c.id))) {
         sib.splice(sib.indexOf(b.id), 1)
@@ -1028,7 +1149,7 @@ export function createLayerStore(opts: {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
-    selectScreen, selectLayer, add, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

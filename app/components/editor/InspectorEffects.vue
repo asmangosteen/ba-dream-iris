@@ -39,10 +39,8 @@ const TYPES: { value: Effect['type']; label: string }[] = [
   { value: 'inner', label: 'Inner shadow' }, { value: 'drop', label: 'Drop shadow' }, { value: 'blur', label: 'Layer blur' }, { value: 'bgblur', label: 'Background blur' },
 ]
 const typeLabel = (t: Effect['type']) => tr(TYPES.find((x) => x.value === t)?.label ?? 'Effect')
-/** 종류 아이콘(16): 안쪽 그림자 = 위 띠, 바깥 그림자 = 아래 띠, 흐림 = 점 격자 */
-const ICON: Record<Effect['type'], { box: boolean; band?: 'top' | 'bottom'; dots: boolean }> = {
-  inner: { box: true, band: 'top', dots: false }, drop: { box: true, band: 'bottom', dots: false }, blur: { box: false, dots: true }, bgblur: { box: true, dots: true },
-}
+/** 종류 아이콘: 안쪽 그림자 · 바깥 그림자 · 레이어 흐림 · 배경 흐림 */
+const ICON: Record<Effect['type'], string> = { inner: 'shadow_inner', drop: 'shadow_drop', blur: 'blur_layer', bgblur: 'blur_background' }
 
 // --- 설정 창 ---
 const open = ref<number | null>(null)
@@ -197,7 +195,7 @@ function detach() {
     <div :class="['sec-h', 'h24', { empty: !list.length && !mixed }]">
       <span>{{ tr('Effects') }}</span>
       <span class="acts">
-        <button ref="stylesBtn" class="ib s24 styl" :class="{ on: stylesOpen }" :aria-label="tr('Apply styles')" :data-tip="tr('Apply styles')" @click="stylesOpen = !stylesOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="5" cy="5" r="2" /><circle cx="11" cy="5" r="2" /><circle cx="5" cy="11" r="2" /><circle cx="11" cy="11" r="2" /></g></svg></button>
+        <button ref="stylesBtn" class="ib s24 styl" :class="{ on: stylesOpen }" :aria-label="tr('Apply styles')" :data-tip="tr('Apply styles')" @click="stylesOpen = !stylesOpen"><EditorIcon name="apply_styles" /></button>
         <button class="ib s24" :aria-label="tr('Add effect')" :data-tip="tr('Add effect')" aria-haspopup="menu" @click="addMenu"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
@@ -206,7 +204,7 @@ function detach() {
     <!-- 스타일이 연결됐어요: [스타일 이름] [연결 풀기] [−] (피그마와 같아요) -->
     <div v-if="boundId && list.length" class="prow bound">
       <button ref="boundBtn" type="button" :class="['sq', 'fld', 'efb', { on: stylesOpen }]" :aria-label="tr('Change effect style')" @click="stylesOpen = !stylesOpen">
-        <svg class="keep ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M3.5 13.2h9" stroke="currentColor" stroke-width="2" opacity=".35" /></svg>
+        <EditorIcon class="keep ic" name="effect_style" />
         <span class="nm">{{ boundTok?.name ?? boundId }}</span>
       </button>
       <button class="ib s24" :aria-label="tr('Detach style')" :data-tip="tr('Detach style')" @click="detach"><EditorIcon name="unlink" :size="16" /></button>
@@ -217,14 +215,9 @@ function detach() {
       <div v-for="(e, i) in list" :key="i" class="item">
         <!-- 피그마 Effects 행: [종류 아이콘 + 이름](누르면 설정 창) [👁 24] [− 24] -->
         <div :ref="rowRef(i)" class="prow" data-drag-row :class="{ off: e.visible === false, dragging: drag?.from === i }">
-          <button v-if="list.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, list.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+          <button v-if="list.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, list.length)"><EditorIcon class="keep" name="menu_hamburger" :size="10" /></button>
           <button type="button" :class="['sq', 'fld', 'efb', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" :aria-label="tr('{name} settings', { name: typeLabel(e.type) })" @click="open = open === i ? null : i">
-            <svg class="keep ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <rect v-if="ICON[e.type].box" x="3" y="3" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.25" />
-              <path v-if="ICON[e.type].band === 'top'" d="M3.6 4.6h8.8" stroke="currentColor" stroke-width="2" opacity=".45" />
-              <path v-if="ICON[e.type].band === 'bottom'" d="M3.5 13.4h9" stroke="currentColor" stroke-width="2" opacity=".45" />
-              <g v-if="ICON[e.type].dots" fill="currentColor"><circle v-for="d in 9" :key="d" :cx="5 + ((d - 1) % 3) * 3" :cy="5 + Math.floor((d - 1) / 3) * 3" r=".8" /></g>
-            </svg>
+            <EditorIcon class="keep ic" :name="ICON[e.type]" />
             <span class="nm">{{ typeLabel(e.type) }}</span>
           </button>
           <button class="ib s24" :aria-label="e.visible === false ? tr('Show effect') : tr('Hide effect')" :data-tip="e.visible === false ? tr('Show') : tr('Hide')" @click="set(i, { visible: e.visible === false ? undefined : false })">
@@ -237,12 +230,7 @@ function detach() {
             <!-- 머리: [아이콘 · 종류 ▾] … [✕] -->
             <div class="pop-h">
               <span class="pop-k">
-                <svg class="keep ic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                  <rect v-if="ICON[e.type].box" x="3" y="3" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.25" />
-                  <path v-if="ICON[e.type].band === 'top'" d="M3.6 4.6h8.8" stroke="currentColor" stroke-width="2" opacity=".45" />
-                  <path v-if="ICON[e.type].band === 'bottom'" d="M3.5 13.4h9" stroke="currentColor" stroke-width="2" opacity=".45" />
-                  <g v-if="ICON[e.type].dots" fill="currentColor"><circle v-for="d in 9" :key="d" :cx="5 + ((d - 1) % 3) * 3" :cy="5 + Math.floor((d - 1) / 3) * 3" r=".8" /></g>
-                </svg>
+                <EditorIcon class="keep ic" :name="ICON[e.type]" />
                 <EditorSelect variant="inline" :model-value="e.type" :options="TYPES" ariaLabel="Effect type" @update:model-value="(v) => setType(i, v as Effect['type'])" />
               </span>
               <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button>
@@ -261,12 +249,12 @@ function detach() {
               </template>
               <div class="row">
                 <span class="lb">{{ tr('Blur') }}</span>
-                <label class="sq fld"><svg class="keep k" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><circle v-for="d in 9" :key="d" :cx="5 + ((d - 1) % 3) * 3" :cy="5 + Math.floor((d - 1) / 3) * 3" r=".8" /></g></svg><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="stepNum(i, 'blur', $event)"></label>
+                <label class="sq fld"><EditorIcon class="keep k" name="blur" /><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="stepNum(i, 'blur', $event)"></label>
               </div>
               <template v-if="shadow(e)">
                 <div class="row">
                   <span class="lb">{{ tr('Spread') }}</span>
-                  <label class="sq fld"><svg class="keep k" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.25" /><g fill="currentColor"><circle cx="8" cy="2.6" r=".8" /><circle cx="8" cy="13.4" r=".8" /><circle cx="2.6" cy="8" r=".8" /><circle cx="13.4" cy="8" r=".8" /><circle cx="4.2" cy="4.2" r=".8" /><circle cx="11.8" cy="4.2" r=".8" /><circle cx="4.2" cy="11.8" r=".8" /><circle cx="11.8" cy="11.8" r=".8" /></g></svg><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" :aria-label="tr('Spread')" @change="num(i, 'spread', $event)" @keydown="stepNum(i, 'spread', $event)"></label>
+                  <label class="sq fld"><EditorIcon class="keep k" name="spread" /><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" :aria-label="tr('Spread')" @change="num(i, 'spread', $event)" @keydown="stepNum(i, 'spread', $event)"></label>
                 </div>
                 <div class="row">
                   <span class="lb">{{ tr('Color') }}</span>
@@ -293,7 +281,7 @@ function detach() {
       <div ref="stylesEl" v-front class="sq fx-pop st-pop editor" role="dialog" :aria-label="tr('Effect styles')" :style="stylesPos">
         <div class="pop-h"><span class="pop-t">{{ tr('Effect styles') }}</span><button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="stylesOpen = false"><EditorIcon name="close" :size="16" /></button></div>
         <div class="st-s"><label class="sq st-q"><EditorIcon name="search" :size="16" class="muted" /><input v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search effect styles')" spellcheck="false"></label></div>
-        <div class="st-l">
+        <div v-ovscroll class="st-l">
           <div class="st-g">바드림 Design System</div>
           <button v-for="t in shadowStyles" :key="t.id" type="button" :class="['sq', 'st-row', { on: t.id === boundId }]" :data-tip="t.value" @click="applyStyle(t)">
             <span class="sq st-pv" :style="{ boxShadow: t.css }" />
@@ -310,14 +298,14 @@ function detach() {
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
-.h24 { height: 24px; padding: 0; }
+.h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
 .muted { color: var(--sys-color-neutral-500); }
 /* 피그마 Effects 행: [아이콘 + 이름] 8 [👁 24][− 24] — Fill 행과 같은 열 */
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) 24px 24px; gap: 0; align-items: center; min-width: 0; }
+.prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
 .prow > .efb { margin-right: var(--ref-spacing-06); }
 .prow.off .efb { opacity: 0.45; }
 /* 행 칸(누르면 설정 창): 회색 칸, 연 칸은 옅은 파랑 + 파란 선(피그마와 같아요) */
@@ -364,7 +352,7 @@ function detach() {
 .st-q input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--sys-color-neutral-800); }
 .st-q input::placeholder { color: var(--sys-color-neutral-500); }
 .st-q:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.st-l { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--ref-spacing-04) 0 var(--ref-spacing-04); display: flex; flex-direction: column; }
+.st-l { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: var(--ref-spacing-04) 0 var(--ref-spacing-04); display: flex; flex-direction: column; }
 .st-g { padding: var(--ref-spacing-04) var(--ref-spacing-08); font-weight: 600; color: var(--sys-color-neutral-800); }
 .st-row { display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: 0; text-align: left; color: var(--sys-color-neutral-800); }
 .st-row:hover { --sq-fill: var(--sys-color-neutral-100); }

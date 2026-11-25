@@ -87,7 +87,7 @@ async function save() {
 
 <template>
   <button ref="btn" type="button" :class="['ib', 's24', { on: open }]" :aria-label="tr(label)" :data-tip="tr(label)" aria-haspopup="dialog" :aria-expanded="open" @click="toggle">
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="1.25" fill="currentColor" /><circle cx="11" cy="5" r="1.25" fill="currentColor" /><circle cx="5" cy="11" r="1.25" fill="currentColor" /><circle cx="11" cy="11" r="1.25" fill="currentColor" /></svg>
+    <EditorIcon name="style_create" />
   </button>
   <Teleport to="body">
     <!-- 피그마 팝오버(§9.1): 폭 240 · 머리 40(제목 + ✕, 아래 선) · 본문 안쪽 12 16 16 · 라벨 11/16 → 칸 28. body 로 옮겨져도 편집기 규칙을 받게 editor 클래스 -->
@@ -113,7 +113,7 @@ async function save() {
 </template>
 
 <style scoped>
-.s24 { width: 24px; height: 24px; }
+.s24 { width: 28px; height: 28px; }
 .ib.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 .sc-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); text-align: left; font-size: 12px; line-height: 18px; font-weight: 400; color: var(--sys-color-neutral-800); }
 .pop-h { display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }

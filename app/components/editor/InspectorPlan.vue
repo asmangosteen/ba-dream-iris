@@ -175,8 +175,8 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .legend span { display: flex; align-items: center; gap: var(--ref-spacing-02); }
 .sec2 { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
 .sec2.tight { gap: var(--ref-spacing-02); }
-.h24 { height: 24px; padding: 0; }
-.s24 { width: 24px; height: 24px; }
+.h24 { height: 28px; padding: 0; }
+.s24 { width: 28px; height: 28px; }
 .grp-list { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .glabel { display: flex; align-items: center; gap: var(--ref-spacing-04); font-weight: 500; color: var(--sys-color-neutral-600); }
 .count { padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-12); --sq-fill: var(--sys-color-neutral-100); font-weight: 500; color: var(--sys-color-neutral-600); }
@@ -211,7 +211,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .m0 { margin: 0; }
 .p6 { padding: var(--ref-spacing-04) var(--ref-spacing-06); }
 .picker { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
-.plist { max-height: 220px; overflow: auto; display: flex; flex-direction: column; }
+.plist { max-height: 220px; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; }
 .plist > * { flex: none; }
 .pfoot { display: flex; justify-content: flex-end; }
 </style>

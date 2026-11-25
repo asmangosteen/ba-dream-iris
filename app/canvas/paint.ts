@@ -1,4 +1,6 @@
 import type { Effect, LayerStyle, LayerType, Paint, VPath } from './schema'
+/** 별 안쪽 반지름 기본 비율 — 피그마 기본값 38.2% */
+export const STAR_INNER = 0.382
 
 /**
  * 칠 · 선 · 효과 → CSS / SVG (v5). 캔버스(LayerView) · 썸네일 · 화면 모양이 함께 씁니다.
@@ -243,11 +245,11 @@ export function vectorPath(t: LayerType, s: LayerStyle, w: number, h: number, pt
   if (t === 'ellipse') return arcPath(w, h, s.arcStart, s.arcSweep, s.arcInner)
   // 다각형 · 별 모서리 둥글기(피그마와 같아요): 꼭짓점마다 같은 r 로
   if ((t === 'polygon' || t === 'star') && (s.radius ?? 0) > 0) {
-    const ps = t === 'polygon' ? polygonPoints(s.sides ?? 3, w, h) : starPoints(s.points ?? 5, s.inner ?? 0.38, w, h)
+    const ps = t === 'polygon' ? polygonPoints(s.sides ?? 3, w, h) : starPoints(s.points ?? 5, s.inner ?? STAR_INNER, w, h)
     return vnetPath([{ closed: true, pts: ps.map(([x, y]) => ({ x: x / (w || 1), y: y / (h || 1), r: s.radius })) }], w, h)
   }
   if (t === 'polygon') return closedD(polygonPoints(s.sides ?? 3, w, h))
-  if (t === 'star') return closedD(starPoints(s.points ?? 5, s.inner ?? 0.38, w, h))
+  if (t === 'star') return closedD(starPoints(s.points ?? 5, s.inner ?? STAR_INNER, w, h))
   if (t === 'line') return pointsPath(pts ?? [0, 0, 1, 0], w, h, false)
   return pointsPath(pts ?? [], w, h, true, closed)
 }
