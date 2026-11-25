@@ -897,7 +897,7 @@ Copy ⌘C · Paste here · Paste to replace ⇧⌘R · Copy/Paste as › · Buil
 - 요구사항 · 디자인 시스템 화면도 같은 틀 — 안쪽 목록 · 본문 · 상세는 떠 있는 카드 대신 세로 선으로 나눔
 - 프로젝트 목록: 제목 20/600 · 카드 열은 폭 따라(최소 240)
 
-**⌘K 검색**: 굵직한 것만 — 프로젝트 · 컴포넌트(디자인 시스템, 고르면 /design-system?c=<id>) · 문서. 화면 · 레이어 · 요구사항 한 줄은 각 화면 안에서 찾음. 모양: 폭 560 · 모서리 12 · 떠 있는 흰 면, 검색 줄 48(아이콘 20 · 글자 14 · 지우기) + 구분선, 결과 행 36(아이콘 칸 24 · 이름 13/500 · 보조 12 neutral-500), 고른 행 --iris-sel(↵ 표시 · 아래 안내 줄 없음). 검색어 없으면 최근 프로젝트 · 최근 문서 5개씩
+**⌘K 검색**: 굵직한 것만 — 프로젝트 · 컴포넌트(디자인 시스템, 고르면 최근 프로젝트 편집기의 Assets 에서 열림) · 문서. 화면 · 레이어 · 요구사항 한 줄은 각 화면 안에서 찾음. 모양: 폭 560 · 모서리 12 · 떠 있는 흰 면, 검색 줄 48(아이콘 20 · 글자 14 · 지우기) + 구분선, 결과 행 36(아이콘 칸 24 · 이름 13/500 · 보조 12 neutral-500), 고른 행 --iris-sel(↵ 표시 · 아래 안내 줄 없음). 검색어 없으면 최근 프로젝트 · 최근 문서 5개씩
 
 **계정 메뉴**: 검은 메뉴(§21) — 아바타 32 + 이름 · 메일 / Theme / Language / Edit profile / Log out · Log out of all devices
 
@@ -940,7 +940,7 @@ Copy ⌘C · Paste here · Paste to replace ⇧⌘R · Copy/Paste as › · Buil
 ## 24. 디자인 시스템 → 편집기 Assets 로 합침 · 컴포넌트 전수검사 (2026-11-24)
 
 **합침**
-- 사이드바 메뉴에서 Design system 을 뺌(Projects · Requirements 만). 편집기 메인 메뉴 · 페이지 Styles 의 'View in design system' 링크도 뺌. `/design-system` 화면 파일은 남아 있지만 메뉴에서는 안 보임(토큰 목록 · 일괄 등록은 나중에 Assets 로 옮길 것)
+- 사이드바 메뉴에서 Design system 을 뺌(Projects · Requirements 만). 편집기 메인 메뉴 · 페이지 Styles 의 'View in design system' 링크도 뺌. `/design-system` 화면 파일은 남아 있지만 메뉴에서는 안 보임(토큰 목록 · 일괄 등록은 나중에 Assets 로 옮길 것) → 2026-11-25 화면 파일과 등록 창(DsRegisterModal)을 지움
 - 편집기 Assets 상세: 실제 모습(미리보기) · Insert instance · 이 파일에서 쓰는 곳 · **다른 곳에서 쓰는 곳**(다른 페이지 · 프로젝트, 누르면 그 화면으로) · **코드**(`<Button />`, 눌러서 복사) · **별칭**(이 이름의 피그마 레이어를 이 컴포넌트로 셈)
 - ⌘K 에서 컴포넌트를 고르면 가장 최근 프로젝트 편집기의 Assets 상세로(`/p/<id>?asset=<컴포넌트 id>`)
 

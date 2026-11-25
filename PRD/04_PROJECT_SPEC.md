@@ -38,8 +38,7 @@ iris/
 │   │   ├── login.vue               # 로그인 (이메일 → 코드)
 │   │   ├── index.vue               # 프로젝트 홈
 │   │   ├── p/[projectId]/index.vue # 에디터 (페이지·화면)
-│   │   ├── p/[projectId]/requirements.vue  # 요구사항 보드
-│   │   └── design-system.vue       # 컴포넌트·토큰
+│   │   └── p/[projectId]/requirements.vue  # 요구사항 보드 (디자인 시스템은 편집기 Assets 패널)
 │   ├── canvas/                     # ★ 캔버스 엔진 (UI와 분리)
 │   │   ├── store.ts                # 노드 맵, 선택, 명령 기록 (Pinia)
 │   │   ├── viewport.ts             # 줌·이동 계산 (화면↔캔버스 좌표 변환)
