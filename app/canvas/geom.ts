@@ -132,7 +132,8 @@ export function currentGap(rs: Rect[], a: Axis): number | null {
 // ---------------------------------------------------------------------------
 // 스냅 · 스마트 가이드
 // ---------------------------------------------------------------------------
-export interface GuideLine { x1: number; y1: number; x2: number; y2: number; dash?: boolean; tick?: boolean }
+/** marks: 맞춰진 점마다 작은 ×(피그마 스마트 가이드와 같아요) */
+export interface GuideLine { x1: number; y1: number; x2: number; y2: number; dash?: boolean; tick?: boolean; marks?: { x: number; y: number }[] }
 export interface GuideLabel { x: number; y: number; text: string }
 export interface Guides { lines: GuideLine[]; labels: GuideLabel[] }
 export const noGuides = (): Guides => ({ lines: [], labels: [] })
@@ -180,7 +181,19 @@ export function alignGuides(b: Rect, targets: Rect[], only?: { x?: number[]; y?:
   for (const a of ['x', 'y'] as const) {
     const ca = cross(a)
     const spans = new Map<number, [number, number]>()
+    const marks = new Map<number, Map<string, { x: number; y: number }>>()
     const mine = only?.[a] ?? edges(b, a)
+    // 맞춰진 선 위의 점: 가장자리면 두 모서리, 가운데면 가운데 점
+    const pts = (r: Rect, v: number) => {
+      const e = edges(r, a)
+      const at = Math.abs(v - e[1]!) < 0.5 ? [pos(r, ca) + len(r, ca) / 2] : [pos(r, ca), pos(r, ca) + len(r, ca)]
+      return at.map((c) => (a === 'x' ? { x: v, y: c } : { x: c, y: v }))
+    }
+    const addMarks = (k: number, ps: { x: number; y: number }[]) => {
+      const m = marks.get(k) ?? new Map<string, { x: number; y: number }>()
+      for (const p of ps) m.set(`${Math.round(p.x * 2)}:${Math.round(p.y * 2)}`, p)
+      marks.set(k, m)
+    }
     for (const t of targets) {
       for (const tv of edges(t, a)) {
         if (!mine.some((m) => Math.abs(m - tv) < 0.5)) continue
@@ -188,9 +201,14 @@ export function alignGuides(b: Rect, targets: Rect[], only?: { x?: number[]; y?:
         const lo = Math.min(pos(b, ca), pos(t, ca)), hi = Math.max(pos(b, ca) + len(b, ca), pos(t, ca) + len(t, ca))
         const cur = spans.get(k)
         spans.set(k, cur ? [Math.min(cur[0], lo), Math.max(cur[1], hi)] : [lo, hi])
+        // 폭 0 인 긴 상자(가이드선)는 점이 없어요
+        addMarks(k, [...(len(t, ca) > 1e5 ? [] : pts(t, k)), ...pts(b, k)])
       }
     }
-    for (const [v, [lo, hi]] of spans) g.lines.push(a === 'x' ? { x1: v, y1: lo, x2: v, y2: hi } : { x1: lo, y1: v, x2: hi, y2: v })
+    for (const [v, [lo, hi]] of spans) {
+      const mk = [...(marks.get(v)?.values() ?? [])]
+      g.lines.push(a === 'x' ? { x1: v, y1: lo, x2: v, y2: hi, marks: mk } : { x1: lo, y1: v, x2: hi, y2: v, marks: mk })
+    }
   }
   return g
 }
