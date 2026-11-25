@@ -17,7 +17,7 @@ import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { useMixScreens } from '~/composables/useLayerMenu'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
-import { isMediaFile, isVideoFile, mediaLimit, uploadImage } from '~/canvas/images'
+import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, uploadImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
@@ -564,7 +564,9 @@ async function onImageFile(e: Event) {
  */
 async function insertImage(file: File, at?: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
   if (!isMediaFile(file)) return say(tr('Only image or video files can be added'))
-  if (file.size > mediaLimit(file)) return say(isVideoFile(file) ? tr('Videos must be smaller than 50MB') : tr('Images must be smaller than 10MB'))
+  const tooLarge = () => say(isVideoFile(file) ? tr('Videos must be smaller than 50MB') : tr('Images must be smaller than 10MB'))
+  // 영상은 바로 잽니다. 이미지는 4096px 로 줄인 뒤의 크기로 uploadImage 가 잽니다
+  if (isVideoFile(file) && file.size > mediaLimit(file)) return tooLarge()
   const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
   const s = (place ? list.value.find((v) => v.id === place.sid) : null) ?? (at ? hitScreen : current.value) ?? canvasScreen.value
   if (!s) return
@@ -583,7 +585,10 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
     const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || (img.video ? 'Video' : 'Image')
     store.add(s.id, parentId, { type: 'image', name, src: img.src, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true })
     tab.value = 'design'
-  } catch { say(isVideoFile(file) ? tr('Couldn\'t upload the video. Try again') : tr('Couldn\'t upload the image. Try again')) }
+  } catch (e) {
+    if (e instanceof MediaTooLargeError) return tooLarge()
+    say(isVideoFile(file) ? tr('Couldn\'t upload the video. Try again') : tr('Couldn\'t upload the image. Try again'))
+  }
 }
 /** 캔버스에 파일 끌어 놓기: 이미지 · 영상. 놓은 화면 · 프레임 안으로 */
 async function onDropFiles(files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
