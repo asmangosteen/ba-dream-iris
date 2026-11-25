@@ -114,21 +114,21 @@ function onRoleKey(e: KeyboardEvent) {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @mousedown.self="close">
+    <div v-if="open" class="pop-overlay" @mousedown.self="close">
       <section
         ref="dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="profileTitle"
-        class="sq dialog"
+        class="sq pop"
         @keydown="onKeydown"
       >
-        <div class="top">
-          <h1 id="profileTitle" class="ttl">{{ tr('Edit profile') }}</h1>
-          <button type="button" class="sq ib" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+        <div class="pop-top">
+          <h1 id="profileTitle" class="pop-ttl">{{ tr('Edit profile') }}</h1>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
         </div>
 
-        <form class="content" @submit.prevent="save">
+        <form class="pop-body" @submit.prevent="save">
           <div class="photo">
             <button type="button" class="pic" :aria-label="tr('Change profile photo')" @click="fileEl?.click()">
               <MemberAvatar :name="trimmed || me?.email || ''" :src="photoUrl" :size="48" />
@@ -169,7 +169,7 @@ function onRoleKey(e: KeyboardEvent) {
           <p v-if="error" class="tx-meta err" role="alert"><Icon name="warning" :size="12" />{{ error }}</p>
         </form>
 
-        <div class="foot">
+        <div class="pop-foot">
           <Button size="s" type="tertiary" @click="close">{{ tr('Cancel') }}</Button>
           <Button size="s" type="primary" :loading="saving" :disabled="!canSave" @click="save">{{ tr('Save') }}</Button>
         </div>
@@ -179,15 +179,7 @@ function onRoleKey(e: KeyboardEvent) {
 </template>
 
 <style scoped>
-/* 프로필 창: 폭 360 · 모서리 16 · 안쪽 16(머리 · 본문 · 아래 모두) · 항목 사이 16 · 라벨 → 칸 6. 버튼은 오른쪽 아래에 작게(s) — Cancel · Save */
-.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 360px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-default); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
-.top { display: flex; align-items: center; justify-content: space-between; height: 48px; box-sizing: border-box; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); }
-.ttl { margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; }
-.top .ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
-.top .ib:hover { --sq-fill: var(--sys-color-neutral-100); }
-.content { flex: 1; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-10); margin: 0; }
-.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); }
+/* 프로필 창 = 팝업 기준(main.css 의 .pop · .pop-top · .pop-body · .pop-foot). 여기에는 안쪽 내용만 */
 .col { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .lbl { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .roles { margin-left: calc(-1 * var(--ref-spacing-06)); }

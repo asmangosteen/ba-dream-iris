@@ -18,7 +18,7 @@ const local = ref('')
 const code = ref('')
 const busy = ref(false)
 const resent = ref(false)
-const error = ref(route.query.blocked ? `Only company emails (@${domain}) can sign in` : route.query.expired ? 'Your session expired after 30 days. Please sign in again' : '')
+const error = ref(route.query.blocked ? `Only company emails (@${domain}) can sign in` : route.query.expired ? 'Your session expired after 30 days. Please sign in again' : route.query.signedout ? 'You were signed out. Sign in again to keep working' : '')
 const email = computed(() => `${local.value.trim()}@${domain}`)
 // 도메인 글자: 입력칸 오른쪽에 늘 보이게(입력 글자는 그 앞에서 끝나요)
 const emailField = ref<HTMLElement | null>(null)
@@ -70,7 +70,9 @@ async function verify() {
       setTimeout(() => { stop(); resolve() }, 3000)
     })
   }
-  await navigateTo('/')
+  // 로그인이 끝나 다시 로그인한 경우(?next=) 보던 화면으로 — 같은 사이트 경로만
+  const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//') ? route.query.next : '/'
+  await navigateTo(next)
   busy.value = false
 }
 

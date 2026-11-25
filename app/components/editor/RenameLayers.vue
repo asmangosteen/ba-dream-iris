@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@ba-dream/design-system'
 /**
  * 여러 레이어 이름 한꺼번에 바꾸기(피그마 'Rename N layers'와 같아요).
  * - Match(선택): 이름 안의 이 글자만 바꿔요. 비우면 이름 전체를 바꿔요
@@ -59,13 +60,13 @@ function apply() {
 
 <template>
   <Teleport to="body">
-    <div class="rn-back" @pointerdown.self="emit('close')">
-      <div v-front class="sq rn editor" role="dialog" aria-modal="true" :aria-label="tr('Rename {n} layers', { n: items.length })" @keydown.esc.stop.prevent="emit('close')" @keydown.stop>
-        <div class="rn-h">
-          <span class="rn-t">{{ tr('Rename {n} layers', { n: items.length }) }}</span>
-          <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
+    <div class="pop-overlay" @pointerdown.self="emit('close')">
+      <div v-front class="sq pop rn editor" style="--pop-w: 480px" role="dialog" aria-modal="true" :aria-label="tr('Rename {n} layers', { n: items.length })" @keydown.esc.stop.prevent="emit('close')" @keydown.stop>
+        <div class="pop-top">
+          <span class="pop-ttl">{{ tr('Rename {n} layers', { n: items.length }) }}</span>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
         </div>
-        <div class="rn-b">
+        <div class="pop-body rn-b">
           <div class="rn-pv">
             <span class="rn-lb">{{ tr('Preview') }}</span>
             <ul v-ovscroll class="rn-list" :aria-label="tr('Preview')">
@@ -86,9 +87,9 @@ function apply() {
             </div>
           </div>
         </div>
-        <div class="rn-e">
-          <button type="button" class="sq act gray" @click="emit('close')">{{ tr('Cancel') }}</button>
-          <button type="button" class="sq act pri" :disabled="!changed" @click="apply">{{ tr('Rename') }}</button>
+        <div class="pop-foot">
+          <Button size="s" type="tertiary" @click="emit('close')">{{ tr('Cancel') }}</Button>
+          <Button size="s" type="primary" :disabled="!changed" @click="apply">{{ tr('Rename') }}</Button>
         </div>
       </div>
     </div>
@@ -96,12 +97,8 @@ function apply() {
 </template>
 
 <style scoped>
-.rn-back { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: var(--ref-spacing-08); background: rgb(0 0 0 / 0.24); }
-.rn { width: min(480px, 100%); display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); text-align: left; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.rn-h { display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
-.rn-t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.s24 { width: 28px; height: 28px; }
-.rn-b { display: grid; grid-template-columns: 140px 1fr; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08); min-height: 160px; }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 본문만: 왼쪽 미리보기 140 · 오른쪽 입력 */
+.rn-b { display: grid; grid-template-columns: 140px 1fr; gap: var(--ref-spacing-08); min-height: 160px; }
 .rn-pv { display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
 .rn-lb { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
 .rn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-02); max-height: 240px; overflow-x: hidden; overflow-y: auto; }
@@ -116,7 +113,4 @@ function apply() {
 .chip.on { --sq-fill: var(--sys-color-neutral-100); }
 .rn-start { display: flex; align-items: center; gap: var(--ref-spacing-06); color: var(--sys-color-neutral-700); }
 .rn-start .num { width: 56px; }
-.rn-e { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); box-shadow: inset 0 1px 0 var(--iris-line); }
-.act { height: 28px; }
-.act:disabled { opacity: 0.4; }
 </style>

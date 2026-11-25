@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { fmtNum } from '~/canvas/num'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
 import { Button, Skeleton, TextButton } from '@ba-dream/design-system'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
@@ -61,7 +62,7 @@ async function doRemovePage() {
   const c = confirmPage.value
   confirmPage.value = null
   if (!c) return
-  try { await removePage(c.id); say(tr('Deleted {name}', { name: c.name })) } catch { say(tr('Couldn\'t delete the page. Try again')) }
+  try { await removePage(c.id); say(tr('Deleted {name}', { name: c.name })) } catch { sayFail(tr('Couldn\'t delete the page. Try again')) }
 }
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
@@ -98,7 +99,7 @@ async function onPageDrop() {
   try {
     await setPageOrder(after)
     store.pushAction(null, () => setPageOrder(before), () => setPageOrder(after))
-  } catch { say(tr('Something went wrong. Try again')) }
+  } catch { sayFail(tr('Something went wrong. Try again')) }
 }
 /** 페이지 구분선: 이름이 대시(-, –, —) 3개 이상뿐이면 */
 const isDivider = (name: string) => /^\s*[-–—]{3,}\s*$/.test(name)
@@ -158,17 +159,26 @@ async function onPageSettings(patch: PageSettings) {
     // 보기 설정(픽셀 격자 · 픽셀에 맞추기)은 문서 내용이 아니라 실행취소에 넣지 않아요(피그마와 같아요)
     if (Object.keys(patch).every((k) => k === 'pixelGrid' || k === 'snapPixel')) return
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
-  } catch { say(tr('Couldn\'t save page settings')) }
+  } catch { sayFail(tr('Couldn\'t save page settings')) }
 }
 const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
+// 저장하지 못한 화면 내용은 이 브라우저에 보관(새로 고치거나 닫아도 다시 열면 복구 — 피그마 autosave 처럼)
+const backup = useUnsavedBackup(projectId)
+let backupFailed = false
 // 화면 안 레이어: 고르기 · 실행취소 · 자동저장
 const store = createLayerStore({
   screens: canvasList,
   save: (sid, doc) => updateScreen(sid, { layers: doc }),
   tokens: computed(() => (tokens.data.value ?? []).map((t) => ({ name: t.name, value: t.value }))),
+  onUnsaved: (sid, doc) => {
+    if (backup.put(sid, doc)) { backupFailed = false; return }
+    if (!backupFailed) say(tr('Couldn\'t keep your changes in this browser (storage is full). Keep this tab open until they\'re saved'), 6000)
+    backupFailed = true
+  },
+  onSaved: (sid) => backup.drop(sid),
 })
 provide(LAYER_STORE, store)
 const selected = store.screenId
@@ -181,10 +191,14 @@ const highlight = computed(() => (docReq.value ? (links.data.value ?? []).filter
 // 토스트
 const toast = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | undefined
-function say(text: string) {
+function say(text: string, ms = 3000) {
   toast.value = text
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => (toast.value = ''), 3000)
+  toastTimer = setTimeout(() => (toast.value = ''), ms)
+}
+/** 실패 알림: 인터넷이 끊겨 있으면 그 이유를 붙여요 */
+function sayFail(text: string) {
+  say(online.value ? text : `${text} · ${tr('You\'re offline')}`, 4000)
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +278,7 @@ onMounted(async () => {
   bootP.value = 0.55
   await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1500))])
   bootP.value = 0.85
-  if (!viewReady.value) await new Promise<void>((r) => { const stop = watch(viewReady, (v) => { if (v) { stop(); r() } }); setTimeout(() => { stop(); r() }, 3000) })
+  if (!viewReady.value && !loadErr.value) await new Promise<void>((r) => { const stop = watch([viewReady, loadErr], ([v, e]) => { if (v || e) { stop(); r() } }); setTimeout(() => { stop(); r() }, 3000) })
   // 아무리 빨라도 최소 2초는 보여요(로고가 딱 한 바퀴 — IrisLoading 의 회전 2s · IRIS_LOADING_MIN 과 같아요). 막대는 그 끝에 맞춰 다 차요
   const wait = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)))
   await wait(IRIS_LOADING_MIN - 500 - (performance.now() - t0))
@@ -282,7 +296,7 @@ async function onAddPage() {
       let cur = row.id
       store.pushAction(null, async () => { await removePage(cur); if (prev) pageId.value = prev }, async () => { const r = await addPage(); if (r) { cur = r.id; await renamePage(r.id, row.name) } })
     }
-  } catch { say(tr('Couldn\'t add a page. Try again')) }
+  } catch { sayFail(tr('Couldn\'t add a page. Try again')) }
 }
 /** 페이지 이름 바꾸기(실행취소 가능) */
 async function renamePageUndoable(id: string, name: string) {
@@ -299,7 +313,7 @@ async function onRename(id: string, e: Event) {
   const name = (e.target as HTMLInputElement).value.trim()
   const before = pages.data.value?.find((x) => x.id === id)?.name
   if (!name || name === before) return
-  try { await renamePageUndoable(id, name) } catch { say(tr('Couldn\'t rename')) }
+  try { await renamePageUndoable(id, name) } catch { sayFail(tr('Couldn\'t rename')) }
 }
 /** 프로젝트 이름: 왼쪽 위 이름을 두 번 누르면 바로 고쳐요(피그마 파일 이름과 같아요). Enter · 바깥 누르기 = 저장, Esc = 취소 */
 const projRenaming = ref(false)
@@ -309,7 +323,7 @@ async function onProjRename(e: Event) {
   projRenaming.value = false
   const name = (e.target as HTMLInputElement).value.trim()
   if (!name || name === project.data.value?.name) return
-  try { await projActions.update(projectId, { name }) } catch { say(tr('Couldn\'t rename the project')) }
+  try { await projActions.update(projectId, { name }) } catch { sayFail(tr('Couldn\'t rename the project')) }
 }
 /** 이름 바꾸기 입력칸: 열리면 바로 포커스하고 글자를 모두 골라요(피그마와 같아요) */
 const vSelect = { mounted: (el: HTMLInputElement) => nextTick(() => { el.focus(); el.select() }) }
@@ -321,7 +335,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
   if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
   const from = moveFrom.get(id) ?? { x, y }
   moveFrom.delete(id)
-  const fail = () => say(tr('Couldn\'t save the position. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t save the position. Try again'))
   updateScreen(id, { x, y }).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, { x, y }).catch(fail))
 }
@@ -334,7 +348,7 @@ function onResizeScreen(id: string, r: ScreenRect, done: boolean) {
   if (!done) { if (!resizeFrom.has(id)) resizeFrom.set(id, { x: s.x, y: s.y, width: s.width, height: s.height }); Object.assign(s, r); return }
   const from = resizeFrom.get(id) ?? r
   resizeFrom.delete(id)
-  const fail = () => say(tr('Couldn\'t save the size. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t save the size. Try again'))
   updateScreen(id, r).catch(fail)
   store.pushAction(id, () => updateScreen(id, from).catch(fail), () => updateScreen(id, r).catch(fail))
 }
@@ -363,7 +377,7 @@ function onArrangeScreens(op: ArrangeOp) {
   const before = rows.map((s) => ({ id: s.id, x: s.x, y: s.y }))
   const after = rows.map((s, i) => ({ id: s.id, x: out[i]!.x, y: out[i]!.y })).filter((p, i) => p.x !== before[i]!.x || p.y !== before[i]!.y)
   if (!after.length) return
-  const fail = () => say(tr('Couldn\'t save the position. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t save the position. Try again'))
   const apply = (ps: { id: string; x: number; y: number }[]) => Promise.all(ps.map((p) => updateScreen(p.id, { x: p.x, y: p.y }))).catch(fail)
   const back = before.filter((b) => after.some((a) => a.id === b.id))
   apply(after)
@@ -378,7 +392,7 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
       let cur = row.id
       store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
     }
-  } catch { say(tr('Couldn\'t create the frame. Try again')) }
+  } catch { sayFail(tr('Couldn\'t create the frame. Try again')) }
 }
 /** 값이 서로 다른(Mixed) 프레임들의 칸에서 ↑ ↓: 각자 값에 더해요(실행취소 한 번) */
 function onStepMany(key: 'x' | 'y' | 'width' | 'height', d: number) {
@@ -397,7 +411,7 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
   const s = target ?? current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
-  const fail = () => say(tr('Couldn\'t save. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t save. Try again'))
   // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요(실행취소는 레이어 기록이 따로)
   if (s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
   if (scrubbing) {
@@ -417,7 +431,7 @@ function onScaleScreen(k: number, anchor: [number, number]) {
   const w = Math.max(1, Math.round(s.width * k)), h = Math.max(1, Math.round(s.height * k))
   const before = { x: s.x, y: s.y, width: s.width, height: s.height }
   const after = { x: Math.round(s.x + (s.width - w) * anchor[0]), y: Math.round(s.y + (s.height - h) * anchor[1]), width: w, height: h }
-  const fail = () => say(tr('Couldn\'t save. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t save. Try again'))
   store.scaleScreenContent(s.id, w / s.width)
   updateScreen(s.id, after).catch(fail)
   store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, after).catch(fail))
@@ -427,14 +441,14 @@ function onRenameScreen(id: string, name: string) {
   const s = canvasList.value.find((v) => v.id === id)
   if (!s) return
   const before = s.name
-  const fail = () => say(tr('Couldn\'t rename the frame. Try again'))
+  const fail = () => sayFail(tr('Couldn\'t rename the frame. Try again'))
   updateScreen(id, { name }).catch(fail)
   store.pushAction(id, () => updateScreen(id, { name: before }).catch(fail), () => updateScreen(id, { name }).catch(fail))
 }
 async function onRemove() {
   if (!current.value) return
   const name = current.value.name
-  try { await removeScreen(current.value.id); store.selectScreen(null); say(tr('Deleted {name}', { name })) } catch { say(tr('Couldn\'t delete the frame')) }
+  try { await removeScreen(current.value.id); store.selectScreen(null); say(tr('Deleted {name}', { name })) } catch { sayFail(tr('Couldn\'t delete the frame')) }
 }
 const nextX = computed(() => (list.value.length ? Math.max(...list.value.map((s) => s.x + s.width)) + 80 : 0))
 
@@ -556,7 +570,7 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
         if (cur.length) { store.selectScreen(cur[0]!); multiScreens.value = cur.length > 1 ? cur : [] }
       }, async () => { await Promise.all(cur.map((id) => removeScreen(id))); store.selectScreen(null); multiScreens.value = [] })
     }
-  } catch { say(tr('Something went wrong. Try again')) }
+  } catch { sayFail(tr('Something went wrong. Try again')) }
 }
 /** 레이어 목록에서 화면을 끌어 순서를 바꿨을 때(그리는 순서 그대로) — 실행취소 한 번 */
 async function onScreenOrder(order: string[]) {
@@ -565,7 +579,7 @@ async function onScreenOrder(order: string[]) {
     await setScreenOrder(order)
     const after = list.value.map((v) => v.id)
     if (before.join() !== after.join()) store.pushAction(null, () => setScreenOrder(before), () => setScreenOrder(after))
-  } catch { say(tr('Something went wrong. Try again')) }
+  } catch { sayFail(tr('Something went wrong. Try again')) }
 }
 async function onFigmaCreated() {
   await screens.refresh()
@@ -619,7 +633,7 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
-  } catch { say(tr('Couldn\'t create the requirement. Try again')) }
+  } catch { sayFail(tr('Couldn\'t create the requirement. Try again')) }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -762,7 +776,96 @@ onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
 // 저장이 끝나기 전에 떠나면 알리기
 function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error') { e.preventDefault(); e.returnValue = '' } }
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
-onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnload); store.flushAll() })
+onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnload); store.dispose() })
+
+// ---------------------------------------------------------------------------
+// 연결 · 저장 위험 알림(PRD/10_ERROR_STATES.md) — 피그마처럼: 오프라인 표시 · 저장 실패 알림 · 다시 연결되면 저장 · 복구 · 로그인 만료
+// ---------------------------------------------------------------------------
+const online = ref(true)
+/** 저장 실패 원인: offline(인터넷 끊김) · auth(로그인 끝남) · server(그 밖의 서버 오류) */
+const saveErr = computed<'offline' | 'auth' | 'server' | null>(() => {
+  if (store.saveState.state !== 'error') return null
+  if (!online.value) return 'offline'
+  const e = store.saveState.error as { message?: string; code?: string; status?: number } | undefined
+  const msg = String(e?.message ?? e ?? '')
+  if (e?.status === 401 || e?.code === 'PGRST301' || /jwt|not authenticated|unauthori/i.test(msg)) return 'auth'
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) return 'offline'
+  return 'server'
+})
+/** 아래 알림 막대를 닫으면 상태가 바뀔 때까지 숨겨요 */
+const bannerClosed = ref<string | null>(null)
+const banner = computed<'offline' | 'server' | null>(() => {
+  const k = !online.value ? (store.hasUnsaved() || saveErr.value ? 'offline' : null) : saveErr.value === 'offline' ? 'offline' : saveErr.value === 'server' ? 'server' : null
+  return k && bannerClosed.value !== k ? k : null
+})
+watch(() => online.value + '|' + saveErr.value, () => { bannerClosed.value = null })
+let wentOffline = false
+function onOnline() {
+  online.value = true
+  if (!wentOffline) return
+  wentOffline = false
+  if (!store.hasUnsaved()) return say(tr('Back online'))
+  store.flushAll().then(() => { if (store.saveState.state === 'saved') say(tr('Back online. Your changes are saved')) })
+}
+function onOffline() { online.value = false; wentOffline = true }
+onMounted(() => {
+  online.value = navigator.onLine
+  wentOffline = !navigator.onLine
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
+})
+onBeforeUnmount(() => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline) })
+
+// 로그인이 끝났을 때(다른 곳에서 로그아웃 · 갱신 실패): 창으로 알리고 다시 로그인하면 이 화면으로 돌아와요(보관한 변경은 그때 복구)
+const authLost = ref(false)
+if (import.meta.client && !preview) {
+  const { data: authSub } = supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') authLost.value = true })
+  onBeforeUnmount(() => authSub.subscription.unsubscribe())
+}
+watch(saveErr, (k) => { if (k === 'auth') authLost.value = true })
+function signInAgain() { navigateTo(`/login?signedout=1&next=${encodeURIComponent(route.fullPath)}`) }
+
+// 지난번에 저장하지 못하고 보관해 둔 변경: 열 때 복구할지 물어봐요
+const recover = ref<{ n: number; at: number } | null>(null)
+onMounted(() => {
+  const all = backup.read(), ids = Object.keys(all)
+  if (ids.length && !store.hasUnsaved()) recover.value = { n: ids.length, at: Math.max(...ids.map((i) => all[i]!.at)) }
+})
+const agoText = (at: number) => {
+  const m = Math.round((Date.now() - at) / 60000)
+  return m < 1 ? tr('just now') : m < 60 ? tr('{n} min ago', { n: m }) : m < 60 * 24 ? tr('{n} hr ago', { n: Math.round(m / 60) }) : tr('{n} days ago', { n: Math.round(m / 1440) })
+}
+async function doRecover() {
+  const all = backup.read()
+  recover.value = null
+  let bad = 0
+  const here = new Set(canvasList.value.map((x) => x.id))
+  for (const [sid, e] of Object.entries(all)) {
+    if (here.has(sid)) { store.recoverDoc(sid, e.doc); continue }
+    // 다른 페이지의 화면: 바로 저장
+    try { await updateScreen(sid, { layers: e.doc as ScreenRow['layers'] }); backup.drop(sid) } catch { bad++ }
+  }
+  if (bad) sayFail(tr('Couldn\'t restore some changes. Try again'))
+  else say(tr('Restored your unsaved changes'))
+}
+function discardRecover() { backup.clear(); recover.value = null; say(tr('Discarded the unsaved changes')) }
+
+// 불러오기 실패: 프로젝트가 없거나(지워짐 · 권한 없음) 연결 문제
+const loadErr = computed(() => project.error.value ?? pages.error.value ?? screens.error.value ?? null)
+const notFound = computed(() => (project.error.value as { code?: string } | null)?.code === 'PGRST116')
+const retrying = ref(false)
+async function retryLoad() {
+  retrying.value = true
+  try { await Promise.all([project.refresh(), pages.refresh(), screens.refresh()]) } finally { retrying.value = false }
+}
+// 다른 화면으로 옮길 때 아직 저장 중이면 잠깐(최대 2.5초) 기다려 마저 저장해요. 그래도 못 하면 보관해 둔 내용으로 다음에 복구.
+// 보관도 못 한 경우(저장 공간 가득)만 묻고 나가요
+onBeforeRouteLeave(async () => {
+  if (!store.hasUnsaved()) return true
+  await Promise.race([store.flushAll(), new Promise((r) => setTimeout(r, 2500))])
+  if (!store.hasUnsaved() || !backupFailed) return true
+  return window.confirm(tr('Some changes aren\'t saved and couldn\'t be kept in this browser. Leave anyway? They\'ll be lost'))
+})
 
 /** 화면 단축키(피그마와 같아요): ⌘\\ UI 숨기기 · ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭 · PageUp · PageDown 이전 · 다음 페이지 */
 function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev-page' | 'next-page') {
@@ -787,7 +890,7 @@ function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
 
 async function share() {
   try { await navigator.clipboard.writeText(location.origin + route.path); say(tr('Link copied')) }
-  catch { say(tr('Couldn\'t copy the link')) }
+  catch { sayFail(tr('Couldn\'t copy the link')) }
 }
 
 const zoomOpen = ref(false)
@@ -813,8 +916,6 @@ function onDocKey(e: KeyboardEvent) {
   viewOpen.value = false
 }
 // 페이지 지우기 확인: 열리면 Cancel 에 포커스(실수로 Enter 를 눌러도 지워지지 않게)
-const confirmCancel = ref<{ $el?: HTMLElement } | null>(null)
-watch(confirmPage, (v) => { if (v) nextTick(() => confirmCancel.value?.$el?.focus?.()) })
 onMounted(() => { document.addEventListener('pointerdown', onDocPointer, true); document.addEventListener('keydown', onDocKey) })
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer, true); document.removeEventListener('keydown', onDocKey) })
 // 숫자 칸 계산식(784-6 → 778)
@@ -825,7 +926,7 @@ useScrub(
   () => { scrubbing = true; frameScrub.clear(); scrubSids = [...new Set([current.value?.id, canvasScreen.value?.id, ...multiList.value.map((v) => v.id)].filter((v): v is string => !!v))]; scrubSids.forEach((s) => store.hold(s)) },
   () => {
     scrubbing = false
-    const fail = () => say(tr('Couldn\'t save. Try again'))
+    const fail = () => sayFail(tr('Couldn\'t save. Try again'))
     // 레이어 기록 + 프레임 값 기록을 실행취소 한 번으로
     store.batch(() => {
       scrubSids.forEach((s) => store.release(s))
@@ -906,7 +1007,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <input v-if="projRenaming" v-select class="sqc txt-in rename prename" :value="project.data.value?.name ?? ''" :aria-label="tr('Project name')" maxlength="80" @blur="onProjRename" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="projRenaming = false">
         <span v-else class="tx-head ellipsis fname" :title="project.data.value?.name ? tr('{name} — double-click to rename', { name: project.data.value.name }) : undefined" @dblclick="projRenaming = true">{{ project.data.value?.name ?? '' }}</span>
-        <span v-if="store.saveState.state === 'saving'" class="tx-meta save">{{ tr('Saving…') }}</span>
+        <!-- 연결 · 저장 상태(피그마 왼쪽 아래 구름 표시처럼): 오프라인 → 저장 중 → 저장 실패(다시 시도) -->
+        <span v-if="!online" class="tx-meta save offline" :data-tip="tr('Offline. Changes are kept in this browser and saved when you\'re back online')"><EditorIcon name="warning" :size="16" />{{ tr('Offline') }}</span>
+        <span v-else-if="store.saveState.state === 'saving'" class="tx-meta save">{{ tr('Saving…') }}</span>
         <TextButton v-else-if="store.saveState.state === 'error'" size="s" color="red" class="save" @click="store.flushAll()">{{ tr('Couldn\'t save · Retry') }}</TextButton>
       </div>
       <div class="pbody">
@@ -1054,7 +1157,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
         <div v-else-if="tab === 'design' && currentPage" class="scroll insp">
-          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePageUndoable(currentPage.id, n).catch(() => say(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
+          <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePageUndoable(currentPage.id, n).catch(() => sayFail(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
           <span class="tx-head">{{ tr('Select a frame') }}</span>
@@ -1067,8 +1170,44 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <EditorToolbar v-model="tool" @rail="onRail" />
 
     <div class="toast-wrap" role="status" aria-live="polite">
+      <!-- 오래 남는 알림(닫을 때까지): 인터넷 끊김 · 저장 실패 — 피그마 'This file has unsaved changes' 처럼 도구 막대 위 -->
+      <div v-if="banner" class="sq toast bell" role="alert">
+        <EditorIcon name="warning" :size="16" class="bell-ic" />
+        <span>{{ banner === 'offline' ? tr('You\'re offline. Changes are kept in this browser and saved when you reconnect') : tr('Couldn\'t save your changes. Retrying automatically') }}</span>
+        <button v-if="banner === 'server'" type="button" class="sq bell-act" @click="store.flushAll()">{{ tr('Retry now') }}</button>
+        <button type="button" class="sq bell-x" :aria-label="tr('Close')" @click="bannerClosed = banner"><EditorIcon name="close" :size="12" /></button>
+      </div>
       <Transition name="toast"><div v-if="toast" class="sq toast">{{ toast }}</div></Transition>
     </div>
+
+    <!-- 불러오기 실패: 캔버스 자리에 안내 · 다시 시도(없거나 권한이 없으면 홈으로) -->
+    <div v-if="loadErr && !booting" class="load-err" role="alert">
+      <EditorIcon name="warning" :size="24" class="le-ic" />
+      <span class="tx-head">{{ notFound ? tr('This project can\'t be found') : tr('Couldn\'t load this project') }}</span>
+      <span class="le-desc">{{ notFound ? tr('It may have been deleted, or you don\'t have access') : online ? tr('Something went wrong on our side. Try again in a moment') : tr('You\'re offline. Check your internet connection and try again') }}</span>
+      <span class="le-row">
+        <Button size="s" type="tertiary" @click="navigateTo('/')">{{ tr('Go to files') }}</Button>
+        <Button v-if="!notFound" size="s" type="primary" :loading="retrying" @click="retryLoad">{{ tr('Retry') }}</Button>
+      </span>
+    </div>
+
+    <!-- 지난번에 저장하지 못한 변경 복구 -->
+    <AppConfirm
+      v-if="recover && !booting && !loadErr"
+      :title="tr('You have unsaved changes')"
+      :desc="tr('Changes to {n} frames weren\'t saved last time and were kept in this browser ({ago}). Restore them? This replaces what\'s there now.', { n: recover.n, ago: agoText(recover.at) })"
+      :closable="false"
+      :actions="[{ label: tr('Discard'), onClick: discardRecover }, { label: tr('Restore'), kind: 'primary', onClick: doRecover }]"
+    />
+
+    <!-- 로그인이 끝났을 때 -->
+    <AppConfirm
+      v-if="authLost"
+      :title="tr('You\'ve been signed out')"
+      :desc="tr('You signed out somewhere else, or your session ended. Changes that weren\'t saved are kept in this browser — sign in again to save them.')"
+      :closable="false"
+      :actions="[{ label: tr('Sign in again'), kind: 'primary', onClick: signInAgain }]"
+    />
 
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" multiple @change="onImageFile" @cancel="tool === 'image' && (tool = 'move')">
     <AppCommandPalette />
@@ -1076,13 +1215,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
-    <div v-if="confirmPage" class="pg-dim" @click.self="confirmPage = null">
-      <div class="sq float pg-confirm" role="alertdialog" aria-modal="true" aria-labelledby="pg-del-t" aria-describedby="pg-del-d">
-        <span id="pg-del-t" class="tx-head">{{ tr('Delete "{name}"?', { name: confirmPage.name }) }}</span>
-        <span id="pg-del-d" class="pg-desc">{{ confirmPage.count >= 0 ? tr('All frames and layers on this page will be deleted ({n} frames). This can\'t be undone.', { n: confirmPage.count }) : tr('All frames and layers on this page will be deleted. This can\'t be undone.') }}</span>
-        <span class="pg-row"><Button ref="confirmCancel" size="s" type="tertiary" @click="confirmPage = null">{{ tr('Cancel') }}</Button><Button size="s" type="destructed" @click="doRemovePage">{{ tr('Delete page') }}</Button></span>
-      </div>
-    </div>
+    <AppConfirm
+      v-if="confirmPage"
+      :title="tr('Delete &quot;{name}&quot;?', { name: confirmPage.name })"
+      :desc="confirmPage.count >= 0 ? tr('All frames and layers on this page will be deleted ({n} frames). This can\'t be undone.', { n: confirmPage.count }) : tr('All frames and layers on this page will be deleted. This can\'t be undone.')"
+      :actions="[{ label: tr('Cancel'), onClick: () => (confirmPage = null) }, { label: tr('Delete page'), kind: 'destructed', onClick: doRemovePage }]"
+      @close="confirmPage = null"
+    />
   </div>
 </template>
 
@@ -1178,8 +1317,18 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 /* 라이트 · 다크 모두 어두운 토스트(neutral-800 · white 토큰은 다크에서 뒤집혀서 고정값을 써요). 다크에선 옅은 흰 테두리로 캔버스와 구분 */
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 /* 피그마 UI3 토스트: 도구 막대 바로 위, 3초, 애니메이션 없이 바로 나타나고 사라져요 */
-.pg-dim { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: var(--dimmed-bg, rgb(0 0 0 / 40%)); }
-.pg-confirm { width: 320px; box-sizing: border-box; padding: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); }
-.pg-desc { color: var(--sys-color-neutral-600); }
-.pg-row { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); }
+/* 오래 남는 알림(인터넷 끊김 · 저장 실패): 토스트와 같은 검은 면, 왼쪽 경고 아이콘 · 오른쪽 동작 · 닫기 */
+.toast.bell { gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); pointer-events: auto; margin-bottom: var(--ref-spacing-04); }
+.bell-ic { flex: none; color: #FFC53D; }
+.bell-act { flex: none; height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: #7CC4FF; font: inherit; font-weight: 500; --sq-fill: transparent; }
+.bell-act:hover { --sq-fill: rgb(255 255 255 / 10%); }
+.bell-x { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: rgb(255 255 255 / 70%); --sq-fill: transparent; }
+.bell-x:hover { --sq-fill: rgb(255 255 255 / 10%); color: #FFFFFF; }
+/* 머리줄의 오프라인 표시 */
+.save.offline { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-neutral-600); }
+/* 불러오기 실패: 캔버스 가운데 안내 */
+.load-err { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-04); background: var(--iris-canvas); text-align: center; padding: 0 var(--ref-spacing-10); }
+.le-ic { color: var(--sys-color-neutral-500); margin-bottom: var(--ref-spacing-04); }
+.le-desc { max-width: 320px; color: var(--sys-color-neutral-600); }
+.le-row { display: flex; justify-content: center; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-06); }
 </style>

@@ -19,6 +19,8 @@
 | [02_DATA_MODEL.md](./02_DATA_MODEL.md) | 데이터 구조 (프로젝트 › 문서 › 요구사항 ↔ 화면 ↔ 컴포넌트) | DB 설계할 때 |
 | [03_PHASES.md](./03_PHASES.md) | 단계별 계획 + **1주 일정표** | 개발 순서 정할 때 |
 | [04_PROJECT_SPEC.md](./04_PROJECT_SPEC.md) | 기술 스택, AI 규칙, 절대 하지 마 | AI에게 코드 시킬 때마다 |
+| [09_FIGMA_PARITY.html](./09_FIGMA_PARITY.html) | 피그마 단축키 · 동작 기준표(한국어 자판) | 편집기 동작을 고치거나 더할 때 |
+| [10_ERROR_STATES.md](./10_ERROR_STATES.md) | 오류 · 저장 위험 알림 경우의 수와 모양(토스트 · 알림 막대 · 창 · 화면) | 실패할 수 있는 기능을 만들 때 |
 
 ## 확정된 결정
 

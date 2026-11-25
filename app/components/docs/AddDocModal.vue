@@ -229,30 +229,31 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @mousedown.self="close">
+    <div v-if="open" class="pop-overlay" @mousedown.self="close">
       <section
         ref="dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="addDocTitle"
-        class="sq dialog"
+        class="sq pop"
+        style="--pop-w: 560px"
         @keydown="onKeydown"
       >
-        <div class="top">
-          <h1 id="addDocTitle" class="tx-title">{{ tr('Add document') }}</h1>
-          <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close')" @click="close" />
+        <div class="pop-top">
+          <h1 id="addDocTitle" class="pop-ttl">{{ tr('Add document') }}</h1>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
         </div>
 
         <!-- 다 넣은 뒤 -->
         <template v-if="done">
-          <div class="content success" role="status">
+          <div class="pop-body content success" role="status">
             <span class="badge-ok"><Icon name="check" :size="20" /></span>
             <span class="tx-head">{{ tr('Document added') }}</span>
             <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 requirement') : done.found ? tr('Found {n} requirements', { n: done.found }) : tr('No numbered requirements (like REQ-001) found') }}</span>
           </div>
-          <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" @click="close">{{ tr('Close') }}</Button>
-            <Button size="m" type="primary" class="grow2" data-autofocus @click="openDoc(done.docId)">{{ tr('Open document') }}</Button>
+          <div class="pop-foot">
+            <Button size="s" type="tertiary" @click="close">{{ tr('Close') }}</Button>
+            <Button size="s" type="primary" data-autofocus @click="openDoc(done.docId)">{{ tr('Open document') }}</Button>
           </div>
         </template>
 
@@ -269,7 +270,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
             >{{ tr(m[1]) }}</button>
           </div>
 
-          <div class="content">
+          <div class="pop-body content">
             <!-- 파일 -->
             <div v-if="mode === 'file'" class="col8">
               <label
@@ -370,9 +371,9 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
             <p v-if="error" class="tx-meta err" role="alert"><Icon name="warning" :size="12" />{{ error }}</p>
           </div>
 
-          <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
-            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Add') }}</Button>
+          <div class="pop-foot">
+            <Button size="s" type="tertiary" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
+            <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Add') }}</Button>
           </div>
         </template>
       </section>
@@ -381,14 +382,9 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 </template>
 
 <style scoped>
-.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 560px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-default); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
-.top { display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-08); }
-.tabs { padding: 0 var(--ref-spacing-10); }
-.content { flex: 1; min-height: 300px; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12); display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
-.foot { display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
-.grow1 { flex: 1; }
-.grow2 { flex: 2.25; }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 여기에는 안쪽 내용만 — 탭은 제목과 같은 왼쪽 16 에서, 본문은 탭 아래 12 */
+.tabs { flex: none; padding: 0 var(--ref-spacing-10) 0 calc(var(--ref-spacing-10) - var(--ref-spacing-06)); }
+.content { min-height: 300px; padding-top: var(--ref-spacing-08); }
 .col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
 /* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
 .col6 > .tx-head:first-child { color: var(--sys-color-neutral-700); }

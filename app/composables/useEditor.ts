@@ -34,6 +34,8 @@ export function useEditor(projectId: string) {
   const supabase = useSupabaseClient()
   const preview = useDevPreview()
   const project = useAsyncData(`project-${projectId}`, async () => {
+    // 미리보기에서도 오프라인이면 실제처럼 불러오기가 실패해요(불러오기 실패 화면 확인용)
+    if (preview && import.meta.client && !navigator.onLine) throw new TypeError('Failed to fetch')
     if (preview) {
       // 미리보기: 메모리에만 있어 새로 고침하면 사라진 프로젝트는 빈 이름으로 다시 만들어 둬요(다른 프로젝트 이름이 보이지 않게)
       let p = PREVIEW_PROJECTS.find((x) => x.id === projectId)
@@ -179,6 +181,8 @@ export function useEditor(projectId: string) {
 
   /** 화면 속성 저장 (위치 · 크기 · 이름 · 상태). 화면에는 먼저 반영하고, 저장이 실패하면 되돌립니다 */
   async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status' | 'layers'>>) {
+    // 미리보기에서도 오프라인이면 실제처럼 저장이 실패해요(연결 · 저장 오류 화면 확인용)
+    if (preview && import.meta.client && !navigator.onLine) throw new TypeError('Failed to fetch')
     // 캔버스 위 레이어 → pages.layers
     if (isPageCanvas(id)) {
       const pid = id.slice(5)

@@ -74,3 +74,10 @@
 - 컴포넌트 안의 글자 크기는 컴포넌트 기본값을 따릅니다(4장 검사에서 컴포넌트 내부는 빼고 봅니다).
 - 컴포넌트로 못 바꾼 부품은 같은 무드로 맞춥니다: 모서리 8, hover `interaction-light-gray-hover`, 눌림 `interaction-light-gray-pressed`, 키보드 포커스 2px 바드림 파랑 바깥선, 전환 120ms (`main.css` 의 "인터랙션" 묶음).
 - 상단 검색 열기 버튼은 Search Field(contained · S)와 같은 생김새에 `⌘K` 키캡을 붙입니다.
+
+## 팝업(가운데 뜨는 창) 공통 양식
+
+- 기준: **프로필 편집 창**(`app/components/app/ProfileModal.vue`). 모든 팝업은 `app/assets/css/main.css` 의 `.pop-overlay` · `.pop` · `.pop-top` · `.pop-ttl` · `.pop-x` · `.pop-body` · `.pop-foot` 를 씁니다(모양 · 무드 통일, 2026-11-25).
+- 값: 바탕 `--dimmed-bg` · 폭 360(창마다 `--pop-w` 로 440 · 480 · 560) · 모서리 radius-08 squircle · 흰 면 · 그림자 `0 12 20 rgb(69 76 88 / 28%)` · 머리 48(제목 14/22 600, 닫기 28) · 본문 안쪽 위 6 · 좌우 16 · 아래 12 · 버튼 줄 위 12 · 좌우 16 · 아래 16.
+- 버튼은 디자인 시스템 `Button` s 를 오른쪽 아래에(취소 tertiary · 주 동작 primary · 지우기 destructed). 머리 · 아래 줄에 구분선 없음. 입력칸은 디자인 시스템 `TextInput`.
+- 고르기만 하는 확인 창은 새로 만들지 말고 `app/components/app/AppConfirm.vue` 를 씁니다.

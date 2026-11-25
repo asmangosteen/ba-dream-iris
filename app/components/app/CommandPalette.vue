@@ -154,7 +154,7 @@ const optId = (it: Item) => 'cmdk-' + it.key
 <template>
   <Teleport to="body">
     <div v-if="open" class="overlay" @mousedown.self="open = false">
-      <section role="dialog" aria-modal="true" :aria-label="tr('Search')" class="sq float dialog" @keydown="onDialogKey">
+      <section role="dialog" aria-modal="true" :aria-label="tr('Search')" class="sq pop dialog" style="--pop-w: 560px" @keydown="onDialogKey">
         <label class="head">
           <EditorIcon name="search" :size="20" />
           <input
@@ -207,8 +207,9 @@ const optId = (it: Item) => 'cmdk-' + it.key
 </template>
 
 <style scoped>
-.overlay { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding: 14vh var(--ref-spacing-12) var(--ref-spacing-12); background: rgb(3 9 26 / 16%); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 560px; max-height: 64vh; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-06); }
+.overlay { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding: 14vh var(--ref-spacing-12) var(--ref-spacing-12); background: var(--dimmed-bg); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+/* 창 모양(모서리 · 면 · 그림자)은 팝업 공통 .pop(프로필 창 기준). 검색 창이라 위쪽(14vh)에 떠요 */
+.dialog { max-height: 64vh; }
 /* 검색 줄 48: 아이콘 20(왼쪽 16) · 글자 14 · 지우기 20 */
 .head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 48px; box-sizing: border-box; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); box-shadow: 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500); cursor: text; }
 .head input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 14px; line-height: 20px; color: var(--sys-color-neutral-800); }

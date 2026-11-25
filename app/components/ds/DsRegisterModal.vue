@@ -215,7 +215,7 @@ const SAMPLE = `{
 </script>
 
 <script setup lang="ts">
-import { Button, Icon, IconButton, TextButton, TextInput } from '@ba-dream/design-system'
+import { Button, Icon, TextButton, TextInput } from '@ba-dream/design-system'
 import { TOKEN_TYPE_LABEL } from '~/composables/useIrisData'
 
 const props = defineProps<{ open: boolean; tab: RegisterTab; prefill?: string; existingNames: string[]; categories: string[] }>()
@@ -371,17 +371,17 @@ async function save() {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="backdrop" @mousedown.self="emit('close')">
-      <div ref="dialog" class="sq float dialog" role="dialog" aria-modal="true" aria-labelledby="ds-reg-title" @keydown="onKey">
-        <div class="top">
-          <h2 id="ds-reg-title" class="tx-title">{{ tr('Add to design system') }}</h2>
-          <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close')" @click="emit('close')" />
+    <div v-if="open" class="pop-overlay" @mousedown.self="emit('close')">
+      <div ref="dialog" class="sq pop" style="--pop-w: 480px" role="dialog" aria-modal="true" aria-labelledby="ds-reg-title" @keydown="onKey">
+        <div class="pop-top">
+          <h2 id="ds-reg-title" class="pop-ttl">{{ tr('Add to design system') }}</h2>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><Icon name="close" :size="16" /></button>
         </div>
         <div class="seg tabs" role="tablist" :aria-label="tr('Ways to add')">
           <button v-for="t in tabs" :key="t.key" type="button" role="tab" :aria-selected="cur === t.key" :class="['sq', 'seg-item', { on: cur === t.key }]" @click="cur = t.key">{{ tr(t.label) }}</button>
         </div>
 
-        <form class="body" @submit.prevent="save" @keydown.enter="onEnter">
+        <form class="pop-body body" @submit.prevent="save" @keydown.enter="onEnter">
           <template v-if="cur === 'component'">
             <TextInput
               v-model:value="comp.name"
@@ -480,22 +480,20 @@ async function save() {
           </template>
 
           <p v-if="error" class="tx-body warn err" role="alert"><Icon name="warning" :size="14" /> {{ error }}</p>
-          <div class="foot">
-            <Button size="m" type="tertiary" class="grow1" @click="emit('close')">{{ tr('Cancel') }}</Button>
-            <Button size="m" type="primary" class="grow2" :loading="saving" :disabled="!canSave" @click="save">{{ saveLabel }}</Button>
-          </div>
         </form>
+        <div class="pop-foot">
+          <Button size="s" type="tertiary" @click="emit('close')">{{ tr('Cancel') }}</Button>
+          <Button size="s" type="primary" :loading="saving" :disabled="!canSave" @click="save">{{ saveLabel }}</Button>
+        </div>
       </div>
     </div>
   </Teleport>
 </template>
 
 <style scoped>
-.backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: var(--ref-spacing-10); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; }
-.dialog { width: 480px; max-width: 100%; max-height: calc(100vh - 64px); display: flex; flex-direction: column; overflow: hidden; }
-.top { display: flex; align-items: center; justify-content: space-between; padding: var(--ref-spacing-10) var(--ref-spacing-08) 0 var(--ref-spacing-12); }
-.tabs { padding: var(--ref-spacing-06) var(--ref-spacing-12) 0 var(--ref-spacing-10); }
-.body { display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); overflow: auto; min-height: 0; }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 여기에는 안쪽 내용만 — 탭은 제목과 같은 왼쪽 16 에서, 본문은 탭 아래 12 */
+.tabs { flex: none; padding: 0 var(--ref-spacing-10) 0 calc(var(--ref-spacing-10) - var(--ref-spacing-06)); }
+.body { gap: var(--ref-spacing-08); padding-top: var(--ref-spacing-08); }
 .row { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
 /* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
 .row > .tx-head:first-child, .bulk-h > .tx-head { color: var(--sys-color-neutral-700); }
@@ -528,7 +526,5 @@ async function save() {
 .result p { margin: 0; }
 .warn { color: var(--sys-color-theme-destructed-default); display: flex; align-items: center; gap: var(--ref-spacing-02); }
 .err { margin: 0; }
-.foot { display: flex; gap: var(--ref-spacing-06); padding-top: var(--ref-spacing-04); }
-.grow1 { flex: 1; }
-.grow2 { flex: 2.25; }
+
 </style>

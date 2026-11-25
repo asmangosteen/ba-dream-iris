@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import { Button, TextInput } from '@ba-dream/design-system'
 // 피그마 화면 가져오기 — 시안: design/iris-canvas/FigmaLink.dc.html, 위계: PRD/05_UI_GUIDE.md
 // 프레임 링크 → 서버(/api/figma/frame)가 피그마에서 이름 · 크기 · 썸네일 · 컴포넌트 요약을 받아오고,
 // "화면 추가"를 누르면 screens · screen_component_usages 에 저장합니다. 미리보기 모드에서는 저장하지 않아요.
@@ -74,6 +75,8 @@ function close() {
   open.value = false
 }
 
+/** 링크 칸에서 Enter = 가져오기(한글 조합 중에는 안 함) */
+function onUrlKey(e: KeyboardEvent) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (url.value.trim()) load() } }
 async function load() {
   if (loading.value) return
   const raw = url.value.trim()
@@ -202,42 +205,36 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="backdrop" @mousedown.self="close">
-      <!-- 편집기 창 양식(이름 바꾸기 · 스타일 만들기와 같아요): 제목 줄 40 / 본문 12 · 16 / 칸 28 / 아래 줄(위 선) -->
-      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq dialog editor">
-        <header class="head">
-          <h2 id="figmaTitle" class="ttl">{{ tr('Import from Figma') }}</h2>
-          <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
+    <div v-if="open" class="pop-overlay" @mousedown.self="close">
+      <!-- 팝업 양식(main.css .pop-* — 프로필 편집 창 기준): 머리 48 / 본문 16 / 디자인 시스템 입력칸 · 버튼 -->
+      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="figmaTitle" class="sq pop" style="--pop-w: 440px">
+        <header class="pop-top">
+          <h2 id="figmaTitle" class="pop-ttl">{{ tr('Import from Figma') }}</h2>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </header>
-
-        <div v-ovscroll class="scroll">
+        <div v-ovscroll class="pop-body">
           <div class="body">
-            <label for="figmaUrl" class="lb">{{ tr('Figma link') }}</label>
-            <div class="row">
-              <label :class="['sq', 'fld', 'grow', { bad: error?.code === 'invalid_url' || error?.code === 'no_node' }]">
-                <input
-                  id="figmaUrl"
-                  v-model="url"
-                  type="text"
-                  inputmode="url"
-                  autocomplete="off"
-                  spellcheck="false"
-                  placeholder="figma.com/design/…?node-id=…"
-                  aria-describedby="figmaHint"
-                  :aria-invalid="error?.code === 'invalid_url' || error?.code === 'no_node'"
-                  @keydown.enter="!$event.isComposing && ($event.preventDefault(), load())"
-                >
-              </label>
-              <button type="button" class="sq act gray" :disabled="loading || !url.trim()" @click="load">{{ loading ? tr('Importing…') : tr('Import') }}</button>
-            </div>
-            <p id="figmaHint" class="hint">{{ tr('Select a frame in Figma, choose Copy link to selection, and paste the URL here') }}</p>
-
+            <TextInput
+              v-model:value="url"
+              size="s"
+              :label="tr('Figma link')"
+              placeholder="figma.com/design/…?node-id=…"
+              :show-left-icon="false"
+              :show-right-icon="false"
+              show-button
+              :button-label="loading ? tr('Importing…') : tr('Import')"
+              show-supporting-text
+              :supporting-text="tr('Select a frame in Figma, choose Copy link to selection, and paste the URL here')"
+              :destructed="error?.code === 'invalid_url' || error?.code === 'no_node'"
+              :input-props="{ id: 'figmaUrl', inputmode: 'url', autocomplete: 'off', spellcheck: false, onKeydown: onUrlKey }"
+              :label-props="{ htmlFor: 'figmaUrl' }"
+              @button-click="url.trim() && load()"
+            />
             <p v-if="error" :class="['sq', 'note', { warn: error.code !== 'no_token' }]" role="alert">
               <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="note-ic" />
               <span>{{ tr(error.message) }}</span>
             </p>
           </div>
-
           <div v-if="result" class="result" aria-live="polite">
             <div class="sq card">
               <div class="sq thumb" data-preview>
@@ -271,9 +268,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <footer class="foot">
-          <button type="button" class="sq act gray" :disabled="saving" @click="close">{{ tr('Cancel') }}</button>
-          <button type="button" class="sq act pri" :disabled="!result || saving" @click="add">{{ saving ? tr('Adding…') : tr('Add frame') }}</button>
+        <footer class="pop-foot">
+          <Button size="s" type="tertiary" :disabled="saving" @click="close">{{ tr('Cancel') }}</Button>
+          <Button size="s" type="primary" :loading="saving" :disabled="!result" @click="add">{{ tr('Add frame') }}</Button>
         </footer>
       </section>
     </div>
@@ -281,30 +278,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-08); background: rgb(0 0 0 / 0.24); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-/* 창: 편집기 떠 있는 창과 같은 바탕 · 선 · 그림자 · 둥글기. 창 자체는 스크롤하지 않고 가운데만(스크롤 막대가 창 가장자리에 붙지 않게) */
-.dialog { width: min(440px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; text-align: left; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); }
-.head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
-.ttl { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.s24 { width: 28px; height: 28px; }
-.scroll { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; }
-.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08); }
-.lb { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
-.row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.grow { flex: 1; min-width: 0; }
-.fld { height: 28px; }
-.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
-.fld.bad { --sq-line: var(--sys-color-theme-destructed-default); --sq-line-w: 1px; }
-.hint { margin: 0; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
-.act { height: 28px; }
-.act:disabled { opacity: 0.4; }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 여기에는 안쪽 내용만 */
+.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .dim { color: var(--sys-color-neutral-500); flex: none; }
 
 .note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-04) 0 0; padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
 .note.warn { color: var(--sys-color-theme-destructed-default); }
 .note-ic { flex: none; margin-top: 1px; }
 
-.result { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-08) var(--ref-spacing-08); }
+.result { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .card { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: var(--ref-spacing-08); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .thumb { height: 180px; display: grid; place-items: center; overflow: hidden; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .thumb img { width: 100%; height: 100%; object-fit: contain; object-position: top center; }
@@ -325,5 +307,4 @@ onBeforeUnmount(() => {
 .dot::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-400); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.foot { flex: none; display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); box-shadow: inset 0 1px 0 var(--iris-line); }
 </style>

@@ -83,14 +83,14 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="backdrop" @mousedown.self="close">
-      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="projTitle" class="sq dialog" @keydown="onKeydown">
-        <header class="head">
-          <h2 id="projTitle" class="ttl">{{ editing ? tr('Project settings') : tr('New project') }}</h2>
-          <button type="button" class="sq ib" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+    <div v-if="open" class="pop-overlay" @mousedown.self="close">
+      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="projTitle" class="sq pop" style="--pop-w: 440px" @keydown="onKeydown">
+        <header class="pop-top">
+          <h2 id="projTitle" class="pop-ttl">{{ editing ? tr('Project settings') : tr('New project') }}</h2>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
         </header>
 
-        <form class="body" @submit.prevent="submit">
+        <form class="pop-body body" @submit.prevent="submit">
           <TextInput v-model:value="name" size="s" :label="tr('Name')" :placeholder="tr('e.g. Subscription sign-up flow redesign')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projName', maxlength: 60 }" :label-props="{ htmlFor: 'projName' }" />
 
           <template v-if="editing">
@@ -128,7 +128,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
           </template>
         </div>
 
-        <footer class="foot">
+        <footer class="pop-foot">
           <Button size="s" type="tertiary" @click="close">{{ tr('Cancel') }}</Button>
           <Button size="s" type="primary" :loading="busy" :disabled="!name.trim()" @click="submit">{{ editing ? tr('Save') : tr('Create') }}</Button>
         </footer>
@@ -138,14 +138,8 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 </template>
 
 <style scoped>
-.backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--ref-spacing-12); background: var(--dimmed-bg); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.dialog { width: 100%; max-width: 440px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: auto; --sq-fill: var(--sys-color-common-white-default); border-radius: var(--ref-radius-08); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); }
-/* 프로필 창과 같은 양식: 머리 48(제목 14/600 · 닫기 28) · 안쪽 16 · 버튼은 오른쪽 아래 작게(s) */
-.head { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); height: 48px; box-sizing: border-box; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); flex: none; }
-.ttl { margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; }
-.head .ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
-.head .ib:hover { --sq-fill: var(--sys-color-neutral-100); }
-.body { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 이 창 본문은 항목이 촘촘해서 사이 6 */
+.body { gap: var(--ref-spacing-04); }
 .mt { margin-top: var(--ref-spacing-06); }
 .kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }
 .kind { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); text-align: left; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
@@ -160,7 +154,6 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: 0 var(--ref-spacing-10) var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
 .row { display: flex; gap: var(--ref-spacing-04); flex: none; }
 .red { color: var(--sys-color-theme-error-default); }
-.foot { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); }
 .kd { white-space: nowrap; }
 .kind:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .mt { margin-top: var(--ref-spacing-06); }
