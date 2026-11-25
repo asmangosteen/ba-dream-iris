@@ -8,7 +8,7 @@ import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, defaultAlign, defaultJoin, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -33,7 +33,8 @@ function transform(r?: number, fx?: boolean, fy?: boolean) {
   return t || undefined
 }
 // 불리언은 계산한 결과 모양을 벡터처럼 그려요(칠 · 선 · 정렬 · 효과가 같아요)
-const vector = computed(() => !!n.value && (isVector(n.value.type) || n.value.type === 'boolean'))
+// 원도 호(Arc: 부채꼴 · 고리)가 있으면 경로로 그려요
+const vector = computed(() => !!n.value && (isVector(n.value.type) || n.value.type === 'boolean' || (n.value.type === 'ellipse' && hasArc(n.value.style))))
 const boxy = computed(() => !!n.value && !vector.value && n.value.type !== 'text')
 const radius = computed(() => {
   const v = n.value
@@ -199,14 +200,14 @@ const vec = computed(() => {
   if (!v || !vector.value) return null
   const s = v.style
   const d = v.type === 'boolean' ? booleanPath(props.doc, v) : vectorPath(v.type, s, v.w, v.h, v.pts, v.closed, v.vnet)
-  const closed = v.type === 'boolean' || v.type === 'polygon' || v.type === 'star' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
+  const closed = v.type === 'boolean' || v.type === 'polygon' || v.type === 'star' || v.type === 'ellipse' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
   const w = s.strokeWidth ?? 0
   const align = closed ? (s.strokeAlign ?? defaultAlign(v.type)) : 'center'
   const cols = strokeColors(s, color).reverse() // 아래부터 그려요
   const size = Math.max(8, w * 4)
   return {
     d, closed, w, align, cols, size,
-    fill: closed && hasFill(s) ? { clipPath: `path(${v.evenodd ? 'evenodd, ' : ''}'${d}')`, ...backgroundCss(s, color, imageSrc) } : null,
+    fill: closed && hasFill(s) ? { clipPath: `path(${v.evenodd || v.type === 'ellipse' ? 'evenodd, ' : ''}'${d}')`, ...backgroundCss(s, color, imageSrc) } : null,
     start: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowStart && s.arrowStart !== 'none' ? s.arrowStart : null,
     end: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowEnd && s.arrowEnd !== 'none' ? s.arrowEnd : null,
     dash: s.dash ? s.dash.join(' ') : undefined,
@@ -256,6 +257,27 @@ function onInput() {
   if (v.style.autoWidth) store.setMeasured(props.screenId, props.id, sz.w, sz.h)
   else store.setMeasured(props.screenId, props.id, v.w, Math.max(orig?.h ?? v.h, sz.h))
 }
+/**
+ * 너비 자동(Auto width · Hug) 글자는 그려진 글자 크기를 늘 레이어 크기로 맞춰요 — 치는 동안만이 아니라 불러온 글자 · 글꼴이 바뀐 글자도.
+ * (저장된 크기가 남아 있으면 그룹 · 정렬 · 간격 재기가 실제보다 큰 상자를 써요: 182 로 보이는데 그룹이 280 이 되던 문제)
+ */
+const blockEl = ref<HTMLElement | null>(null)
+let textRo: ResizeObserver | null = null
+function syncTextSize() {
+  const v = n.value
+  const el = textEl.value ?? blockEl.value
+  if (!v || v.type !== 'text' || !v.style.autoWidth || !el || editingThis.value) return
+  const sz = textSize(el)
+  store.setMeasured(props.screenId, props.id, sz.w, sz.h)
+}
+watch([textEl, blockEl], ([a, b]) => {
+  textRo?.disconnect()
+  const el = a ?? b
+  if (!el || typeof ResizeObserver === 'undefined') return
+  textRo = new ResizeObserver(() => syncTextSize())
+  textRo.observe(el)
+}, { flush: 'post' })
+onBeforeUnmount(() => textRo?.disconnect())
 /** 글자 상자 크기(확대와 상관없는 CSS 크기, 소수까지) */
 function textSize(el: HTMLElement) {
   const cs = getComputedStyle(el)
@@ -308,7 +330,7 @@ function onKey(e: KeyboardEvent) {
       <component :is="n.style.list === 'number' ? 'ol' : 'ul'" v-if="blockText && n.style.list" class="txt list" :style="textFill">
         <li v-for="(l, i) in lines" :key="i" :style="{ marginBottom: n.style.paraSpacing ? n.style.paraSpacing + 'px' : undefined }">{{ l || '&nbsp;' }}</li>
       </component>
-      <span v-else-if="blockText" class="txt" :style="textFill"><span v-for="(l, i) in lines" :key="i" class="para" :style="{ marginBottom: i < lines.length - 1 ? n.style.paraSpacing + 'px' : undefined }">{{ l || '&nbsp;' }}</span></span>
+      <span v-else-if="blockText" ref="blockEl" class="txt" :style="textFill"><span v-for="(l, i) in lines" :key="i" class="para" :style="{ marginBottom: i < lines.length - 1 ? n.style.paraSpacing + 'px' : undefined }">{{ l || '&nbsp;' }}</span></span>
       <span
         v-else
         ref="textEl"

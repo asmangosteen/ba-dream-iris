@@ -123,6 +123,25 @@ export function rectPath(w: number, h: number, radii: [number, number, number, n
   const [a, b, c, d] = radii.map((r) => Math.min(lim, Math.max(0, r - inset)))
   return `M${r2(x0 + a!)} ${r2(y0)}H${r2(x1 - b!)}${b ? `A${r2(b)} ${r2(b)} 0 0 1 ${r2(x1)} ${r2(y0 + b)}` : ''}V${r2(y1 - c!)}${c ? `A${r2(c)} ${r2(c)} 0 0 1 ${r2(x1 - c)} ${r2(y1)}` : ''}H${r2(x0 + d!)}${d ? `A${r2(d)} ${r2(d)} 0 0 1 ${r2(x0)} ${r2(y1 - d)}` : ''}V${r2(y0 + a!)}${a ? `A${r2(a)} ${r2(a)} 0 0 1 ${r2(x0 + a)} ${r2(y0)}` : ''}Z`
 }
+/** 원에 호(Arc) 설정이 있는지 — 한 바퀴 다 안 돌거나 안쪽 구멍이 있으면 경로로 그려요 */
+export const hasArc = (s: LayerStyle) => (s.arcSweep !== undefined && s.arcSweep < 360) || (s.arcInner ?? 0) > 0
+/** 원 호 경로(피그마 Arc): start 시작 각 · sweep 쓸어 간 각(°) · inner 구멍 비율. 한 바퀴 + 구멍이면 고리(evenodd), 부채꼴은 가운데(또는 안쪽 호)로 닫아요 */
+export function arcPath(w: number, h: number, start = 0, sweep = 360, inner = 0): string {
+  const cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2
+  const k = Math.max(0, Math.min(0.999, inner)), ix = rx * k, iy = ry * k
+  const sw = Math.max(0, Math.min(360, sweep))
+  if (sw <= 0.001) return ''
+  if (sw >= 359.999) {
+    const ring = k > 0 ? `M${r2(cx - ix)} ${r2(cy)}A${r2(ix)} ${r2(iy)} 0 1 1 ${r2(cx + ix)} ${r2(cy)}A${r2(ix)} ${r2(iy)} 0 1 1 ${r2(cx - ix)} ${r2(cy)}Z` : ''
+    return ellipsePath(w, h) + ring
+  }
+  const a0 = (start * Math.PI) / 180, a1 = a0 + (sw * Math.PI) / 180
+  const P = (a: number, kx: number, ky: number) => `${r2(cx + kx * Math.cos(a))} ${r2(cy + ky * Math.sin(a))}`
+  const large = sw > 180 ? 1 : 0
+  let d = `M${P(a0, rx, ry)}A${r2(rx)} ${r2(ry)} 0 ${large} 1 ${P(a1, rx, ry)}`
+  d += k > 0 ? `L${P(a1, ix, iy)}A${r2(ix)} ${r2(iy)} 0 ${large} 0 ${P(a0, ix, iy)}Z` : `L${r2(cx)} ${r2(cy)}Z`
+  return d
+}
 export function ellipsePath(w: number, h: number, inset = 0): string {
   const rx = Math.max(0, w / 2 - inset), ry = Math.max(0, h / 2 - inset)
   return `M${r2(w / 2 - rx)} ${r2(h / 2)}A${r2(rx)} ${r2(ry)} 0 1 0 ${r2(w / 2 + rx)} ${r2(h / 2)}A${r2(rx)} ${r2(ry)} 0 1 0 ${r2(w / 2 - rx)} ${r2(h / 2)}Z`
@@ -162,9 +181,48 @@ export function pointsPath(pts: number[], w: number, h: number, smooth: boolean,
 }
 
 /** 벡터 경로(0~1 비율) → SVG d. 핸들이 있으면 3차 베지어 */
+/**
+ * 꼭짓점 모서리 둥글기(VPoint.r, px)를 실제 곡선 점으로 바꾼 vnet(0~1) — 피그마 vertex corner radius 와 같아요.
+ * 양옆이 곧은 선(핸들 없음)인 꼭짓점만 둥글게: 두 선을 따라 d 만큼 들어간 두 점 + 원호에 가까운 3차 곡선.
+ * d 는 선 길이의 절반을 넘지 않아요(이웃 꼭짓점과 겹치지 않게). r 이 없으면 그대로 돌려줘요
+ */
+export function bakeCorners(vnet: VPath[] | undefined, w: number, h: number): VPath[] {
+  const list = vnet ?? []
+  if (!list.some((p) => p.pts.some((q) => q.r))) return list
+  const W = w || 1, H = h || 1
+  return list.map((p) => {
+    const n = p.pts.length
+    if (!p.pts.some((q) => q.r) || n < 3) return p
+    const A = p.pts.map((q) => ({ x: q.x * W, y: q.y * H }))
+    const out: VPath['pts'] = []
+    p.pts.forEach((q, k) => {
+      const prev = k > 0 ? k - 1 : p.closed ? n - 1 : -1
+      const next = k < n - 1 ? k + 1 : p.closed ? 0 : -1
+      const straight = prev >= 0 && next >= 0 && !q.i && !q.o && !p.pts[prev]!.o && !p.pts[next]!.i
+      const { r: _r, ...plain } = q
+      if (!q.r || !straight) { out.push(plain); return }
+      const v = A[k]!, a = A[prev]!, b = A[next]!
+      const la = Math.hypot(a.x - v.x, a.y - v.y), lb = Math.hypot(b.x - v.x, b.y - v.y)
+      if (!la || !lb) { out.push(plain); return }
+      const ua = { x: (a.x - v.x) / la, y: (a.y - v.y) / la }, ub = { x: (b.x - v.x) / lb, y: (b.y - v.y) / lb }
+      const cos = Math.max(-1, Math.min(1, ua.x * ub.x + ua.y * ub.y))
+      const th = Math.acos(cos) // 두 선 사이 각
+      if (th < 1e-3 || Math.PI - th < 1e-3) { out.push(plain); return }
+      const d = Math.min(q.r / Math.tan(th / 2), la / 2, lb / 2)
+      const R = d * Math.tan(th / 2) // 실제로 들어가는 원 반지름
+      const hl = (4 / 3) * Math.tan((Math.PI - th) / 4) * R // 원호 → 3차 곡선 핸들 길이
+      const p1 = { x: v.x + ua.x * d, y: v.y + ua.y * d }, p2 = { x: v.x + ub.x * d, y: v.y + ub.y * d }
+      const N = (x: number, y: number): [number, number] => [x / W, y / H]
+      out.push({ x: p1.x / W, y: p1.y / H, o: N(p1.x - ua.x * hl, p1.y - ua.y * hl) })
+      out.push({ x: p2.x / W, y: p2.y / H, i: N(p2.x - ub.x * hl, p2.y - ub.y * hl) })
+    })
+    return { ...p, pts: out }
+  })
+}
+
 export function vnetPath(vnet: VPath[] | undefined, w: number, h: number, ox = 0, oy = 0): string {
   let d = ''
-  for (const p of vnet ?? []) {
+  for (const p of bakeCorners(vnet, w, h)) {
     const pts = p.pts
     if (!pts.length) continue
     const X = (v: number) => r2(ox + v * w), Y = (v: number) => r2(oy + v * h)
@@ -182,6 +240,12 @@ export function vnetPath(vnet: VPath[] | undefined, w: number, h: number, ox = 0
 /** 점으로 그리는 레이어의 경로 */
 export function vectorPath(t: LayerType, s: LayerStyle, w: number, h: number, pts?: number[], closed?: boolean, vnet?: VPath[]): string {
   if (t === 'vector') return vnetPath(vnet, w, h)
+  if (t === 'ellipse') return arcPath(w, h, s.arcStart, s.arcSweep, s.arcInner)
+  // 다각형 · 별 모서리 둥글기(피그마와 같아요): 꼭짓점마다 같은 r 로
+  if ((t === 'polygon' || t === 'star') && (s.radius ?? 0) > 0) {
+    const ps = t === 'polygon' ? polygonPoints(s.sides ?? 3, w, h) : starPoints(s.points ?? 5, s.inner ?? 0.38, w, h)
+    return vnetPath([{ closed: true, pts: ps.map(([x, y]) => ({ x: x / (w || 1), y: y / (h || 1), r: s.radius })) }], w, h)
+  }
   if (t === 'polygon') return closedD(polygonPoints(s.sides ?? 3, w, h))
   if (t === 'star') return closedD(starPoints(s.points ?? 5, s.inner ?? 0.38, w, h))
   if (t === 'line') return pointsPath(pts ?? [0, 0, 1, 0], w, h, false)

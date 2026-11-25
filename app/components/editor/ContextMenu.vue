@@ -36,7 +36,7 @@ onBeforeUnmount(() => { window.removeEventListener('pointerdown', onDoc, true); 
   <div v-if="state" ref="el" class="sq ctx" role="menu" :aria-label="tr('Context menu')" tabindex="-1" :style="{ left: pos.x + 'px', top: pos.y + 'px' }" @contextmenu.prevent @pointerleave="el?.focus({ preventScroll: true })">
     <template v-for="(it, i) in state.items" :key="i">
       <hr v-if="it === 'sep'" role="separator">
-      <button v-else type="button" role="menuitem" tabindex="-1" :class="['sq', { danger: it.danger }]" :disabled="it.disabled" :aria-disabled="it.disabled || undefined" @click="run(it.action)" @pointerenter="($event.currentTarget as HTMLElement).focus({ preventScroll: true })"><span class="lb">{{ it.label }}</span><span v-if="it.shortcut" class="sc">{{ it.shortcut }}</span></button>
+      <button v-else type="button" role="menuitem" tabindex="-1" :class="['sq', { danger: it.danger }]" :disabled="it.disabled" :aria-disabled="it.disabled || undefined" @click="run(it.action)" @pointerenter="($event.currentTarget as HTMLElement).focus({ preventScroll: true })"><span class="lb"><svg v-if="it.icon" class="mi" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path v-if="it.icon.fill" :d="it.icon.fill" fill="currentColor" fill-rule="evenodd" /><path v-if="it.icon.stroke" :d="it.icon.stroke" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg>{{ it.label }}</span><span v-if="it.shortcut" class="sc">{{ it.shortcut }}</span></button>
     </template>
   </div>
 </template>
@@ -48,7 +48,9 @@ button { display: flex; align-items: center; gap: var(--ref-spacing-10); width: 
 button:hover:not(:disabled), button:focus-visible, button:focus:not(:disabled) { --sq-fill: var(--iris-select, #0D99FF); }
 button:disabled { color: rgb(255 255 255 / 40%); cursor: default; }
 button.danger:is(:hover, :focus):not(:disabled) { --sq-fill: #E5484D; }
-.lb { flex: 1; white-space: nowrap; }
+.lb { flex: 1; display: flex; align-items: center; gap: var(--ref-spacing-06); white-space: nowrap; }
+/* 이름 왼쪽 아이콘(불리언 메뉴 등) */
+.mi { flex: none; }
 .sc { color: rgb(255 255 255 / 70%); white-space: nowrap; font-variant-numeric: proportional-nums; }
 button:is(:hover, :focus):not(:disabled) .sc { color: #FFFFFF; }
 hr { height: 1px; margin: 4px 0 3px; border: 0; background: rgb(255 255 255 / 12%); }

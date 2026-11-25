@@ -1,5 +1,5 @@
 import type { LayerDoc, LayerNode, VPath, VPoint } from './schema'
-import { polygonPoints, radiiOf, starPoints, vnetPath } from './paint'
+import { arcPath, bakeCorners, hasArc, polygonPoints, radiiOf, starPoints, vnetPath } from './paint'
 import { booleanLoops, loopsD } from './boolean'
 import { translate } from './geom'
 
@@ -8,7 +8,7 @@ import { translate } from './geom'
  * vnet 은 레이어 상자 안 0~1 비율 — 크기를 바꿔도 점을 다시 계산하지 않아도 돼요.
  */
 const K = 0.5523 // 원을 3차 베지어 4개로: 핸들 길이 비율
-type Abs = { x: number; y: number; i?: [number, number]; o?: [number, number] }
+type Abs = { x: number; y: number; i?: [number, number]; o?: [number, number]; r?: number }
 type AbsPath = { pts: Abs[]; closed?: boolean }
 
 /** 절대 좌표(px) 경로 → 상자(x · y · w · h) + 0~1 비율 vnet */
@@ -18,12 +18,12 @@ export function normalize(paths: AbsPath[]): { x: number; y: number; w: number; 
   const x = Math.min(...xs), y = Math.min(...ys)
   const w = Math.max(...xs) - x, h = Math.max(...ys) - y
   const nx = (v: number) => (w ? Math.round(((v - x) / w) * 1e5) / 1e5 : 0), ny = (v: number) => (h ? Math.round(((v - y) / h) * 1e5) / 1e5 : 0)
-  return { x, y, w: Math.max(w, 0), h: Math.max(h, 0), vnet: paths.map((p) => ({ closed: p.closed, pts: p.pts.map((q) => ({ x: nx(q.x), y: ny(q.y), ...(q.i ? { i: [nx(q.i[0]), ny(q.i[1])] as [number, number] } : {}), ...(q.o ? { o: [nx(q.o[0]), ny(q.o[1])] as [number, number] } : {}) })) })) }
+  return { x, y, w: Math.max(w, 0), h: Math.max(h, 0), vnet: paths.map((p) => ({ closed: p.closed, pts: p.pts.map((q) => ({ x: nx(q.x), y: ny(q.y), ...(q.i ? { i: [nx(q.i[0]), ny(q.i[1])] as [number, number] } : {}), ...(q.o ? { o: [nx(q.o[0]), ny(q.o[1])] as [number, number] } : {}), ...(q.r ? { r: q.r } : {}) })) })) }
 }
 /** 0~1 vnet → 상자 안 절대 좌표 */
 export function denorm(vnet: VPath[], w: number, h: number, ox = 0, oy = 0): AbsPath[] {
   const X = (v: number) => ox + v * w, Y = (v: number) => oy + v * h
-  return vnet.map((p) => ({ closed: p.closed, pts: p.pts.map((q) => ({ x: X(q.x), y: Y(q.y), ...(q.i ? { i: [X(q.i[0]), Y(q.i[1])] as [number, number] } : {}), ...(q.o ? { o: [X(q.o[0]), Y(q.o[1])] as [number, number] } : {}) })) }))
+  return vnet.map((p) => ({ closed: p.closed, pts: p.pts.map((q) => ({ x: X(q.x), y: Y(q.y), ...(q.i ? { i: [X(q.i[0]), Y(q.i[1])] as [number, number] } : {}), ...(q.o ? { o: [X(q.o[0]), Y(q.o[1])] as [number, number] } : {}), ...(q.r ? { r: q.r } : {}) })) }))
 }
 
 /** 도형 하나 → vnet(그 레이어 상자 기준 0~1). 펜 편집 · 평탄화 · 불리언 · 마스크가 써요 */
@@ -31,13 +31,17 @@ export function shapeVnet(n: LayerNode): VPath[] {
   const w = n.w || 1, h = n.h || 1
   const N = (pts: Abs[], closed = true): VPath[] => [{ closed, pts: pts.map((q) => ({ x: q.x / w, y: q.y / h, ...(q.i ? { i: [q.i[0] / w, q.i[1] / h] as [number, number] } : {}), ...(q.o ? { o: [q.o[0] / w, q.o[1] / h] as [number, number] } : {}) })) }]
   switch (n.type) {
-    case 'vector': return n.vnet ?? []
-    case 'ellipse': return [{ closed: true, pts: [
+    // 벡터: 꼭짓점 둥글기(r)는 곡선 점으로 굳혀서(불리언 · Flatten · 마스크가 실제 모양을 쓰게)
+    case 'vector': return bakeCorners(n.vnet ?? [], n.w, n.h)
+    // 원 호(Arc)가 있으면 그 모양 그대로(부채꼴 · 고리)
+    case 'ellipse': if (hasArc(n.style)) return parsePathD(arcPath(w, h, n.style.arcStart, n.style.arcSweep, n.style.arcInner)).map((p) => ({ closed: p.closed, pts: p.pts.map((q) => ({ x: q.x / w, y: q.y / h, ...(q.i ? { i: [q.i[0] / w, q.i[1] / h] as [number, number] } : {}), ...(q.o ? { o: [q.o[0] / w, q.o[1] / h] as [number, number] } : {}) })) }))
+    return [{ closed: true, pts: [
       { x: 0.5, y: 0, i: [0.5 - K / 2, 0], o: [0.5 + K / 2, 0] }, { x: 1, y: 0.5, i: [1, 0.5 - K / 2], o: [1, 0.5 + K / 2] },
       { x: 0.5, y: 1, i: [0.5 + K / 2, 1], o: [0.5 - K / 2, 1] }, { x: 0, y: 0.5, i: [0, 0.5 + K / 2], o: [0, 0.5 - K / 2] },
     ] }]
-    case 'polygon': return N(polygonPoints(n.style.sides ?? 3, w, h).map(([x, y]) => ({ x, y })))
-    case 'star': return N(starPoints(n.style.points ?? 5, n.style.inner ?? 0.38, w, h).map(([x, y]) => ({ x, y })))
+    // 다각형 · 별: 모서리 둥글기(radius)가 있으면 곡선 점으로 굳혀서
+    case 'polygon': return bakeCorners(N(polygonPoints(n.style.sides ?? 3, w, h).map(([x, y]) => ({ x, y }))).map((p) => ({ ...p, pts: p.pts.map((q) => ({ ...q, ...(n.style.radius ? { r: n.style.radius } : {}) })) })), w, h)
+    case 'star': return bakeCorners(N(starPoints(n.style.points ?? 5, n.style.inner ?? 0.38, w, h).map(([x, y]) => ({ x, y }))).map((p) => ({ ...p, pts: p.pts.map((q) => ({ ...q, ...(n.style.radius ? { r: n.style.radius } : {}) })) })), w, h)
     case 'line': { const p = n.pts ?? [0, 0, 1, 0]; return [{ closed: false, pts: [{ x: p[0]!, y: p[1]! }, { x: p[2]!, y: p[3]! }] }] }
     case 'path': {
       // 연필은 점 사이를 2차 곡선(가운데점)으로 그려요 → 같은 모양의 3차 곡선으로

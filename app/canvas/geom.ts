@@ -311,6 +311,24 @@ export function measureGuides(s: Rect, t: Rect): Guides {
     line('y', gy[0]!, gy[1]!, at)
     if (!ox) { const near = Math.abs(t.x - at) < Math.abs(tr - at) ? t.x : tr; const ey = gy[1] === t.y ? t.y : tb; g.lines.push({ x1: at, y1: ey, x2: near, y2: ey, dash: true }) }
   }
+  // 위아래로 떨어져 있고 가로로 겹치면(피그마와 같아요): 왼쪽끼리 · 오른쪽끼리 어긋난 만큼도 — 상대의 세로 가장자리를 점선으로 늘려 고른 것 높이까지
+  if (gy && ox) {
+    const tNear = gy[1] === t.y ? t.y : tb, sFar = gy[1] === t.y ? s.y : sb
+    for (const [se, te] of [[s.x, t.x], [sr, tr]] as const) {
+      if (Math.abs(se - te) < 0.5) continue
+      line('x', se, te, scy)
+      g.lines.push({ x1: te, y1: Math.min(tNear, sFar), x2: te, y2: Math.max(tNear, sFar), dash: true })
+    }
+  }
+  // 좌우로 떨어져 있고 세로로 겹치면: 위끼리 · 아래끼리 어긋난 만큼 — 상대의 가로 가장자리를 점선으로 늘려 고른 것 너비까지
+  if (gx && oy) {
+    const tNear = gx[1] === t.x ? t.x : tr, sFar = gx[1] === t.x ? s.x : sr
+    for (const [se, te] of [[s.y, t.y], [sb, tb]] as const) {
+      if (Math.abs(se - te) < 0.5) continue
+      line('y', se, te, scx)
+      g.lines.push({ x1: Math.min(tNear, sFar), y1: te, x2: Math.max(tNear, sFar), y2: te, dash: true })
+    }
+  }
   // 겹치면 가장자리끼리
   if (!gx && !gy) {
     line('x', s.x, t.x, scy); line('x', sr, tr, scy)

@@ -1,5 +1,6 @@
 /** 우클릭 메뉴(피그마처럼). 한 번에 하나만 떠요 */
-export type MenuItem = { label: string; shortcut?: string; action: () => unknown; disabled?: boolean; danger?: boolean } | 'sep'
+/** icon: 이름 왼쪽 16 아이콘(fill = 채운 모양, stroke = 1.25 선 — 16×16 경로) */
+export type MenuItem = { label: string; shortcut?: string; action: () => unknown; disabled?: boolean; danger?: boolean; icon?: { fill?: string; stroke?: string } } | 'sep'
 export interface MenuState { x: number; y: number; items: MenuItem[] }
 export function useContextMenu() {
   const state = useState<MenuState | null>('iris-context-menu', () => null)

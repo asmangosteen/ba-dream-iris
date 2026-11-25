@@ -327,18 +327,33 @@ const selCorners = computed(() => {
   const c = [...new Set(vselNow.value.filter((k) => k[0] < 0).map((k) => k[1]))]
   return c.length ? c : null
 })
-/** Corner radius 칸 값: 고른 모서리들(없으면 네 모서리)이 같으면 그 값, 다르면 Mixed */
+/** 벡터: 모서리 둥글기를 바꿀 꼭짓점 — 점 편집에서 고른 점(고른 선의 양 끝 포함), 고른 게 없거나 편집 중이 아니면 모든 점 */
+const vecTargets = computed<VKey[]>(() => {
+  const n = one.value
+  if (!n || n.type !== 'vector') return []
+  const sel = vselNow.value.filter((k) => k[0] >= 0)
+  return sel.length ? sel : (n.vnet ?? []).flatMap((p, pi) => p.pts.map((_, qi) => [pi, qi] as VKey))
+})
+/** Corner radius 칸 값: 사각형은 고른 모서리들(없으면 네 모서리), 벡터는 고른 꼭짓점들(없으면 모든 꼭짓점) — 같으면 그 값, 다르면 Mixed */
 const editRad = computed<number | 'Mixed'>(() => {
   const n = one.value
   if (!n) return 0
-  const r = radiiOf(n.style)
-  const vals = (selCorners.value ?? [0, 1, 2, 3]).map((i) => r[i] ?? 0)
+  let vals: number[]
+  if (n.type === 'vector') vals = vecTargets.value.map(([pi, qi]) => n.vnet?.[pi]?.pts[qi]?.r ?? 0)
+  else { const r = radiiOf(n.style); vals = (selCorners.value ?? [0, 1, 2, 3]).map((i) => r[i] ?? 0) }
+  if (!vals.length) return 0
   return vals.every((v) => v === vals[0]) ? vals[0]! : 'Mixed'
 })
-/** Corner radius 바꾸기: 고른 모서리만(없으면 네 모서리 모두). 네 값이 같아지면 한 값(radius)으로 */
+/** Corner radius 바꾸기: 사각형은 고른 모서리만(네 값이 같아지면 한 값으로), 벡터는 고른 꼭짓점의 r 만(피그마 vertex corner radius) */
 function setEditRad(v: number) {
   const idx = selCorners.value
   const val = Math.max(0, Math.round(v * 100) / 100)
+  const n0 = one.value
+  if (n0?.type === 'vector') {
+    const on = new Set(vecTargets.value.map(([pi, qi]) => pi + ':' + qi))
+    store.update(sid.value, [n0.id], (nn) => ({ vnet: (nn.vnet ?? []).map((p, pi) => ({ ...p, pts: p.pts.map((q, qi) => { if (!on.has(pi + ':' + qi)) return q; const { r: _r, ...rest } = q; return val ? { ...rest, r: val } : rest }) })) }))
+    return
+  }
   store.update(sid.value, ids.value, (nn) => {
     if (!idx) return { style: { ...nn.style, radius: val, radii: undefined } }
     const rr = [...radiiOf(nn.style)] as [number, number, number, number]
@@ -367,8 +382,9 @@ const editable = computed(() => !!one.value && EDITABLE.has(one.value.type) && !
 const under = (e: MouseEvent) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); return { clientX: r.left, clientY: r.bottom + 4, preventDefault() {}, stopPropagation() {} } as unknown as MouseEvent }
 const boolItems = () => {
   const isBool = one.value?.type === 'boolean'
-  const ops = BOOL_OPS.map((b) => ({ label: (isBool && one.value?.op === b.k ? '✓ ' : '') + tr(b.label.replace(' selection', '')), shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
-  return [...ops, 'sep' as const, { label: tr('Flatten'), shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
+  // 이름 왼쪽에 그 연산 아이콘(겹친 두 네모 + 결과 칠, 머리 버튼과 같은 그림) — 체크 표시는 없어요
+  const ops = BOOL_OPS.map((b) => ({ label: tr(b.label.replace(' selection', '')), icon: { fill: b.d, stroke: 'M2.5 2.5h7v7h-7zM6.5 6.5h7v7h-7z' }, shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
+  return [...ops, 'sep' as const, { label: tr('Flatten'), icon: { stroke: 'M3 12.5L6.5 4l3 5.5 3.5-5M3 12.5h0M12.5 4.5h0' }, shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
 }
 function boolMenu(e: MouseEvent) { ctxMenu.open(under(e), boolItems()) }
 /** 프레임 ↔ 그룹(피그마 머리의 'Frame ▾'): 그룹으로 바꾸면 칠 · 자르기 · 오토 레이아웃을 빼요 */
@@ -510,6 +526,14 @@ function setSideAt(i: number, fn: (cur: number) => number) {
 const ARROWS = [{ k: 'none', label: 'None' }, { k: 'arrow', label: 'Line arrow' }, { k: 'triangle', label: 'Triangle arrow' }, { k: 'circle', label: 'Circle' }] as const
 const blendNow = computed(() => same((n) => n.style.blend ?? 'normal'))
 const noRadius = computed(() => has('text', 'ellipse', 'line', 'path', 'polygon', 'star'))
+/** 원 호(Arc): start 각(°, 0~360), sweep 쓸어 간 정도(%, 100 = 한 바퀴 → 기본값으로 지움), inner 구멍 비율(%, 0 → 지움) */
+function setArcVal(k: 'start' | 'sweep' | 'inner', v: number) {
+  if (!Number.isFinite(v)) return
+  if (k === 'start') setStyle('arcStart', ((Math.round(v * 10) / 10) % 360 + 360) % 360 || undefined)
+  else if (k === 'sweep') { const p = Math.max(0, Math.min(100, v)); setStyle('arcSweep', p >= 100 ? undefined : Math.round(p * 3.6 * 100) / 100) }
+  else { const p = Math.max(0, Math.min(99, v)); setStyle('arcInner', p <= 0 ? undefined : Math.round(p) / 100) }
+}
+function setArc(k: 'start' | 'sweep' | 'inner', e: Event) { setArcVal(k, Number((e.target as HTMLInputElement).value)) }
 function setCount(key: 'sides' | 'points', e: Event) {
   const v = Math.round(Number((e.target as HTMLInputElement).value))
   if (Number.isFinite(v)) setStyle(key, Math.max(3, Math.min(60, v)))
@@ -570,7 +594,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </div>
         <span />
       </div>
-      <template v-if="one.type === 'rect'">
+      <template v-if="one.type === 'rect' || one.type === 'vector'">
         <div class="ig-l"><span>{{ tr('Corner radius') }}</span></div>
         <div class="ig">
           <!-- 고른 꼭짓점 · 선이 있으면 그 모서리만, 없으면 네 모서리 모두(피그마와 같아요) -->
@@ -578,6 +602,38 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <span /><span />
         </div>
       </template>
+      <!-- 도형 속성(더블클릭 편집 중에도): 다각형 · 별 개수 · 비율 · 모서리, 원 호 -->
+      <template v-if="one.type === 'polygon' || one.type === 'star'">
+        <div class="ig-l"><span>{{ tr('Count') }}</span><span v-if="one.type === 'star'">{{ tr('Ratio') }}</span></div>
+        <div class="ig">
+          <label v-if="one.type === 'polygon'" class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l5.5 10h-11z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'p' + one.style.sides" :value="one.style.sides ?? 3" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('sides', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('sides', Math.max(3, Math.min(60, (one!.style.sides ?? 3) + Math.sign(d)))))"></label>
+          <label v-else class="sq fld" :title="tr('Point count')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5l1.7 3.6 3.8.4-2.9 2.6.8 3.9L8 11l-3.4 2 .8-3.9-2.9-2.6 3.8-.4z" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linejoin="round" /></svg><input :key="'s' + one.style.points" :value="one.style.points ?? 5" inputmode="numeric" :aria-label="tr('Point count')" @change="setCount('points', $event)" @keydown="blurOnEnter($event); step($event, (d) => setStyle('points', Math.max(3, Math.min(60, (one!.style.points ?? 5) + Math.sign(d)))))"></label>
+          <label v-if="one.type === 'star'" class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" stroke="currentColor" stroke-width="1.25" fill="none" /></svg><input :key="'r' + one.style.inner" :value="Math.round((one.style.inner ?? 0.38) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setRatio" @keydown="blurOnEnter($event); step($event, (d) => setStyle('inner', Math.max(0.01, Math.min(1, Math.round((one!.style.inner ?? 0.38) * 100 + d) / 100))))"><span class="unit">%</span></label>
+          <span v-else />
+          <span />
+        </div>
+        <!-- 다각형 · 별 모서리 둥글기(꼭짓점마다 같은 값 — 피그마와 같아요) -->
+        <div class="ig-l"><span>{{ tr('Corner radius') }}</span></div>
+        <div class="ig">
+          <label class="sq fld"><EditorIcon name="var_radius" :size="16" /><input :key="'pr' + (one.style.radius ?? 0)" :value="one.style.radius ?? 0" inputmode="numeric" :aria-label="tr('Corner radius')" @change="setStyle('radius', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))" @keydown="blurOnEnter($event); step($event, (d) => setStyle('radius', Math.max(0, (one!.style.radius ?? 0) + d)))"></label>
+          <span /><span />
+        </div>
+      </template>
+      <!-- 원 호(피그마 Arc): 시작 각 · 쓸어 간 정도 · 안쪽 구멍 -->
+      <template v-if="one.type === 'ellipse'">
+        <div class="ig-l"><span>{{ tr('Start') }}</span><span>{{ tr('Sweep') }}</span></div>
+        <div class="ig">
+          <label class="sq fld u" :title="tr('Start')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M8 8h5.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
+          <label class="sq fld u" :title="tr('Sweep')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8V2.5A5.5 5.5 0 1 1 2.5 8z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
+          <span />
+        </div>
+        <div class="ig-l"><span>{{ tr('Ratio') }}</span></div>
+        <div class="ig">
+          <label class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" fill="none" stroke="currentColor" stroke-width="1.25" /></svg><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
+          <span /><span />
+        </div>
+      </template>
+
     </section>
     <section v-if="!editing" class="s first">
       <!-- 피그마 UI3 머리: [종류(프레임 · 그룹은 ▾ 로 바꾸기)] … [마스크 · 불리언 ▾ · 점 편집] — 프레임은 [⋯] 메뉴에 -->
@@ -676,9 +732,12 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <div class="ig">
         <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :value="same((n) => Math.round((n.style.opacity ?? 1) * 100)) === 'Mixed' ? '' : same((n) => Math.round((n.style.opacity ?? 1) * 100))" :placeholder="same((n) => n.style.opacity ?? 1) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Opacity')" @change="setOpacity" @keydown="blurOnEnter($event); step($event, stepOpacity)"><span v-if="same((n) => n.style.opacity ?? 1) !== 'Mixed'" class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbind('opacity')" @step="stepOpacity" /></label>
         <template v-if="!noRadius">
-          <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="show(allCorners)" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setCorner($event)" @keydown="blurOnEnter"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbind([...CORNER_KEYS, 'radius'])" /></label>
+          <!-- 벡터 하나: 모든 꼭짓점의 모서리 둥글기(피그마 vertex corner radius) -->
+          <label v-if="one?.type === 'vector'" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input :key="'vr' + editRad" :value="show(editRad)" :placeholder="editRad === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')" @change="setEditRad(Number(($event.target as HTMLInputElement).value) || 0)" @keydown="blurOnEnter($event); step($event, (d) => editRad !== 'Mixed' && setEditRad(editRad + d))"></label>
+          <label v-else-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="show(allCorners)" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setCorner($event)" @keydown="blurOnEnter"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbind([...CORNER_KEYS, 'radius'])" /></label>
           <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :value="show(same((n) => n.style.radius ?? 0))" :placeholder="same((n) => n.style.radius ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Corner radius')"@change="setStyleNum('radius', $event)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('radius', d))"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbind('radius')" @step="(d) => stepStyle('radius', d)" /></label>
-          <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
+          <span v-if="one?.type === 'vector'" />
+          <button v-else :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
         </template>
         <template v-else><span /><span /></template>
       </div>
@@ -696,7 +755,28 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
           <span v-else />
           <span />
         </div>
+        <!-- 다각형 · 별 모서리 둥글기(꼭짓점마다 같은 값 — 피그마와 같아요) -->
+        <div class="ig-l"><span>{{ tr('Corner radius') }}</span></div>
+        <div class="ig">
+          <label class="sq fld"><EditorIcon name="var_radius" :size="16" /><input :key="'pr' + (one.style.radius ?? 0)" :value="one.style.radius ?? 0" inputmode="numeric" :aria-label="tr('Corner radius')" @change="setStyle('radius', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))" @keydown="blurOnEnter($event); step($event, (d) => setStyle('radius', Math.max(0, (one!.style.radius ?? 0) + d)))"></label>
+          <span /><span />
+        </div>
       </template>
+      <!-- 원 호(피그마 Arc): 시작 각 · 쓸어 간 정도 · 안쪽 구멍 -->
+      <template v-if="one?.type === 'ellipse'">
+        <div class="ig-l"><span>{{ tr('Start') }}</span><span>{{ tr('Sweep') }}</span></div>
+        <div class="ig">
+          <label class="sq fld u" :title="tr('Start')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M8 8h5.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg><input :key="'as' + (one.style.arcStart ?? 0)" :value="Math.round(one.style.arcStart ?? 0)" inputmode="numeric" :aria-label="tr('Start')" @change="setArc('start', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('start', (one!.style.arcStart ?? 0) + d))"><span class="unit">°</span></label>
+          <label class="sq fld u" :title="tr('Sweep')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8V2.5A5.5 5.5 0 1 1 2.5 8z" fill="currentColor" fill-opacity=".25" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg><input :key="'aw' + (one.style.arcSweep ?? 360)" :value="Math.round(((one.style.arcSweep ?? 360) / 360) * 1000) / 10" inputmode="decimal" :aria-label="tr('Sweep')" @change="setArc('sweep', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('sweep', ((one!.style.arcSweep ?? 360) / 3.6) + d))"><span class="unit">%</span></label>
+          <span />
+        </div>
+        <div class="ig-l"><span>{{ tr('Ratio') }}</span></div>
+        <div class="ig">
+          <label class="sq fld u" :title="tr('Ratio')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11zM8 6a2 2 0 1 0 0 4a2 2 0 1 0 0-4z" fill="none" stroke="currentColor" stroke-width="1.25" /></svg><input :key="'ai' + (one.style.arcInner ?? 0)" :value="Math.round((one.style.arcInner ?? 0) * 100)" inputmode="numeric" :aria-label="tr('Ratio')" @change="setArc('inner', $event)" @keydown="blurOnEnter($event); step($event, (d) => setArcVal('inner', (one!.style.arcInner ?? 0) * 100 + d))"><span class="unit">%</span></label>
+          <span /><span />
+        </div>
+      </template>
+
     </section>
 
     <section v-if="has('text') && !editing" class="s">

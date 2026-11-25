@@ -487,4 +487,7 @@ export default {
   'Search icons': '아이콘 찾기',
   'No icons match “{q}”': '‘{q}’에 맞는 아이콘이 없어요',
   'Outlined': '선',
+  // 원 호(Arc)
+  'Start': '시작',
+  'Sweep': '범위',
 } satisfies Record<string, string>

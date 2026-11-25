@@ -2,6 +2,7 @@ import type { InjectionKey, Ref } from 'vue'
 import { relayout as layoutDoc, constrain, boxes0 } from './layout'
 import { guessAxis, currentGap, rowsOf } from './geom'
 import { shapeVnet } from './vector'
+import { radiiOf } from './paint'
 import { booleanLoops, flattenLoops, flattenable, loopsVnet } from './boolean'
 import { scaledStyle } from './scale'
 import { newSmoothing } from './prefs'
@@ -15,7 +16,8 @@ import type { ScreenRow } from '~/composables/useEditor'
  */
 export interface SaveState { state: 'idle' | 'saving' | 'saved' | 'error' }
 type Entry =
-  | { kind?: 'layers'; screenId: string; before: string; after: string }
+  /** selBefore: 바꾸기 전 고른 레이어, selAfter: 되돌리기 직전 고른 레이어 — 실행취소 · 다시하기 때 고른 것도 함께 되돌려요(피그마와 같아요) */
+  | { kind?: 'layers'; screenId: string; before: string; after: string; selBefore?: string[]; selAfter?: string[] }
   | { kind: 'action'; screenId: string | null; undo: () => unknown; redo: () => unknown }
 
 export function createLayerStore(opts: {
@@ -91,11 +93,11 @@ export function createLayerStore(opts: {
       if (!Object.keys(vars).length) delete n.style.vars
     }
   }
-  function record(sid: string, before: string) {
+  function record(sid: string, before: string, selBefore?: string[]) {
     detachEdited(sid, before)
     const after = snap(sid)
     if (after === before) return
-    push({ screenId: sid, before, after })
+    push({ screenId: sid, before, after, selBefore: selBefore ?? (screenId.value === sid ? [...layerIds.value] : []) })
     scheduleSave(sid)
   }
   /** 묶음(batch) 중이면 기록을 모아 두었다가 끝에 실행취소 한 번으로 */
@@ -111,8 +113,11 @@ export function createLayerStore(opts: {
   /** 레이어 밖의 변경(화면 옮기기 · 만들기 · 속성)도 실행취소 기록에 넣습니다 */
   const pushAction = (screenId: string | null, undo: () => unknown, redo: () => unknown) => push({ kind: 'action', screenId, undo, redo })
   /** 바꾸기 전 모습을 받아 두는 시작점 (끌기처럼 여러 번 바뀌다가 끝에 한 번 기록할 때) */
-  const begin = (sid: string) => snap(sid)
-  const commit = (sid: string, before: string) => { layoutDoc(doc(sid)); record(sid, before) }
+  /** 시작할 때 고른 레이어(끌기 · 잡아 두기가 끝나 기록할 때 '바꾸기 전 고른 것'으로) */
+  const begunSel = new Map<string, string[]>()
+  const selOf = (sid: string) => (screenId.value === sid ? [...layerIds.value] : [])
+  const begin = (sid: string) => { begunSel.set(sid, selOf(sid)); return snap(sid) }
+  const commit = (sid: string, before: string) => { layoutDoc(doc(sid)); record(sid, before, begunSel.get(sid)); begunSel.delete(sid) }
   /**
    * 잡아 두기(색 판 · 슬라이더를 끄는 동안): 그 사이 바뀐 것은 기록하지 않다가 release 에서 한 번에 기록 · 저장해요.
    * hold 를 여러 번 불러도 처음 모습이 기준이에요
@@ -120,7 +125,7 @@ export function createLayerStore(opts: {
   const held = new Map<string, string>()
   /** 잡아 두기 시작 모습(읽은 것) — 끄는 동안에도 값이 바뀐 연결을 곧바로 풀려고(Fill 행이 토큰 → 색 코드로 실시간) */
   const heldDoc = new Map<string, LayerDoc>()
-  function hold(sid: string) { if (!held.has(sid)) { const s = snap(sid); held.set(sid, s); heldDoc.set(sid, JSON.parse(s)) } }
+  function hold(sid: string) { if (!held.has(sid)) { const s = snap(sid); held.set(sid, s); heldDoc.set(sid, JSON.parse(s)); begunSel.set(sid, selOf(sid)) } }
   function release(sid: string) {
     const before = held.get(sid)
     if (before === undefined) return
@@ -131,9 +136,10 @@ export function createLayerStore(opts: {
   function mutate<T>(sid: string, fn: (d: LayerDoc) => T): T {
     if (held.has(sid)) { const out = fn(doc(sid)); layoutDoc(doc(sid)); const h = heldDoc.get(sid); if (h) detachEdited(sid, h); return out }
     const before = snap(sid)
+    const sel0 = selOf(sid)
     const out = fn(doc(sid))
     layoutDoc(doc(sid)) // 오토 레이아웃은 바뀔 때마다 다시 계산
-    record(sid, before)
+    record(sid, before, sel0)
     return out
   }
   /** 그려진 크기를 재서 넣기(인스턴스 Hug 등) — 실행취소 기록 없이 저장만 */
@@ -154,8 +160,22 @@ export function createLayerStore(opts: {
     layerIds.value = layerIds.value.filter((id) => docs[sid]!.nodes[id])
     scheduleSave(sid)
   }
-  const undoEntry = (e: Entry) => { if (e.kind === 'action') e.undo(); else { restore(e.screenId, e.before); screenId.value = e.screenId } }
-  const redoEntry = (e: Entry) => { if (e.kind === 'action') e.redo(); else { restore(e.screenId, e.after); screenId.value = e.screenId } }
+  /** 되돌린 문서에 있는 것만 다시 고르기 */
+  const reselect = (sid: string, ids: string[] | undefined) => { if (ids) layerIds.value = ids.filter((id) => docs[sid]?.nodes[id]) }
+  const undoEntry = (e: Entry) => {
+    if (e.kind === 'action') { e.undo(); return }
+    // 되돌리기 직전 고른 것(= 바꾼 뒤 고른 것)을 다시하기용으로 기억
+    if (screenId.value === e.screenId) e.selAfter = [...layerIds.value]
+    restore(e.screenId, e.before)
+    screenId.value = e.screenId
+    reselect(e.screenId, e.selBefore)
+  }
+  const redoEntry = (e: Entry) => {
+    if (e.kind === 'action') { e.redo(); return }
+    restore(e.screenId, e.after)
+    screenId.value = e.screenId
+    reselect(e.screenId, e.selAfter)
+  }
   /**
    * 여러 화면 · 여러 번의 변경을 실행취소 한 번으로 묶어요(프레임 여러 개를 한꺼번에 고칠 때).
    * 안쪽에서 또 부르면 바깥 묶음에 그대로 들어가요
@@ -185,8 +205,7 @@ export function createLayerStore(opts: {
     const e = redoStack.pop()
     if (!e) return
     undoStack.push(e)
-    if (e.kind === 'action') e.redo()
-    else { restore(e.screenId, e.after); screenId.value = e.screenId }
+    redoEntry(e)
     canUndo.value = true
     canRedo.value = !!redoStack.length
   }
@@ -501,12 +520,32 @@ export function createLayerStore(opts: {
    * - 불리언 · 그룹: 계산한 결과 모양 하나로(안쪽 도형은 없어져요)
    * - 여럿: 같은 부모 안 것들을 합친 벡터 하나로(맨 위 자리, 칠 · 선은 맨 아래 것)
    */
+  /**
+   * 점 편집에서 사각형 꼭짓점을 처음 옮길 때(피그마와 같아요): 벡터로 바꾸되 꼭짓점 네 개 그대로 — 모서리 둥글기는 각 꼭짓점의 r 로 남아요.
+   * (곡선 점으로 굳히는 건 Flatten ⌘E). 사각형이 아니면 false(그때는 flatten 으로)
+   */
+  function toCornerVector(sid: string, id: string): boolean {
+    const n0 = doc(sid).nodes[id]
+    if (!n0 || n0.type !== 'rect') return false
+    mutate(sid, (d) => {
+      const n = d.nodes[id]!
+      const [a, b, c, e] = radiiOf(n.style).map((r) => Math.max(0, Math.min(r, n.w / 2, n.h / 2)))
+      const pt = (x: number, y: number, r?: number) => ({ x, y, ...(r ? { r } : {}) })
+      const style = { ...n.style }
+      delete style.radius
+      delete style.radii
+      delete style.smoothing
+      Object.assign(n, { type: 'vector', vnet: [{ closed: true, pts: [pt(0, 0, a), pt(1, 0, b), pt(1, 1, c), pt(0, 1, e)] }], closed: true, style })
+    })
+    return true
+  }
   function flatten(sid: string, ids: string[]) {
     const d0 = doc(sid)
     const top = topIds(sid, ids).filter((id) => flattenable(d0.nodes[id]))
     if (!top.length) return
     const list = top.length > 1 ? orderedSiblings(d0, top) : top
-    if (list.length === 1 && d0.nodes[list[0]!]!.type === 'vector') return
+    // 벡터 하나: 꼭짓점 둥글기(r)가 없으면 할 일 없음. 있으면 곡선 점으로 굳혀요(피그마 Flatten)
+    if (list.length === 1 && d0.nodes[list[0]!]!.type === 'vector' && !d0.nodes[list[0]!]!.vnet?.some((p) => p.pts.some((q) => q.r))) return
     const keepStyle = (n: LayerNode) => { const k = { ...n.style }; for (const key of ['radius', 'radii', 'sides', 'points', 'inner', 'smoothing', 'layout', 'clip', 'grids'] as const) delete k[key]; return k }
     const drop = (d: LayerDoc, id: string) => { for (const c of descendants(d, id)) delete d.nodes[c] }
     mutate(sid, (d) => {
@@ -989,7 +1028,7 @@ export function createLayerStore(opts: {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
-    selectScreen, selectLayer, add, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

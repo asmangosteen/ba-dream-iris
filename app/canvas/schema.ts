@@ -10,7 +10,8 @@ export const SCHEMA_VERSION = 7
 export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section' | 'vector' | 'instance' | 'boolean'
 
 /** 벡터 점 (v7). x · y · 핸들(i 들어오는 쪽, o 나가는 쪽)은 모두 레이어 상자 안 0~1 비율 */
-export interface VPoint { x: number; y: number; i?: [number, number]; o?: [number, number] }
+/** 벡터 점(0~1 비율). r: 그 꼭짓점의 모서리 둥글기(px, 피그마 vertex corner radius — 그릴 때 둥글게, Flatten · 불리언에서 곡선으로 굳어요) */
+export interface VPoint { x: number; y: number; i?: [number, number]; o?: [number, number]; r?: number }
 /** 그라디언트 색 지점. token: 연결된 색 토큰 id(color 에는 그 값을 써 둬요 — 그리기 · 내보내기는 color) */
 export interface GradStop { pos: number; color: string; token?: string }
 export interface VPath { pts: VPoint[]; closed?: boolean }
@@ -72,6 +73,10 @@ export interface LayerStyle {
   /** Corner smoothing 0~1(피그마와 같아요, 0.6 = iOS). 모서리가 있을 때 squircle 로 그려요 */
   smoothing?: number
   radius?: number
+  /** 원 호(피그마 Arc, 원만): 시작 각(°, 오른쪽 0 · 시계 방향) · 쓸어 간 각(°, 360 = 한 바퀴) · 안쪽 구멍 비율(0~1) */
+  arcStart?: number
+  arcSweep?: number
+  arcInner?: number
   /** 모서리 따로 [왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래] — 있으면 radius 대신 씁니다 (v2) */
   radii?: [number, number, number, number]
   opacity?: number // 0~1

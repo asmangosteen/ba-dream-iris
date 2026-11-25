@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
-import { descendants, isContainer, normAngle, ratioLocked, frameCss, frameSmoothLayers, frameStroke, type LayerNode, type LayerType } from '~/canvas/schema'
+import { DEFAULT_STYLE, descendants, isGroupNode, isContainer, normAngle, ratioLocked, frameCss, frameSmoothLayers, frameStroke, type LayerNode, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { ellipsePath, radiiOf, rectPath, simplify, vectorPath } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
@@ -66,6 +66,16 @@ const el = ref<HTMLElement | null>(null)
 const space = ref(false)
 const panning = ref(false)
 const draft = ref<{ x: number; y: number; width: number; height: number } | null>(null) // 캔버스 좌표
+/** 그리는 중인 도형 종류(사각형 · 원 · 다각형 · 별): 그 모양 그대로 미리 보여요(피그마와 같아요) */
+const draftType = ref<LayerType | null>(null)
+const DRAFT_SHAPES = new Set<LayerType>(['rect', 'ellipse', 'polygon', 'star'])
+const draftShape = computed(() => {
+  const r = draft.value, t = draftType.value
+  if (!r || !t || !DRAFT_SHAPES.has(t) || marqueeOn.value) return null
+  const st = DEFAULT_STYLE[t] ?? {}
+  const d = t === 'rect' ? rectPath(r.width, r.height, radiiOf(st)) : t === 'ellipse' ? ellipsePath(r.width, r.height) : vectorPath(t, st, r.width, r.height)
+  return { d, fill: st.fill ?? '#E9EBED' }
+})
 /** ⌥ 끌기로 복제될 화면들의 자리(놓으면 복제) */
 const mixGhosts = ref<{ x: number; y: number; width: number; height: number }[]>([])
 /** 선 · 연필 미리보기(캔버스 좌표 점들) */
@@ -132,12 +142,13 @@ type Drag =
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
   | { kind: 'pen'; moved: boolean }
-  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number }[]; group?: [number, number][]; collapse?: VKey }
+  | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number; qi: number }[]; group?: [number, number][]; collapse?: VKey }
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number } }[]; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
   | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean }
+  | { kind: 'vmarquee'; x0: number; y0: number; base: VKey[]; moved: boolean }
   | { kind: 'marqueeCanvas'; wx: number; wy: number; moved: boolean; baseScreens: string[]; baseLayers: string[] }
   | { kind: 'screens'; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; b0: Rect; targets: Rect[]; moved: boolean; dup?: boolean }
 let drag: Drag | null = null
@@ -402,11 +413,16 @@ const vshape = computed(() => {
 // 정해진 점 자리(패널 X · Y): 고른 점들(고른 선의 양 끝 포함)을 함께 옮겨요 — X · Y 는 고른 점들 상자의 왼쪽 위.
 // 아직 도형이면 벡터로 바꾸고 고른 꼭짓점들(둥근 모서리면 양 끝 점들)을, 벡터면 그 점들을
 watch(vptSet, (r) => {
+  if (!r) return
+  vptSet.value = null
+  moveVsel({ x: r.x, y: r.y })
+})
+/** 고른 점들 옮기기: x · y = 고른 점들 상자 왼쪽 위를 그 자리로(패널), dx · dy = 그만큼(방향키) */
+function moveVsel(r: { x?: number; y?: number; dx?: number; dy?: number }) {
   const ve = vedit.value
-  if (!r || !ve) return
+  if (!ve) return
   const keys = vselOf(ve)
   if (!keys.length) return
-  vptSet.value = null
   let n = store.node(ve.sid, ve.id)
   if (!n) return
   let group: [number, number][]
@@ -416,11 +432,14 @@ watch(vptSet, (r) => {
     const rads = n.type === 'rect' ? radiiOf(n.style) : []
     const cs = keys.map(([, qi]) => ({ c: corners[qi] ?? [0, 0], r: rads[qi] ?? 0 }))
     cur = { x: Math.min(...cs.map((v) => v.c[0])), y: Math.min(...cs.map((v) => v.c[1])) }
-    store.flatten(ve.sid, [ve.id])
+    // 사각형은 꼭짓점 네 개 그대로 벡터로(모서리 둥글기는 꼭짓점 r), 다른 도형은 곡선 점으로
+    const corner = store.toCornerVector(ve.sid, ve.id)
+    if (!corner) store.flatten(ve.sid, [ve.id])
     n = store.node(ve.sid, ve.id)!
     const abs = denorm(n.vnet ?? [], n.w, n.h)
     group = []
-    abs.forEach((p, pi) => p.pts.forEach((q, qj) => { if (cs.some((v) => Math.abs(q.x - v.c[0]) <= v.r + 0.5 && Math.abs(q.y - v.c[1]) <= v.r + 0.5)) group.push([pi, qj]) }))
+    if (corner) group = keys.map(([, qi]) => [0, qi] as [number, number])
+    else abs.forEach((p, pi) => p.pts.forEach((q, qj) => { if (cs.some((v) => Math.abs(q.x - v.c[0]) <= v.r + 0.5 && Math.abs(q.y - v.c[1]) <= v.r + 0.5)) group.push([pi, qj]) }))
     if (!group.length) return
     ve.pts = group
     ve.segs = []
@@ -432,13 +451,25 @@ watch(vptSet, (r) => {
     const qs = group.map(([pi, qi]) => abs[pi]!.pts[qi]!)
     cur = { x: Math.min(...qs.map((q) => q.x)), y: Math.min(...qs.map((q) => q.y)) }
   }
-  const dx = r.x === undefined ? 0 : r.x - (n.x + cur.x), dy = r.y === undefined ? 0 : r.y - (n.y + cur.y)
+  const dx = r.dx ?? (r.x === undefined ? 0 : r.x - (n.x + cur.x)), dy = r.dy ?? (r.y === undefined ? 0 : r.y - (n.y + cur.y))
   const abs = denorm(n.vnet ?? [], n.w, n.h)
   const mv = (p?: [number, number]) => (p ? [p[0] + dx, p[1] + dy] as [number, number] : p)
   for (const [pi, qj] of group) { const q = abs[pi]?.pts[qj]; if (q) { q.x += dx; q.y += dy; q.i = mv(q.i); q.o = mv(q.o) } }
   const box = normalize(abs)
   store.update(ve.sid, [ve.id], { x: n.x + box.x, y: n.y + box.y, w: box.w, h: box.h, vnet: box.vnet })
-})
+}
+/** 점 편집 중 모든 점 고르기(⌘A) */
+function selectAllVpts() {
+  const ve = vedit.value
+  const n = ve ? store.node(ve.sid, ve.id) : undefined
+  if (!ve || !n) return
+  const all: VKey[] = n.type === 'vector' ? (n.vnet ?? []).flatMap((p, pi) => p.pts.map((_, qi) => [pi, qi] as VKey)) : shapeCorners(n).map((_, qi) => [-1, qi] as VKey)
+  ve.pts = all
+  ve.segs = []
+  ve.sel = all[0] ?? null
+}
+/** 점 편집 중 빈 곳 끌기: 상자 안 점 고르기(⇧ 면 더하기) — 화면(캔버스 요소) 좌표 */
+const vmarq = ref<{ x: number; y: number; w: number; h: number } | null>(null)
 /**
  * 모서리 원형 손잡이(피그마와 같아요): 고른 사각형 · 프레임 · 이미지에 마우스를 올리면 모서리 안쪽에 — 끌면 Corner radius,
  * ⌥ 를 누르고 끌면 그 모서리만. 끄는 동안 'Radius n' 표시, 실행 취소 한 번
@@ -548,7 +579,7 @@ function beginGroupDrag(e: PointerEvent, ve: VEdit, s: { id: string }, n: LayerN
     const corners = shapeCorners(n)
     const rads = n.type === 'rect' ? radiiOf(n.style) : []
     const order = [at[1], ...keys.filter((k) => k[0] < 0 && k[1] !== at[1]).map((k) => k[1])]
-    const virtual = order.map((qi) => ({ cx: corners[qi]?.[0] ?? 0, cy: corners[qi]?.[1] ?? 0, r: rads[qi] ?? 0 }))
+    const virtual = order.map((qi) => ({ cx: corners[qi]?.[0] ?? 0, cy: corners[qi]?.[1] ?? 0, r: rads[qi] ?? 0, qi }))
     drag = { kind: 'vpt', sid: ve.sid, id: ve.id, pi: -1, qi: at[1], part: 'a', sx: e.clientX, sy: e.clientY, abs0: [], inv: invert(worldMat(sc, ve.id)), x0: n.x, y0: n.y, before: store.begin(ve.sid), moved: false, virtual, collapse }
     return
   }
@@ -687,8 +718,12 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     return
   }
   if (tool.value === 'pen') { penDown(e, screen); return }
-  // 점 편집 중에 다른 곳을 누르면 끝내요
-  if (vedit.value) vedit.value = null
+  // 점 편집 중 빈 곳을 누르면(피그마와 같아요): 편집은 그대로 — 끌면 상자 안 점 고르기, 그냥 누르면 고른 점 풀기. 끝내기는 Esc · Enter
+  if (vedit.value) {
+    const box = el.value!.getBoundingClientRect()
+    drag = { kind: 'vmarquee', x0: e.clientX - box.left, y0: e.clientY - box.top, base: e.shiftKey ? vselOf(vedit.value) : [], moved: false }
+    return
+  }
   const t = drawType(tool.value)
   // 빈 캔버스에 프레임 도구 → 새 화면
   if (!screen) {
@@ -964,6 +999,11 @@ function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: num
 }
 
 function move(e: PointerEvent) {
+  // ⌥ 를 누른 채 옮기기 · 크기 바꾸기(⇧⌥ 가운데 기준 포함): 포인터 아래 레이어 · 부모와의 간격을 계속 보여요
+  if (drag && (drag.kind === 'layers' || drag.kind === 'resize' || drag.kind === 'resizeMany')) {
+    if (altOn.value !== e.altKey) altOn.value = e.altKey
+    dragHover.value = e.altKey ? dragTarget(e, drag.sid) : null
+  }
   if (!drag) {
     trackHover(e)
     if (pen.value) {
@@ -987,6 +1027,23 @@ function move(e: PointerEvent) {
     pn.hover = [hx, hy]
     return
   }
+  if (drag.kind === 'vmarquee') {
+    const box = el.value!.getBoundingClientRect()
+    const x = e.clientX - box.left, y = e.clientY - box.top
+    if (!drag.moved && Math.abs(x - drag.x0) + Math.abs(y - drag.y0) < 4) return
+    drag.moved = true
+    const r = { x: Math.min(x, drag.x0), y: Math.min(y, drag.y0), w: Math.abs(x - drag.x0), h: Math.abs(y - drag.y0) }
+    vmarq.value = r
+    const ve = vedit.value
+    if (!ve) return
+    const inside = (vhandles.value ?? []).filter((q) => q.a.x >= r.x && q.a.x <= r.x + r.w && q.a.y >= r.y && q.a.y <= r.y + r.h).map((q) => [q.pi, q.qi] as VKey)
+    const all = new Map<string, VKey>()
+    for (const k of [...drag.base, ...inside]) all.set(vk(k), k)
+    ve.pts = [...all.values()]
+    ve.segs = []
+    ve.sel = ve.pts[ve.pts.length - 1] ?? null
+    return
+  }
   if (drag.kind === 'vpt') {
     const dx = (e.clientX - drag.sx) / vp.value.zoom, dy = (e.clientY - drag.sy) / vp.value.zoom
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 1 / vp.value.zoom) return
@@ -995,7 +1052,9 @@ function move(e: PointerEvent) {
     if (drag.virtual) {
       const vts = drag.virtual
       drag.virtual = undefined
-      store.flatten(drag.sid, [drag.id])
+      // 사각형: 꼭짓점 네 개 그대로 벡터로(모서리 둥글기는 꼭짓점 r 로 — 피그마와 같아요). 다른 도형: 곡선 점으로 바꿔요
+      const corner = store.toCornerVector(drag.sid, drag.id)
+      if (!corner) store.flatten(drag.sid, [drag.id])
       const n2 = store.node(drag.sid, drag.id)
       if (!n2?.vnet) return
       drag.abs0 = denorm(n2.vnet, n2.w, n2.h)
@@ -1003,7 +1062,8 @@ function move(e: PointerEvent) {
       const near = (q: { x: number; y: number }, vt: { cx: number; cy: number; r: number }) => Math.abs(q.x - vt.cx) <= vt.r + 0.5 && Math.abs(q.y - vt.cy) <= vt.r + 0.5
       const g: [number, number][] = []
       // 누른 꼭짓점(맨 앞)의 점이 먼저 오게
-      for (const vt of vts) drag.abs0.forEach((p, pi) => p.pts.forEach((q, qi) => { if (near(q, vt) && !g.some((k) => k[0] === pi && k[1] === qi)) g.push([pi, qi]) }))
+      if (corner) for (const vt of vts) g.push([0, vt.qi])
+      else for (const vt of vts) drag.abs0.forEach((p, pi) => p.pts.forEach((q, qi) => { if (near(q, vt) && !g.some((k) => k[0] === pi && k[1] === qi)) g.push([pi, qi]) }))
       if (!g.length) return
       drag.group = g
       drag.pi = g[0]![0]; drag.qi = g[0]![1]
@@ -1273,10 +1333,13 @@ function move(e: PointerEvent) {
     if (ww < 0) { x0 += ww; ww = -ww }
     if (hh < 0) { y0 += hh; hh = -hh }
     draft.value = { x: Math.round(s.x + x0), y: Math.round(s.y + y0), width: Math.round(ww), height: Math.round(hh) }
+    draftType.value = drag.type
   }
 }
 
 function end(e: PointerEvent) {
+  dragHover.value = null
+  draftType.value = null
   if (!drag) return
   const d = drag
   drag = null
@@ -1327,6 +1390,7 @@ function end(e: PointerEvent) {
     if (s) emit('resize-screen', d.id, { x: s.x, y: s.y, width: s.width, height: s.height }, true)
   }
   if (d.kind === 'marquee') { draft.value = null; marqueeOn.value = false; if (!d.moved) toggleMulti(d.sid) }
+  if (d.kind === 'vmarquee') { vmarq.value = null; if (!d.moved && !d.base.length && vedit.value) { vedit.value.pts = []; vedit.value.segs = []; vedit.value.sel = null } }
   if (d.kind === 'marqueeCanvas') { draft.value = null; marqueeOn.value = false; if (!d.moved && !d.baseScreens.length && !d.baseLayers.length) { store.selectScreen(null); multi.value = [] } }
   if (d.kind === 'screens' && d.moved && d.dup) {
     const items = d.ids.map((id, i) => ({ id, x: mixGhosts.value[i]?.x ?? d.orig[id]!.x, y: mixGhosts.value[i]?.y ?? d.orig[id]!.y }))
@@ -1601,6 +1665,17 @@ function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Backspace' || e.key === 'Delete') { pen.value.pts.pop(); if (!pen.value.pts.length) pen.value = null }
     else finishPen(false)
     return
+  }
+  // 점 편집 중(피그마와 같아요): ⌘A 모든 점, 방향키 고른 점 1 씩(⇧ 10)
+  if (vedit.value) {
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyA') { e.preventDefault(); selectAllVpts(); return }
+    const ar = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[e.key]
+    if (ar && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault()
+      const k = e.shiftKey ? 10 : 1
+      if (vselOf(vedit.value).length) moveVsel({ dx: ar[0] * k, dy: ar[1] * k })
+      return
+    }
   }
   // 점 편집 중: Enter · Esc 끝내기, Backspace 고른 점 지우기
   if (vedit.value && ['Enter', 'Escape', 'Backspace', 'Delete'].includes(e.key)) {
@@ -2066,13 +2141,20 @@ const hoverOutline = computed(() => {
   const r = n.type === 'ellipse' ? '50%' : rv.some(Boolean) ? rv.map((x) => x * z + 'px').join(' ') : undefined
   return { frame: null, comp: n.type === 'instance', style: { ...rbox(g), borderRadius: r } }
 })
-/** 마우스를 올린 것이 글자 레이어면: 상자 대신 줄마다 기준선 밑줄 2px(피그마와 같아요). 프레임 · 그룹 안 글자는 ⌘ 를 눌러야 글자가 잡혀요 */
+/** 마우스를 올린 것이 일반 글자 레이어면(그룹 · 오토 레이아웃 안이 아니면): 상자 대신 줄마다 기준선 밑줄 2px(피그마와 같아요) */
 const hoverTextLines = computed<MarkBox[]>(() => {
   void tick.value
   void vp.value
   const h = hover.value
   const host = el.value
-  if (HOVER_BOX_ONLY || !h?.id || !hoverOutline.value || !host || store.node(h.sid, h.id)?.type !== 'text') return []
+  if (!h?.id || !hoverOutline.value || !host) return []
+  const d = store.doc(h.sid)
+  const n = d.nodes[h.id]
+  if (n?.type !== 'text') return []
+  // 그룹 · 오토 레이아웃 안 글자는 상자 그대로, 화면 · 일반 프레임에 바로 놓인 글자만 밑줄(사용자 요청 2026-11-25)
+  const p = n.parentId ? d.nodes[n.parentId] : null
+  if (p && (isGroupNode(p) || p.style.layout || p.type === 'boolean')) return []
+  if (!p && d.frame?.layout) return []
   const t = host.querySelector(`.world [data-screen="${h.sid}"] [data-layer="${h.id}"] .txt`)
   return t ? baselineLines(t, 2, host.getBoundingClientRect()) : []
 })
@@ -2236,11 +2318,26 @@ const bandLabel = computed(() => {
   const r = el.value?.getBoundingClientRect()
   return b && r ? { left: b.x - r.left + 'px', top: b.y - r.top - 18 + 'px' } : null
 })
+/** ⌥ 를 누른 채 옮기거나 크기를 바꾸는 동안 잴 상대(피그마와 같아요): 포인터 아래 고르지 않은 레이어, 없으면 고른 것의 부모(프레임) */
+const dragHover = ref<{ sid: string; id: string | null } | null>(null)
+function dragTarget(e: PointerEvent, sid: string): { sid: string; id: string | null } {
+  const d = store.doc(sid)
+  const sel = store.layerIds.value
+  const mine = (id: string) => sel.some((k) => k === id || descendants(d, k).includes(id))
+  for (const node of document.elementsFromPoint(e.clientX, e.clientY)) {
+    const lay = (node as HTMLElement).closest?.('[data-layer]') as HTMLElement | null
+    const scr = lay?.closest('[data-screen]') as HTMLElement | null
+    const id = lay?.dataset.layer
+    if (id && scr?.dataset.screen === sid && d.nodes[id] && !mine(id)) return { sid, id }
+  }
+  const parent = sel.length ? d.nodes[sel[0]!]?.parentId ?? null : null
+  return { sid, id: parent }
+}
 const measure = computed<Guides | null>(() => {
   void tick.value
   const s = selScreen.value
-  const h = hover.value
-  if (!altOn.value || !h || guides.value || !s || store.editing.value) return null
+  const h = dragHover.value ?? hover.value
+  if (!altOn.value || !h || (guides.value && !dragHover.value) || !s || store.editing.value) return null
   const hs = props.screens.find((v) => v.id === h.sid)
   if (!hs) return null
   // 고른 것: 레이어들, 없으면 고른 화면(프레임)들 — 프레임끼리 · 캔버스 위에서도 재요
@@ -2268,7 +2365,8 @@ const measure = computed<Guides | null>(() => {
   }
   return target ? measureGuides(union(sel), target) : null
 })
-const shown = computed(() => guides.value ?? measure.value)
+// ⌥ 를 누른 채 끄는 중이면 붙는 선 대신 간격 재기를 보여요
+const shown = computed(() => (dragHover.value && measure.value ? measure.value : guides.value ?? measure.value))
 const sx = (v: number) => v * vp.value.zoom + vp.value.x
 const sy = (v: number) => v * vp.value.zoom + vp.value.y
 /** 간격 표시 양 끝 눈금 */
@@ -2491,7 +2589,10 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       </div>
       <!-- 파일 끌어 놓을 자리 -->
       <div v-if="dropAt" class="drop-at" :class="{ line: dropLine }" :style="{ left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
- <div v-if="draft && !marqueeOn" class="draft" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }" />
+ <div v-if="draft && !marqueeOn" :class="['draft', { shape: !!draftShape }]" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }">
+        <!-- 도형은 그리는 동안에도 그 모양 · 기본 칠 그대로 -->
+        <svg v-if="draftShape" class="draft-svg" :width="draft.width" :height="draft.height" aria-hidden="true"><path :d="draftShape.d" :fill="draftShape.fill" /></svg>
+      </div>
     </div>
 
     <template v-if="pxOn"><canvas ref="pxDif" class="pxgrid dif" :style="{ opacity: pxAlpha }" aria-hidden="true" /><canvas ref="pxMid" class="pxgrid mid" :style="{ opacity: pxAlpha }" aria-hidden="true" /></template>
@@ -2636,6 +2737,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <path v-if="vshape?.filled" :d="vshape.d" :transform="vshape.tf" class="vhatch" />
         <path v-if="vshape" :d="vshape.d" :transform="vshape.tf" class="vline" vector-effect="non-scaling-stroke" />
         <polygon v-if="vbox" :points="vbox" class="vbox" />
+        <rect v-if="vmarq" :x="vmarq.x" :y="vmarq.y" :width="vmarq.w" :height="vmarq.h" class="vmarq" />
         <!-- 선 손잡이: 보이지 않는 굵은 선(누르기 쉬움) · 고른 선은 파란 2px -->
         <g v-for="g in vsegs ?? []" :key="'s' + g.pi + ':' + g.qi" :class="['vseg', { on: segOn(g.pi, g.qi) }]">
           <path :d="g.d" class="vs-line" />
@@ -2679,6 +2781,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 .fsmb { position: absolute; inset: 0; }
 .frame-sqk { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
 .draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
+.draft.shape { background: none; }
+.draft-svg { position: absolute; inset: 0; overflow: visible; }
 .overlay { position: absolute; inset: 0; pointer-events: none; }
 /* 픽셀 격자 두 겹(줌 400–800% 사이는 opacity 로 서서히):
    1) 흰 선 5% difference — 밝은 바탕은 살짝 어둡게, 어두운 바탕은 살짝 밝게
@@ -2757,6 +2861,8 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .pen .an.cur { fill: var(--iris-select); }
 .vedit .an, .vedit .hd { pointer-events: auto; cursor: default; }
 .vedit .an.on { fill: var(--iris-select); }
+/* 점 고르기 상자(빈 곳 끌기) */
+.vedit .vmarq { fill: color-mix(in srgb, var(--iris-select) 8%, transparent); stroke: var(--iris-select); stroke-width: 1; pointer-events: none; }
 /* 선 손잡이: 누를 자리는 12px 굵기(투명), 마우스를 올리면 파란 1px, 고르면 파란 2px(피그마와 같아요) */
 .vedit .vs-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: default; }
 .vedit .vs-line { fill: none; stroke: transparent; stroke-width: 1; pointer-events: none; }
