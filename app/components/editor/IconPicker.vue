@@ -46,7 +46,7 @@ function pick(n: string) { emit('update:modelValue', n); emit('close') }
 
 <template>
   <Teleport to="body">
-    <div ref="el" class="sq float ip editor" role="dialog" :aria-label="tr('Icons')" :style="pos">
+    <div ref="el" v-front class="sq float ip editor" role="dialog" :aria-label="tr('Icons')" :style="pos">
       <div class="ip-h">
         <h3 class="ip-t">{{ tr('Icons') }}</h3>
         <button type="button" class="sq ib s24" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>

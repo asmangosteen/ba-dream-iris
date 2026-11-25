@@ -2,10 +2,11 @@ import type { InjectionKey, Ref } from 'vue'
 import { relayout as layoutDoc, constrain, boxes0 } from './layout'
 import { guessAxis, currentGap, rowsOf } from './geom'
 import { shapeVnet } from './vector'
+import { booleanLoops, flattenLoops, flattenable, loopsVnet } from './boolean'
 import { scaledStyle } from './scale'
 import { newSmoothing } from './prefs'
 import { absPos, bindLiteral, descendants, isContainer, isGroupNode, migrate, newId, normAngle, siblings, DEFAULT_STYLE, TYPE_LABEL, type BindKey, type ExportSetting, type LayerDoc, type LayerNode, type LayerStyle, type LayerType } from './schema'
-import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, parentMatrix, spaceRects, tidyRects, type AlignKind, type Axis, type Rect } from './geom'
+import { aabb, alignRects, applyVec, distributeRects, invert, layerMatrix, localMatrix, parentMatrix, spaceRects, tidyRects, type AlignKind, type Axis, type Rect } from './geom'
 import type { ScreenRow } from '~/composables/useEditor'
 
 /**
@@ -74,11 +75,11 @@ export function createLayerStore(opts: {
   const flushAll = () => Promise.all([...pending].map(flush))
 
   /** 연결은 그대로인데 값이 바뀐 키(직접 고침 · 끌어서 옮기기 · 크기 바꾸기)는 연결을 풉니다 */
-  function detachEdited(sid: string, before: string) {
+  function detachEdited(sid: string, before: string | LayerDoc) {
     const d = doc(sid)
     const bound = Object.values(d.nodes).filter((n) => n.style.vars)
     if (!bound.length) return
-    const prev = JSON.parse(before) as LayerDoc
+    const prev = typeof before === 'string' ? (JSON.parse(before) as LayerDoc) : before
     for (const n of bound) {
       const p = prev.nodes[n.id]
       if (!p) continue // 새로 생긴 레이어(붙여넣기 등)는 연결을 그대로
@@ -97,7 +98,10 @@ export function createLayerStore(opts: {
     push({ screenId: sid, before, after })
     scheduleSave(sid)
   }
+  /** 묶음(batch) 중이면 기록을 모아 두었다가 끝에 실행취소 한 번으로 */
+  let batching: Entry[] | null = null
   function push(e: Entry) {
+    if (batching) { batching.push(e); return }
     undoStack.push(e)
     if (undoStack.length > 200) undoStack.shift()
     redoStack.length = 0
@@ -114,15 +118,18 @@ export function createLayerStore(opts: {
    * hold 를 여러 번 불러도 처음 모습이 기준이에요
    */
   const held = new Map<string, string>()
-  function hold(sid: string) { if (!held.has(sid)) held.set(sid, snap(sid)) }
+  /** 잡아 두기 시작 모습(읽은 것) — 끄는 동안에도 값이 바뀐 연결을 곧바로 풀려고(Fill 행이 토큰 → 색 코드로 실시간) */
+  const heldDoc = new Map<string, LayerDoc>()
+  function hold(sid: string) { if (!held.has(sid)) { const s = snap(sid); held.set(sid, s); heldDoc.set(sid, JSON.parse(s)) } }
   function release(sid: string) {
     const before = held.get(sid)
     if (before === undefined) return
     held.delete(sid)
+    heldDoc.delete(sid)
     commit(sid, before)
   }
   function mutate<T>(sid: string, fn: (d: LayerDoc) => T): T {
-    if (held.has(sid)) { const out = fn(doc(sid)); layoutDoc(doc(sid)); return out }
+    if (held.has(sid)) { const out = fn(doc(sid)); layoutDoc(doc(sid)); const h = heldDoc.get(sid); if (h) detachEdited(sid, h); return out }
     const before = snap(sid)
     const out = fn(doc(sid))
     layoutDoc(doc(sid)) // 오토 레이아웃은 바뀔 때마다 다시 계산
@@ -147,12 +154,30 @@ export function createLayerStore(opts: {
     layerIds.value = layerIds.value.filter((id) => docs[sid]!.nodes[id])
     scheduleSave(sid)
   }
+  const undoEntry = (e: Entry) => { if (e.kind === 'action') e.undo(); else { restore(e.screenId, e.before); screenId.value = e.screenId } }
+  const redoEntry = (e: Entry) => { if (e.kind === 'action') e.redo(); else { restore(e.screenId, e.after); screenId.value = e.screenId } }
+  /**
+   * 여러 화면 · 여러 번의 변경을 실행취소 한 번으로 묶어요(프레임 여러 개를 한꺼번에 고칠 때).
+   * 안쪽에서 또 부르면 바깥 묶음에 그대로 들어가요
+   */
+  function batch<T>(fn: () => T): T {
+    if (batching) return fn()
+    const list: Entry[] = []
+    batching = list
+    try { return fn() } finally {
+      batching = null
+      if (list.length === 1) push(list[0]!)
+      else if (list.length > 1) {
+        const sel = screenId.value
+        push({ kind: 'action', screenId: sel, undo: () => { for (const e of [...list].reverse()) undoEntry(e); screenId.value = sel }, redo: () => { for (const e of list) redoEntry(e); screenId.value = sel } })
+      }
+    }
+  }
   function undo() {
     const e = undoStack.pop()
     if (!e) return
     redoStack.push(e)
-    if (e.kind === 'action') e.undo()
-    else { restore(e.screenId, e.before); screenId.value = e.screenId }
+    undoEntry(e)
     canUndo.value = !!undoStack.length
     canRedo.value = true
   }
@@ -470,18 +495,53 @@ export function createLayerStore(opts: {
     })
     layerIds.value = [gid]
   }
-  /** ⌘E 평탄화: 도형을 점 편집 가능한 벡터로 */
+  /**
+   * ⌘E 평탄화(피그마와 같아요): 점 편집할 수 있는 벡터 하나로.
+   * - 도형 하나: 그 자리에서 벡터로(크기 · 돌리기 그대로)
+   * - 불리언 · 그룹: 계산한 결과 모양 하나로(안쪽 도형은 없어져요)
+   * - 여럿: 같은 부모 안 것들을 합친 벡터 하나로(맨 위 자리, 칠 · 선은 맨 아래 것)
+   */
   function flatten(sid: string, ids: string[]) {
+    const d0 = doc(sid)
+    const top = topIds(sid, ids).filter((id) => flattenable(d0.nodes[id]))
+    if (!top.length) return
+    const list = top.length > 1 ? orderedSiblings(d0, top) : top
+    if (list.length === 1 && d0.nodes[list[0]!]!.type === 'vector') return
+    const keepStyle = (n: LayerNode) => { const k = { ...n.style }; for (const key of ['radius', 'radii', 'sides', 'points', 'inner', 'smoothing', 'layout', 'clip', 'grids'] as const) delete k[key]; return k }
+    const drop = (d: LayerDoc, id: string) => { for (const c of descendants(d, id)) delete d.nodes[c] }
     mutate(sid, (d) => {
-      for (const id of ids) {
-        const n = d.nodes[id]
-        if (!n || n.type === 'vector' || n.type === 'text' || n.type === 'image' || n.type === 'instance' || isContainer(n)) continue
-        const vnet = shapeVnet(n)
-        const keep = { ...n.style }
-        for (const k of ['radius', 'radii', 'sides', 'points', 'inner'] as const) delete keep[k]
-        Object.assign(n, { type: 'vector', vnet, style: keep })
-        delete n.pts
+      const one = list.length === 1 ? d.nodes[list[0]!]! : null
+      if (one && one.type !== 'boolean' && !isContainer(one)) {
+        // 도형 하나: 상자 · 돌리기는 그대로
+        const vnet = shapeVnet(one)
+        Object.assign(one, { type: 'vector', vnet, closed: vnet.some((p) => p.closed) || undefined, style: keepStyle(one) })
+        delete one.pts
+        return
       }
+      if (one?.type === 'boolean') {
+        // 불리언: 결과 모양을 그 상자 안 벡터로(돌리기 그대로)
+        const r = loopsVnet(booleanLoops(d, one))
+        if (!r) return
+        for (const c of one.children ?? []) drop(d, c)
+        const M = localMatrix(one, one.w, one.h)
+        const o = { x: M.a * r.x + M.c * r.y + M.e, y: M.b * r.x + M.d * r.y + M.f }
+        Object.assign(one, { type: 'vector', vnet: r.vnet, closed: true, w: r.w, h: r.h, x: o.x - r.w / 2 + (M.a * r.w) / 2 + (M.c * r.h) / 2, y: o.y - r.h / 2 + (M.b * r.w) / 2 + (M.d * r.h) / 2, style: keepStyle(one) })
+        delete one.children; delete one.op; delete one.evenodd
+        return
+      }
+      // 그룹 · 여럿: 부모 안쪽 좌표로 모아서 새 벡터 하나
+      const ns = list.map((id) => d.nodes[id]!)
+      const r = loopsVnet(flattenLoops(d, ns))
+      if (!r) return
+      const parentId = ns[0]!.parentId
+      const base = one ? (one.children ?? []).map((c) => d.nodes[c]).find((c): c is LayerNode => !!c && !c.hidden) ?? one : ns[0]!
+      const sib = siblings(d, parentId)
+      const at = Math.max(...list.map((k) => sib.indexOf(k)))
+      const id = newId()
+      d.nodes[id] = { id, type: 'vector', name: one ? one.name : nextName(d, 'vector'), parentId, x: r.x, y: r.y, w: r.w, h: r.h, vnet: r.vnet, closed: r.vnet.every((p) => p.closed) || undefined, style: keepStyle(base), ...(one?.absolute ? { absolute: true } : {}) }
+      sib.splice(at + 1, 0, id)
+      for (const n of ns) { sib.splice(sib.indexOf(n.id), 1); drop(d, n.id) }
+      layerIds.value = [id]
     })
   }
   /** ⌃⌘M 마스크로 쓰기: 고른 것 중 맨 아래가 마스크, 모두 'Mask group' 으로. 마스크 하나만 고르고 다시 누르면 풀어요 */
@@ -929,7 +989,7 @@ export function createLayerStore(opts: {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
-    selectScreen, selectLayer, add, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    selectScreen, selectLayer, add, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

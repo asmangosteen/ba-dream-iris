@@ -15,7 +15,8 @@ import PaintPopover from '~/components/editor/PaintPopover.vue'
  * 견본을 누르면 피그마 같은 칠 편집 창(색 판 · 그라디언트 · 이미지)이 떠요.
  * frame: 화면(프레임) 자체의 모양(doc.frame)을 고쳐요 — 칠이 비어 있으면 흰 바탕, '' 이면 칠 없음
  */
-const props = defineProps<{ sid: string; ids: string[]; kind: 'fill' | 'stroke' | 'text'; title: string; frame?: boolean }>()
+/** sids: 프레임 여러 개를 함께 고칠 때(frame) — 값이 다르면 Mixed, 고치면 모두에 */
+const props = defineProps<{ sid: string; ids: string[]; kind: 'fill' | 'stroke' | 'text'; title: string; frame?: boolean; sids?: string[] }>()
 const store = useLayerStore()
 const imageSrc = useImageSrc()
 
@@ -23,7 +24,12 @@ const base = computed(() => (props.kind === 'fill' ? 'fill' : props.kind === 'st
 const extraKey = computed(() => (props.kind === 'stroke' ? 'strokes' : 'fills') as 'fills' | 'strokes')
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
 const look = computed<LayerStyle>(() => store.doc(props.sid).frame ?? {})
-const styles = computed<LayerStyle[]>(() => (props.frame ? [look.value] : nodes.value.map((n) => n.style)))
+const frameIds = computed(() => (props.sids?.length ? props.sids : [props.sid]))
+const styles = computed<LayerStyle[]>(() => (props.frame ? frameIds.value.map((id) => store.doc(id).frame ?? {}) : nodes.value.map((n) => n.style)))
+/** 프레임 모양 고치기: 고른 프레임 모두에(실행취소 한 번) */
+function frameAll(patch: Partial<LayerStyle> | ((s: LayerStyle) => Partial<LayerStyle>), vars?: Record<string, string | null>) {
+  store.batch(() => { for (const id of frameIds.value) store.frameStyle(id, typeof patch === 'function' ? patch(store.doc(id).frame ?? {}) : patch, vars) })
+}
 const firstStyle = computed<LayerStyle | undefined>(() => styles.value[0])
 const baseVal = computed(() => {
   const s = firstStyle.value
@@ -34,17 +40,25 @@ const baseVal = computed(() => {
 const extras = computed<Paint[]>(() => firstStyle.value?.[extraKey.value] ?? [])
 const mixed = computed(() => styles.value.some((s) => JSON.stringify([s[base.value], s[extraKey.value]]) !== JSON.stringify([firstStyle.value?.[base.value], firstStyle.value?.[extraKey.value]])))
 /** 줄: 위(맨 위 칠)부터. -1 은 바탕 칠 */
-const rows = computed(() => [...extras.value.map((_, i) => i).reverse(), ...(baseVal.value ? [-1] : [])])
+const rows = computed(() => (mixed.value ? [] : [...extras.value.map((_, i) => i).reverse(), ...(baseVal.value ? [-1] : [])]))
 const types = computed<Paint['type'][]>(() => (props.kind === 'stroke' ? ['solid'] : ['solid', 'linear', 'radial', 'angular', 'image']))
 const TYPE_NAME: Record<Paint['type'], string> = { solid: 'Solid', linear: 'Linear', radial: 'Radial', angular: 'Angular', image: 'Image' }
 
 function patchAll(fn: (s: LayerStyle) => Partial<LayerStyle>, vars?: Record<string, string | null>) {
-  if (props.frame) store.frameStyle(props.sid, fn(look.value), vars)
+  if (props.frame) frameAll(fn, vars)
   else store.update(props.sid, props.ids, (n) => ({ style: { ...n.style, ...fn(n.style) } }))
 }
 const setExtras = (fn: (list: Paint[]) => Paint[]) => patchAll((s) => { const l = fn([...(s[extraKey.value] ?? [])]); return { [extraKey.value]: l.length ? l : undefined } })
 
 function add() {
+  // 여러 값(Mixed): 모두 같은 칠 하나로 바꿔요(피그마와 같아요)
+  if (mixed.value) {
+    const v = props.kind === 'stroke' ? '#000000' : props.kind === 'text' ? '#000000' : props.frame ? '#FFFFFF' : '#D9D9D9'
+    const unbound = (s: LayerStyle) => { const vars: Record<string, string> = { ...(s.vars as Record<string, string> | undefined) }; delete vars[base.value]; return Object.keys(vars).length ? vars : undefined }
+    if (props.frame) frameAll({ fill: v, fills: undefined }, { fill: null })
+    else patchAll((s) => ({ [base.value]: v, [extraKey.value]: undefined, vars: unbound(s), ...(props.kind === 'stroke' ? { strokeWidth: s.strokeWidth || 1 } : {}) }))
+    return
+  }
   if (!baseVal.value && !extras.value.length) {
     if (props.kind === 'stroke') patchAll((s) => ({ stroke: '#000000', strokeWidth: s.strokeWidth || 1 }))
     else patchAll(() => ({ [base.value]: props.kind === 'text' ? '#000000' : props.frame ? '#FFFFFF' : '#D9D9D9' }))
@@ -64,7 +78,7 @@ function remove(i: number) {
 function baseToExtra(change: (p: Paint) => Paint) {
   const c = baseVal.value
   if (!c) return
-  const p = change({ type: 'solid', color: hexOf(store.color(c) ?? c), opacity: alphaOf(store.color(c) ?? c) < 1 ? alphaOf(store.color(c) ?? c) : undefined })
+  const p = change({ type: 'solid', color: hexOf(store.color(c) ?? c), opacity: alphaOf(store.color(c) ?? c) < 1 ? alphaOf(store.color(c) ?? c) : undefined, ...(bound.value ? { token: bound.value } : {}) })
   if (props.frame) { patchAll((s) => ({ fill: '', fills: [p, ...(s.fills ?? [])] }), { fill: null }); return }
   patchAll((s) => {
     const vars = { ...s.vars }
@@ -76,7 +90,43 @@ function toggle(i: number) {
   if (i < 0) baseToExtra((p) => ({ ...p, visible: false }))
   else setExtras((l) => l.map((p, k) => (k === i ? { ...p, visible: p.visible === false ? undefined : false } : p)))
 }
-function setPaint(i: number, p: Paint) { setExtras((l) => l.map((x, k) => (k === i ? p : x))) }
+/** 덧붙인 단색의 색을 직접 바꾸면 토큰 연결은 풀려요 */
+function setPaint(i: number, p: Paint) {
+  setExtras((l) => l.map((x, k) => {
+    if (k !== i) return x
+    if (p.type === 'solid' && x.type === 'solid' && x.token && p.token === x.token && hexOf(p.color) !== hexOf(x.color)) { const { token: _t, ...rest } = p; return rest }
+    return p
+  }))
+}
+function bindExtra(i: number, t: CatalogToken) { const p = extras.value[i]; if (p?.type === 'solid' && t.color) setPaint(i, { ...p, color: hexOf(t.color), opacity: alphaOf(t.color) < 1 ? alphaOf(t.color) : p.opacity, token: t.id }) }
+function unbindExtra(i: number) { const p = extras.value[i]; if (p?.type === 'solid') { const { token: _t, ...rest } = p; setExtras((l) => l.map((x, k) => (k === i ? rest : x))) } }
+
+// --- 끌어서 순서 바꾸기(피그마와 같아요): 보이는 줄 순서(위 → 아래)로 옮겨요 ---
+const { box: dragBox, drag, start: dragStart, key: dragKey } = useRowDrag(reorder)
+function reorder(from: number, to: number) {
+  open.value = null
+  const order = moveItem(rows.value, from, to).reverse() // 아래 → 위
+  if (!order.includes(-1) || order[0] === -1) { setExtras(() => order.filter((i) => i >= 0).map((i) => extras.value[i]!)); return }
+  // 바탕 칠이 위로 올라갔어요: 모두 칠 목록으로 놓고 다시 나눠요
+  const c = store.color(baseVal.value) ?? baseVal.value ?? '#000000'
+  const basePaint: Paint = { type: 'solid', color: hexOf(c), opacity: alphaOf(c) < 1 ? alphaOf(c) : undefined, ...(bound.value ? { token: bound.value } : {}) }
+  applyList(order.map((i) => (i < 0 ? basePaint : extras.value[i]!)))
+}
+/** 아래 → 위 칠 목록을 바탕 칠 + 덧붙인 칠로: 맨 아래가 보이는 단색이면 바탕 칠(토큰도 다시 연결), 아니면 모두 덧붙인 칠 */
+function applyList(list: Paint[]) {
+  const b = list[0]
+  const solidB = b && b.type === 'solid' && b.visible !== false ? b : null
+  const ex = solidB ? list.slice(1) : list
+  const val = solidB ? withAlpha(solidB.color, solidB.opacity ?? 1) : undefined
+  const tok = solidB?.token
+  if (props.frame) { frameAll({ fill: val ?? '', fills: ex.length ? ex : undefined }, { fill: tok ?? null }); return }
+  patchAll((s) => {
+    const vars: Record<string, string> = { ...(s.vars as Record<string, string> | undefined) }
+    delete vars[base.value]
+    if (tok) vars[base.value] = tok
+    return { [base.value]: val, [extraKey.value]: ex.length ? ex : undefined, vars: Object.keys(vars).length ? vars : undefined }
+  })
+}
 
 // --- 색 ---
 function setBase(v: string) { patchAll(() => ({ [base.value]: v })) }
@@ -108,22 +158,34 @@ const bound = computed(() => {
   return c?.startsWith('token:') ? 'db:' + c.slice(6) : null
 })
 function pick(t: CatalogToken) {
-  if (props.frame) store.frameStyle(props.sid, { fill: t.color }, { fill: t.id })
+  if (props.frame) frameAll({ fill: t.color }, { fill: t.id })
   else store.bind(props.sid, props.ids, base.value, t.id, () => ({ style: { [base.value]: t.color } }))
 }
 function unbind() {
-  if (props.frame) store.frameStyle(props.sid, { fill: store.color(look.value.fill) ?? look.value.fill }, { fill: null })
+  if (props.frame) frameAll({ fill: store.color(look.value.fill) ?? look.value.fill }, { fill: null })
   else store.unbind(props.sid, props.ids, [base.value], (n) => ({ style: n.style[base.value]?.startsWith('token:') ? { [base.value]: store.color(n.style[base.value]) } : {} }))
 }
 function createdStyle(id: string) {
   const v = store.color(baseVal.value) ?? baseVal.value
-  if (props.frame) store.frameStyle(props.sid, { fill: v }, { fill: id })
+  if (props.frame) frameAll({ fill: v }, { fill: id })
   else store.bind(props.sid, props.ids, base.value, id, () => ({ style: { [base.value]: v } }))
 }
 
 // --- 칠 편집 창 ---
 const open = ref<number | null>(null)
+/** 칠 창을 Libraries 탭으로 열기(머리의 스타일 · 변수 버튼) */
+const libTab = ref(false)
 watch(() => props.ids.join() + props.sid, () => (open.value = null))
+watch(open, (v, old) => { if (v === null || (old !== null && v !== old)) libTab.value = false })
+const openAt = (i: number) => { libTab.value = false; open.value = open.value === i ? null : i }
+/** 스타일 · 변수 적용(피그마 Fill 머리의 ⁘): 칠이 없으면 하나 만들고, 바탕 칠(없으면 맨 위 칠)의 창을 Libraries 탭으로 */
+function openLibraries() {
+  if (!baseVal.value && !extras.value.length) add()
+  const i = baseVal.value ? -1 : extras.value.length - 1
+  if (i < -1 || (i >= 0 && !extras.value[i])) return
+  libTab.value = true
+  open.value = i
+}
 // 반응형: 칠 종류를 바꿔 줄이 새로 생겨도(바탕 → 덧붙인 칠) 창이 새 견본을 따라가요
 const anchors = shallowReactive(new Map<number, HTMLElement>())
 const anchorRef = (i: number) => (el: unknown) => { if (el) anchors.set(i, el as HTMLElement); else anchors.delete(i) }
@@ -180,20 +242,22 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 </script>
 
 <template>
-  <section class="s">
+  <section ref="dragBox" class="s drag-box">
     <div :class="['sec-h', 'h24', { empty: !rows.length && !mixed }]">
       <span>{{ tr(title) }}</span>
       <span class="acts">
         <!-- Create color style 은 뺐어요: 로컬 스타일은 고르는 목록에 나오지 않아요(디자인 시스템 변수만) -->
+        <button class="ib s24 styl" :aria-label="tr('Apply styles and variables')" :data-tip="tr('Apply styles and variables')" @click="openLibraries"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.25"><circle cx="5" cy="5" r="2" /><circle cx="11" cy="5" r="2" /><circle cx="5" cy="11" r="2" /><circle cx="11" cy="11" r="2" /></g></svg></button>
         <button class="ib s24" :aria-label="tr(`Add ${title.toLowerCase()}`)" :data-tip="tr(`Add ${title.toLowerCase()}`)" @click="add"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
     <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
-    <template v-for="i in rows" :key="i">
+    <template v-for="(i, vi) in rows" :key="i">
       <!-- 바탕 칠: [견본 + 값] · 👁 · − (피그마 Fill 행) -->
-      <div v-if="i < 0" class="prow">
+      <div v-if="i < 0" class="prow" data-drag-row :class="{ dragging: drag?.from === vi }">
+        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
         <div :class="['sq', 'fld', 'pf', { open: open === -1, bound: !!bound }]">
-          <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="tr(`Edit ${title.toLowerCase()} color`)" :aria-expanded="open === -1" @click="open = open === -1 ? null : -1" />
+          <button :ref="anchorRef(-1)" class="sq sq-clip swatch" :style="baseSwatch" :aria-label="tr(`Edit ${title.toLowerCase()} color`)" :aria-expanded="open === -1" @click="openAt(-1)" />
           <template v-if="!bound">
             <input :key="'h' + baseVal" class="hex" :value="colorLabel(store.color(baseVal) ?? '').split(' ')[0]!.replace('#', '')" :aria-label="tr(`${title} hex`)" spellcheck="false" @change="onBaseHex" @keydown="blur" @focus="sel">
             <TokenPicker :kinds="['color']" reveal :label="`${title} color`" @pick="pick" />
@@ -206,13 +270,18 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
         <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <!-- 덧붙인 칠 -->
-      <div v-else-if="extras[i]" class="prow" :class="{ off: extras[i]!.visible === false }">
-        <div :class="['sq', 'fld', 'pf', { open: open === i }]">
-          <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="tr(`Edit ${title.toLowerCase()}`)" :aria-expanded="open === i" @click="open = open === i ? null : i" />
-          <input v-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="tr(`${title} hex`)" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
-          <button v-else class="pname" @click="open = open === i ? null : i">{{ tr(TYPE_NAME[extras[i]!.type]) }}</button>
+      <div v-else-if="extras[i]" class="prow" data-drag-row :class="{ off: extras[i]!.visible === false, dragging: drag?.from === vi }">
+        <button v-if="rows.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, vi)" @keydown="dragKey($event, vi, rows.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
+        <div :class="['sq', 'fld', 'pf', { open: open === i, bound: !!(extras[i] as { token?: string }).token }]">
+          <button :ref="anchorRef(i)" class="sq sq-clip swatch" :style="swatch(extras[i]!)" :aria-label="tr(`Edit ${title.toLowerCase()}`)" :aria-expanded="open === i" @click="openAt(i)" />
+          <TokenPicker v-if="extras[i]!.type === 'solid' && (extras[i] as { token?: string }).token" :kinds="['color']" :bound="(extras[i] as { token?: string }).token" :label="`${title} color`" @pick="(t) => bindExtra(i, t)" @unbind="unbindExtra(i)" />
+          <input v-else-if="extras[i]!.type === 'solid'" :key="'h' + i + (extras[i] as { color: string }).color" class="hex" :value="hexOf((extras[i] as { color: string }).color).slice(1)" :aria-label="tr(`${title} hex`)" spellcheck="false" @change="onExtraHex(i, $event)" @keydown="blur" @focus="sel">
+          <button v-else class="pname" @click="openAt(i)">{{ tr(TYPE_NAME[extras[i]!.type]) }}</button>
+          <TokenPicker v-if="extras[i]!.type === 'solid' && !(extras[i] as { token?: string }).token" :kinds="['color']" reveal :label="`${title} color`" @pick="(t) => bindExtra(i, t)" />
+          <template v-if="!(extras[i] as { token?: string }).token">
           <span class="vsep" aria-hidden="true" />
           <span class="op"><input :key="'a' + i + extras[i]!.opacity" class="pct" :value="Math.round((extras[i]!.opacity ?? 1) * 100)" inputmode="numeric" :aria-label="tr(`${title} opacity`)" @change="onExtraAlpha(i, $event)" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
+          </template>
         </div>
         <button class="ib s24" :aria-label="extras[i]!.visible === false ? tr(`Show ${title.toLowerCase()}`) : tr(`Hide ${title.toLowerCase()}`)" :data-tip="extras[i]!.visible === false ? tr('Show') : tr('Hide')" @click="toggle(i)">
           <EditorIcon :name="extras[i]!.visible === false ? 'eye_off' : 'eye'" :size="16" />
@@ -220,18 +289,22 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
         <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" @click="remove(i)"><EditorIcon name="minus" :size="16" /></button>
       </div>
     </template>
+    <div v-if="drag" class="row-drop" :style="{ top: drag.y + 'px', left: drag.x + 'px', width: drag.w + 'px' }" />
     <PaintPopover
       v-if="open !== null && popPaint"
-      :key="open"
+      :key="String(open) + (libTab ? 'L' : '')"
       :anchor="popAnchor"
       :paint="popPaint"
       :types="types"
       :sid="sid"
-      :bindable="open === -1"
+      :sids="frame ? frameIds : undefined"
+      :bindable="open === -1 || popPaint.type === 'solid'"
+      :bound-id="open === -1 ? bound : popPaint.type === 'solid' ? popPaint.token ?? null : null"
+      :initial-tab="libTab ? 'libraries' : 'custom'"
       :title="title"
       @update="onPopUpdate"
       @type="onPopType"
-      @token="(t) => { pick(t); open = null }"
+      @token="(t) => (open === -1 ? pick(t) : open !== null && bindExtra(open, t))"
       @close="open = null"
     />
     <slot />

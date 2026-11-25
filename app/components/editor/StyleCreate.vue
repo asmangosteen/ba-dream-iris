@@ -91,7 +91,7 @@ async function save() {
   </button>
   <Teleport to="body">
     <!-- 피그마 팝오버(§9.1): 폭 240 · 머리 40(제목 + ✕, 아래 선) · 본문 안쪽 12 16 16 · 라벨 11/16 → 칸 28. body 로 옮겨져도 편집기 규칙을 받게 editor 클래스 -->
-    <div v-if="open" ref="pop" class="sq sc-pop editor" role="dialog" :aria-label="tr(label)" :style="pos" @keydown.esc.stop.prevent="close(true)">
+    <div v-if="open" ref="pop" v-front class="sq sc-pop editor" role="dialog" :aria-label="tr(label)" :style="pos" @keydown.esc.stop.prevent="close(true)">
       <div class="pop-h">
         <span class="pop-t">{{ tr(label) }}</span>
         <button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button>

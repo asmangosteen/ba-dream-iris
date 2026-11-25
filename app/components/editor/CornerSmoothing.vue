@@ -27,10 +27,13 @@ watch(() => props.anchor, () => nextTick(place))
 const v = computed(() => (props.value === 'Mixed' ? 0 : props.value))
 // 슬라이더 끌기: 누른 자리로 바로, 끄는 동안 기록 하나(start · end)
 const track = ref<HTMLElement | null>(null)
+const SNAP = 60
 function at(clientX: number) {
   const r = track.value?.getBoundingClientRect()
   if (!r) return
-  emit('update', Math.round(Math.max(0, Math.min(1, (clientX - r.left - 8) / Math.max(1, r.width - 16))) * 100))
+  const n = Math.round(Math.max(0, Math.min(1, (clientX - r.left - 8) / Math.max(1, r.width - 16))) * 100)
+  // 60%(iOS) 근처(±4)에서는 자석처럼 60 에 붙어요 — 끌 때만(키보드 · 직접 입력은 그대로)
+  emit('update', Math.abs(n - SNAP) <= 4 ? SNAP : n)
 }
 function down(e: PointerEvent) {
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -65,7 +68,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true)
 
 <template>
   <Teleport to="body">
-    <div ref="root" class="sq float cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
+    <div ref="root" v-front class="sq float cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
       <div class="cs-h">
         <span>{{ tr('Corner smoothing') }}</span>
         <button class="ib s24" :aria-label="tr('Close')" @click="emit('close')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /></svg></button>

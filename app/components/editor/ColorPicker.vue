@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { CatalogToken } from '~/canvas/tokens'
+import TokenPicker from '~/components/editor/TokenPicker.vue'
 import { fromRgba, hslToRgb, hsvToRgb, normHex, rgbToHsl, rgbToHsv, toRgba, type HSVA } from '~/canvas/color'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 
@@ -6,8 +8,9 @@ import EditorSelect from '~/components/editor/EditorSelect.vue'
  * 색 고르기 판(피그마와 같아요): 채도 · 밝기 판, 색상 · 투명도 막대, 스포이트, Hex · RGB · HSL · HSB 입력.
  * v-model 은 '#RRGGBB' 또는 '#RRGGBBAA'. 끄는 동안 start · end 를 알려서 바깥에서 실행취소를 한 번으로 묶어요
  */
-const props = defineProps<{ modelValue: string }>()
-const emit = defineEmits<{ 'update:modelValue': [v: string]; start: []; end: [] }>()
+/** tokens: 값 칸 안에 토큰(색 변수) 고르기 버튼(Fill 행처럼 마우스를 올리면 보여요) — 고르면 'token' 으로 알려요 */
+const props = defineProps<{ modelValue: string; tokens?: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [v: string]; start: []; end: []; token: [t: CatalogToken] }>()
 
 const hsv = ref<HSVA>(rgbToHsv(toRgba(props.modelValue)))
 let last = props.modelValue
@@ -138,7 +141,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
     </div>
     <div class="cp-row">
       <button v-if="canPick" class="ib s24" :aria-label="tr('Pick color from screen')" :data-tip="tr('Pick color from screen')" @click="eyedrop">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.2 2.6a1.9 1.9 0 0 1 2.7 2.7l-1.4 1.4.6.6-1 1-.6-.6-4.8 4.8H3.6v-2.1l4.8-4.8-.6-.6 1-1 .6.6z" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linejoin="round" /></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><path d="M6.95 5.45l3.6 3.6" /><path d="M7.95 6.45l2.6-2.6a1.13 1.13 0 0 1 1.6 1.6l-2.6 2.6" /><path d="M8.25 6.75l-5 5-.65 1.65 1.65-.65 5-5" /></g></svg>
       </button>
       <div class="cp-bars">
         <div class="bar hue" :style="{ backgroundImage: HUE_BG }" role="slider" tabindex="0" :aria-label="tr('Hue')" :aria-valuenow="Math.round(hsv.h)" aria-valuemin="0" aria-valuemax="360" @pointerdown.prevent="drag($event, 'hue')" @keydown="key($event, 'hue')">
@@ -150,7 +153,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         </div>
       </div>
     </div>
-    <!-- 값 줄: [형식 ▾] [Hex · RGB …] [불투명도 %] -->
+    <!-- 값 줄: [형식 ▾] [Hex · RGB … (토큰) | 불투명도 %] — 값과 불투명도는 Fill 행처럼 한 칸, 세로선으로 나눠요 -->
     <div class="cp-in">
       <EditorSelect :model-value="fmt" :options="FMT" ariaLabel="Color format" @update:model-value="(v) => (fmt = v as Fmt)" />
       <div :class="['sq', 'fld', 'vals', { parts: fmt !== 'hex' }]">
@@ -158,10 +161,10 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         <template v-else>
           <input v-for="(p, i) in parts" :key="fmt + i + p" class="part" :value="p" inputmode="numeric" :aria-label="tr((fmt === 'rgb' ? ['Red', 'Green', 'Blue'] : fmt === 'hsl' ? ['Hue', 'Saturation', 'Lightness'] : ['Hue', 'Saturation', 'Brightness'])[i]!)" @change="onPart(i, $event)" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
         </template>
+        <TokenPicker v-if="tokens" :kinds="['color']" reveal :label="tr('Color')" @pick="(t) => emit('token', t)" />
+        <span class="vsep" aria-hidden="true" />
+        <span class="op"><input :key="'a' + hsv.a" class="pct" :value="Math.round(hsv.a * 100)" inputmode="numeric" :aria-label="tr('Opacity')" @change="onAlpha" @keydown="blur" @focus="($event.target as HTMLInputElement).select()"><i class="unit">%</i></span>
       </div>
-      <label class="sq fld op">
-        <input :key="'a' + hsv.a" class="pct" :value="Math.round(hsv.a * 100)" inputmode="numeric" :aria-label="tr('Opacity')" @change="onAlpha" @keydown="blur" @focus="($event.target as HTMLInputElement).select()"><span class="unit">%</span>
-      </label>
     </div>
   </div>
 </template>
@@ -169,7 +172,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 <style scoped>
 /* 피그마 색 선택기(§9.2): SV 판 208 · 스포이드 24 + 막대 2개 · [형식 ▾ | 값 | %], 줄 사이 8(판 아래 12) */
 .cp { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
-.cp-sv { position: relative; aspect-ratio: 1; margin-bottom: var(--ref-spacing-02); border-radius: var(--ref-radius-03); cursor: crosshair; touch-action: none; outline: none; }
+.cp-sv { position: relative; aspect-ratio: 1; margin-bottom: var(--ref-spacing-02); border-radius: var(--ref-radius-03); cursor: default; touch-action: none; outline: none; }
 .cp-sv-bg { position: absolute; inset: 0; border-radius: inherit; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%); }
 .cp-sv:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 /* 조준점: 16 원 = 흰 테 4 + 가운데 지금 색, 그림자 .2 — 중심이 판 안쪽 8 안에서만 움직여요 */
@@ -177,7 +180,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .cp-row { display: flex; align-items: center; gap: var(--ref-spacing-06); }
 .s24 { width: 24px; height: 24px; }
 .cp-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-02) 0; }
-.bar { position: relative; height: 12px; border-radius: 999px; cursor: pointer; touch-action: none; outline: none; }
+.bar { position: relative; height: 12px; border-radius: 999px; cursor: default; touch-action: none; outline: none; }
 .bar:focus-visible { box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default); }
 .hue { box-shadow: inset 0 0 0 .5px rgb(0 0 0 / 10%); }
 .alpha { background: repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 8px 8px; }
@@ -186,18 +189,21 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .bar .knob { position: absolute; top: 50%; width: 16px; height: 16px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 .5px rgb(0 0 0 / 20%), 0 1px 3px rgb(0 0 0 / 20%); pointer-events: none; overflow: hidden; }
 .alpha .knob { background: repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px; }
 .alpha .knob b { position: absolute; inset: 0; }
-.cp-in { display: grid; grid-template-columns: 56px minmax(0, 1fr) 48px; gap: var(--ref-spacing-06); align-items: center; }
+.cp-in { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--ref-spacing-06); align-items: center; }
 .cp-in > * { min-width: 0; }
-.vals { gap: 0; }
-.vals.parts { padding: 0; }
+.vals { gap: var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); }
+.vals.parts { gap: 0; padding: 0; }
+/* 값 · 불투명도 사이 1px 칸막이(Fill 행과 같아요 — 위아래 1px 비움) · 불투명도 48(오른쪽 정렬, 안쪽 8) */
+.vsep { width: 1px; align-self: stretch; margin: 1px 0; background: var(--sys-color-common-white-emphasis); flex: none; }
+.op { flex: none; width: 48px; height: 100%; box-sizing: border-box; margin-left: calc(-1 * var(--ref-spacing-06)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.vals.parts .op { margin-left: 0; }
+.op .pct { flex: 1; width: auto; min-width: 0; padding: 0; text-align: right; }
+.op .unit { flex: none; font-style: normal; color: var(--sys-color-neutral-500); }
+.vals:has(input:focus) { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 /* RGB · HSL · HSB: 세 칸을 1px 칸막이(패널 바탕색)로 나눠요 — 숫자가 붙어 보이지 않게(피그마와 같아요) */
 .vals .part + .part { box-shadow: inset 1px 0 0 var(--sys-color-common-white-emphasis); }
 .vals input { padding: 0; }
 .vals .hex { flex: 1; min-width: 0; text-transform: uppercase; }
 .vals .part { flex: 1; min-width: 0; height: 100%; padding: 0; text-align: center; }
-/* 불투명도 48: 숫자는 오른쪽 정렬이라 왼쪽 안쪽은 4 만 */
-.op { gap: var(--ref-spacing-02); padding-left: var(--ref-spacing-04); }
-.op .pct { flex: 1; min-width: 0; width: auto; padding: 0; text-align: right; }
-.op .unit { flex: none; color: var(--sys-color-neutral-500); }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 </style>

@@ -6,6 +6,7 @@ import { useLayerStore } from '~/canvas/store'
 import { ellipsePath, radiiOf, rectPath, simplify, vectorPath } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
 import { nodePathIn } from '~/canvas/vector'
+import { booleanPath } from '~/canvas/boolean'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
@@ -346,12 +347,12 @@ const vbox = computed(() => {
   return [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]].map(([x, y]) => { const q = apply(m, x!, y!); return `${sx(q.x)},${sy(q.y)}` }).join(' ')
 })
 /** 선 · 벡터 · 다각형처럼 상자가 아닌 모양: 화면 좌표로 그릴 경로(모양선) */
-const OUTLINE_TYPES = new Set(['vector', 'path', 'line', 'polygon', 'star'])
+const OUTLINE_TYPES = new Set(['vector', 'path', 'line', 'polygon', 'star', 'boolean'])
 function outlineOf(sid: string, id: string) {
   const s = props.screens.find((v) => v.id === sid)
   const n = s ? store.node(sid, id) : undefined
   if (!s || !n || !OUTLINE_TYPES.has(n.type)) return null
-  const d = vectorPath(n.type, n.style, n.w, n.h, n.pts, n.closed, n.vnet)
+  const d = n.type === 'boolean' ? booleanPath(store.doc(sid), n) : vectorPath(n.type, n.style, n.w, n.h, n.pts, n.closed, n.vnet)
   if (!d) return null
   const m = worldMat(s, id), z = vp.value.zoom
   return { d, tf: `matrix(${m.a * z} ${m.b * z} ${m.c * z} ${m.d * z} ${m.e * z + vp.value.x} ${m.f * z + vp.value.y})` }

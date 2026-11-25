@@ -208,7 +208,7 @@ const isOn = (col: number, row: number) => {
 .s24 { width: 24px; height: 24px; }
 .ig.top { align-items: start; }
 /* 정렬판: 왼쪽 칸 폭 × 64(칸 두 줄 높이), 점 3 × 3. 고른 칸 · 올린 칸은 흐름 방향 막대 3개로 미리 보여요(피그마) */
-.align { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 64px; padding: 4px; box-sizing: border-box; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
+.align { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); width: 100%; height: 64px; padding: 4px; box-sizing: border-box; border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); }
 .dot { position: relative; display: grid; place-items: center; border-radius: 3px; min-width: 0; }
 .dot .pt { width: 3px; height: 3px; border-radius: 1px; background: var(--sys-color-neutral-400); }
 .dot .bars { display: none; gap: 2px; }

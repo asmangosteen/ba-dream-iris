@@ -9,19 +9,27 @@ import { EXPORT_FORMATS, EXPORT_SCALES, download, fileNameOf, isVectorFormat, no
  * Export 칸(피그마와 같아요): [배율 ▾] [형식 ▾] [⋯] [−] 줄을 여러 개, 아래 'Export 이름' 버튼과 Preview.
  * 화면(프레임)을 고르면 화면 설정(doc.exports), 레이어를 고르면 레이어 설정(node.exports). 설정은 파일에 함께 저장돼요
  */
-const props = defineProps<{ sid: string; ids: string[]; screen?: { id: string; name: string } | null }>()
+/** screens: 프레임을 여러 개 골랐을 때 — 설정은 모두에 한꺼번에, 내보내기도 모두(피그마 'Export 2 layers') */
+const props = defineProps<{ sid: string; ids: string[]; screen?: { id: string; name: string } | null; screens?: { id: string; name: string }[] }>()
 const store = useLayerStore()
 const emit = defineEmits<{ toast: [text: string] }>()
 const toast = (t: string) => emit('toast', t)
 
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
-const list = computed<ExportSetting[]>(() => (props.screen ? store.doc(props.sid).exports : nodes.value[0]?.exports) ?? [])
+const frames = computed(() => (props.screens && props.screens.length > 1 ? props.screens : props.screen ? [props.screen] : null))
+const allLists = computed(() => (frames.value ? frames.value.map((f) => store.doc(f.id).exports ?? []) : nodes.value.map((n) => n.exports ?? [])))
+/** 고른 것들의 내보내기 설정이 서로 다르면 Mixed — 목록 대신 안내, + 로 모두 같은 설정으로 */
+const mixed = computed(() => allLists.value.some((l) => JSON.stringify(l) !== JSON.stringify(allLists.value[0] ?? [])))
+const list = computed<ExportSetting[]>(() => (mixed.value ? [] : allLists.value[0] ?? []))
 function save(next: ExportSetting[]) {
-  if (props.screen) store.setScreenExports(props.sid, next.length ? next : undefined)
+  if (frames.value) { store.batch(() => { for (const f of frames.value!) store.setScreenExports(f.id, next.length ? next.map((e) => ({ ...e })) : undefined) }); return }
   else store.update(props.sid, props.ids, { exports: next.length ? next.map((e) => ({ ...e })) : undefined })
 }
 /** + : 처음은 1x PNG, 다음부터는 한 단계 큰 배율(피그마와 같아요) */
+/** 끌어서 순서 바꾸기 */
+const { box: dragBox, drag, start: dragStart, key: dragKey } = useRowDrag((from, to) => { menu.value = null; save(moveItem(list.value, from, to)) })
 function add() {
+  if (mixed.value) { save([{ scale: '1x', format: 'PNG' }]); return }
   const cur = list.value
   if (!cur.length) { save([{ scale: '1x', format: 'PNG' }]); return }
   const last = cur[cur.length - 1]!
@@ -52,13 +60,10 @@ function setSuffix(i: number, ev: Event) {
 function targets(): { el: HTMLElement; name: string }[] {
   const world = document.querySelector('.canvas .world')
   if (!world) return []
-  if (props.screen) {
-    const el = world.querySelector<HTMLElement>(`.frame[data-screen="${props.screen.id}"]`)
-    return el ? [{ el, name: props.screen.name }] : []
-  }
+  if (frames.value) return frames.value.map((f) => ({ el: world.querySelector<HTMLElement>(`.frame[data-screen="${f.id}"]`), name: f.name })).filter((t): t is { el: HTMLElement; name: string } => !!t.el)
   return nodes.value.map((n) => ({ el: world.querySelector<HTMLElement>(`[data-screen="${props.sid}"] [data-layer="${n.id}"]`), name: n.name })).filter((t): t is { el: HTMLElement; name: string } => !!t.el)
 }
-const label = computed(() => (props.screen ? props.screen.name : nodes.value.length > 1 ? tr('{n} layers', { n: nodes.value.length }) : nodes.value[0]?.name ?? ''))
+const label = computed(() => (frames.value && frames.value.length > 1 ? tr('{n} layers', { n: frames.value.length }) : props.screen ? props.screen.name : nodes.value.length > 1 ? tr('{n} layers', { n: nodes.value.length }) : nodes.value[0]?.name ?? ''))
 const busy = ref(false)
 async function run() {
   if (busy.value || !list.value.length) return
@@ -86,13 +91,15 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 </script>
 
 <template>
-  <section class="s ex">
-    <div :class="['sec-h', 'h24', { empty: !list.length }]">
+  <section ref="dragBox" class="s ex drag-box">
+    <div :class="['sec-h', 'h24', { empty: !list.length && !mixed }]">
       <span>{{ tr('Export') }}</span>
       <button class="ib s24" :aria-label="tr('Add export setting')" :title="tr('Add export setting')" @click="add"><EditorIcon name="plus" :size="16" /></button>
     </div>
+    <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed export settings') }}</p>
     <template v-if="list.length">
-      <div v-for="(e, i) in list" :key="i" class="erow">
+      <div v-for="(e, i) in list" :key="i" class="erow" data-drag-row :class="{ dragging: drag?.from === i }">
+        <button v-if="list.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, list.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
         <!-- 배율: 직접 입력 + ▾ 고르기. SVG · PDF 는 피그마처럼 배율 없음 -->
         <label :class="['sq', 'fld', 'esc', { off: isVectorFormat(e.format) }]">
           <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" :aria-label="tr('Export scale')" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
@@ -117,6 +124,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
         <span v-else class="tx-meta">{{ tr('Rendering…') }}</span>
       </div>
     </template>
+    <div v-if="drag" class="row-drop" :style="{ top: drag.y + 'px', left: drag.x + 'px', width: drag.w + 'px' }" />
   </section>
 </template>
 
@@ -149,4 +157,5 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 .pvt .rot { transform: rotate(-90deg); }
 .pv { display: grid; place-items: center; min-height: 80px; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
 .pv img { display: block; max-width: 100%; max-height: 240px; box-shadow: 0 0 0 1px var(--ref-color-gray-900-5); }
+.m0 { margin: 0; }
 </style>

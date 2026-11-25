@@ -1,4 +1,5 @@
 import type { AutoLayout, Constraints, LayerDoc, LayerNode } from './schema'
+import { fitBoolean } from './boolean'
 
 /**
  * 오토 레이아웃 계산 (v6). 자식 x · y · w · h 를 직접 써 넣어서 선택 상자 · 측정 · 내보내기는 레이아웃을 몰라도 돼요.
@@ -15,6 +16,8 @@ export function relayout(d: LayerDoc) {
     const n = d.nodes[id]
     if (!n) return
     for (const c of n.children ?? []) visit(c)
+    // 불리언: 상자를 결과 모양에 맞춰요(안쪽 도형이 바뀌면 곧바로)
+    if (n.type === 'boolean') fitBoolean(d, n)
     if (n.style.layout && !done.has(id)) { layoutFrame(d, n); done.add(id) }
   }
   for (const id of d.rootIds) visit(id)

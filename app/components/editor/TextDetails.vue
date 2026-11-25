@@ -109,7 +109,7 @@ function onParaKey(e: KeyboardEvent) {
 
 <template>
   <Teleport to="body">
-    <div ref="el" class="sq tdp editor" role="dialog" :aria-label="tr('Type settings')" :style="pos">
+    <div ref="el" v-front class="sq tdp editor" role="dialog" :aria-label="tr('Type settings')" :style="pos">
       <div class="td-h">
         <div class="td-tabs" role="tablist">
           <button role="tab" :aria-selected="tab === 'basics'" :class="['sq', 'td-tab', { on: tab === 'basics' }]" @click="tab = 'basics'">{{ tr('Basics') }}</button>
@@ -186,11 +186,11 @@ function onParaKey(e: KeyboardEvent) {
 <style scoped>
 /* 겉면은 칠 창 · 사이드바와 같아요(흰 바탕 · 떠 있는 선 · 그림자) */
 .tdp { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.td-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--iris-line); }
+.td-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); box-shadow: inset 0 -1px 0 var(--iris-line); }
 .td-tabs { display: flex; gap: var(--ref-spacing-02); }
 .td-tab { height: 24px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-size: 12px; line-height: 24px; font-weight: 500; color: var(--sys-color-neutral-600); }
 .td-tab:hover { color: var(--sys-color-neutral-800); }
-.td-tab.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); font-weight: 600; }
+.td-tab.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 .td-tab:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 /* 묶음: 위아래 8 · 옆 12, 묶음 사이 선(피그마: 미리 보기 · 정렬 · 꾸밈 · 대소문자 / 목록 · 문단 · 말줄임 · 줄바꿈) */
 .td-b { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-08); }

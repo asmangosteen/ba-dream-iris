@@ -191,7 +191,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .note-edit { margin-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .txt { width: 100%; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); display: block; background: transparent; font-size: 12px; line-height: 18px; }
 /* 메모 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선을 그려요 */
-.txt-box { border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); --sq-line-w: 0.5px; }
+.txt-box { border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); --sq-line-w: 0.5px; }
 .txt-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .row-end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); margin-left: var(--ref-spacing-10); padding-top: var(--ref-spacing-04); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-500); }

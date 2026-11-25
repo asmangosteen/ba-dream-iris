@@ -10,7 +10,7 @@ import PaintPopover from '~/components/editor/PaintPopover.vue'
  * bindable 이면 Libraries 탭에서 고른 토큰을 token 으로 알려요(연결)
  * label 은 영어 원문(사전 열쇠)으로 받아서 보여 줄 때 tr 해요(PaintPopover title 도 같아요)
  */
-const props = withDefaults(defineProps<{ modelValue?: string | null; label: string; sid?: string | null; bindable?: boolean }>(), { modelValue: '#000000', sid: null, bindable: false })
+const props = withDefaults(defineProps<{ modelValue?: string | null; label: string; sid?: string | null; sids?: string[]; bindable?: boolean }>(), { modelValue: '#000000', sid: null, bindable: false })
 const emit = defineEmits<{ 'update:modelValue': [v: string]; token: [t: CatalogToken]; close: [] }>()
 
 const open = ref(false)
@@ -33,7 +33,7 @@ defineExpose({ open: () => (open.value = true) })
     :aria-expanded="open"
     @click="open ? close() : (open = true)"
   />
-  <PaintPopover v-if="open" :anchor="btn" :paint="paint" :sid="sid" :bindable="bindable" :title="label" @update="onUpdate" @token="(t) => { emit('token', t); close() }" @close="close" />
+  <PaintPopover v-if="open" :anchor="btn" :paint="paint" :sid="sid" :sids="sids" :bindable="bindable" :title="label" @update="onUpdate" @token="(t) => { emit('token', t); close() }" @close="close" />
 </template>
 
 <style scoped>

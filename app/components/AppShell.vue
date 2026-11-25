@@ -128,7 +128,7 @@ async function signOut(scope: 'local' | 'global' = 'local') {
         <NuxtLink v-for="n in nav" :key="n.to" :to="n.to" :class="['sq', 'nav-row', { on: isOn(n.to) }]" :aria-current="isOn(n.to) ? 'page' : undefined"><EditorIcon :name="n.icon" :size="16" />{{ tr(n.label) }}</NuxtLink>
       </nav>
       <div class="side-foot">
-        <IrisLogo kind="horizontal" :height="18" />
+        <IrisLogo kind="horizontal" :height="16" />
         <span class="powered">Powered by <b>CYCLOID</b></span>
       </div>
     </aside>
@@ -168,8 +168,8 @@ async function signOut(scope: 'local' | 'global' = 'local') {
 .nav-row:hover { --sq-fill: var(--sys-color-neutral-100); }
 .nav-row.on { --sq-fill: var(--iris-sel); font-weight: 600; }
 .nav-row:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
-/* 아래(전체 50% 흐리게): Iris 로고(높이 18) + Powered by CYCLOID(Pretendard 11/16, 자간 0 — 대문자도 벌리지 않아요. 브랜드 문구라 번역 안 함) */
-.side-foot { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-05); padding: var(--ref-spacing-04); opacity: .5; }
-.powered { font-family: Pretendard, var(--font-family-base); font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-600); letter-spacing: 0; }
+/* 아래(전체 50% 흐리게): 한 줄 — 바닥 여백 8 · Iris 로고(높이 16) · 사이 6 · Powered by CYCLOID(아래 맞춤: 글자 기준선을 로고 바닥에 · Pretendard 11/11, 자간 -0.15 — 살짝 좁게, 대문자도 벌리지 않아요. 브랜드 문구라 번역 안 함) */
+.side-foot { margin-top: auto; display: flex; align-items: flex-end; gap: var(--ref-spacing-05); min-width: 0; padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-06); opacity: .5; }
+.powered { font-family: Pretendard, var(--font-family-base); font-size: 11px; line-height: 11px; color: var(--sys-color-neutral-600); letter-spacing: -0.15px; white-space: nowrap; }
 .powered b { font-weight: 600; }
 </style>

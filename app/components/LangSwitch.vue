@@ -18,7 +18,7 @@ const items: Lang[] = ['en', 'ko']
 <style scoped>
 .theme { display: flex; flex-direction: column; padding: var(--ref-spacing-05) 0; gap: var(--ref-spacing-04); }
 .lbl { padding: 0 var(--ref-spacing-06); }
-.seg { display: grid; grid-template-columns: repeat(2, 1fr); padding: var(--ref-spacing-02); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
+.seg { display: grid; grid-template-columns: repeat(2, 1fr); padding: var(--ref-spacing-02); border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); }
 .seg-item { justify-content: center; height: 24px; box-sizing: border-box; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); }
 .seg-item:not(.on) { color: var(--sys-color-neutral-600); }
 .seg-item.on { --sq-fill: var(--sys-color-common-white-emphasis); }

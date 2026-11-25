@@ -1,6 +1,7 @@
 import { isContainer, type LayerDoc, type LayerNode } from '~/canvas/schema'
 import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
 import { nodePathIn } from '~/canvas/vector'
+import { canFlatten } from '~/canvas/boolean'
 import type { LayerStore } from '~/canvas/store'
 import type { MenuItem } from './useContextMenu'
 
@@ -85,7 +86,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
       { label: tr('Exclude selection'), shortcut: '⌥⇧E', action: () => store.booleanOp(sid, ids, 'exclude') },
     ] : []),
     { label: one?.isMask ? tr('Remove mask') : tr('Use as mask'), shortcut: '⌃⌘M', action: () => store.toggleMask(sid, ids) },
-    { label: tr('Flatten'), shortcut: '⌘E', action: () => store.flatten(sid, ids), disabled: nodes.every((n) => n.type === 'vector' || n.type === 'text' || n.type === 'image' || n.type === 'instance' || isContainer(n)) },
+    { label: tr('Flatten'), shortcut: '⌘E', action: () => store.flatten(sid, ids), disabled: !canFlatten(nodes) },
     'sep',
     { label: allHidden ? tr('Show') : tr('Hide'), action: () => store.update(sid, ids, { hidden: allHidden ? undefined : true }) },
     { label: allLocked ? tr('Unlock') : tr('Lock'), action: () => store.update(sid, ids, { locked: allLocked ? undefined : true }) },

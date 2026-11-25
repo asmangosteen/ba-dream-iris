@@ -10,31 +10,57 @@ import InspectorPaints from '~/components/editor/InspectorPaints.vue'
 import ColorField from '~/components/editor/ColorField.vue'
 import InspectorEffects from '~/components/editor/InspectorEffects.vue'
 import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
+import InspectorSelectionColors from '~/components/editor/InspectorSelectionColors.vue'
+import ArrangeControls from '~/components/editor/ArrangeControls.vue'
+import { currentGap, guessAxis, type ArrangeOp, type Rect } from '~/canvas/geom'
 
 /** 오른쪽 패널 · 디자인 탭: 화면(프레임) 이름 · 상태 · 위치 · 크기 · 모양(채우기 · 선 · 모서리 · 투명도 · 내용 자르기). 값을 바꾸면 캔버스에 바로 반영하고 저장합니다 */
-const props = defineProps<{ screen: ScreenRow }>()
-const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: [] }>()
+/**
+ * multi: 프레임을 여러 개 골랐을 때(피그마와 같아요) — 같은 패널을 그대로 보여 주고, 값이 서로 다르면 Mixed.
+ * 고치면 고른 프레임 모두에 한꺼번에(실행취소 한 번). screen 은 그중 첫 프레임
+ */
+const props = defineProps<{ screen: ScreenRow; multi?: ScreenRow[] }>()
+const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: []; arrange: [op: ArrangeOp] }>()
+const all = computed<ScreenRow[]>(() => (props.multi && props.multi.length > 1 ? props.multi : [props.screen]))
+const isMulti = computed(() => all.value.length > 1)
+const ids = computed(() => all.value.map((s) => s.id))
+/** 위치 · 크기: 모두 같으면 그 값, 다르면 null(Mixed) */
+const same = (key: 'x' | 'y' | 'width' | 'height') => { const v = all.value.map((s) => Math.round(s[key])); return v.every((x) => x === v[0]) ? v[0]! : null }
+// 여러 프레임 정렬 · 균등 분배 · 간격(Alignment)
+const rects = computed<Rect[]>(() => all.value.map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height })))
+const axis = computed(() => guessAxis(rects.value))
+const gap = computed(() => currentGap(rects.value, axis.value))
 
 
 function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
-  if (!Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = String(Math.round(props.screen[key])); return }
-  if (Math.round(v) !== Math.round(props.screen[key])) emit('update', { [key]: Math.round(v) })
+  if (!input.value.trim() || !Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = same(key) === null ? '' : String(same(key)); return }
+  if (Math.round(v) !== same(key)) emit('update', { [key]: Math.round(v) })
 }
 /** 화살표 키로 1씩(Shift 는 10씩) 바꾸기 */
 function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
   e.preventDefault()
+  const cur = same(key)
+  if (cur === null) return
   const d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
-  const v = Math.max(key === 'width' || key === 'height' ? 1 : -1e9, Math.round(props.screen[key]) + d)
+  const v = Math.max(key === 'width' || key === 'height' ? 1 : -1e9, cur + d)
   emit('update', { [key]: v })
 }
 // --- 화면 모양: 레이어와 같은 방식(토큰 연결 포함). 기본은 흰 바탕 · 선 없음 · 모서리 0 ---
 const store = useLayerStore()
-const native = computed(() => props.screen.source === 'native')
+const native = computed(() => all.value.every((s) => s.source === 'native'))
 const look = computed<LayerStyle>(() => store.doc(props.screen.id).frame ?? {})
-const fstyle = (patch: Partial<LayerStyle>, vars?: Record<string, string | null>) => store.frameStyle(props.screen.id, patch, vars)
+const fstyle = (patch: Partial<LayerStyle>, vars?: Record<string, string | null>) => store.batch(() => { for (const id of ids.value) store.frameStyle(id, patch, vars) })
+/** 고른 프레임들의 모양 값이 서로 다른지(Mixed) */
+const looks = computed<LayerStyle[]>(() => ids.value.map((id) => store.doc(id).frame ?? {}))
+const differs = (fn: (l: LayerStyle) => unknown) => looks.value.some((l) => JSON.stringify(fn(l) ?? null) !== JSON.stringify(fn(looks.value[0]!) ?? null))
+const mixOpacity = computed(() => differs((l) => [l.opacity, (l.vars as Record<string, string> | undefined)?.opacity]))
+const mixRadius = computed(() => differs((l) => [l.radius, l.radii]))
+const mixClip = computed(() => differs((l) => l.clip !== false))
+const mixStroke = computed(() => differs((l) => [l.stroke, l.strokeWidth]))
+const mixGrids = computed(() => differs((l) => l.grids ?? []))
 const vb = (key: string) => (look.value.vars as Record<string, string> | undefined)?.[key] ?? null
 const hasFill = computed(() => look.value.fill !== '')
 const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
@@ -131,6 +157,8 @@ const smoothOpen = ref(false)
 const smoothBtn = ref<HTMLElement[] | HTMLElement | null>(null)
 const smoothBtnEl = computed(() => (Array.isArray(smoothBtn.value) ? smoothBtn.value[0] ?? null : smoothBtn.value))
 const smoothNow = computed(() => Math.round((look.value.smoothing ?? 0) * 100))
+const holdAll = () => { for (const id of ids.value) store.hold(id) }
+const releaseAll = () => store.batch(() => { for (const id of ids.value) store.release(id) })
 const setSmoothing = (v: number) => fstyle({ smoothing: v > 0 ? v / 100 : undefined })
 watch(() => props.screen.id, () => { smoothOpen.value = false })
 
@@ -143,9 +171,14 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 
     <section class="s">
       <div class="sec-h h24"><span>{{ tr('Position') }}</span></div>
+      <template v-if="isMulti">
+        <div class="ig-l"><span>{{ tr('Alignment') }}</span></div>
+        <ArrangeControls :count="all.length" :gap="gap" :axis="axis" @op="emit('arrange', $event)" />
+        <div class="ig-l"><span>{{ tr('Position') }}</span></div>
+      </template>
       <div class="ig">
-        <label class="sq fld"><span>X</span><input :key="'x' + screen.x" :value="Math.round(screen.x)" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>Y</span><input :key="'y' + screen.y" :value="Math.round(screen.y)" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>X</span><input :key="'x' + same('x')" :value="same('x') ?? ''" :placeholder="same('x') === null ? tr('Mixed') : ''" inputmode="numeric" aria-label="X" @change="num('x', $event)" @keydown="step('x', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>Y</span><input :key="'y' + same('y')" :value="same('y') ?? ''" :placeholder="same('y') === null ? tr('Mixed') : ''" inputmode="numeric" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <span />
       </div>
     </section>
@@ -154,11 +187,11 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <div class="sec-h h24"><span>{{ tr('Layout') }}</span></div>
       <div class="ig-l"><span>{{ tr('Dimensions') }}</span></div>
       <div class="ig">
-        <label class="sq fld"><span>W</span><input :key="'w' + screen.width" :value="Math.round(screen.width)" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>H</span><input :key="'h' + screen.height" :value="Math.round(screen.height)" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>W</span><input :key="'w' + same('width')" :value="same('width') ?? ''" :placeholder="same('width') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>H</span><input :key="'h' + same('height')" :value="same('height') ?? ''" :placeholder="same('height') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <span />
       </div>
-      <button v-if="native" :class="['cb', { on: look.clip !== false }]" role="checkbox" :aria-checked="look.clip !== false" @click="fstyle({ clip: look.clip === false ? undefined : false })"><i class="sq" />{{ tr('Clip content') }}</button>
+      <button v-if="native" :class="['cb', { on: !mixClip && look.clip !== false, mix: mixClip }]" role="checkbox" :aria-checked="mixClip ? 'mixed' : look.clip !== false" @click="fstyle({ clip: !mixClip && look.clip !== false ? false : undefined })"><i class="sq" />{{ tr('Clip content') }}</button>
     </section>
 
     <template v-if="native">
@@ -166,26 +199,27 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         <div class="sec-h h24"><span>{{ tr('Appearance') }}</span></div>
         <div class="ig-l"><span>{{ tr('Opacity') }}</span><span>{{ tr('Corner radius') }}</span></div>
         <div class="ig">
-          <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity')" :value="numText('opacity')" inputmode="numeric" :aria-label="tr('Frame opacity')" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
+          <label class="sq fld u"><EditorIcon name="var_opacity" :size="16" /><template v-if="!vb('opacity')"><input :key="'o' + numText('opacity') + mixOpacity" :value="mixOpacity ? '' : numText('opacity')" :placeholder="mixOpacity ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame opacity')" @change="setNumber('opacity', $event)" @keydown="keyStep('opacity', $event)"><span class="unit">%</span></template><TokenPicker :kinds="['opacity']" :bound="vb('opacity')" reveal label="Frame opacity" @pick="(t) => pickNum('opacity', t)" @unbind="unbindKey('opacity')" @step="(d) => stepNumber('opacity', d)" /></label>
           <label v-if="separate" class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vbCorners" :key="'all' + String(allCorners)" :value="allCorners === 'Mixed' ? '' : allCorners" :placeholder="allCorners === 'Mixed' ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setCorner($event, null)" @keydown="cornerKey(null, $event)"><TokenPicker :kinds="['radius']" :bound="vbCorners" reveal label="Frame corner radius" @pick="(t) => pickCorner(null, t)" @unbind="fstyle({}, cornerVars(null, null))" @step="(d) => stepCorner(null, d)" /></label>
-          <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius')" :value="numText('radius')" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
+          <label v-else class="sq fld"><EditorIcon name="var_radius" :size="16" /><input v-if="!vb('radius')" :key="'r' + numText('radius') + mixRadius" :value="mixRadius ? '' : numText('radius')" :placeholder="mixRadius ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Frame corner radius')" @change="setNumber('radius', $event)" @keydown="keyStep('radius', $event)"><TokenPicker :kinds="['radius']" :bound="vb('radius')" reveal label="Frame corner radius" @pick="(t) => pickNum('radius', t)" @unbind="unbindKey('radius')" @step="(d) => stepNumber('radius', d)" /></label>
           <button :class="['ib', 's24', 'tog', { on: separate }]" :aria-pressed="separate" :aria-label="tr('Independent corners')" :title="tr('Independent corners')" @click="toggleCorners"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V3.5a2 2 0 0 1 2-2H5M9 1.5h1.5a2 2 0 0 1 2 2V5M12.5 9v1.5a2 2 0 0 1-2 2H9M5 12.5H3.5a2 2 0 0 1-2-2V9" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" /></svg></button>
         </div>
         <template v-if="separate">
           <!-- 피그마 순서: ┌ ┐ / └ ┘ -->
           <div v-for="row in ([[0, 1], [3, 2]] as const)" :key="row[0]" class="ig"><label v-for="i in row" :key="i" class="sq fld" :title="tr(CORNER_LABEL[i]!)"><EditorIcon name="var_radius" :size="16" :style="{ transform: `rotate(${i * 90}deg)` }" /><input v-if="!vb(CORNER_KEYS[i]!)" :key="'c' + i + radiiNow[i]" :value="radiiNow[i]" inputmode="numeric" :aria-label="tr(CORNER_LABEL[i]!)" @change="setCorner($event, i)" @keydown="cornerKey(i, $event)"><TokenPicker :kinds="['radius']" :bound="vb(CORNER_KEYS[i]!)" reveal short :label="CORNER_LABEL[i]" @pick="(t) => pickCorner(i, t)" @unbind="fstyle({}, { [CORNER_KEYS[i]!]: null })" @step="(d) => stepCorner(i, d)" /></label><button v-if="row[0] === 3" ref="smoothBtn" :class="['ib', 's24', 'tog', { on: smoothOpen || smoothNow > 0 }]" :aria-pressed="smoothOpen" :aria-label="tr('Corner smoothing')" :title="tr('Corner smoothing')" @click="smoothOpen = !smoothOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button><span v-else /></div>
         </template>
-        <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="store.hold(screen.id)" @end="store.release(screen.id)" @close="smoothOpen = false" />
+        <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="holdAll" @end="releaseAll" @close="smoothOpen = false" />
       </section>
 
-      <InspectorPaints :sid="screen.id" :ids="[]" kind="fill" title="Fill" frame />
+      <InspectorPaints :sid="screen.id" :sids="ids" :ids="[]" kind="fill" title="Fill" frame />
 
       <section class="s">
-        <div :class="['sec-h', 'h24', { empty: !hasStroke }]"><span>{{ tr('Stroke') }}</span><button v-if="!hasStroke" class="ib s24" :aria-label="tr('Add stroke')" :title="tr('Add stroke')" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
-        <template v-if="hasStroke">
+        <div :class="['sec-h', 'h24', { empty: !hasStroke && !mixStroke }]"><span>{{ tr('Stroke') }}</span><button v-if="!hasStroke || mixStroke" class="ib s24" :aria-label="tr('Add stroke')" :title="tr('Add stroke')" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
+        <p v-if="mixStroke" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
+        <template v-if="hasStroke && !mixStroke">
           <!-- 피그마 Stroke 행: [견본 + 값] [변수 24] [− 24] -->
           <div class="prow">
-            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" :aria-label="tr('Frame stroke color value')"@change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
+            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" :sids="ids" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" :aria-label="tr('Frame stroke color value')"@change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
             <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
             <span v-else />
             <button class="ib s24" :aria-label="tr('Remove stroke')" :title="tr('Remove stroke')" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><EditorIcon name="minus" :size="16" /></button>
@@ -198,9 +232,12 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         </template>
       </section>
 
-      <InspectorEffects :sid="screen.id" :ids="[]" frame />
+      <InspectorEffects :sid="screen.id" :sids="ids" :ids="[]" frame />
 
-      <InspectorGrids :grids="look.grids ?? []" @change="(g) => fstyle({ grids: g })" />
+      <!-- 프레임 안에 쓰인 색(피그마 Selection colors) — 색이 많아서 처음엔 버튼만 -->
+      <InspectorSelectionColors :targets="ids.map((id) => ({ sid: id, ids: [] }))" lazy />
+
+      <InspectorGrids :grids="look.grids ?? []" :mixed="mixGrids" @change="(g) => fstyle({ grids: g })" />
     </template>
 
   </div>
@@ -231,4 +268,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 .cb:hover > i { --sq-line: var(--sys-color-neutral-600); }
 .cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+.m0 { margin: 0; }
+/* 자르기 Mixed: 상자 안 가로줄(피그마와 같아요) */
+.cb.mix > i::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' stroke='%23202837' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-position: center; background-size: 12px; background-repeat: no-repeat; }
 </style>

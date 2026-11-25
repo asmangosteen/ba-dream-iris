@@ -12,7 +12,6 @@ import InspectorLayer from '~/components/editor/InspectorLayer.vue'
 import InspectorScale from '~/components/editor/InspectorScale.vue'
 import InspectorExport from '~/components/editor/InspectorExport.vue'
 import InspectorPage from '~/components/editor/InspectorPage.vue'
-import InspectorScreens from '~/components/editor/InspectorScreens.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { useMixScreens } from '~/composables/useLayerMenu'
@@ -237,8 +236,13 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
     }
   } catch { say(tr('Couldn\'t create the frame. Try again')) }
 }
-function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
-  const s = current.value
+/** 프레임 여러 개를 한꺼번에(실행취소 한 번) */
+function onUpdateMany(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
+  const rows = multiList.value
+  store.batch(() => { for (const s of rows) onUpdate(patch, s) })
+}
+function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>, target?: ScreenRow) {
+  const s = target ?? current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
   const fail = () => say(tr('Couldn\'t save. Try again'))
@@ -761,7 +765,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             </div>
             <span class="tx-meta">{{ current.source === 'figma' ? tr('Figma frame') : tr('Iris frame') }} · <span class="num">{{ Math.round(current.width) }} × {{ Math.round(current.height) }}</span></span>
           </div>
-          <div class="scroll">
+          <div class="scroll insp">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <template v-else-if="store.layerIds.value.length">
@@ -770,7 +774,11 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
               <InspectorScale v-if="tool === 'scale'" :sid="current.id" :ids="store.layerIds.value" />
               <InspectorExport :sid="current.id" :ids="store.layerIds.value" @toast="say" />
             </template>
-            <InspectorScreens v-else-if="multiList.length > 1" :screens="multiList" @arrange="onArrangeScreens" />
+            <!-- 프레임 여러 개: 한 개일 때와 같은 패널(값이 다르면 Mixed) — 고치면 모두에 한꺼번에(피그마와 같아요) -->
+            <template v-else-if="multiList.length > 1">
+              <InspectorDesign :screen="multiList[0]!" :multi="multiList" @update="onUpdateMany" @arrange="onArrangeScreens" />
+              <InspectorExport :sid="multiList[0]!.id" :ids="[]" :screen="multiList[0]" :screens="multiList" @toast="say" />
+            </template>
             <template v-else>
               <InspectorDesign :screen="current" @update="onUpdate" @remove="onRemove" />
               <!-- 스케일 도구(K) + 화면(프레임) 고름: 화면과 안의 내용을 같은 비율로 -->
@@ -781,13 +789,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           </div>
         </template>
         <!-- 캔버스 위 레이어를 골랐을 때: 디자인 속성만 -->
-        <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll">
+        <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll insp">
           <InspectorLayer :screen="canvasScreen" @replace-image="pickImage" />
           <InspectorScale v-if="tool === 'scale'" :sid="canvasScreen.id" :ids="store.layerIds.value" />
           <InspectorExport :sid="canvasScreen.id" :ids="store.layerIds.value" @toast="say" />
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
-        <div v-else-if="tab === 'design' && currentPage" class="scroll">
+        <div v-else-if="tab === 'design' && currentPage" class="scroll insp">
           <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePage(currentPage.id, n).catch(() => say(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">

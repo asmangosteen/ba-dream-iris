@@ -18,12 +18,15 @@ import InspectorAutoLayout from '~/components/editor/InspectorAutoLayout.vue'
 import { consShown, setConsShown } from '~/canvas/prefs'
 import InspectorInstance from '~/components/editor/InspectorInstance.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
+import InspectorSelectionColors from '~/components/editor/InspectorSelectionColors.vue'
+import StrokeSettings from '~/components/editor/StrokeSettings.vue'
 import { isPageCanvas } from '~/composables/useEditor'
 import type { Constraints, Sizing } from '~/canvas/schema'
 import { BLEND_MODES, defaultAlign } from '~/canvas/paint'
 import { isContainer, isGroupNode, isVector } from '~/canvas/schema'
 import { useContextMenu } from '~/composables/useContextMenu'
 import { denorm, shapeVnet } from '~/canvas/vector'
+import { canFlatten } from '~/canvas/boolean'
 
 /**
  * 오른쪽 패널 · 디자인 탭(레이어를 골랐을 때): 위치 · 크기(비율 고정) · 회전 · 뒤집기 · 정렬 · 균등 분배 · 모양(모서리 따로) · 채우기 · 선 · 텍스트 · 순서
@@ -325,7 +328,7 @@ const under = (e: MouseEvent) => { const r = (e.currentTarget as HTMLElement).ge
 const boolItems = () => {
   const isBool = one.value?.type === 'boolean'
   const ops = BOOL_OPS.map((b) => ({ label: (isBool && one.value?.op === b.k ? '✓ ' : '') + tr(b.label.replace(' selection', '')), shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
-  return [...ops, 'sep' as const, { label: tr('Flatten'), shortcut: '⌘E', action: () => store.flatten(sid.value, ids.value) }]
+  return [...ops, 'sep' as const, { label: tr('Flatten'), shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
 }
 function boolMenu(e: MouseEvent) { ctxMenu.open(under(e), boolItems()) }
 /** 프레임 ↔ 그룹(피그마 머리의 'Frame ▾'): 그룹으로 바꾸면 칠 · 자르기 · 오토 레이아웃을 빼요 */
@@ -413,13 +416,56 @@ watch(() => (one.value?.type === 'instance' ? one.value.id + JSON.stringify(one.
 const alignNow = computed(() => same((n) => n.style.strokeAlign ?? defaultAlign(n.type)))
 const closedShape = computed(() => nodes.value.every((n) => !isVector(n.type) || n.type === 'polygon' || n.type === 'star' || !!n.closed))
 const openPath = computed(() => nodes.value.every((n) => n.type === 'line' || n.type === 'path'))
-const dashed = computed(() => nodes.value.some((n) => !!n.style.dash))
-function setDash(i: 0 | 1, e: Event) {
-  const v = Math.max(0, Number((e.target as HTMLInputElement).value) || 0)
-  store.update(sid.value, ids.value, (n) => { const d = [...(n.style.dash ?? [4, 4])] as [number, number]; d[i] = v; return { style: { ...n.style, dash: d } } })
+// --- Stroke: 세부 설정 창 · 변마다 두께(피그마 Individual strokes) ---
+const strokeOpen = ref(false)
+const strokeBtn = ref<HTMLElement | null>(null)
+watch(() => ids.value.join(), () => { strokeOpen.value = false })
+/** 변마다 두께는 상자 도형(사각형 · 프레임 · 이미지)만 */
+const boxSides = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'rect' || n.type === 'frame' || n.type === 'image'))
+const SIDE_KEYS = ['top', 'right', 'bottom', 'left'] as const
+const SIDE_LABEL = ['Top', 'Right', 'Bottom', 'Left']
+const SIDE_PATH: Record<string, string> = { top: 'M3 3h10', right: 'M13 3v10', bottom: 'M3 13h10', left: 'M3 3v10' }
+type SideMode = 'all' | 'top' | 'right' | 'bottom' | 'left' | 'custom'
+/** 첫 레이어 기준: 비어 있으면 All, 한 변만 있으면 그 변, 아니면 Custom */
+const sideMode = computed<SideMode>(() => {
+  const sd = nodes.value[0]?.style.strokeSides
+  if (!sd) return 'all'
+  const on = sd.map((x) => x > 0)
+  return on.filter(Boolean).length === 1 ? SIDE_KEYS[on.indexOf(true)]! : 'custom'
+})
+const sidesNow = computed(() => { const n = nodes.value[0]; const w = n?.style.strokeWidth ?? 1; return n?.style.strokeSides ?? [w, w, w, w] })
+function setSideMode(m: SideMode) {
+  store.update(sid.value, ids.value, (n) => {
+    const w = n.style.strokeWidth || 1
+    const sides: [number, number, number, number] | undefined = m === 'all' ? undefined : m === 'custom' ? [w, w, w, w] : (SIDE_KEYS.map((k) => (k === m ? w : 0)) as [number, number, number, number])
+    return { style: { ...n.style, strokeSides: sides } }
+  })
 }
-function stepDash(i: 0 | 1, d: number) {
-  store.update(sid.value, ids.value, (n) => { const v = [...(n.style.dash ?? [4, 4])] as [number, number]; v[i] = Math.max(0, v[i] + d); return { style: { ...n.style, dash: v } } })
+function sidesMenu(e: MouseEvent) {
+  const item = (m: SideMode, label: string) => ({ label: (sideMode.value === m ? '✓ ' : '') + tr(label), action: () => setSideMode(m) })
+  ctxMenu.open(under(e), [item('all', 'All'), item('top', 'Top'), item('bottom', 'Bottom'), item('left', 'Left'), item('right', 'Right'), 'sep' as const, item('custom', 'Custom')])
+}
+/** 두께를 바꾸면 켜진 변들도 같은 두께로(꺼진 변은 그대로 0) */
+function syncSides() {
+  store.update(sid.value, ids.value, (n) => (n.style.strokeSides ? { style: { ...n.style, strokeSides: n.style.strokeSides.map((x) => (x > 0 ? n.style.strokeWidth ?? 1 : 0)) as [number, number, number, number] } } : {}))
+}
+const onStrokeWeight = (e: Event) => store.batch(() => { setStyleNum('strokeWidth', e); syncSides() })
+const stepStrokeWeight = (d: number) => store.batch(() => { stepStyle('strokeWidth', d); syncSides() })
+/** Custom 한 변: 두께(strokeWidth)는 가장 두꺼운 변 */
+function setSide(i: number, e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace(/[^\d.]/g, ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = String(sidesNow.value[i]); return }
+  setSideAt(i, () => Math.max(0, Math.round(v * 10) / 10))
+}
+const stepSide = (i: number, d: number) => setSideAt(i, (cur) => Math.max(0, cur + d))
+function setSideAt(i: number, fn: (cur: number) => number) {
+  store.update(sid.value, ids.value, (n) => {
+    const w = n.style.strokeWidth ?? 1
+    const sd = [...(n.style.strokeSides ?? [w, w, w, w])] as [number, number, number, number]
+    sd[i] = fn(sd[i]!)
+    return { style: { ...n.style, strokeSides: sd, strokeWidth: Math.max(...sd) || n.style.strokeWidth } }
+  })
 }
 const ARROWS = [{ k: 'none', label: 'None' }, { k: 'arrow', label: 'Line arrow' }, { k: 'triangle', label: 'Triangle arrow' }, { k: 'circle', label: 'Circle' }] as const
 const blendNow = computed(() => same((n) => n.style.blend ?? 'normal'))
@@ -548,9 +594,9 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <div class="ig">
         <label class="sq fld u" :title="tr('Rotation')"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13h11M2.5 13l7-8.5M7.4 13a4.9 4.9 0 0 0-1.8-3.8" stroke="currentColor" stroke-width="1.25" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg><input :value="showG(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span v-if="same((n) => n.rotation ?? 0) !== 'Mixed'" class="unit">°</span></label>
         <div class="grp" role="group" :aria-label="tr('Rotate and flip')">
-          <button class="ib" :aria-label="tr('Rotate 90°')" :title="tr('Rotate 90°')" @click="store.rotateBy(sid, ids, 90)"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.5a4.5 4.5 0 1 0 1.6-3.5M4.5 1.5v2.7h2.7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-          <button :class="['ib', { on: same((n) => !!n.flipX) === true }]" :aria-label="tr('Flip horizontal') + ' (⇧H)'" :title="tr('Flip horizontal') + ' ⇧H'" @click="store.flip(sid, ids, 'x')"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v11" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.5 1.5" /><path d="M5 3.5v7L1.5 10.5zM9 3.5v7l3.5 0z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg></button>
-          <button :class="['ib', { on: same((n) => !!n.flipY) === true }]" :aria-label="tr('Flip vertical') + ' (⇧V)'" :title="tr('Flip vertical') + ' ⇧V'" @click="store.flip(sid, ids, 'y')"><svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 7h11" stroke="currentColor" stroke-width="1.2" stroke-dasharray="1.5 1.5" /><path d="M3.5 5h7L10.5 1.5zM3.5 9h7l0 3.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" /></svg></button>
+          <button class="ib" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="store.rotateBy(sid, ids, 90)"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M7.5 5.2L11 8.7L7.5 12.2L4 8.7z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /><path d="M5.2 4.6A4.6 4.6 0 0 1 12.4 5.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M12.6 3.2v2.4h-2.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <button class="ib" :aria-label="tr('Flip horizontal') + ' (⇧H)'" :data-tip="tr('Flip horizontal') + ' ⇧H'" @click="store.flip(sid, ids, 'x')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M2.5 4.8v6.4L5.8 8zM13.5 4.8v6.4L10.2 8z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg></button>
+          <button class="ib" :aria-label="tr('Flip vertical') + ' (⇧V)'" :data-tip="tr('Flip vertical') + ' ⇧V'" @click="store.flip(sid, ids, 'y')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><path d="M4.8 2.5h6.4L8 5.8zM4.8 13.5h6.4L8 10.2z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" /></svg></button>
         </div>
         <span />
       </div>
@@ -669,18 +715,21 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <div class="cstroke-meta tx-meta"><span>{{ tr('Inside') }} · {{ tr(compStroke.side) }}</span><span class="num">{{ fmtNum(compStroke.width) }}px</span></div>
       </template>
       <template v-if="hasStroke">
-        <div class="ig-l"><span v-if="closedShape && !has('text')">{{ tr('Position') }}</span><span>{{ tr('Weight') }}</span></div>
-        <div class="ig">
+        <!-- 피그마 Stroke 줄: [Position ▾] [Weight] [⚙ 세부 설정] [▢ 변마다] -->
+        <div class="ig-l ig4"><span v-if="closedShape && !has('text')">{{ tr('Position') }}</span><span>{{ tr('Weight') }}</span></div>
+        <div class="ig ig4">
           <EditorSelect v-if="closedShape && !has('text')" :model-value="alignNow === 'Mixed' ? null : String(alignNow)" :options="[{ value: 'center', label: 'Center' }, { value: 'inside', label: 'Inside' }, { value: 'outside', label: 'Outside' }]" ariaLabel="Stroke position" placeholder="Mixed" @update:model-value="(v) => setStyle('strokeAlign', v)" />
-          <label class="sq fld u" :title="tr('Stroke weight')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :value="show(same((n) => n.style.strokeWidth ?? 0))" :placeholder="same((n) => n.style.strokeWidth ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Stroke weight')" @change="setStyleNum('strokeWidth', $event)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('strokeWidth', d))"><span v-if="same((n) => n.style.strokeWidth ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbind('strokeWidth')" @step="(d) => stepStyle('strokeWidth', d)" /></label>
+          <label class="sq fld u" :title="tr('Stroke weight')"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11" stroke="currentColor" stroke-width="1" /><path d="M2.5 8h11" stroke="currentColor" stroke-width="1.6" /><path d="M2.5 12h11" stroke="currentColor" stroke-width="2.4" /></svg><template v-if="!vb('strokeWidth')"><input :value="show(same((n) => n.style.strokeWidth ?? 0))" :placeholder="same((n) => n.style.strokeWidth ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Stroke weight')" @change="onStrokeWeight($event)" @keydown="blurOnEnter($event); step($event, stepStrokeWeight)"><span v-if="same((n) => n.style.strokeWidth ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Stroke weight" @pick="(t) => store.batch(() => { pickNum('strokeWidth', t); syncSides() })" @unbind="unbind('strokeWidth')" @step="stepStrokeWeight" /></label>
           <span v-if="!(closedShape && !has('text'))" />
-          <span />
+          <span class="ig4-acts">
+          <button ref="strokeBtn" type="button" :class="['ib', 's24', 'tog', { on: strokeOpen }]" :aria-expanded="strokeOpen" aria-haspopup="dialog" :aria-label="tr('Stroke settings')" :data-tip="tr('Stroke settings')" @click="strokeOpen = !strokeOpen"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5v11M11 2.5v11" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" /><circle cx="5" cy="10" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /><circle cx="11" cy="6" r="1.75" fill="var(--sq-fill, #fff)" stroke="currentColor" stroke-width="1.25" /></svg></button>
+          <button v-if="boxSides" type="button" :class="['ib', 's24', 'tog', { on: sideMode !== 'all' }]" aria-haspopup="menu" :aria-label="tr('Individual strokes')" :data-tip="tr('Individual strokes')" @click="sidesMenu"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1" fill="none" stroke="currentColor" :stroke-width="sideMode === 'all' ? 1.25 : 1" :stroke-dasharray="sideMode === 'all' ? undefined : '1.5 1.5'" /><path v-if="sideMode !== 'all'" :d="SIDE_PATH[sideMode]" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><rect v-else x="5.5" y="5.5" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.25" /></svg></button>
+          </span>
         </div>
-        <button v-if="!has('text')" :class="['cb', { on: dashed }]" role="checkbox" :aria-checked="dashed" @click="setStyle('dash', dashed ? undefined : [4, 4])"><i class="sq" />{{ tr('Dashed') }}</button>
-        <template v-if="dashed">
-          <div class="ig-l"><span>{{ tr('Dash') }}</span><span>{{ tr('Gap') }}</span></div>
-          <div class="ig">
-            <label v-for="(k, i) in (['Dash', 'Gap'] as const)" :key="k" class="sq fld"><input :key="k + nodes[0]?.style.dash?.[i]" :value="nodes[0]?.style.dash?.[i] ?? 4" inputmode="numeric" :aria-label="tr(k)" @change="setDash(i as 0 | 1, $event)" @keydown="blurOnEnter($event); step($event, (d) => stepDash(i as 0 | 1, d))"></label>
+        <!-- Custom: 변마다 두께 [왼쪽 · 위] [오른쪽 · 아래](피그마 순서) -->
+        <template v-if="boxSides && sideMode === 'custom'">
+          <div v-for="row in ([[3, 0], [1, 2]] as const)" :key="row[0]" class="ig">
+            <label v-for="i in row" :key="i" class="sq fld" :title="tr(SIDE_LABEL[i]!)"><svg class="keep" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 1.5" opacity=".6" /><path :d="SIDE_PATH[SIDE_KEYS[i]!]" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg><input :key="'sd' + i + sidesNow[i]" :value="sidesNow[i]" inputmode="decimal" :aria-label="tr(SIDE_LABEL[i]!)" @change="setSide(i, $event)" @keydown="blurOnEnter($event); step($event, (d) => stepSide(i, d))"></label>
             <span />
           </div>
         </template>
@@ -690,18 +739,14 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
             <EditorSelect v-for="k in (['arrowStart', 'arrowEnd'] as const)" :key="k" :model-value="same((n) => n.style[k] ?? 'none') === 'Mixed' ? null : String(same((n) => n.style[k] ?? 'none'))" :options="ARROWS.map((a) => ({ value: a.k, label: a.label }))" :aria-label="k === 'arrowStart' ? 'Start point' : 'End point'" placeholder="Mixed" @update:model-value="(v) => setStyle(k, v === 'none' ? undefined : v)" />
             <span />
           </div>
-          <div class="ig-l"><span>{{ tr('Cap') }}</span></div>
-          <div class="ig">
-            <div class="grp span2" role="group" :aria-label="tr('Cap')">
-              <button v-for="c in (['butt', 'round', 'square'] as const)" :key="c" :class="['ib', 'txt-b', { on: same((n) => n.style.cap ?? (n.type === 'path' ? 'round' : 'butt')) === c }]" :aria-pressed="same((n) => n.style.cap ?? (n.type === 'path' ? 'round' : 'butt')) === c" :aria-label="tr({ butt: 'Butt cap', round: 'Round cap', square: 'Square cap' }[c])" :title="tr({ butt: 'Butt cap', round: 'Round cap', square: 'Square cap' }[c])" @click="setStyle('cap', c)">{{ tr({ butt: 'Butt', round: 'Round', square: 'Square' }[c]) }}</button>
-            </div>
-            <span />
-          </div>
         </template>
+        <StrokeSettings v-if="strokeOpen" :anchor="strokeBtn" :styles="nodes.map((n) => n.style)" :open-path="openPath" :default-join="nodes[0]?.type === 'path' ? 'round' : 'miter'" :default-cap="nodes[0]?.type === 'path' ? 'round' : 'butt'" @set="(p) => store.style(sid, ids, p)" @close="strokeOpen = false" />
       </template>
     </InspectorPaints>
 
     <InspectorEffects v-if="!editing" :sid="sid" :ids="ids" />
+    <!-- 여러 개 · 프레임 · 그룹을 고르면: 안에 쓰인 색 모아 보기 · 한꺼번에 바꾸기(피그마 Selection colors) -->
+    <InspectorSelectionColors v-if="!editing && (nodes.length > 1 || (one && isContainer(one) && !!one.children?.length))" :targets="[{ sid, ids }]" />
 
     <InspectorGrids v-if="one?.type === 'frame' && !editing" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
 
@@ -772,7 +817,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .cons > :deep(.esel) > .dd:hover, .cons > :deep(.esel) > .dd.open { --sq-line: var(--sys-color-neutral-400); }
 .cons > :deep(.esel.c2) { grid-row: 2; }
 .cons-ic { flex: none; margin-right: var(--ref-spacing-04); color: var(--sys-color-neutral-600); }
-.cons-box { grid-column: 1; grid-row: 1 / span 2; position: relative; height: 64px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); }
+.cons-box { grid-column: 1; grid-row: 1 / span 2; position: relative; height: 64px; border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); }
 /* 가운데 네모(피그마: 둥근 네모 안에 +) — 모두 가운데 기준이라 칸 폭이 바뀌어도 그대로 */
 .cons-box > b { position: absolute; left: calc(50% - 28px); top: calc(50% - 12px); width: 56px; height: 24px; border-radius: var(--ref-radius-02); --sq-line: var(--sys-color-neutral-300); --sq-line-w: 1px; pointer-events: none; }
 /* 누르는 자리(넓게) 안의 막대 */
@@ -822,4 +867,10 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .cs-sw { width: 14px; height: 14px; flex: none; border-radius: 3px; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .cs-a { margin-left: auto; color: var(--sys-color-neutral-500); }
 .cstroke-meta { display: flex; justify-content: space-between; padding: 0 var(--ref-spacing-02); }
+/* Stroke 줄: [Position][Weight][⚙ 24 · ▢ 24] — 글자 줄과 같은 격자, ⚙ · ▢ 는 Fill 행의 👁 · − 자리(사이 0) */
+.ig4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px !important; }
+.ig4-acts { display: flex; align-items: center; }
+/* Position ▾: Constraints 드롭다운처럼 흰 바탕 + 테두리(피그마와 같아요) */
+.ig4 > :deep(.esel) > .dd { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--sys-color-brand-primary-default); }
 </style>

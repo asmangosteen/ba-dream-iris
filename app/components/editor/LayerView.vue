@@ -5,10 +5,10 @@ import { isVideoSrc, useImageSrc } from '~/canvas/images'
 import { GHOST_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import InstanceView from '~/components/editor/InstanceView.vue'
-import BooleanView from '~/components/editor/BooleanView.vue'
 import { nodePathIn } from '~/canvas/vector'
+import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, defaultAlign, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, defaultAlign, defaultJoin, effectCss, ellipsePath, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -32,7 +32,8 @@ function transform(r?: number, fx?: boolean, fy?: boolean) {
   const t = [r ? `rotate(${r}deg)` : '', fx ? 'scaleX(-1)' : '', fy ? 'scaleY(-1)' : ''].filter(Boolean).join(' ')
   return t || undefined
 }
-const vector = computed(() => !!n.value && isVector(n.value.type))
+// 불리언은 계산한 결과 모양을 벡터처럼 그려요(칠 · 선 · 정렬 · 효과가 같아요)
+const vector = computed(() => !!n.value && (isVector(n.value.type) || n.value.type === 'boolean'))
 const boxy = computed(() => !!n.value && !vector.value && n.value.type !== 'text')
 const radius = computed(() => {
   const v = n.value
@@ -53,7 +54,8 @@ const smooth = computed(() => {
   if (!(sm > 0) || !r.some(Boolean)) return null
   return { sm, r, path: squirclePath(v.w, v.h, r, sm) }
 })
-const strokes = computed(() => (n.value && boxy.value && !smooth.value ? strokeShadows(n.value.style, n.value.type, color) : { outer: [], inner: [] }))
+/** 상자 선(box-shadow). 변마다 두께는 smoothing 모양이어도 이걸로(변마다 그은 선) */
+const strokes = computed(() => (n.value && boxy.value && (!smooth.value || n.value.style.strokeSides) ? strokeShadows(n.value.style, n.value.type, color) : { outer: [], inner: [] }))
 const fx = computed(() => (n.value ? effectCss(n.value.style.effects, color, boxy.value) : null))
 
 const style = computed(() => {
@@ -75,7 +77,7 @@ const style = computed(() => {
   const sq = smooth.value
   if (boxy.value && v.type !== 'image' && !sq) Object.assign(css, backgroundCss(s, color, imageSrc))
   const e = fx.value!
-  const shadow = sq ? [] : [...strokes.value.outer, ...e.outer, ...e.inner]
+  const shadow = sq ? [...strokes.value.outer] : [...strokes.value.outer, ...e.outer, ...e.inner]
   if (shadow.length) css.boxShadow = shadow.join(', ')
   // smoothing: 그림자(drop-shadow)는 .smw 가 그려서 여기선 흐림(blur)만
   // 내용을 자르는 프레임(overflow)은 .smw 그림자까지 잘라서, 그땐 그림자를 레이어 자체 filter 로(자기 filter 는 안 잘려요)
@@ -145,14 +147,28 @@ const dashed = computed(() => {
   if (!v || !boxy.value || !v.style.dash || !v.style.strokeWidth) return null
   const w = v.style.strokeWidth
   const align = v.style.strokeAlign ?? defaultAlign(v.type)
-  const inset = align === 'inside' ? w / 2 : align === 'outside' ? -w / 2 : 0
-  return { d: v.type === 'ellipse' ? ellipsePath(v.w, v.h, inset) : smooth.value ? squirclePath(v.w, v.h, smooth.value.r, smooth.value.sm, inset) : rectPath(v.w, v.h, radiiOf(v.style), inset), w, colors: strokeColors(v.style, color).reverse() }
+  const off = (sw: number) => (align === 'inside' ? sw / 2 : align === 'outside' ? -sw / 2 : 0)
+  const cap = v.style.cap ?? 'butt', join = v.style.join ?? 'miter', colors = strokeColors(v.style, color).reverse()
+  // 변마다 두께(Top · Bottom · Left · Right · Custom): 변마다 따로 그은 점선
+  const sides = v.style.strokeSides
+  if (sides && v.type !== 'ellipse') {
+    const [t, r, b, l] = sides
+    const parts = [
+      t ? { d: `M0 ${off(t)}H${v.w}`, w: t } : null,
+      r ? { d: `M${v.w - off(r)} 0V${v.h}`, w: r } : null,
+      b ? { d: `M0 ${v.h - off(b)}H${v.w}`, w: b } : null,
+      l ? { d: `M${off(l)} 0V${v.h}`, w: l } : null,
+    ].filter((x): x is { d: string; w: number } => !!x)
+    return { parts, colors, cap, join }
+  }
+  const d = v.type === 'ellipse' ? ellipsePath(v.w, v.h, off(w)) : smooth.value ? squirclePath(v.w, v.h, smooth.value.r, smooth.value.sm, off(w)) : rectPath(v.w, v.h, radiiOf(v.style), off(w))
+  return { parts: [{ d, w }], colors, cap, join }
 })
 /** smoothing 선(점선 아님): 같은 squircle 경로로 — 안쪽 · 가운데 · 바깥 */
 const smoothStroke = computed(() => {
   const v = n.value
   const sq = smooth.value
-  if (!v || !sq || v.style.dash || !v.style.strokeWidth) return null
+  if (!v || !sq || v.style.dash || v.style.strokeSides || !v.style.strokeWidth) return null
   const colors = strokeColors(v.style, color)
   if (!colors.length) return null
   const w = v.style.strokeWidth
@@ -182,8 +198,8 @@ const vec = computed(() => {
   const v = n.value
   if (!v || !vector.value) return null
   const s = v.style
-  const d = vectorPath(v.type, s, v.w, v.h, v.pts, v.closed, v.vnet)
-  const closed = v.type === 'polygon' || v.type === 'star' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
+  const d = v.type === 'boolean' ? booleanPath(props.doc, v) : vectorPath(v.type, s, v.w, v.h, v.pts, v.closed, v.vnet)
+  const closed = v.type === 'boolean' || v.type === 'polygon' || v.type === 'star' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
   const w = s.strokeWidth ?? 0
   const align = closed ? (s.strokeAlign ?? defaultAlign(v.type)) : 'center'
   const cols = strokeColors(s, color).reverse() // 아래부터 그려요
@@ -195,6 +211,7 @@ const vec = computed(() => {
     end: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowEnd && s.arrowEnd !== 'none' ? s.arrowEnd : null,
     dash: s.dash ? s.dash.join(' ') : undefined,
     cap: s.cap ?? (v.type === 'path' ? 'round' : 'butt'),
+    join: s.join ?? defaultJoin(v.type),
   }
 })
 const mid = (k: string) => `${uid}-${k}`.replace(/[^\w-]/g, '')
@@ -273,8 +290,7 @@ function onKey(e: KeyboardEvent) {
       <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
       <template v-else>{{ n.name }}</template>
     </span>
-    <BooleanView v-if="n.type === 'boolean'" :doc="doc" :node="n" />
-    <template v-else-if="isContainer(n)">
+    <template v-if="isContainer(n) && n.type !== 'boolean'">
       <template v-if="mask">
         <LayerView v-for="c in mask.below" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
         <!-- 마스크: 그 위 형제들을 마스크 모양으로 잘라요(마스크 자체는 그리지 않아요) -->
@@ -327,7 +343,7 @@ function onKey(e: KeyboardEvent) {
           :stroke-width="vec.align === 'center' ? vec.w : vec.w * 2"
           :stroke-dasharray="vec.dash"
           :stroke-linecap="vec.cap"
-          stroke-linejoin="round"
+          :stroke-linejoin="vec.join"
           :clip-path="vec.align === 'inside' ? `url(#${mid('c')})` : undefined"
           :mask="vec.align === 'outside' ? `url(#${mid('m')})` : undefined"
           :marker-start="vec.start && i === vec.cols.length - 1 ? `url(#${mid(vec.start)})` : undefined"
@@ -341,7 +357,7 @@ function onKey(e: KeyboardEvent) {
       <path v-for="(c, i) in smoothStroke.colors" :key="i" :d="smoothStroke.d" fill="none" :stroke="c" :stroke-width="smoothStroke.w" />
     </svg>
     <svg v-if="dashed" class="dash" :width="n.w" :height="n.h" overflow="visible" aria-hidden="true">
-      <path v-for="(c, i) in dashed.colors" :key="i" :d="dashed.d" fill="none" :stroke="c" :stroke-width="dashed.w" :stroke-dasharray="n.style.dash?.join(' ')" />
+      <template v-for="(c, i) in dashed.colors" :key="i"><path v-for="(p, j) in dashed.parts" :key="j" :d="p.d" fill="none" :stroke="c" :stroke-width="p.w" :stroke-dasharray="n.style.dash?.join(' ')" :stroke-linecap="dashed.cap" :stroke-linejoin="dashed.join" /></template>
     </svg>
   </div>
 </template>

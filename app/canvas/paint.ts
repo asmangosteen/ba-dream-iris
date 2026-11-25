@@ -58,6 +58,8 @@ export function strokeColors(s: LayerStyle, color: ColorFn): string[] {
 }
 
 export const defaultAlign = (t: LayerType): 'inside' | 'center' => (t === 'line' || t === 'path' ? 'center' : 'inside')
+/** 기본 이음새: 연필은 둥글게, 나머지는 각지게(피그마 Miter) */
+export const defaultJoin = (t: LayerType): 'miter' | 'round' => (t === 'path' ? 'round' : 'miter')
 
 /** 상자 도형의 선(실선) → box-shadow. outer 는 상자 바깥(그림자와 함께), inner 는 내용 위 덮개에 */
 export function strokeShadows(s: LayerStyle, t: LayerType, color: ColorFn): { outer: string[]; inner: string[] } {
@@ -65,7 +67,26 @@ export function strokeShadows(s: LayerStyle, t: LayerType, color: ColorFn): { ou
   const w = s.strokeWidth ?? 0
   if (!w || s.dash) return out
   const align = s.strokeAlign ?? defaultAlign(t)
+  const sides = s.strokeSides
   for (const c of strokeColors(s, color)) {
+    if (sides) {
+      // 변마다: 그 변 쪽으로만 밀린 그림자 — 안쪽(inset) · 바깥 · 가운데(반씩)
+      const [top, right, bottom, left] = sides
+      const k = align === 'center' ? 0.5 : 1
+      if (align !== 'outside') {
+        if (top) out.inner.push(`inset 0 ${top * k}px 0 0 ${c}`)
+        if (bottom) out.inner.push(`inset 0 ${-bottom * k}px 0 0 ${c}`)
+        if (left) out.inner.push(`inset ${left * k}px 0 0 0 ${c}`)
+        if (right) out.inner.push(`inset ${-right * k}px 0 0 0 ${c}`)
+      }
+      if (align !== 'inside') {
+        if (top) out.outer.push(`0 ${-top * k}px 0 0 ${c}`)
+        if (bottom) out.outer.push(`0 ${bottom * k}px 0 0 ${c}`)
+        if (left) out.outer.push(`${-left * k}px 0 0 0 ${c}`)
+        if (right) out.outer.push(`${right * k}px 0 0 0 ${c}`)
+      }
+      continue
+    }
     if (align === 'inside') out.inner.push(`inset 0 0 0 ${w}px ${c}`)
     else if (align === 'outside') out.outer.push(`0 0 0 ${w}px ${c}`)
     else { out.inner.push(`inset 0 0 0 ${w / 2}px ${c}`); out.outer.push(`0 0 0 ${w / 2}px ${c}`) }

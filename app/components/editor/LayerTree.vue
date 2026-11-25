@@ -179,18 +179,25 @@ const isSel = (r: Row) => store.screenId.value === r.sid && store.layerIds.value
  * 고른 줄 + 그 하위 줄을 한 박스로 칠하기(피그마 UI3): 행마다 따로 칠하지 않고, 줄 범위에 squircle 박스 하나를 깔아요.
  * 맨 윗줄(고른 것)은 조금 진하게, 아래 하위 줄들은 더 옅게. 줄 높이는 28 고정
  */
+/**
+ * 고른 줄 바탕 상자: 고른 줄(옅은 파랑) + 그 아래 하위 줄(더 옅은 파랑)을 상자 하나로.
+ * 고른 줄이 바로 위 상자에 이어지면(연달아 고름) 새 상자를 만들지 않고 이어 붙여요 — 위 · 아래 끝 모서리만 둥글고 사이는 0(한 묶음처럼)
+ */
 const groups = computed(() => {
-  const out: { top: number; n: number }[] = []
-  let g: { top: number; n: number } | null = null
+  const out: { top: number; on: boolean[] }[] = []
+  let g: { top: number; on: boolean[] } | null = null
   items.value.forEach((it, i) => {
     const on = it.kind === 'screen' ? screenOn(it.s) : isSel(it.r)
     const under = it.kind === 'screen' ? it.under : it.r.under
-    if (on) { g = { top: i, n: 1 }; out.push(g) }
-    else if (under && g) g.n++
+    if (on && g) g.on.push(true)
+    else if (on) { g = { top: i, on: [true] }; out.push(g) }
+    else if (under && g) g.on.push(false)
     else g = null
   })
   return out
 })
+/** 상자 칠: 줄마다 고른 줄 · 하위 줄 색을 28 씩 이어 붙인 세로 줄무늬 */
+const groupBg = (on: boolean[]) => `linear-gradient(${on.map((v, k) => `${v ? 'var(--lt-sel)' : 'var(--lt-under)'} ${k * 28}px ${(k + 1) * 28}px`).join(', ')})`
 /**
  * 레이어 목록 고르기(피그마와 같아요): ⌘(Ctrl) 클릭 = 하나씩 더하기 · 빼기, Shift 클릭 = 마지막으로 고른 줄부터 여기까지(같은 화면 안)
  */
@@ -264,7 +271,7 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
 <template>
   <div class="tree" role="tree" :aria-label="tr('Layers')">
     <div v-if="dropY !== null" class="drop-line" :style="{ top: dropY - 1 + 'px' }" aria-hidden="true" />
-    <div v-for="(g, i) in groups" :key="'g' + i" class="sqc grp-bg" :style="{ top: g.top * 28 + 'px', height: g.n * 28 + 'px' }" aria-hidden="true" />
+    <div v-for="(g, i) in groups" :key="'g' + i" class="sqc grp-bg" :style="{ top: g.top * 28 + 'px', height: g.on.length * 28 + 'px', background: groupBg(g.on) }" aria-hidden="true" />
     <template v-for="it in items" :key="itemKey(it)">
       <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id }]" :style="{ '--d': it.depth }" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" @keydown.enter.self.prevent="emit('pick-screen', s.id)" @keydown.space.self.prevent="emit('pick-screen', s.id)">
         <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(s.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>

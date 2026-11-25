@@ -4,18 +4,27 @@ import type { LayoutGrid } from '~/canvas/schema'
 import { colorLabel, parseColor } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import ColorField from '~/components/editor/ColorField.vue'
+import TokenPicker from '~/components/editor/TokenPicker.vue'
+import type { CatalogToken } from '~/canvas/tokens'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 
 /** Layout grid (피그마와 같아요): Columns · Rows · Grid. ⌃G 로 모두 숨기기 · 보이기 */
-const props = defineProps<{ grids: LayoutGrid[] }>()
+/** mixed: 고른 프레임들의 격자가 서로 달라요 — 목록 대신 안내, + 로 모두 같은 격자 하나로 */
+const props = defineProps<{ grids: LayoutGrid[]; mixed?: boolean }>()
 const emit = defineEmits<{ change: [grids: LayoutGrid[] | undefined] }>()
 const open = ref<number | null>(null)
 /** 피그마 순서: Grid · Columns · Rows */
 const TYPES: { value: LayoutGrid['type']; label: string }[] = [{ value: 'grid', label: 'Grid' }, { value: 'columns', label: 'Columns' }, { value: 'rows', label: 'Rows' }]
 const store = useLayerStore()
 const out = (l: LayoutGrid[]) => emit('change', l.length ? l : undefined)
-function add() { out([...props.grids, { type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }]); open.value = props.grids.length }
-function set(i: number, patch: Partial<LayoutGrid>) { out(props.grids.map((g, k) => (k === i ? { ...g, ...patch } : g))) }
+function add() { const g: LayoutGrid = { type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }; if (props.mixed) { out([g]); open.value = 0; return } out([...props.grids, g]); open.value = props.grids.length }
+/** 색을 직접 바꾸면 토큰 연결은 풀려요 — 토큰을 고를 때만 token 을 함께 넘겨요 */
+function set(i: number, patch: Partial<LayoutGrid>) {
+  const p = 'color' in patch && !('token' in patch) ? { ...patch, token: undefined } : patch
+  out(props.grids.map((g, k) => (k === i ? { ...g, ...p } : g)))
+}
+/** 토큰 색은 격자 투명도를 지켜요(격자는 늘 옅게) */
+const bindGrid = (i: number, t: CatalogToken) => { const g = props.grids[i]; if (g && t.color) set(i, { color: withA(hex(t.color), alpha(g.color)), token: t.id }) }
 function setType(i: number, t: LayoutGrid['type']) { set(i, t === 'grid' ? { type: t, size: 8, color: '#FF000019' } : { type: t, count: props.grids[i]?.count ?? 4, gutter: props.grids[i]?.gutter ?? 16, margin: props.grids[i]?.margin ?? 16 }) }
 function num(i: number, key: 'count' | 'gutter' | 'margin' | 'size', e: Event) {
   const v = Number((e.target as HTMLInputElement).value)
@@ -55,15 +64,19 @@ function onDoc(e: PointerEvent) {
 const onReflow = (e: Event) => { if (open.value !== null && !(e.target instanceof Node && pop.value?.contains(e.target))) place() }
 onMounted(() => { document.addEventListener('pointerdown', onDoc, true); window.addEventListener('resize', onReflow); window.addEventListener('scroll', onReflow, true) })
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true); window.removeEventListener('resize', onReflow); window.removeEventListener('scroll', onReflow, true) })
+/** 끌어서 순서 바꾸기 */
+const { box: dragBox, drag, start: dragStart, key: dragKey } = useRowDrag((from, to) => { open.value = null; out(moveItem(props.grids, from, to)) })
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 </script>
 
 <template>
-  <section class="s">
-    <div :class="['sec-h', 'h24', { empty: !grids.length }]"><span>{{ tr('Layout grid') }}</span><button class="ib s24" :aria-label="tr('Add layout grid')" :data-tip="tr('Add layout grid')" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
-    <div v-for="(g, i) in grids" :key="i">
+  <section ref="dragBox" class="s drag-box">
+    <div :class="['sec-h', 'h24', { empty: !grids.length && !mixed }]"><span>{{ tr('Layout grid') }}</span><button class="ib s24" :aria-label="tr('Add layout grid')" :data-tip="tr('Add layout grid')" @click="add"><EditorIcon name="plus" :size="16" /></button></div>
+    <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
+    <div v-for="(g, i) in mixed ? [] : grids" :key="i">
       <!-- 피그마 Layout guide 행: [설정 + 이름] [👁 24] [− 24] -->
-      <div :ref="rowRef(i)" class="prow" :class="{ off: g.visible === false }">
+      <div :ref="rowRef(i)" class="prow" data-drag-row :class="{ off: g.visible === false, dragging: drag?.from === i }">
+        <button v-if="grids.length > 1" type="button" class="drag-h" :aria-label="tr('Drag to reorder')" @pointerdown="dragStart($event, i)" @keydown="dragKey($event, i, grids.length)"><svg class="keep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 2h8M1 5h8M1 8h8" stroke="currentColor" stroke-width="1" /></svg></button>
         <div class="ef">
           <button :class="['ib', 's24', 'tog', { on: open === i }]" :aria-expanded="open === i" aria-haspopup="dialog" :aria-label="tr('Layout grid settings')" :data-tip="tr('Layout grid settings')" @click="open = open === i ? null : i">
             <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true"><path :d="g.type === 'columns' ? 'M2.5 2v10M7 2v10M11.5 2v10' : g.type === 'rows' ? 'M2 2.5h10M2 7h10M2 11.5h10' : 'M2 4.5h10M2 9.5h10M4.5 2v10M9.5 2v10'" stroke="currentColor" stroke-width="1.2" fill="none" /></svg>
@@ -76,7 +89,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         <button class="ib s24" :aria-label="tr('Remove layout grid')" :data-tip="tr('Remove')" @click="out(grids.filter((_, k) => k !== i)); open = null"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <Teleport v-if="open === i" to="body">
-      <div :ref="setPop" class="sq fx-pop editor" role="dialog" :aria-label="tr('Layout grid settings')" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
+      <div :ref="setPop" v-front class="sq fx-pop editor" role="dialog" :aria-label="tr('Layout grid settings')" :style="pos" @keydown.esc.stop.prevent="closePop(true)">
         <div class="pop-h"><span class="pop-t">{{ tr('Layout grid') }}</span><button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="closePop(true)"><EditorIcon name="close" :size="16" /></button></div>
         <div class="pop-b">
         <div class="ig">
@@ -106,10 +119,14 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
         <div class="ig-l"><span>{{ tr('Color') }}</span></div>
         <div class="ig">
           <div class="sq fld pf span2">
-            <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" label="Grid color" @update:model-value="(v) => set(i, { color: v })" />
+            <ColorField :model-value="withA(hex(g.color), alpha(g.color))" :sid="store.screenId.value" bindable label="Grid color" @update:model-value="(v) => set(i, { color: v })" @token="(t: CatalogToken) => bindGrid(i, t)" />
+            <TokenPicker v-if="g.token" :kinds="['color']" :bound="g.token" label="Grid color" @pick="(t) => bindGrid(i, t)" @unbind="set(i, { token: undefined })" />
+            <template v-else>
             <input :key="'h' + g.color" class="hex" :value="colorLabel(hex(g.color)).replace('#', '')" :aria-label="tr('Grid hex')"spellcheck="false" @change="(e) => { const v = (e.target as HTMLInputElement).value.trim().replace(/^#?/, '#'); if (/^#[0-9a-f]{6}$/i.test(v)) set(i, { color: withA(v.toUpperCase(), alpha(g.color)) }); else (e.target as HTMLInputElement).value = hex(g.color).slice(1) }" @keydown="blur" @focus="($event.target as HTMLInputElement).select()">
+            <TokenPicker :kinds="['color']" reveal label="Grid color" @pick="(t) => bindGrid(i, t)" />
             <span class="vsep" aria-hidden="true" />
             <span class="op"><input :key="'a' + g.color" class="pct" :value="Math.round(alpha(g.color) * 100)" inputmode="numeric" :aria-label="tr('Grid opacity')"@change="(e) => { const a = Number((e.target as HTMLInputElement).value.replace('%', '')); if (Number.isFinite(a)) set(i, { color: withA(hex(g.color), Math.min(100, Math.max(0, a)) / 100) }) }" @keydown="blur"><i class="unit">%</i></span>
+            </template>
           </div>
           <span />
         </div>
@@ -117,6 +134,7 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
       </div>
       </Teleport>
     </div>
+    <div v-if="drag" class="row-drop" :style="{ top: drag.y + 'px', left: drag.x + 'px', width: drag.w + 'px' }" />
   </section>
 </template>
 
@@ -148,4 +166,5 @@ const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInp
 .op { flex: none; width: 48px; height: 100%; box-sizing: border-box; margin-left: calc(-1 * var(--ref-spacing-06)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
 .op .pct { flex: 1; width: auto; min-width: 0; padding: 0; text-align: right; }
 .op .unit { flex: none; font-style: normal; }
+.m0 { margin: 0; }
 </style>

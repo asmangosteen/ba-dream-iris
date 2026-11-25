@@ -1,5 +1,7 @@
 import type { LayerDoc, LayerNode, VPath, VPoint } from './schema'
 import { polygonPoints, radiiOf, starPoints, vnetPath } from './paint'
+import { booleanLoops, loopsD } from './boolean'
+import { translate } from './geom'
 
 /**
  * 벡터 도우미 (v7): 도형 → 벡터 점(펜 편집 · 불리언 · 마스크), SVG 경로 해석, SVG 가져오기.
@@ -70,10 +72,8 @@ export function shapeVnet(n: LayerNode): VPath[] {
 
 /** 레이어(와 자식) → 부모 상자 기준 경로 d. 불리언 · 마스크가 써요(돌리기는 반영하지 않아요) */
 export function nodePathIn(doc: LayerDoc, n: LayerNode, ox = 0, oy = 0): string {
-  if (n.type === 'boolean' || n.type === 'frame' || n.type === 'section') {
-    if (n.type !== 'boolean') return vnetPath(shapeVnet(n), n.w, n.h, ox + n.x, oy + n.y)
-    return (n.children ?? []).map((c) => doc.nodes[c]).filter((c): c is LayerNode => !!c && !c.hidden).map((c) => nodePathIn(doc, c, ox + n.x, oy + n.y)).join('')
-  }
+  // 불리언: 계산한 결과 모양(boolean.ts)
+  if (n.type === 'boolean') return loopsD(booleanLoops(doc, n, translate(ox + n.x, oy + n.y)))
   return vnetPath(shapeVnet(n), n.w, n.h, ox + n.x, oy + n.y)
 }
 

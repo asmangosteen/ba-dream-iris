@@ -28,7 +28,7 @@ const label = (m: ThemeMode) => tr(EN_LABEL[m]) // 지금 언어로(영어 기�
 /* 메뉴 안(compact): 라벨을 메뉴 항목 글자 열(안쪽 8)에 맞추고, 위아래 6(Theme · Language 묶음 사이 12) · 라벨 → 칸 4 · 칸 안 고르기 24 · 바탕 neutral-200(입력칸 · 세그먼트와 같은 회색) */
 .theme.ed { padding: var(--ref-spacing-05) 0; gap: var(--ref-spacing-04); }
 .theme.ed .lbl { padding: 0 var(--ref-spacing-06); }
-.theme.ed .seg { --sq-fill: var(--sys-color-neutral-200); border-radius: var(--ref-radius-03); padding: var(--ref-spacing-02); }
+.theme.ed .seg { --sq-fill: var(--sys-color-neutral-200); border-radius: var(--iris-field-r); padding: var(--ref-spacing-02); }
 .theme.ed .seg-item:not(.on) { color: var(--sys-color-neutral-600); }
 .theme.ed .seg-item:not(.on):hover { color: var(--sys-color-neutral-800); }
 .theme.ed .seg-item { height: 24px; box-sizing: border-box; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); }

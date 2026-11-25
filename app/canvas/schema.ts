@@ -11,18 +11,20 @@ export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line'
 
 /** 벡터 점 (v7). x · y · 핸들(i 들어오는 쪽, o 나가는 쪽)은 모두 레이어 상자 안 0~1 비율 */
 export interface VPoint { x: number; y: number; i?: [number, number]; o?: [number, number] }
+/** 그라디언트 색 지점. token: 연결된 색 토큰 id(color 에는 그 값을 써 둬요 — 그리기 · 내보내기는 color) */
+export interface GradStop { pos: number; color: string; token?: string }
 export interface VPath { pts: VPoint[]; closed?: boolean }
 
 /** 칠(채우기 · 선 색). solid 는 한 색, linear · radial 은 그라디언트, image 는 이미지 채우기 (v5) */
 export type Paint =
-  | { type: 'solid'; color: string; opacity?: number; visible?: boolean }
-  | { type: 'linear' | 'radial' | 'angular'; stops: { pos: number; color: string }[]; angle?: number; opacity?: number; visible?: boolean }
+  | { type: 'solid'; color: string; opacity?: number; visible?: boolean; token?: string }
+  | { type: 'linear' | 'radial' | 'angular'; stops: GradStop[]; angle?: number; opacity?: number; visible?: boolean }
   | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean }
 export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
 
 /** 효과 (v5): 그림자 · 안쪽 그림자 · 레이어 흐림 · 배경 흐림 */
 export type Effect =
-  | { type: 'drop' | 'inner'; x: number; y: number; blur: number; spread?: number; color: string; visible?: boolean }
+  | { type: 'drop' | 'inner'; x: number; y: number; blur: number; spread?: number; color: string; visible?: boolean; token?: string }
   | { type: 'blur' | 'bgblur'; blur: number; visible?: boolean }
 
 export type ArrowHead = 'none' | 'arrow' | 'triangle' | 'circle'
@@ -47,6 +49,8 @@ export interface Constraints { h: 'left' | 'right' | 'leftright' | 'center' | 's
 /** 레이아웃 그리드 (v6) */
 export interface LayoutGrid {
   type: 'columns' | 'rows' | 'grid'
+  /** 연결된 색 토큰 id(color 에는 그 값) */
+  token?: string
   count?: number
   gutter?: number
   margin?: number
@@ -92,8 +96,12 @@ export interface LayerStyle {
   strokeAlign?: 'inside' | 'center' | 'outside'
   /** 점선 [선 길이, 간격] */
   dash?: [number, number]
-  /** 선 끝 모양 */
+  /** 선 끝 모양(열린 선) · 점선 끝 모양(Dash cap) */
   cap?: 'butt' | 'round' | 'square'
+  /** 선 이음새(피그마 Join): 비어 있으면 연필은 둥글게, 나머지는 각지게 */
+  join?: 'miter' | 'bevel' | 'round'
+  /** 변마다 선 두께 [위, 오른쪽, 아래, 왼쪽](피그마 Top · Bottom · Left · Right · Custom). 비어 있으면 모든 변에 strokeWidth */
+  strokeSides?: [number, number, number, number]
   /** 선 · 연필 끝 화살표 */
   arrowStart?: ArrowHead
   arrowEnd?: ArrowHead
@@ -142,7 +150,7 @@ export function bindLiteral(n: LayerNode, key: BindKey): string {
     case 'x': case 'y': case 'w': case 'h': return String(n[key])
     case 'radii.0': case 'radii.1': case 'radii.2': case 'radii.3': return String(s.radii?.[Number(key.slice(6))])
     case 'textStyle': return `${s.fontSize}/${s.lineHeight}/${s.letterSpacing}/${s.fontWeight}` // 굵기도 스타일에 들어요(옛 굵기 없는 스타일도 굵기를 바꾸면 풀려요 — 피그마와 같아요)
-    case 'shadow': return ''
+    case 'shadow': return JSON.stringify(s.effects ?? []) // 효과를 직접 고치면 스타일 연결이 풀려요
     // 오토 레이아웃 간격 · 안쪽 여백(위 · 오른 · 아래 · 왼)
     case 'gap': return String(s.layout?.gap)
     case 'rowGap': return String(s.layout?.rowGap ?? s.layout?.gap)

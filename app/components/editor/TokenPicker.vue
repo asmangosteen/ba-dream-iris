@@ -280,7 +280,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
   ><EditorIcon v-if="icon" :name="icon" :size="16" /><svg v-else class="eic" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path :d="VARIABLE" fill="none" stroke="currentColor" stroke-width="1.25" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
 
   <Teleport to="body">
-    <div v-if="open" ref="menu" :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
+    <div v-if="open" ref="menu" v-front :class="['sq', 'menu', 'tp', 'tsp']" :style="pos" @keydown="onKey">
       <div class="tsp-h"><span>{{ isTS ? tr('Text styles') : tr('{kind} variables', { kind: kindLabel }) }}</span><button type="button" class="ib tsp-x" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="close(true)"><EditorIcon name="close" :size="16" /></button></div>
       <label class="sq tp-s"><EditorIcon name="search" :size="16" class="muted" /><input ref="search" v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search {kind} variables', { kind: kindLabel.toLowerCase() })" role="combobox" aria-expanded="true" :aria-controls="uid" :aria-activedescendant="`${uid}-${active}`" autocomplete="off" spellcheck="false"></label>
       <div :id="uid" ref="list" class="tp-l" role="listbox" :aria-label="tr('{kind} variables', { kind: kindLabel })">
@@ -361,7 +361,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 
 /* 목록 카드 — 피그마 변수 목록: 폭 240 · 안쪽 4 · 검색 28 · 묶음 라벨 11/16 · 행 28 (body 로 옮겨져서 .editor 규칙을 받지 않아요: 값을 여기서 모두 정해요) */
 .tp { position: fixed; right: auto; top: auto; width: 240px; z-index: 50; padding: var(--ref-spacing-06) var(--ref-spacing-04) var(--ref-spacing-04); gap: var(--ref-spacing-04); box-sizing: border-box; border-radius: var(--ref-radius-06); /* 테두리 · 그림자는 .menu 공통(= 사이드바 .float) 그대로 */ }
-.tp-s { flex: none; margin: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-200); cursor: text; }
+.tp-s { flex: none; margin: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); cursor: text; }
 .tp-s input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; color: var(--sys-color-neutral-800); }
 .tp-s input::placeholder { color: var(--sys-color-neutral-500); }
 .tp-s:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
