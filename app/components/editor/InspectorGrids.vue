@@ -8,7 +8,7 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
 import type { CatalogToken } from '~/canvas/tokens'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 
-/** Layout grid (피그마와 같아요): Columns · Rows · Grid. ⌃G 로 모두 숨기기 · 보이기 */
+/** Layout grid (피그마와 같아요): Columns · Rows · Grid. ⇧G 로 모두 숨기기 · 보이기 */
 /** mixed: 고른 프레임들의 격자가 서로 달라요 — 목록 대신 안내, + 로 모두 같은 격자 하나로 */
 const props = defineProps<{ grids: LayoutGrid[]; mixed?: boolean }>()
 const emit = defineEmits<{ change: [grids: LayoutGrid[] | undefined] }>()

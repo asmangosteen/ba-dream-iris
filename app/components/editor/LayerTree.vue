@@ -5,7 +5,7 @@ import { descendants, isContainer, isGroupNode, type LayerNode } from '~/canvas/
 import { LAYER_ICON } from '~/canvas/icons'
 import { radiiOf, rectPath, vectorPath } from '~/canvas/paint'
 import { booleanPath } from '~/canvas/boolean'
-import { layerMenuItems, pickedLayers, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
+import { layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
 import RenameLayers from '~/components/editor/RenameLayers.vue'
 import { useLayerStore } from '~/canvas/store'
 
@@ -372,15 +372,15 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
   // 이미 고른 화면(여러 개 중 하나)이면 선택은 그대로 — 메뉴 동작이 고른 화면 전부에 가요
   if (!screenOn(s)) emit('pick-screen', s.id)
   ctx.open(e, [
-    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip() } },
     { label: tr('Paste'), shortcut: '⌘V', action: paste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
     { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => emit('screen-action', 'section') },
     'sep',
-    { label: tr('Bring to front'), shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: tr('Bring to front'), shortcut: ']', action: () => emit('screen-action', 'front') },
     { label: tr('Bring forward'), shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
     { label: tr('Send backward'), shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
-    { label: tr('Send to back'), shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
+    { label: tr('Send to back'), shortcut: '[', action: () => emit('screen-action', 'back') },
     'sep',
     { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ])

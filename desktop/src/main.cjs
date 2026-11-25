@@ -115,7 +115,8 @@ function buildMenu() {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+        // ⌘R · ⇧⌘R 은 편집기의 이름 바꾸기 · 바꿔 붙여넣기(피그마와 같아요) — 새로고침은 ⌥⌘R · ⌥⇧⌘R 로 옮겨요
+        { role: 'reload', accelerator: 'CmdOrCtrl+Alt+R' }, { role: 'forceReload', accelerator: 'CmdOrCtrl+Alt+Shift+R' }, { role: 'toggleDevTools' },
         { type: 'separator' }, { role: 'togglefullscreen' },
       ],
     },

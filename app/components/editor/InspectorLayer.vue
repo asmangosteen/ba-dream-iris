@@ -396,7 +396,7 @@ const boolItems = () => {
   const isBool = one.value?.type === 'boolean'
   // 이름 왼쪽에 그 연산 아이콘(머리 버튼과 같은 그림) — 체크 표시는 없어요
   const ops = BOOL_OPS.map((b) => ({ label: tr(b.label.replace(' selection', '')), icon: { name: b.icon }, shortcut: b.key, disabled: !isBool && nodes.value.length < 2, action: () => (isBool ? store.update(sid.value, ids.value, { op: b.k, name: b.label.split(' ')[0] }) : store.booleanOp(sid.value, ids.value, b.k)) }))
-  return [...ops, 'sep' as const, { label: tr('Flatten'), icon: { name: 'flatten' }, shortcut: '⌘E', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
+  return [...ops, 'sep' as const, { label: tr('Flatten'), icon: { name: 'flatten' }, shortcut: '⌥⇧F', disabled: !canFlatten(nodes.value), action: () => store.flatten(sid.value, ids.value) }]
 }
 function boolMenu(e: MouseEvent) { ctxMenu.open(under(e), boolItems()) }
 /** 프레임 ↔ 그룹(피그마 머리의 'Frame ▾'): 그룹으로 바꾸면 칠 · 자르기 · 오토 레이아웃을 빼요 */

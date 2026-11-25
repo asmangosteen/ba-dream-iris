@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { clipsContent, isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
+import { textShortcut } from '~/canvas/textKeys'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
 import { GHOST_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
@@ -234,6 +235,8 @@ function secKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') renameSec.value = null
 }
 const textEl = ref<HTMLElement | null>(null)
+/** 더블클릭으로 글자 편집을 시작한 자리(화면 좌표) — 그 자리 단어를 골라요 */
+const editAt = useState<{ x: number; y: number } | null>('iris-edit-at', () => null)
 let orig: { w: number; h: number } | null = null // 고치기 전 크기(실행 취소가 이 크기로 돌아가게)
 /**
  * 여러 글자를 함께 고른 채 고치기: 같이 고른 다른 글자(다른 프레임 것도)에 치는 대로 똑같이 — 끝낼 때 한 번에 기록(실행 취소 한 번)
@@ -259,12 +262,31 @@ watch(editingThis, async (on) => {
   const el = textEl.value
   if (!el) return
   el.focus()
+  const sel = window.getSelection()
+  // 더블클릭으로 들어왔으면 누른 자리의 단어를, Enter 로 들어왔으면 전체를 골라요(피그마와 같아요)
+  const at = editAt.value
+  editAt.value = null
+  const hit = at ? (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(at.x, at.y) : null
+  if (hit && el.contains(hit.startContainer) && sel) {
+    sel.removeAllRanges()
+    sel.addRange(hit)
+    const m = sel as Selection & { modify?: (a: string, d: string, g: string) => void }
+    m.modify?.('move', 'backward', 'word')
+    m.modify?.('extend', 'forward', 'word')
+    return
+  }
   const r = document.createRange()
   r.selectNodeContents(el)
-  const sel = window.getSelection()
   sel?.removeAllRanges()
   sel?.addRange(r)
 }, { immediate: true })
+/** 글자 붙여넣기: 서식 없이 글자만(피그마와 같아요) */
+function onPaste(e: ClipboardEvent) {
+  const t = e.clipboardData?.getData('text/plain')
+  e.preventDefault()
+  e.stopPropagation()
+  if (t) document.execCommand('insertText', false, t.replace(/\r\n?/g, '\n'))
+}
 /** 치는 동안: 글자 상자 크기를 바로 맞춰요(기록 없이) — 선택 · 마우스 올림 상자가 글자를 따라 커져요 */
 function onInput() {
   const el = textEl.value
@@ -331,7 +353,18 @@ function finish() {
   })
 }
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); (e.target as HTMLElement).blur() }
+  // 한글 조합 중에는 브라우저에 맡겨요(Esc · Enter 가 조합을 깨지 않게)
+  if (e.isComposing || e.keyCode === 229) { e.stopPropagation(); return }
+  const mod = e.metaKey || e.ctrlKey
+  // 확대 · 축소(⌘+ ⌘− ⌘0)는 캔버스가 받아요 — 브라우저 화면 확대가 되지 않게
+  if (mod && !e.altKey && ['Equal', 'Minus', 'Digit0', 'NumpadAdd', 'NumpadSubtract'].includes(e.code)) return
+  if (e.key === 'Escape' || (e.key === 'Enter' && mod)) { e.preventDefault(); (e.target as HTMLElement).blur() }
+  // Tab: 편집에서 빠져나가지 않고 탭 글자(피그마와 같아요)
+  else if (e.key === 'Tab' && !mod && !e.altKey) { e.preventDefault(); document.execCommand('insertText', false, '\t') }
+  // 글자 단축키(⌘B · ⌘U · 정렬 · 크기 · 목록 등): 브라우저 서식 대신 레이어에
+  else if (textShortcut(e, store, props.screenId, [props.id])) e.preventDefault()
+  // 브라우저 서식(⌘I 등)은 저장되지 않아서 막아요
+  else if (mod && !e.altKey && ['KeyI'].includes(e.code)) e.preventDefault()
   e.stopPropagation()
 }
 </script>
@@ -373,6 +406,7 @@ function onKey(e: KeyboardEvent) {
         @blur="editingThis && finish()"
         @keydown="editingThis && onKey($event)"
         @input="editingThis && onInput()"
+        @paste="editingThis && onPaste($event)"
         @pointerdown="editingThis && $event.stopPropagation()"
       >{{ n.text }}</span>
     </template>

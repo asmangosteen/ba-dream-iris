@@ -70,6 +70,7 @@ function key(e: KeyboardEvent, kind: 'sv' | 'hue' | 'alpha') {
   const dy = e.key === 'ArrowUp' ? d : e.key === 'ArrowDown' ? -d : 0
   if (!dx && !dy) return
   e.preventDefault()
+  e.stopPropagation() // 고른 레이어가 함께 움직이지 않게
   const c = (v: number) => Math.min(1, Math.max(0, v))
   if (kind === 'sv') set({ s: c(hsv.value.s + dx), v: c(hsv.value.v + dy) })
   else if (kind === 'hue') set({ h: Math.min(359.9, Math.max(0, hsv.value.h + (dx || dy) * 360)) })

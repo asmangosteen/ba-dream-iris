@@ -485,7 +485,8 @@ export function createLayerStore(opts: {
       /** 원본 id → 방금 붙인 복제본 id(같은 원본을 여러 번 붙이면 그 뒤에 이어서) */
       const lastAfter = new Map<string, string>()
       const sel = layerIds.value.length === 1 ? d.nodes[layerIds.value[0]!] : undefined
-      const into = sel && isContainer(sel) && !cb.rootIds.includes(sel.id) ? sel.id : null
+      // 고른 프레임 · 섹션 안으로(그룹 · 불리언은 아니에요 — 피그마와 같아요)
+      const into = sel && isContainer(sel) && !isGroupNode(sel) && sel.type !== 'boolean' && !cb.rootIds.includes(sel.id) ? sel.id : null
       const fresh: string[] = []
       const same = cb.sid === sid
       const so = geo?.origin(cb.sid), to = geo?.origin(sid)
@@ -544,6 +545,53 @@ export function createLayerStore(opts: {
       layerIds.value = fresh
       screenId.value = sid
     })
+  }
+  /**
+   * ⇧⌘V 고른 것 위에 붙여넣기 · ⇧⌘R 바꿔 붙여넣기(피그마와 같아요): 고른 것과 같은 부모, 같은 왼쪽 위 자리에 붙이고
+   * 고른 것 바로 위 순서에 놓아요. 바꾸기면 고른 것은 지워요. 실행취소 한 번
+   */
+  function pasteOnSelection(replace: boolean): boolean {
+    const sid = screenId.value
+    if (!clipboard || !sid || !layerIds.value.length) return false
+    const cb = clipboard
+    const d0 = doc(sid)
+    const targets = topIds(sid, layerIds.value).filter((id) => d0.nodes[id] && !cb.rootIds.includes(id))
+    if (!targets.length) return false
+    mutate(sid, (d) => {
+      const parentId = d.nodes[targets[0]!]!.parentId
+      const sib = siblings(d, parentId)
+      const pa = parentId ? absPos(d, parentId) : { x: 0, y: 0 }
+      const tAbs = targets.map((id) => absPos(d, id))
+      const tx = Math.min(...tAbs.map((p) => p.x)), ty = Math.min(...tAbs.map((p) => p.y))
+      const roots = cb.nodes.filter((n) => cb.rootIds.includes(n.id))
+      const rAbs = (n: LayerNode) => cb.abs[n.id] ?? { x: n.x, y: n.y }
+      const ax = Math.min(...roots.map((n) => rAbs(n).x)), ay = Math.min(...roots.map((n) => rAbs(n).y))
+      const map = new Map(cb.nodes.map((n) => [n.id, newId()]))
+      let at = Math.max(-1, ...targets.filter((id) => d.nodes[id]!.parentId === parentId).map((id) => sib.indexOf(id)))
+      const fresh: string[] = []
+      for (const n0 of cb.nodes) {
+        const n = JSON.parse(JSON.stringify(n0)) as LayerNode
+        const id = map.get(n.id)!
+        const root = cb.rootIds.includes(n.id)
+        const label = n.group ? 'Group' : TYPE_LABEL[n.type]
+        const name = root && label && new RegExp('^' + label + ' \\d+$').test(n.name ?? '') ? nextLabel(label, d) : n.name
+        const pos = root ? { x: snapPx(tx - pa.x + rAbs(n).x - ax), y: snapPx(ty - pa.y + rAbs(n).y - ay) } : {}
+        d.nodes[id] = { ...n, id, name, parentId: root ? parentId : map.get(n.parentId!)!, children: n.children?.map((c) => map.get(c)!), ...pos }
+        if (root) { sib.splice(++at, 0, id); fresh.push(id) }
+      }
+      if (replace) {
+        for (const t of targets) {
+          const n = d.nodes[t]
+          if (!n) continue
+          const s = siblings(d, n.parentId)
+          const i = s.indexOf(t)
+          if (i >= 0) s.splice(i, 1)
+          for (const k of descendants(d, t)) delete d.nodes[k]
+        }
+      }
+      layerIds.value = fresh
+    })
+    return true
   }
   /**
    * 스마트 복제(피그마와 같아요): ⌘D 로 복제한 복제본을 옮긴 뒤(또는 ⌥ 끌기 복제 뒤) 다시 ⌘D 를 누르면
@@ -951,8 +999,24 @@ export function createLayerStore(opts: {
 
   // --- 속성 복사 · 붙여넣기 (⌥⌘C · ⌥⌘V) ---
   let styleClip: LayerStyle | null = null
-  function copyStyle() { const sid = screenId.value; const n = sid && layerIds.value[0] ? node(sid, layerIds.value[0]) : undefined; if (n) { styleClip = { ...n.style }; return true } return false }
-  function pasteStyle() { const sid = screenId.value; if (sid && styleClip && layerIds.value.length) style(sid, layerIds.value, styleClip) }
+  // 레이어를 안 고르고 화면(프레임)만 골랐으면 그 화면의 모양을 복사 · 붙여넣어요(피그마와 같아요 — 프레임도 레이어)
+  const FRAME_KEYS = ['fill', 'fills', 'stroke', 'strokes', 'strokeWidth', 'strokeAlign', 'strokeSides', 'dash', 'radius', 'radii', 'smoothing', 'opacity', 'effects', 'blend'] as const
+  function copyStyle() {
+    const sid = screenId.value
+    if (!sid) return false
+    const n = layerIds.value[0] ? node(sid, layerIds.value[0]) : undefined
+    if (n) { styleClip = { ...n.style }; return true }
+    const f = doc(sid).frame
+    if (f) { styleClip = { ...f }; return true }
+    return false
+  }
+  function pasteStyle() {
+    const sid = screenId.value
+    if (!sid || !styleClip) return
+    if (layerIds.value.length) { style(sid, layerIds.value, styleClip); return }
+    const clip = styleClip
+    frameStyle(sid, Object.fromEntries(FRAME_KEYS.map((k) => [k, clip[k]])) as Partial<LayerStyle>)
+  }
 
   // --- 회전 · 뒤집기 ---
   /**
@@ -1149,7 +1213,7 @@ export function createLayerStore(opts: {
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, pushAction,
     hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
-    nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, duplicate, duplicateInPlace, color,
+    nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),

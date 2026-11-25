@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LayoutGrid } from '~/canvas/schema'
 
-/** 레이아웃 그리드 그리기(프레임 · 화면 위). ⌃G 로 모두 숨기기 — useLayoutGridsShown() */
+/** 레이아웃 그리드 그리기(프레임 · 화면 위). ⇧G 로 모두 숨기기 — useLayoutGridsShown() */
 const props = defineProps<{ grids?: LayoutGrid[]; w: number; h: number }>()
 const shown = useLayoutGridsShown()
 const bands = computed(() => {

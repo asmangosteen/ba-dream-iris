@@ -131,7 +131,7 @@ function onRoleKey(e: KeyboardEvent) {
         <form class="content" @submit.prevent="save">
           <div class="photo">
             <button type="button" class="pic" :aria-label="tr('Change profile photo')" @click="fileEl?.click()">
-              <MemberAvatar :name="trimmed || me?.name || me?.email || ''" :src="photoUrl" :size="48" />
+              <MemberAvatar :name="trimmed || me?.email || ''" :src="photoUrl" :size="48" />
               <span class="pic-edit" aria-hidden="true"><Icon name="camera" :size="12" /></span>
             </button>
             <div class="pic-act">

@@ -66,7 +66,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
   const allHidden = nodes.every((n) => n.hidden), allLocked = nodes.every((n) => n.locked)
   const hasLayout = nodes.some((n) => n.style.layout)
   return [
-    { label: tr('Copy'), shortcut: '⌘C', action: () => { if (store.copy()) opts.lastCopy.value = 'layers' } },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { if (store.copy()) { opts.lastCopy.value = 'layers'; markIrisClip() } } },
     { label: tr('Paste'), shortcut: '⌘V', action: opts.paste, disabled: !store.hasClipboard() && opts.lastCopy.value !== 'screen' },
     ...(opts.pasteHere ? [{ label: tr('Paste here'), action: opts.pasteHere, disabled: !store.hasClipboard() || opts.lastCopy.value === 'screen' }] : []),
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => store.duplicate() },
@@ -79,10 +79,10 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     { label: tr('Select inverse'), shortcut: '⇧⌘A', action: () => store.selectInverse(sid) },
     { label: tr('Select all matching layers'), shortcut: '⌥⌘A', action: () => store.selectMatching(sid) },
     'sep',
-    { label: tr('Bring to front'), shortcut: '⌥⌘]', action: () => store.arrange(sid, ids, 'top') },
+    { label: tr('Bring to front'), shortcut: ']', action: () => store.arrange(sid, ids, 'top') },
     { label: tr('Bring forward'), shortcut: '⌘]', action: () => store.arrange(sid, ids, 1) },
     { label: tr('Send backward'), shortcut: '⌘[', action: () => store.arrange(sid, ids, -1) },
-    { label: tr('Send to back'), shortcut: '⌥⌘[', action: () => store.arrange(sid, ids, 'bottom') },
+    { label: tr('Send to back'), shortcut: '[', action: () => store.arrange(sid, ids, 'bottom') },
     'sep',
     { label: tr('Group selection'), shortcut: '⌘G', action: () => store.wrap(sid, ids, 'group') },
     { label: tr('Frame selection'), shortcut: '⌥⌘G', action: () => store.wrap(sid, ids, 'frame') },
@@ -99,18 +99,27 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
       { label: tr('Exclude selection'), shortcut: '⌥⇧E', action: () => store.booleanOp(sid, ids, 'exclude') },
     ] : []),
     { label: one?.isMask ? tr('Remove mask') : tr('Use as mask'), shortcut: '⌃⌘M', action: () => store.toggleMask(sid, ids) },
-    { label: tr('Flatten'), shortcut: '⌘E', action: () => store.flatten(sid, ids), disabled: !canFlatten(nodes) },
+    { label: tr('Flatten'), shortcut: '⌥⇧F', action: () => store.flatten(sid, ids), disabled: !canFlatten(nodes) },
     'sep',
-    { label: allHidden ? tr('Show') : tr('Hide'), action: () => store.update(sid, ids, { hidden: allHidden ? undefined : true }) },
-    { label: allLocked ? tr('Unlock') : tr('Lock'), action: () => store.update(sid, ids, { locked: allLocked ? undefined : true }) },
+    { label: allHidden ? tr('Show') : tr('Hide'), shortcut: '⇧⌘H', action: () => store.update(sid, ids, { hidden: allHidden ? undefined : true }) },
+    { label: allLocked ? tr('Unlock') : tr('Lock'), shortcut: '⇧⌘L', action: () => store.update(sid, ids, { locked: allLocked ? undefined : true }) },
     'sep',
     { label: tr('Flip horizontal'), shortcut: '⇧H', action: () => store.flip(sid, ids, 'x') },
     { label: tr('Flip vertical'), shortcut: '⇧V', action: () => store.flip(sid, ids, 'y') },
     'sep',
     { label: tr('Copy properties'), shortcut: '⌥⌘C', action: () => store.copyStyle(), disabled: !one },
     { label: tr('Paste properties'), shortcut: '⌥⌘V', action: () => store.pasteStyle() },
-    ...(opts.fit ? ['sep' as const, { label: tr('Zoom to selection'), shortcut: '⇧2', action: opts.fit }] : []),
+    ...(opts.fit ? ['sep' as const, { label: tr('Zoom to selection'), shortcut: '2', action: opts.fit }] : []),
     'sep',
     { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => store.remove(sid, ids) },
   ]
+}
+
+/**
+ * Iris 안에서 복사했다는 표시를 운영체제 클립보드에도 써 둬요. ⌘V 때 클립보드에 이 표시가 있으면 Iris 클립보드(레이어 · 화면)를,
+ * 다른 앱에서 그 뒤에 복사한 그림 · SVG 가 있으면 그것을 붙여요(피그마와 같아요 — 마지막에 복사한 것이 붙어요)
+ */
+export const IRIS_CLIP = '\u2063iris-clipboard\u2063'
+export function markIrisClip() {
+  try { navigator.clipboard?.writeText(IRIS_CLIP).catch(() => {}) } catch { /* 클립보드를 못 쓰면 Iris 클립보드만 */ }
 }

@@ -10,7 +10,7 @@ import { booleanPath } from '~/canvas/boolean'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
-import { layerMenuItems, pickedLayers, svgOf, useAlHint, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
+import { layerMenuItems, markIrisClip, pickedLayers, svgOf, useAlHint, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize, shapeVnet } from '~/canvas/vector'
@@ -22,6 +22,9 @@ import { GHOST_KEY } from '~/canvas/ghost'
 import { fmtNum } from '~/canvas/num'
 import { scaledStyle } from '~/canvas/scale'
 import { useImageSrc } from '~/canvas/images'
+import { textShortcut } from '~/canvas/textKeys'
+import { download, fileNameOf, renderExport } from '~/canvas/exporter'
+import type { ExportSetting } from '~/canvas/schema'
 
 /**
  * 무한 캔버스 + 화면 안 레이어 편집.
@@ -61,8 +64,12 @@ const emit = defineEmits<{
   'clone-screens': [items: { id: string; x: number; y: number }[]]
   'clip-screens': [ids: string[]]
   'paste-screens': [withLayers: boolean]
+  /** 화면 단축키(피그마와 같아요): ⌘\\ UI 숨기기 · ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭 · PageUp/PageDown 이전 · 다음 페이지 */
+  ui: [k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev-page' | 'next-page']
 }>()
 const store = useLayerStore()
+/** 더블클릭으로 글자 편집을 시작한 자리(LayerView 가 그 자리 단어를 골라요) */
+const editAt = useState<{ x: number; y: number } | null>('iris-edit-at', () => null)
 
 const el = ref<HTMLElement | null>(null)
 const space = ref(false)
@@ -135,12 +142,29 @@ function onWheel(e: WheelEvent) {
 const CORNERS = ['nw', 'ne', 'sw', 'se'] as const
 const EDGES = ['n', 's', 'e', 'w'] as const
 type Targets = { sibs: Rect[]; parents: Rect[] }
+/** 그리는 중 Space(피그마와 같아요): 누른 순간의 포인터 · 시작점 — 손을 뗄 때까지 그리던 것을 통째로 옮겨요 */
+type SpaceMove = { x: number; y: number; ox: number; oy: number }
+/**
+ * 끌어 그린 상자(피그마와 같아요): ⇧ 정비율, ⌥ 누른 점이 가운데
+ */
+function boxFrom(ax: number, ay: number, bx: number, by: number, square: boolean, center: boolean) {
+  let dx = bx - ax, dy = by - ay
+  if (square) { const m = Math.max(Math.abs(dx), Math.abs(dy)); dx = Math.sign(dx || 1) * m; dy = Math.sign(dy || 1) * m }
+  if (center) return { x: ax - Math.abs(dx), y: ay - Math.abs(dy), w: Math.abs(dx) * 2, h: Math.abs(dy) * 2 }
+  return { x: Math.min(ax, ax + dx), y: Math.min(ay, ay + dy), w: Math.abs(dx), h: Math.abs(dy) }
+}
+/** 그리는 중 Space 로 시작점 옮기기: 누르고 있는 동안 시작점이 포인터를 따라가요 */
+function spaceShift(dg: { sp?: SpaceMove }, start: { x: number; y: number }, px: number, py: number): { x: number; y: number } {
+  if (!space.value) { dg.sp = undefined; return start }
+  if (!dg.sp) dg.sp = { x: px, y: py, ox: start.x, oy: start.y }
+  return { x: dg.sp.ox + px - dg.sp.x, y: dg.sp.oy + py - dg.sp.y }
+}
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number; moved: boolean }
   | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string; dup?: boolean; canDup?: boolean }
-  | { kind: 'draw'; wx: number; wy: number; moved: boolean }
+  | { kind: 'draw'; wx: number; wy: number; moved: boolean; sp?: SpaceMove }
   | { kind: 'layers'; xcarry?: { sid: string; id: string; x: number; y: number; inv: Mat }[]; xbefore?: [string, string][]; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean }
-  | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean }
+  | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean; sp?: SpaceMove; c?: { x: number; y: number } }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
   | { kind: 'pen'; moved: boolean }
@@ -148,8 +172,8 @@ type Drag =
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number } }[]; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
-  | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean }
-  | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean; deep?: boolean; click?: string; add?: boolean }
+  | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean; sp?: SpaceMove }
+  | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean; deep?: boolean; click?: string; add?: boolean; pick?: boolean }
   | { kind: 'vmarquee'; x0: number; y0: number; base: VKey[]; moved: boolean }
   | { kind: 'marqueeCanvas'; wx: number; wy: number; moved: boolean; baseScreens: string[]; baseLayers: string[]; deep?: boolean }
   | { kind: 'screens'; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; b0: Rect; targets: Rect[]; moved: boolean; dup?: boolean }
@@ -209,7 +233,8 @@ function frameAt(sid: string, lx: number, ly: number, exclude?: Set<string>): st
       const n = d.nodes[id]
       if (!n || !isContainer(n) || n.hidden || n.locked || exclude?.has(id)) continue
       const p = store.absPos(sid, id)
-      if (lx >= p.x && ly >= p.y && lx <= p.x + n.w && ly <= p.y + n.h) { found = id; walk(n.children ?? []) }
+      // 그룹 · 불리언은 들어갈 곳이 아니에요(피그마와 같아요) — 그룹 안의 프레임은 돼요
+      if (lx >= p.x && ly >= p.y && lx <= p.x + n.w && ly <= p.y + n.h) { if (!isGroupNode(n) && n.type !== 'boolean') found = id; if (n.type !== 'boolean') walk(n.children ?? []) }
     }
   }
   walk(d.rootIds)
@@ -271,8 +296,10 @@ function retarget(dg: Extract<Drag, { kind: 'layers' }>, e: PointerEvent, dx: nu
   if (out) { setDropLine(under ? rectOf(under) : null); return }
   const ex = new Set(roots.flatMap((id) => descendants(d, id)))
   const target = frameAt(sc.id, w.x - sc.x, w.y - sc.y, ex)
-  setDropLine(target !== dg.parent0 ? (target ? layerWorld(sc, target) : isCanvas(sc) ? null : rectOf(sc)) : null)
-  const moving = roots.filter((id) => d.nodes[id] && d.nodes[id]!.parentId !== target)
+  // 그룹 · 불리언 안의 레이어는 같은 프레임 안에서 끄는 동안 그대로 그 안에(피그마와 같아요)
+  const frameOf = (pid: string | null | undefined) => { let q = pid ?? null; while (q && (isGroupNode(d.nodes[q]) || d.nodes[q]?.type === 'boolean')) q = d.nodes[q]!.parentId ?? null; return q }
+  setDropLine(target !== frameOf(dg.parent0) ? (target ? layerWorld(sc, target) : isCanvas(sc) ? null : rectOf(sc)) : null)
+  const moving = roots.filter((id) => d.nodes[id] && d.nodes[id]!.parentId !== target && frameOf(d.nodes[id]!.parentId) !== target)
   if (moving.length) store.reparent(sc.id, moving, target)
   for (const id of moving) {
     const n = d.nodes[id]
@@ -780,9 +807,13 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     return
   }
   const t = drawType(tool.value)
+  // 그리기 시작점도 주변에 붙어요(피그마와 같아요, ⌘ 끔)
+  const drawing = !!t || pointTool(tool.value) || tool.value === 'frame' || tool.value === 'section'
+  const w0 = toWorld(e.clientX, e.clientY)
+  const startAt = (sid: string | null) => (drawing && !snapOff(e) ? snapPoint(w0.x, w0.y, [], sid ? pointTargets(sid) : [...realScreens.value.map(rectOf), ...guideRects()]) : { x: w0.x, y: w0.y })
   // 빈 캔버스에 프레임 도구 → 새 화면
   if (!screen) {
-    const w = toWorld(e.clientX, e.clientY)
+    const w = tool.value === 'frame' ? startAt(null) : canvasDoc.value ? startAt(canvasDoc.value.id) : w0
     // 프레임 도구 → 새 화면
     if (tool.value === 'frame') { drag = { kind: 'draw', wx: w.x, wy: w.y, moved: false }; return }
     if (pointTool(tool.value) && canvasDoc.value) { startPoints(canvasDoc.value.id, w.x, w.y); return }
@@ -807,7 +838,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     }
     return
   }
-  const w = toWorld(e.clientX, e.clientY)
+  const w = startAt(drawing ? screen.id : null)
   const lx = w.x - screen.x, ly = w.y - screen.y
   // 섹션은 늘 캔버스 위에(화면을 묶는 바탕)
   if (tool.value === 'section' && canvasDoc.value) {
@@ -866,8 +897,12 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     const wasSel = store.screenId.value === screen.id && store.layerIds.value.includes(lid)
     // 여러 개 중 하나를 누르면: 끌면 함께 옮기고, 그냥 떼면 그 하나만 골라요(피그마와 같아요)
     const pickOne = wasSel && (store.layerIds.value.length > 1 || store.xsel.value.length > 0) ? lid : undefined
-    if (!anc && !wasSel) store.selectLayer(screen.id, lid)
-    if (e.altKey) keepMix(() => store.duplicateInPlace()) // ⌥ 끌기: 복제해서 옮기기
+    // 고른 것의 상자 안을 누르면(위에 다른 레이어가 겹쳐 있어도) 고른 것을 끌어요 — 끌지 않고 떼면 누른 레이어를 골라요(피그마와 같아요)
+    const selBoxes = !anc && !wasSel && store.screenId.value === screen.id ? store.layerIds.value.map((id) => layerWorld(screen!, id)).filter((b): b is Rect => !!b) : []
+    const sb = selBoxes.length ? union(selBoxes) : null
+    const inSel = !!sb && w.x >= sb.x && w.x <= sb.x + sb.w && w.y >= sb.y && w.y <= sb.y + sb.h
+    if (!anc && !wasSel && !inSel) store.selectLayer(screen.id, lid)
+    // ⌥ 끌기 복제는 실제로 끌 때 해요(move) — ⌥ 를 누른 채 누르기만 하면(거리 재기) 아무것도 생기지 않게(피그마와 같아요)
     const d = store.doc(screen.id)
     // 부모와 자식을 함께 골랐으면 부모만 옮겨요(자식은 따라와요 — 두 번 움직이지 않게)
     const ids = store.topIds(screen.id, store.layerIds.value).filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
@@ -880,11 +915,11 @@ function start(e: PointerEvent, screen?: ScreenRow) {
       targets: snapTargets(sc, ids),
       before: store.begin(sc.id), moved: false,
       carry: [...sectionCarry(sc, ids), ...mixCarry()],
-      clickLayer: anc ? lid : pickOne,
+      clickLayer: anc || inSel ? lid : pickOne,
       parent0: ids[0] ? d.nodes[ids[0]]?.parentId ?? null : null,
-      duped: e.altKey,
+      duped: false,
       mixIds: [...mix.value],
-      carryDup: e.altKey && mix.value.length > 0,
+      carryDup: false,
       ...xCarryStart(),
     }
     return
@@ -909,7 +944,6 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   if (mix.value.includes(screen.id) && store.screenId.value && store.layerIds.value.length) {
     const sc = props.screens.find((v) => v.id === store.screenId.value)
     if (sc) {
-      if (e.altKey) keepMix(() => store.duplicateInPlace())
       const d = store.doc(sc.id)
       const ids = store.topIds(sc.id, store.layerIds.value).filter((id) => d.nodes[id] && !d.nodes[id]!.locked)
       drag = {
@@ -919,7 +953,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
         b0: union([...ids.map((id) => layerWorld(sc, id)!), ...mixCarry().map((c) => rectOf(props.screens.find((v) => v.id === c.id)!))]),
         targets: snapTargets(sc, ids), before: store.begin(sc.id), moved: false,
         carry: mixCarry(), parent0: ids[0] ? d.nodes[ids[0]]?.parentId ?? null : null,
-        duped: e.altKey, mixIds: [...mix.value], carryDup: e.altKey,
+        duped: false, mixIds: [...mix.value], carryDup: false,
       }
       return
     }
@@ -928,6 +962,13 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     const orig = Object.fromEntries(multi.value.map((id) => { const v = props.screens.find((x) => x.id === id)!; return [id, { x: v.x, y: v.y }] }))
     const moving = realScreens.value.filter((v) => multi.value.includes(v.id))
     drag = { kind: 'screens', ids: [...multi.value], sx: e.clientX, sy: e.clientY, orig, b0: union(moving.map(rectOf)), targets: realScreens.value.filter((v) => !multi.value.includes(v.id)).map(rectOf), moved: false, dup: e.altKey }
+    return
+  }
+  // 고르지 않은 화면(맨 위 프레임)의 빈 곳을 끌면 상자 고르기, 누르기만 하면 그 화면 고르기(피그마와 같아요). 이미 고른 화면은 끌면 옮겨요
+  const screenSel = store.screenId.value === screen.id && !store.layerIds.value.length
+  if (!layerEl && isNative(screen) && !isCanvas(screen) && !e.altKey && !screenSel && !multi.value.includes(screen.id)) {
+    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base: [], moved: false, pick: true }
+    marqueeOn.value = true
     return
   }
   store.selectScreen(screen.id)
@@ -1348,10 +1389,17 @@ function move(e: PointerEvent) {
     const n = store.node(drag.sid, drag.id)
     if (n) n.rotation = normAngle(deg) || undefined
   } else if (drag.kind === 'draw') {
-    const w = toWorld(e.clientX, e.clientY)
+    // 빈 캔버스에 프레임(화면) 그리기: 다른 화면 · 가이드에 붙고(⌘ 끔), ⇧ 정비율 · ⌥ 가운데 · Space 옮기기(피그마와 같아요)
+    const sp = snapPoint(toWorld(e.clientX, e.clientY).x, toWorld(e.clientX, e.clientY).y, [], [...realScreens.value.map(rectOf), ...guideRects()], snapOff(e))
+    const w = { x: sp.x, y: sp.y }
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
     drag.moved = true
-    draft.value = { x: store.snapPx(Math.min(w.x, drag.wx)), y: store.snapPx(Math.min(w.y, drag.wy)), width: store.snapPx(Math.abs(w.x - drag.wx)), height: store.snapPx(Math.abs(w.y - drag.wy)) }
+    guides.value = sp.g
+    const o = spaceShift(drag, { x: drag.wx, y: drag.wy }, w.x, w.y)
+    drag.wx = o.x; drag.wy = o.y
+    if (drag.sp) { drag.sp = { x: w.x, y: w.y, ox: o.x, oy: o.y } }
+    const b = boxFrom(drag.wx, drag.wy, w.x, w.y, e.shiftKey, e.altKey)
+    draft.value = { x: store.snapPx(b.x), y: store.snapPx(b.y), width: store.snapPx(b.w), height: store.snapPx(b.h) }
   } else if (drag.kind === 'screens') {
     let dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && (Math.abs(dx) + Math.abs(dy)) * z < 3) return
@@ -1445,27 +1493,44 @@ function move(e: PointerEvent) {
     }
     if (!drag.moved && Math.hypot(lx - drag.lx, ly - drag.ly) * z < 4) return
     drag.moved = true
+    drag.c ??= { x: drag.lx, y: drag.ly }
+    // 끝점이 주변 레이어 가장자리 · 가운데에 붙어요(⌘ 끔)
+    const spt = snapPoint(lx + s.x, ly + s.y, [], pointTargets(dsid), snapOff(e) || e.shiftKey)
+    lx = spt.x - s.x; ly = spt.y - s.y
+    guides.value = spt.g
+    // Space: 그리던 선째 옮기기
+    const c = spaceShift(drag, drag.c, lx, ly)
+    if (drag.sp) drag.sp = { x: lx, y: ly, ox: c.x, oy: c.y }
+    drag.c = c
     // Shift: 45° 단위
     if (e.shiftKey) {
-      const a = Math.round(Math.atan2(ly - drag.ly, lx - drag.lx) / (Math.PI / 4)) * (Math.PI / 4)
-      const len = Math.hypot(lx - drag.lx, ly - drag.ly)
-      lx = drag.lx + Math.cos(a) * len; ly = drag.ly + Math.sin(a) * len
+      const a = Math.round(Math.atan2(ly - c.y, lx - c.x) / (Math.PI / 4)) * (Math.PI / 4)
+      const len = Math.hypot(lx - c.x, ly - c.y)
+      lx = c.x + Math.cos(a) * len; ly = c.y + Math.sin(a) * len
     }
+    // ⌥: 누른 점이 선의 가운데
+    drag.lx = e.altKey ? 2 * c.x - lx : c.x
+    drag.ly = e.altKey ? 2 * c.y - ly : c.y
     drag.ex = lx; drag.ey = ly
     draftPts.value = [[drag.lx + s.x, drag.ly + s.y], [lx + s.x, ly + s.y]]
   } else if (drag.kind === 'drawLayer') {
     const dsid = drag.sid
     const s = props.screens.find((v) => v.id === dsid)
     if (!s) return
-    const w = toWorld(e.clientX, e.clientY)
-    const lx = w.x - s.x, ly = w.y - s.y
+    // 끄는 모서리가 주변 레이어 가장자리 · 가운데에 붙어요(⌘ 끔, ⇧ 정비율일 때는 끔)
+    const w0 = toWorld(e.clientX, e.clientY)
+    const spt = snapPoint(w0.x, w0.y, [], pointTargets(dsid), snapOff(e) || e.shiftKey)
+    const lx = spt.x - s.x, ly = spt.y - s.y
     if (!drag.moved && (Math.abs(lx - drag.lx) + Math.abs(ly - drag.ly)) * z < 4) return
     drag.moved = true
-    let x0 = drag.lx, y0 = drag.ly, ww = lx - drag.lx, hh = ly - drag.ly
-    if (e.shiftKey) { const m = Math.max(Math.abs(ww), Math.abs(hh)); ww = Math.sign(ww || 1) * m; hh = Math.sign(hh || 1) * m }
-    if (ww < 0) { x0 += ww; ww = -ww }
-    if (hh < 0) { y0 += hh; hh = -hh }
-    draft.value = { x: store.snapPx(s.x + x0), y: store.snapPx(s.y + y0), width: store.snapPx(ww), height: store.snapPx(hh) }
+    guides.value = spt.g
+    // Space: 그리던 상자째 옮기기
+    const o = spaceShift(drag, { x: drag.lx, y: drag.ly }, lx, ly)
+    if (drag.sp) drag.sp = { x: lx, y: ly, ox: o.x, oy: o.y }
+    drag.lx = o.x; drag.ly = o.y
+    // ⇧ 정비율 · ⌥ 누른 점이 가운데(피그마와 같아요)
+    const b = boxFrom(drag.lx, drag.ly, lx, ly, e.shiftKey, e.altKey)
+    draft.value = { x: store.snapPx(s.x + b.x), y: store.snapPx(s.y + b.y), width: store.snapPx(b.w), height: store.snapPx(b.h) }
     draftType.value = drag.type
   }
 }
@@ -1529,7 +1594,10 @@ function end(e: PointerEvent) {
       // ⌘ 클릭(끌지 않음): 가장 안쪽 레이어(⇧ 면 더하기), 빈 곳이면 그 화면
       if (d.click) store.selectLayer(d.sid, d.click, d.add && store.screenId.value === d.sid)
       else if (!d.add) store.selectScreen(d.sid)
-    } else if (!d.moved) toggleMulti(d.sid)
+    } else if (!d.moved && d.pick) { store.selectScreen(d.sid); multi.value = [] }
+    else if (!d.moved) toggleMulti(d.sid)
+    // 빈 곳에서 끌었는데 아무것도 안 걸렸으면 아무것도 안 고른 상태(피그마와 같아요)
+    else if (d.pick && !store.layerIds.value.length) store.selectScreen(null)
   }
   if (d.kind === 'vmarquee') { vmarq.value = null; if (!d.moved && !d.base.length && vedit.value) { vedit.value.pts = []; vedit.value.segs = []; vedit.value.sel = null } }
   if (d.kind === 'marqueeCanvas') { draft.value = null; marqueeOn.value = false; if (!d.moved && !d.baseScreens.length && !d.baseLayers.length) { store.selectScreen(null); multi.value = [] } }
@@ -1539,7 +1607,8 @@ function end(e: PointerEvent) {
     emit('clone-screens', items)
   } else if (d.kind === 'screens' && d.moved) for (const id of d.ids) { const v = props.screens.find((x) => x.id === id); if (v) emit('move', id, v.x, v.y, true) }
   if (d.kind === 'draw') {
-    const rect = d.moved && draft.value && draft.value.width >= 16 && draft.value.height >= 16 ? draft.value : { x: store.snapPx(d.wx), y: store.snapPx(d.wy), width: 390, height: 844 }
+    // 끌지 않고 누르기만 하면 누른 점이 가운데인 100×100(피그마와 같아요)
+    const rect = d.moved && draft.value && draft.value.width >= 1 && draft.value.height >= 1 ? draft.value : { x: store.snapPx(d.wx - 50), y: store.snapPx(d.wy - 50), width: 100, height: 100 }
     draft.value = null
     emit('create', rect)
     tool.value = 'move'
@@ -1552,11 +1621,14 @@ function end(e: PointerEvent) {
     if (!s) return
     const big = d.moved && r && r.width >= 2 && r.height >= 2
     if (d.type === 'text') {
-      const id = store.add(d.sid, d.parentId, { type: 'text', text: 'Text', x: store.snapPx(d.lx - d.px), y: store.snapPx(d.ly - d.py), w: big ? r!.width : 60, h: 24, style: big ? { autoWidth: false } : {} })
+      // 비어 있는 글자 상자로 시작해요 — 치지 않고 나가면 레이어가 사라져요(피그마와 같아요). 끌어 그리면 그 크기의 고정 상자
+      const id = big
+        ? store.add(d.sid, d.parentId, { type: 'text', text: '', x: store.snapPx(r!.x - s.x - d.px), y: store.snapPx(r!.y - s.y - d.py), w: r!.width, h: r!.height, sizeV: 'fixed', style: { autoWidth: false } })
+        : store.add(d.sid, d.parentId, { type: 'text', text: '', x: store.snapPx(d.lx - d.px), y: store.snapPx(d.ly - d.py), w: 1, h: 24, style: {} })
       store.editing.value = id
       return
     }
-    const size = d.type === 'frame' ? { w: 200, h: 200 } : d.type === 'section' ? { w: 400, h: 300 } : { w: 100, h: 100 }
+    const size = d.type === 'section' ? { w: 400, h: 300 } : { w: 100, h: 100 }
     const x = big ? r!.x - s.x - d.px : store.snapPx(d.lx - d.px - size.w / 2)
     const y = big ? r!.y - s.y - d.py : store.snapPx(d.ly - d.py - size.h / 2)
     const part = { type: d.type, x, y, w: big ? r!.width : size.w, h: big ? r!.height : size.h }
@@ -1685,13 +1757,15 @@ function onDbl(target: HTMLElement, screen: ScreenRow, ev?: MouseEvent) {
     const many = store.layerIds.value.length + store.xsel.value.length > 1
     const picked = inX || (store.screenId.value === screen.id && store.layerIds.value.includes(lid))
     if (many && picked) { if (inX) store.promoteX(screen.id) } else store.selectLayer(screen.id, lid)
+    // 누른 자리의 단어를 골라 고치기 시작(피그마와 같아요) — Enter 로 들어가면 전체
+    if (ev) editAt.value = { x: ev.clientX, y: ev.clientY }
     store.editing.value = lid
     return
   }
   // 도형: 이미 골라 둔 것이거나 맨 위 단계에서 바로 잡히는 것이면 편집, 막 안으로 들어가 골라진 것이면 고르기만
   const direct = before.includes(lid) || pickLayer(screen.id, deepest, false, []) === lid
   if (!direct) { store.selectLayer(screen.id, lid); return }
-  if (tool.value === 'move') enterVectorEdit(screen.id, lid)
+  if (tool.value === 'move' || tool.value === 'scale') enterVectorEdit(screen.id, lid)
 }
 
 // ---------------------------------------------------------------------------
@@ -1760,10 +1834,6 @@ function pasteAt(w: { x: number; y: number }) {
   const dx = Math.round(w.x - u.x), dy = Math.round(w.y - u.y)
   store.update(s.id, [...store.layerIds.value], (n) => ({ x: n.x + dx, y: n.y + dy }))
 }
-/** 이름 바꾸기: 오른쪽 패널의 이름 칸으로 */
-function focusName() {
-  nextTick(() => { const i = document.querySelector<HTMLInputElement>(`input[aria-label="Layer name"], input[aria-label="Frame name"], input[aria-label="${tr('Layer name')}"], input[aria-label="${tr('Frame name')}"]`); i?.focus(); i?.select() })
-}
 /** 화면(프레임) 우클릭 메뉴 */
 /** 고른 화면(프레임)들을 감싸는 섹션을 캔버스에 만들어요(둘레 80 여백). 섹션을 옮기면 안의 화면도 함께 움직여요 */
 function sectionScreens(ids?: string[]) {
@@ -1781,24 +1851,24 @@ function sectionScreens(ids?: string[]) {
 function screenMenuItems(screen: ScreenRow, at: { x: number; y: number }): MenuItem[] {
   const native = isNative(screen)
   return [
-    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy') } },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip() } },
     { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
     ...(native ? [{ label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
     { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => sectionScreens(multi.value.includes(screen.id) ? multi.value : [screen.id]) },
     'sep',
-    { label: tr('Bring to front'), shortcut: '⌥⌘]', action: () => emit('screen-action', 'front') },
+    { label: tr('Bring to front'), shortcut: ']', action: () => emit('screen-action', 'front') },
     { label: tr('Bring forward'), shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
     { label: tr('Send backward'), shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
-    { label: tr('Send to back'), shortcut: '⌥⌘[', action: () => emit('screen-action', 'back') },
+    { label: tr('Send to back'), shortcut: '[', action: () => emit('screen-action', 'back') },
     'sep',
     ...(native ? [
-      { label: tr('Select all layers'), shortcut: '⌘A', action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
+      { label: tr('Select all layers'), action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
       { label: store.doc(screen.id).frame?.grids?.length ? tr('Remove layout grid') : tr('Add layout grid'), action: () => store.frameStyle(screen.id, { grids: store.doc(screen.id).frame?.grids?.length ? undefined : [{ type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }] }) },
       { label: tr('Copy as SVG'), action: () => { const d = store.doc(screen.id); const svg = svgOf(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color); if (svg) navigator.clipboard.writeText(svg).then(() => emit('hint', tr('Copied to clipboard')), () => emit('hint', tr('Couldn\'t copy to the clipboard'))); else emit('hint', tr('Nothing to copy as SVG')) } },
     ] : []),
-    { label: tr('Rename'), action: focusName },
-    { label: tr('Zoom to selection'), shortcut: '⇧2', action: fitSelection },
+    { label: tr('Rename'), shortcut: '⌘R', action: () => (renamingFrame.value = screen.id) },
+    { label: tr('Zoom to selection'), shortcut: '2', action: fitSelection },
     'sep',
     { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ]
@@ -1811,13 +1881,24 @@ function onContext(e: MouseEvent) {
   const screen = scrEl ? props.screens.find((v) => v.id === scrEl.dataset.screen) : undefined
   const lid = (t.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
   const at = toWorld(e.clientX, e.clientY)
-  if (screen && lid && isNative(screen)) {
-    if (!(store.screenId.value === screen.id && store.layerIds.value.includes(lid))) store.selectLayer(screen.id, lid)
+  // 누른 자리에 겹친 레이어들(맨 위부터) — 'Select layer' 로 골라요(피그마와 같아요, ⌘ 우클릭은 바로 이 목록)
+  const under = screen ? [...new Set(document.elementsFromPoint(e.clientX, e.clientY).filter((x) => (x as HTMLElement).closest?.('[data-screen]')?.getAttribute('data-screen') === screen.id).map((x) => (x.closest('[data-layer]') as HTMLElement | null)?.dataset.layer).filter((v): v is string => !!v))] : []
+  const pickMenu = (sid: string) => ctx.open(e, under.map((id) => ({ label: store.node(sid, id)?.name ?? id, action: () => store.selectLayer(sid, id) })))
+  if (screen && lid && isNative(screen) && e.metaKey && under.length) { pickMenu(screen.id); return }
+  // 왼쪽 클릭과 같은 레이어를 골라요(그룹 안이면 그룹) — 고른 것의 상자 안이면 그대로
+  const picked = screen && lid && isNative(screen) ? pickLayer(screen.id, lid) : undefined
+  if (screen && picked) {
+    const lid = picked
+    const selB = store.screenId.value === screen.id ? store.layerIds.value.map((id) => layerWorld(screen, id)).filter((b): b is Rect => !!b) : []
+    const sb = selB.length ? union(selB) : null
+    const inSel = store.screenId.value === screen.id && (store.layerIds.value.includes(lid) || (!!sb && at.x >= sb.x && at.x <= sb.x + sb.w && at.y >= sb.y && at.y <= sb.y + sb.h))
+    if (!inSel) store.selectLayer(screen.id, lid)
     const n0 = store.node(screen.id, lid)
     const items = layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (t) => emit('hint', t) })
     // 이름 바꾸기 · 점 편집은 Delete 위에(Delete 가 늘 맨 끝)
-    const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 ? [{ label: tr('Rename'), action: focusName }, ...(EDITABLE.has(n0.type) ? [{ label: tr('Edit vector'), shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : [])] : []
+    const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 && EDITABLE.has(n0.type) ? [{ label: tr('Edit vector'), shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : []
     items.splice(Math.max(0, items.length - 2), 0, ...extra)
+    if (under.length > 1) items.unshift({ label: tr('Select layer'), action: () => pickMenu(screen.id) }, 'sep')
     ctx.open(e, items)
     return
   }
@@ -1830,17 +1911,113 @@ function onContext(e: MouseEvent) {
     { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
     { label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' },
     'sep',
-    { label: tr('Zoom in'), shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 1.25) },
-    { label: tr('Zoom out'), shortcut: '⌘−', action: () => zoomAt(vp.value.zoom / 1.25) },
-    { label: tr('Zoom to {n}%', { n: 100 }), shortcut: '⇧0', action: () => zoomAt(1) },
-    { label: tr('Zoom to fit'), shortcut: '⇧1', action: () => fit() },
+    { label: tr('Zoom in'), shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 2) },
+    { label: tr('Zoom out'), shortcut: '⌘−', action: () => zoomAt(vp.value.zoom / 2) },
+    { label: tr('Zoom to {n}%', { n: 100 }), shortcut: '⌘0', action: () => zoomAt(1) },
+    { label: tr('Zoom to fit'), shortcut: '1', action: () => fit() },
     'sep',
     { label: rulersShown.value ? tr('Hide rulers') : tr('Show rulers'), shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
-    { label: gridsShown.value ? tr('Hide layout grids') : tr('Show layout grids'), shortcut: '⌃G', action: () => (gridsShown.value = !gridsShown.value) },
+    { label: gridsShown.value ? tr('Hide layout grids') : tr('Show layout grids'), shortcut: '⇧G', action: () => (gridsShown.value = !gridsShown.value) },
   ])
 }
+const isMac = typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform)
+/** 불투명도 숫자키(피그마 한국어 자판과 같아요): ⇧1 = 10% … ⇧9 = 90%, ⇧0 = 100%, 빠르게 두 번(⇧5 ⇧5 = 55%, ⇧0 ⇧0 = 0%) */
+let opBuf: { s: string; t: number } | null = null
+function setOpacity(v: number) {
+  const sid = store.screenId.value
+  if (!sid) return
+  const ids = store.layerIds.value
+  if (ids.length) { store.style(sid, ids, { opacity: v }); return }
+  const list = multi.value.length ? multi.value : [sid]
+  store.batch(() => { for (const id of list) { const s = props.screens.find((x) => x.id === id); if (s && isNative(s) && !isCanvas(s)) store.frameStyle(id, { opacity: v }) } })
+}
+/** 칠 · 선 단축키: ⇧X 맞바꾸기 · ⌥/ 칠 지우기 · ⇧/ 선 지우기(피그마와 같아요). 글자의 칠은 글자 색 */
+function paintKey(kind: 'swap' | 'noFill' | 'noStroke') {
+  const sid = store.screenId.value
+  if (!sid) return
+  const ids = store.layerIds.value
+  store.batch(() => {
+    for (const id of ids) {
+      const n = store.node(sid, id)
+      if (!n) continue
+      const s = n.style
+      const fk = n.type === 'text' ? 'color' : 'fill'
+      if (kind === 'swap') store.style(sid, [id], { [fk]: s.stroke, stroke: s[fk], fills: s.strokes, strokes: s.fills, strokeWidth: s[fk] && !s.strokeWidth ? 1 : s.strokeWidth })
+      else if (kind === 'noFill') store.style(sid, [id], { [fk]: n.type === 'text' ? 'transparent' : undefined, fills: undefined })
+      else store.style(sid, [id], { stroke: undefined, strokes: undefined })
+    }
+  })
+}
+/** ⌃C 색 추출(피그마와 같아요): 화면에서 색을 집어 고른 것의 칠로. 아무것도 안 골랐으면 HEX 를 복사 */
+async function pickColor() {
+  const ED = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper
+  if (!ED) { emit('hint', tr('This browser can’t pick colors from the screen. Try Chrome or Edge')); return }
+  let hex: string
+  try { hex = (await new ED().open()).sRGBHex.toUpperCase() } catch { return }
+  const sid = store.screenId.value
+  const ids = store.layerIds.value
+  if (sid && ids.length) {
+    store.batch(() => { for (const id of ids) { const n = store.node(sid, id); if (n) store.style(sid, [id], n.type === 'text' ? { color: hex } : { fill: hex, fills: undefined }) } })
+  } else if (sid && !isPageCanvas(sid)) store.frameStyle(sid, { fill: hex, fills: undefined })
+  else navigator.clipboard?.writeText(hex).then(() => emit('hint', tr('Copied {v}', { v: hex })), () => {})
+}
+/** 내보내기 대상 요소: 고른 레이어(여럿이면 각각) 또는 고른 화면 */
+function exportTargets(): { el: HTMLElement; name: string; exports?: ExportSetting[] }[] {
+  const sid = store.screenId.value
+  const world = el.value?.querySelector('.world')
+  if (!sid || !world) return []
+  const ids = store.layerIds.value
+  if (ids.length) return ids.map((id) => ({ el: world.querySelector<HTMLElement>(`[data-screen="${sid}"] [data-layer="${id}"]`), n: store.node(sid, id) })).filter((t) => t.el && t.n).map((t) => ({ el: t.el!, name: t.n!.name, exports: t.n!.exports }))
+  const list = multi.value.length ? multi.value : [sid]
+  return list.map((id) => ({ el: world.querySelector<HTMLElement>(`.frame[data-screen="${id}"]`), s: props.screens.find((x) => x.id === id) })).filter((t) => t.el && t.s).map((t) => ({ el: t.el!, name: t.s!.name, exports: store.doc(t.s!.id).exports }))
+}
+/** ⇧⌘C PNG 로 복사(피그마와 같아요, 2배) */
+async function copyPng() {
+  const t = exportTargets()[0]
+  if (!t) return
+  try {
+    const blob = renderExport(t.el, { scale: '2x', format: 'PNG' })
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+    emit('hint', tr('Copied as PNG'))
+  } catch { emit('hint', tr('Couldn\'t copy to the clipboard')) }
+}
+/** ⇧⌘E 내보내기(피그마와 같아요): 고른 것의 Export 설정대로, 없으면 PNG 1x 로 내려받기 */
+async function exportNow() {
+  const ts = exportTargets()
+  if (!ts.length) { emit('hint', tr('Nothing to export')); return }
+  try {
+    for (const t of ts) for (const e of t.exports?.length ? t.exports : [{ scale: '1x', format: 'PNG' } as ExportSetting]) download(await renderExport(t.el, e), fileNameOf(t.name, e))
+  } catch { emit('hint', tr('Couldn’t export. Try again')) }
+}
+/** N · ⇧N 다음 · 이전 화면으로 맞춰 보기, End · Home 은 확대는 그대로 두고 찾아가기(피그마와 같아요) */
+function stepScreen(back: boolean, zoom: boolean) {
+  const list = realScreens.value
+  if (!list.length) return
+  const cur = list.findIndex((s) => s.id === store.screenId.value)
+  const next = list[cur < 0 ? (back ? list.length - 1 : 0) : (cur + (back ? -1 : 1) + list.length) % list.length]!
+  store.selectScreen(next.id)
+  multi.value = []
+  if (zoom) { fit([next.id]); return }
+  const r = el.value?.getBoundingClientRect()
+  if (!r) return
+  const z = vp.value.zoom
+  vp.value = { zoom: z, x: r.width / 2 - (next.x + next.width / 2) * z, y: r.height / 2 - (next.y + next.height / 2) * z }
+}
 function onKeyDown(e: KeyboardEvent) {
+  const cmdKey = e.metaKey || e.ctrlKey
+  const handled = e.defaultPrevented
+  // 글자를 고치는 중에도 확대 · 축소는 캔버스로(브라우저 화면 확대 대신)
+  if (cmdKey && !e.altKey && (e.target as HTMLElement).closest?.('[contenteditable="true"]')) {
+    if (e.code === 'Equal' || e.code === 'NumpadAdd') { e.preventDefault(); zoomAt(vp.value.zoom * 2); return }
+    if (e.code === 'Minus' || e.code === 'NumpadSubtract') { e.preventDefault(); zoomAt(vp.value.zoom / 2); return }
+    if (e.code === 'Digit0') { e.preventDefault(); zoomAt(1); return }
+  }
+  // 브라우저 · 데스크톱 앱 기본 동작이 새지 않게(편집기에서는 늘): ⌘S 저장 창 · ⌘P 인쇄 · ⌘R · ⇧⌘R 새로고침 · ⌥⌘B 북마크
+  if (cmdKey && !e.altKey && ['KeyS', 'KeyP', 'KeyR'].includes(e.code)) e.preventDefault()
+  if (cmdKey && e.altKey && e.code === 'KeyB') e.preventDefault()
   if (typing(e)) return
+  // 다른 곳(색 고르기 · 메뉴 등)이 이미 처리한 키, 변수 화면처럼 캔버스를 덮는 창이 열려 있을 때는 캔버스 단축키를 쓰지 않아요
+  if (handled || document.querySelector('.vars[role="dialog"]')) return
   if (e.key === 'Meta' && !metaHeld.value) { metaHeld.value = true; updateCmd() }
   // 펜으로 그리는 중: Enter · Esc 끝내기, Backspace 마지막 점 지우기
   if (pen.value && ['Enter', 'Escape', 'Backspace', 'Delete'].includes(e.key)) {
@@ -1875,9 +2052,32 @@ function onKeyDown(e: KeyboardEvent) {
   const native = !!screen && isNative(screen)
   const layerMode = !!sid && ids.length > 0
   const stop = () => e.preventDefault()
+  const bare = !mod && !e.altKey && !e.shiftKey
 
   if (e.code === 'Space') { space.value = true; stop(); return }
   if (e.key === 'Alt') altOn.value = true
+  // 글자 단축키(글자 레이어를 골랐을 때): ⌘B · ⌘U · ⇧⌘X · ⌥⌘L/T/R/J · ⇧⌘< > · ⌥⌘< > · ⌥< > · ⌥⇧< > · ⇧⌘7 · ⇧⌘8
+  if (layerMode && textShortcut(e, store, sid, ids)) { stop(); return }
+  // 패널(피그마와 같아요): ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭, ⌘\ UI 숨기기
+  if (e.altKey && !mod && !e.shiftKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit8')) { stop(); emit('ui', e.code === 'Digit1' ? 'left-file' : e.code === 'Digit2' ? 'left-assets' : 'design'); return }
+  if (mod && !e.altKey && !e.shiftKey && (e.code === 'Backslash' || e.code === 'IntlYen')) { stop(); emit('ui', 'toggle-ui'); return }
+  // 페이지 · 화면 찾아가기: PageUp · PageDown 이전 · 다음 페이지, N · ⇧N 다음 · 이전 화면, Home · End 이전 · 다음 화면(확대 그대로)
+  if (!mod && !e.altKey && (e.key === 'PageUp' || e.key === 'PageDown')) { stop(); emit('ui', e.key === 'PageUp' ? 'prev-page' : 'next-page'); return }
+  if (!mod && !e.altKey && e.code === 'KeyN') { stop(); stepScreen(e.shiftKey, true); return }
+  if (bare && (e.key === 'Home' || e.key === 'End')) { stop(); stepScreen(e.key === 'Home', false); return }
+  // 불투명도 ⇧0~⇧9(피그마 한국어 자판과 같아요)
+  if (e.shiftKey && !mod && !e.altKey && /^Digit\d$/.test(e.code)) {
+    stop()
+    const dg = e.code.slice(5)
+    const now = Date.now()
+    const two = !!opBuf && now - opBuf.t < 700 && opBuf.s.length === 1
+    const v = two ? Number(opBuf!.s + dg) / 100 : dg === '0' ? 1 : Number(dg) / 10
+    opBuf = two ? null : { s: dg, t: now }
+    setOpacity(v)
+    return
+  }
+  // ⌃C 색 추출(맥)
+  if (isMac && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyC') { stop(); pickColor(); return }
   // 정렬 ⌥A · ⌥D · ⌥W · ⌥S · ⌥H · ⌥V / 균등 분배 ⌃⌥H · ⌃⌥V (macOS 는 ⌥ 가 e.key 를 바꿔서 e.code 로)
   if (e.altKey && !e.metaKey && !e.shiftKey) {
     const many = multi.value.length > 1
@@ -1897,45 +2097,67 @@ function onKeyDown(e: KeyboardEvent) {
       if (layerMode) { stop(); store.align(sid!, ids, k) } else if (many) { stop(); emit('arrange-screens', { kind: 'align', k }) }
       return
     }
+    // ⌥/ 칠 지우기
+    if (e.code === 'Slash' && !e.ctrlKey) { if (layerMode) { stop(); paintKey('noFill') } return }
   }
   // 뒤집기 ⇧H · ⇧V (⇧⌘H 숨기기와 다름)
   if (e.shiftKey && !mod && !e.altKey && (e.code === 'KeyH' || e.code === 'KeyV')) { if (layerMode) { stop(); store.flip(sid!, ids, e.code === 'KeyH' ? 'x' : 'y') } return }
+  // 칠 · 선 맞바꾸기 ⇧X · 선 지우기 ⇧/
+  if (e.shiftKey && !mod && !e.altKey && (e.code === 'KeyX' || e.code === 'Slash')) { if (layerMode) { stop(); paintKey(e.code === 'KeyX' ? 'swap' : 'noStroke') } return }
   // 실행취소 · 확대
   if (mod && key === 'z') { stop(); if (e.shiftKey) store.redo(); else store.undo(); return }
   if (mod && key === 'y') { stop(); store.redo(); return }
-  if (mod && (e.key === '=' || e.key === '+')) { stop(); zoomAt(vp.value.zoom * 1.25); return }
-  if (mod && e.key === '-') { stop(); zoomAt(vp.value.zoom / 1.25); return }
-  if (mod && e.key === '0') { stop(); zoomAt(1); return }
-  if (e.shiftKey && !mod && e.code === 'Digit1') { fit(); return }
-  if (e.shiftKey && !mod && e.code === 'Digit2' && sid) { fitSelection(); return }
-  if (e.shiftKey && !mod && e.code === 'Digit0') { zoomAt(1); return }
-  // 눈금자 ⇧R
-  // 이름 바꾸기 ⌘R(피그마와 같아요 — 브라우저 새로고침 대신): 하나면 레이어 목록에서 바로, 여러 개면 창
-  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyR') { if (layerMode) { stop(); renameReq.value = pickedLayers(store, sid!, ids) } return }
+  if (!e.altKey && !e.shiftKey && (e.code === 'Equal' || e.code === 'NumpadAdd')) { stop(); zoomAt(vp.value.zoom * 2); return }
+  if (!e.altKey && (e.code === 'Minus' || e.code === 'NumpadSubtract')) { stop(); zoomAt(vp.value.zoom / 2); return }
+  if (mod && !e.shiftKey && e.code === 'Digit0') { stop(); zoomAt(1); return }
+  // 1 모두 보이게 · 2 고른 것에 맞추기(피그마 한국어 자판과 같아요 — ⇧ 숫자는 불투명도)
+  if (bare && e.code === 'Digit1') { stop(); fit(); return }
+  if (bare && e.code === 'Digit2') { stop(); if (sid) fitSelection(); return }
+  // 이름 바꾸기 ⌘R(피그마와 같아요 — 브라우저 새로고침 대신): 레이어 하나면 레이어 목록에서 바로, 여러 개면 창, 화면이면 이름표에서
+  if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyR') {
+    if (layerMode) renameReq.value = pickedLayers(store, sid!, ids)
+    else if (sid && !isPageCanvas(sid) && !multi.value.length) renamingFrame.value = sid
+    return
+  }
+  // 바꿔 붙여넣기 ⇧⌘R · 고른 것 위에 붙여넣기 ⇧⌘V(피그마와 같아요)
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyR') {
+    if (layerMode && lastCopy.value !== 'screen' && store.pasteOnSelection(true)) return
+    emit('hint', layerMode ? tr('Copy something first') : tr('Select layers to replace'))
+    return
+  }
+  if (mod && e.shiftKey && !e.altKey && key === 'v') {
+    stop()
+    if (layerMode && lastCopy.value !== 'screen' && store.pasteOnSelection(false)) return
+    doPaste()
+    return
+  }
   if (e.shiftKey && !mod && !e.altKey && e.code === 'KeyR') { stop(); rulersShown.value = !rulersShown.value; return }
   // ⇧' 픽셀 격자 보이기 · ⇧⌘' 픽셀에 맞추기(피그마와 같아요)
   if (e.shiftKey && !e.altKey && e.code === 'Quote') { stop(); emit('view', mod ? 'snapPixel' : 'pixelGrid'); return }
-  // 레이아웃 그리드 보이기 · 숨기기 ⌃G
-  if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? tr('Layout grids shown') : tr('Layout grids hidden')); return }
+  // 레이아웃 그리드 보이기 · 숨기기 ⇧G(피그마 Layout guides) · ⌃G
+  if (((e.shiftKey && !mod) || (e.ctrlKey && !e.metaKey && !e.shiftKey)) && !e.altKey && e.code === 'KeyG') { stop(); gridsShown.value = !gridsShown.value; emit('hint', gridsShown.value ? tr('Layout grids shown') : tr('Layout grids hidden')); return }
   // 오토 레이아웃 ⇧A · 빼기 ⌥⇧A
   if (e.shiftKey && !mod && e.code === 'KeyA') { if (layerMode && native) { stop(); if (e.altKey) store.removeAutoLayout(sid!, ids); else store.addAutoLayout(sid!, ids) } return }
-  // 속성 복사 · 붙여넣기 ⌥⌘C / ⌥⌘V
-  if (mod && e.altKey && e.code === 'KeyC') { if (layerMode && store.copyStyle()) { stop(); emit('hint', tr('Copied properties')) } return }
-  if (mod && e.altKey && e.code === 'KeyV') { if (layerMode) { stop(); store.pasteStyle() } return }
+  // 속성 복사 · 붙여넣기 ⌥⌘C / ⌥⌘V (레이어 · 화면)
+  if (mod && e.altKey && e.code === 'KeyC') { stop(); if (sid && !isPageCanvas(sid) || layerMode) { if (store.copyStyle()) emit('hint', tr('Copied properties')) } return }
+  if (mod && e.altKey && e.code === 'KeyV') { stop(); if (sid) store.pasteStyle(); return }
+  // PNG 로 복사 ⇧⌘C
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyC') { stop(); copyPng(); return }
+  // 내보내기 ⇧⌘E
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyE') { stop(); exportNow(); return }
   // 복사 · 잘라내기 · 붙여넣기 · 복제
   if (mod && key === 'c') {
     // 레이어 + 섞어 고른 화면 · 여러 화면: 고른 것 전부(피그마와 같아요)
     if (layerMode && store.copy()) { stop(); if (mix.value.length) { lastCopy.value = 'mixed'; emit('clip-screens', [...mix.value]) } else lastCopy.value = 'layers' }
     else if (!layerMode && multi.value.length > 1) { lastCopy.value = 'screen'; emit('clip-screens', [...multi.value]); stop() }
     else if (sid && !layerMode && !isPageCanvas(sid)) { lastCopy.value = 'screen'; emit('screen-action', 'copy'); stop() }
+    else return
+    markIrisClip()
     return
   }
-  if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); store.remove(sid!, ids) } return }
-  if (mod && key === 'v') {
-    stop()
-    doPaste()
-    return
-  }
+  if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); markIrisClip(); store.remove(sid!, ids) } return }
+  // ⌘V 는 막지 않아요: 붙여넣기 이벤트(onPaste)가 다른 앱에서 복사한 그림 · SVG 를 먼저 보고, 없으면 Iris 클립보드를 붙여요
+  if (mod && key === 'v') return
   if (mod && key === 'd') {
     stop()
     // 섞어 고른 것 · 여러 화면은 복사 + 붙여넣기와 같아요(고른 것 전부)
@@ -1962,15 +2184,16 @@ function onKeyDown(e: KeyboardEvent) {
     multi.value = next.length > 1 ? next : []
     return
   }
-  // 평탄화 ⌘E · 마스크 ⌃⌘M · 불리언 ⌥⇧U 합치기 · ⌥⇧S 빼기 · ⌥⇧I 교차 · ⌥⇧E 제외
+  // 평탄화 ⌥⇧F(피그마) · ⌘E · 마스크 ⌃⌘M · 불리언 ⌥⇧U 합치기 · ⌥⇧S 빼기 · ⌥⇧I 교차 · ⌥⇧E 제외
   if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyE') { if (layerMode && native) { stop(); store.flatten(sid!, ids) } return }
   if (e.metaKey && e.ctrlKey && e.code === 'KeyM') { if (layerMode && native) { stop(); store.toggleMask(sid!, ids) } return }
   if (e.altKey && e.shiftKey && !mod) {
+    if (e.code === 'KeyF') { if (layerMode && native) { stop(); store.flatten(sid!, ids) } return }
     const OPS: Record<string, 'union' | 'subtract' | 'intersect' | 'exclude'> = { KeyU: 'union', KeyS: 'subtract', KeyI: 'intersect', KeyE: 'exclude' }
     const op = OPS[e.code]
     if (op) { if (layerMode && native && ids.length > 1) { stop(); store.booleanOp(sid!, ids, op) } return }
   }
-  // 섹션으로 감싸기 ⌥⌘S: 캔버스 위 레이어 → 섹션, 화면(프레임) → 그 화면들을 감싸는 섹션. 화면 안 레이어는 안 돼요(피그마와 같아요)
+  // 섹션으로 감싸기 ⌥⌘S(Iris 단축키 — 피그마는 단축키 없이 메뉴로만): 캔버스 위 레이어 → 섹션, 화면(프레임) → 그 화면들을 감싸는 섹션
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyS') {
     stop()
     if (layerMode) {
@@ -1985,25 +2208,36 @@ function onKeyDown(e: KeyboardEvent) {
   // 숨기기 ⇧⌘H · 잠그기 ⇧⌘L
   if (mod && e.shiftKey && e.code === 'KeyH') { if (layerMode) { stop(); const hide = !store.node(sid!, ids[0]!)?.hidden; store.update(sid!, ids, { hidden: hide }) } return }
   if (mod && e.shiftKey && e.code === 'KeyL') { if (layerMode) { stop(); const lock = !store.node(sid!, ids[0]!)?.locked; store.update(sid!, ids, { locked: lock }) } return }
+  // Esc: 선택 모두 풀기(피그마와 같아요 — 안쪽 레이어를 골랐어도 바깥 프레임으로 돌아가지 않고 아무것도 안 고른 상태로)
   if (e.key === 'Escape') {
-    if (layerMode) store.selectLayer(sid!, null)
-    else store.selectScreen(null)
+    store.selectScreen(null)
+    multi.value = []
     tool.value = 'move'
     return
   }
-  if (!sid) return
-  // 지우기
-  if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) { if (mix.value.length) emit('screen-action', 'remove'); store.remove(sid, ids) } else emit('screen-action', 'remove'); return }
-  // 순서
-  // ⌥ 가 e.key 를 바꾸는 맥에서도 되게 e.code 로. 화면만 골랐으면 화면 순서
-  if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
-    stop()
-    const up = e.code === 'BracketRight'
-    if (layerMode) store.arrange(sid, ids, up ? (e.altKey ? 'top' : 1) : (e.altKey ? 'bottom' : -1))
-    else if (!isPageCanvas(sid)) emit('screen-action', up ? (e.altKey ? 'front' : 'forward') : (e.altKey ? 'back' : 'backward'))
+  const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+  const a = arrows[e.key]
+  // 아무것도 안 골랐을 때 방향키: 캔버스 옮기기(피그마와 같아요, ⇧ 크게)
+  if (!sid) {
+    if (a && !mod && !e.altKey) { stop(); const k = e.shiftKey ? 200 : 40; vp.value = { ...vp.value, x: vp.value.x - a[0] * k, y: vp.value.y - a[1] * k } }
     return
   }
-  // 고르기 이동: Enter(안으로 · 텍스트면 고치기) · Shift+Enter(부모로) · Tab(다음 레이어)
+  // 그룹 · 프레임 · 섹션 풀기 ⌘⌫(피그마와 같아요 — 안의 내용은 남겨요)
+  if (mod && (e.key === 'Delete' || e.key === 'Backspace')) { stop(); if (layerMode) store.unwrap(sid, ids); return }
+  // 지우기
+  if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) { if (mix.value.length) emit('screen-action', 'remove'); store.remove(sid, ids) } else emit('screen-action', 'remove'); return }
+  // 순서: ⌘] · ⌘[ 한 칸, ] · [ 맨 앞 · 맨 뒤(피그마와 같아요), ⌥⌘] · ⌥⌘[ 도 맨 앞 · 맨 뒤
+  // ⌥ 가 e.key 를 바꾸는 맥에서도 되게 e.code 로. 화면만 골랐으면 화면 순서
+  if ((e.code === 'BracketRight' || e.code === 'BracketLeft') && !e.shiftKey && (mod || !e.altKey)) {
+    stop()
+    const up = e.code === 'BracketRight'
+    const toEnd = !mod || e.altKey
+    if (layerMode) store.arrange(sid, ids, up ? (toEnd ? 'top' : 1) : (toEnd ? 'bottom' : -1))
+    else if (!isPageCanvas(sid)) emit('screen-action', up ? (toEnd ? 'front' : 'forward') : (toEnd ? 'back' : 'backward'))
+    return
+  }
+  // 고르기 이동: Enter(안으로 · 텍스트면 고치기) · Shift+Enter · \(부모로) · Tab(다음 레이어)
+  if (bare && e.code === 'Backslash' && native) { stop(); store.selectParent(sid); return }
   if (e.key === 'Enter' && native) {
     stop()
     if (e.shiftKey) { store.selectParent(sid); return }
@@ -2017,12 +2251,17 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
   if (e.key === 'Tab' && native) { stop(); store.selectSibling(sid, e.shiftKey ? -1 : 1); return }
-  // 화살표로 옮기기(Shift 10px)
-  const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
-  const a = arrows[e.key]
   if (a) {
     stop()
     const k = e.shiftKey ? 10 : 1
+    // ⌘ 방향키: 크기(피그마와 같아요) — → 너비 +, ← 너비 −, ↓ 높이 +, ↑ 높이 −
+    if (mod) {
+      if (e.altKey) return
+      if (layerMode) store.sizeTo(sid, store.topIds(sid, ids).filter((id) => !store.node(sid, id)?.locked), (n) => ({ w: Math.max(1, n.w + a[0] * k), h: Math.max(1, n.h + a[1] * k), ...(n.type === 'text' && a[0] && n.style.autoWidth ? { style: { ...n.style, autoWidth: false } } : {}) }))
+      else if (screen && !isPageCanvas(sid)) emit('resize-screen', sid, { x: screen.x, y: screen.y, width: Math.max(1, screen.width + a[0] * k), height: Math.max(1, screen.height + a[1] * k) }, true)
+      return
+    }
+    if (e.altKey) return
     // 오토 레이아웃 안이면 옮기지 않고 순서를 바꿔요(피그마와 같아요)
     const dirOf = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } as const
     if (layerMode && store.moveInFlow(sid, ids, dirOf[e.key as keyof typeof dirOf])) return
@@ -2045,7 +2284,7 @@ function fitSelection() {
   if (!boxes.length) return fit([s.id])
   fitRect(Math.min(...boxes.map((b) => b!.x)), Math.min(...boxes.map((b) => b!.y)), Math.max(...boxes.map((b) => b!.x + b!.w)), Math.max(...boxes.map((b) => b!.y + b!.h)), 4)
 }
-defineExpose({ fit, zoomAt, fitSelection, insertInstance, sectionScreens })
+defineExpose({ fit, zoomAt, fitSelection, insertInstance, sectionScreens, paste: doPaste })
 
 let gz = 1
 const onGestureStart = (e: Event) => { e.preventDefault(); gz = vp.value.zoom }
@@ -2263,6 +2502,10 @@ function pickLayer(sid: string, deepId: string | undefined, deep = false, selAt?
   // selAt: 이 선택 기준으로(두 번 누르기는 첫 누름 직전 선택으로 판단해요)
   const selNow = selAt ?? (store.screenId.value === sid ? store.layerIds.value : [])
   for (const id of selNow) for (let p: string | null | undefined = id; p && d.nodes[p]; p = d.nodes[p]!.parentId) open.add(p)
+  // 캔버스에 바로 놓인 프레임도 맨 위 프레임이에요(피그마와 같아요): 안을 누르면 안쪽 레이어가 바로 골라져요
+  const top = d.nodes[chain[0]!]
+  const s0 = isPageCanvas(sid) && chain.length > 1 && top?.type === 'frame' && !isGroupNode(top) ? 1 : 0
+  if (s0) open.add(chain[0]!)
   let target = chain[0]
   for (let i = 1; i < chain.length; i++) {
     const parent = d.nodes[chain[i - 1]!]

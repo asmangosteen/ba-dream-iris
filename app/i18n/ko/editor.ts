@@ -266,4 +266,11 @@ export default {
   'Registered': '등록한 토큰',
   'No variables match “{q}”': '‘{q}’에 맞는 변수가 없어요',
   'No variables yet': '아직 변수가 없어요',
+  // 피그마 단축키 맞추기(2026-11-25)
+  'Copied as PNG': 'PNG로 복사했어요',
+  'Select layer': '레이어 고르기',
+  'Copy something first': '먼저 붙여넣을 것을 복사해 주세요',
+  'Select layers to replace': '바꿀 레이어를 골라 주세요',
+  'This browser can’t pick colors from the screen. Try Chrome or Edge': '이 브라우저는 화면에서 색을 집을 수 없어요. 크롬이나 엣지에서 해 주세요',
+  'Copied {v}': '{v}를 복사했어요',
 } satisfies Record<string, string>

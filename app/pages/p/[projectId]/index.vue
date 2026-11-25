@@ -139,7 +139,7 @@ const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
@@ -605,7 +605,11 @@ function onPaste(e: ClipboardEvent) {
     e.preventDefault()
     // 피그마처럼 벡터 레이어들로(안쪽 도형까지 고칠 수 있게). 읽지 못하면 이미지로
     if (!importSvgVectors(text, current.value ? undefined : center)) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
+    return
   }
+  // 그 밖에는 Iris 안에서 복사한 것(레이어 · 화면) — ⌘V 키는 캔버스가 막지 않고 이 이벤트로 와요
+  e.preventDefault()
+  canvas.value?.paste()
 }
 /** SVG 코드 → 'svg' 프레임 안 벡터 레이어들. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false */
 function importSvgVectors(text: string, at?: { x: number; y: number }): boolean {
@@ -630,6 +634,16 @@ function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 's
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
 onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnload); store.flushAll() })
 
+/** 화면 단축키(피그마와 같아요): ⌘\\ UI 숨기기 · ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭 · PageUp · PageDown 이전 · 다음 페이지 */
+function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev-page' | 'next-page') {
+  if (k === 'toggle-ui') { togglePanel(); return }
+  if (k === 'left-file' || k === 'left-assets') { left.value = k === 'left-file' ? 'file' : 'assets'; expandPanels(); return }
+  if (k === 'design') { tab.value = 'design'; expandPanels(); return }
+  const ps = pages.data.value ?? []
+  const i = ps.findIndex((p) => p.id === pageId.value)
+  const next = ps[i + (k === 'prev-page' ? -1 : 1)]
+  if (next) pageId.value = next.id
+}
 // 툴바 버튼
 function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   if (k === 'assets') { left.value = 'assets'; asset.value = null }
@@ -714,6 +728,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @hint="say"
       @screen-action="onScreenAction"
       @drop-files="onDropFiles"
+      @ui="onUiKey"
     />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
@@ -829,12 +844,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div class="zoom-wrap">
             <button class="sq hov zoom" :aria-label="tr('Zoom')" :aria-expanded="zoomOpen" @click="zoomOpen = !zoomOpen"><span class="num">{{ Math.round(vp.zoom * 100) }}%</span><EditorIcon name="chevron_down" :size="12" class="muted" /></button>
             <div v-if="zoomOpen" class="sq menu zmenu" role="menu" @click="zoomOpen = false">
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 1.25)"><span class="f1">{{ tr('Zoom in') }}</span><span class="tx-meta">⌘+</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 1.25)"><span class="f1">{{ tr('Zoom out') }}</span><span class="tx-meta">⌘−</span></button>
-              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">{{ tr('Zoom to fit') }}</span><span class="tx-meta">⇧1</span></button>
-              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">{{ tr('Zoom to selection') }}</span><span class="tx-meta">⇧2</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom * 2)"><span class="f1">{{ tr('Zoom in') }}</span><span class="tx-meta">⌘+</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.zoomAt(vp.zoom / 2)"><span class="f1">{{ tr('Zoom out') }}</span><span class="tx-meta">⌘−</span></button>
+              <button class="sq menu-item" role="menuitem" @click="canvas?.fit()"><span class="f1">{{ tr('Zoom to fit') }}</span><span class="tx-meta">1</span></button>
+              <button v-if="selected" class="sq menu-item" role="menuitem" @click="canvas?.fitSelection()"><span class="f1">{{ tr('Zoom to selection') }}</span><span class="tx-meta">2</span></button>
               <div class="msep" role="separator" />
-              <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)">{{ tr('Zoom to {n}%', { n: z * 100 }) }}</button>
+              <button v-for="z in ZOOMS" :key="z" class="sq menu-item num" role="menuitem" @click="canvas?.zoomAt(z)"><span class="f1">{{ tr('Zoom to {n}%', { n: z * 100 }) }}</span><span v-if="z === 1" class="tx-meta">⌘0</span></button>
             </div>
           </div>
           <!-- 보기 설정(피그마 보기 메뉴에서 Iris 가 그리는 것만). 나머지는 PRD/07 §20 -->
@@ -844,7 +859,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="currentPage?.viewport?.pixelGrid !== false" @click="onPageSettings({ pixelGrid: currentPage?.viewport?.pixelGrid === false })"><EditorIcon name="check" :size="12" :class="['zck', { off: currentPage?.viewport?.pixelGrid === false }]" /><span class="f1">{{ tr('Pixel grid') }}</span><span class="tx-meta">⇧'</span></button>
               <!-- 픽셀에 맞추기(피그마 Snap to pixel grid): 격자 보이기와 따로 — 끄면 소수점으로 옮기고 크기를 바꿔요 -->
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="currentPage?.viewport?.snapPixel !== false" @click="onPageSettings({ snapPixel: currentPage?.viewport?.snapPixel === false })"><EditorIcon name="check" :size="12" :class="['zck', { off: currentPage?.viewport?.snapPixel === false }]" /><span class="f1">{{ tr('Snap to pixel grid') }}</span><span class="tx-meta">⇧⌘'</span></button>
-              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="gridsShown" @click="gridsShown = !gridsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !gridsShown }]" /><span class="f1">{{ tr('Layout grids') }}</span><span class="tx-meta">⌃G</span></button>
+              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="gridsShown" @click="gridsShown = !gridsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !gridsShown }]" /><span class="f1">{{ tr('Layout grids') }}</span><span class="tx-meta">⇧G</span></button>
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="rulersShown" @click="rulersShown = !rulersShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !rulersShown }]" /><span class="f1">{{ tr('Rulers') }}</span><span class="tx-meta">⇧R</span></button>
             </div>
           </div>
