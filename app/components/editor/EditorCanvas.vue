@@ -389,15 +389,6 @@ function enterVectorEdit(sid: string, id: string) {
   return true
 }
 /** 도형 점 편집 중 회색 상자(피그마처럼 모양 대신 상자 선) */
-const vbox = computed(() => {
-  void tick.value
-  const ve = vedit.value
-  const s = ve ? props.screens.find((v) => v.id === ve.sid) : undefined
-  const n = ve && s ? store.node(ve.sid, ve.id) : undefined
-  if (!ve || !s || !n || n.type === 'vector') return null
-  const m = worldMat(s, ve.id)
-  return [[0, 0], [n.w, 0], [n.w, n.h], [0, n.h]].map(([x, y]) => { const q = apply(m, x!, y!); return `${sx(q.x)},${sy(q.y)}` }).join(' ')
-})
 /** 선 · 벡터 · 다각형처럼 상자가 아닌 모양: 화면 좌표로 그릴 경로(모양선) */
 const OUTLINE_TYPES = new Set(['vector', 'path', 'line', 'polygon', 'star', 'boolean'])
 function outlineOf(sid: string, id: string) {
@@ -802,9 +793,20 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   if (tool.value === 'pen') { penDown(e, screen); return }
   // 점 편집 중 빈 곳을 누르면(피그마와 같아요): 편집은 그대로 — 끌면 상자 안 점 고르기, 그냥 누르면 고른 점 풀기. 끝내기는 Esc · Enter
   if (vedit.value) {
-    const box = el.value!.getBoundingClientRect()
-    drag = { kind: 'vmarquee', x0: e.clientX - box.left, y0: e.clientY - box.top, base: e.shiftKey ? vselOf(vedit.value) : [], moved: false }
-    return
+    // 편집 중인 모양 상자(바깥 8px 여유) 밖을 누르면 편집 끝(피그마와 같아요) — 누른 자리는 평소처럼(다른 레이어 · 화면 고르기 등)
+    const ve = vedit.value
+    const vs = props.screens.find((v) => v.id === ve.sid)
+    const vg = vs ? layerGeom(vs, ve.id) : null
+    const vw = toWorld(e.clientX, e.clientY), vm = 8 / vp.value.zoom
+    const va = vg ? (-vg.angle * Math.PI) / 180 : 0
+    const vdx = vg ? vw.x - vg.cx : 0, vdy = vg ? vw.y - vg.cy : 0
+    const inBox = !!vg && Math.abs(vdx * Math.cos(va) - vdy * Math.sin(va)) <= vg.w / 2 + vm && Math.abs(vdx * Math.sin(va) + vdy * Math.cos(va)) <= vg.h / 2 + vm
+    if (!inBox) vedit.value = null
+    else {
+      const box = el.value!.getBoundingClientRect()
+      drag = { kind: 'vmarquee', x0: e.clientX - box.left, y0: e.clientY - box.top, base: e.shiftKey ? vselOf(vedit.value) : [], moved: false }
+      return
+    }
   }
   const t = drawType(tool.value)
   // 그리기 시작점도 주변에 붙어요(피그마와 같아요, ⌘ 끔)
@@ -1693,6 +1695,8 @@ function commitFrameName(id: string, e: Event) {
   if (c && name && name !== store.node(c.id, id)?.name) store.update(c.id, [id], { name })
 }
 function onDblAny(e: MouseEvent) {
+  // 점 편집 중 두 번 누르기(점 · 선 손잡이 말고): 편집 끝(피그마와 같아요)
+  if (vedit.value) { if (!(e.target as Element | null)?.closest?.('.an, .hd, .vs-hit')) vedit.value = null; return }
   const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
   const lab = hit?.closest('.label') as HTMLElement | null
   if (lab?.dataset.screen) { renamingScreen.value = lab.dataset.screen; return }
@@ -3213,15 +3217,16 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
           <span v-for="h in screenRad ?? []" :key="'srh' + h.c" class="rh" :style="{ left: h.x + 'px', top: h.y + 'px' }" :title="tr('Corner radius (⌥ one corner)')" @pointerdown.stop.prevent="startScreenRadius($event, h.c)" />
         </template>
       </div>
-      <div v-for="b in selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
-      <div v-for="b in xBoxes" :key="'x' + b.id" class="sel" :style="rbox(b)" />
+      <!-- 점 편집 중에는 선택 상자 · 크기를 감춰요(피그마와 같아요 — 점 · 선만) -->
+      <div v-for="b in vedit ? [] : selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
+      <div v-for="b in vedit ? [] : xBoxes" :key="'x' + b.id" class="sel" :style="rbox(b)" />
       <!-- 오토 레이아웃 간격 · 여백 표시(오른쪽 패널 칸에 올렸을 때) -->
       <div v-for="a in alZones" :key="'al' + a.key" class="al-hint" :style="rbox(a.g)" aria-hidden="true">
         <span v-for="(z, k) in a.zones" :key="k" class="al-zone" :style="{ left: z.x * vp.zoom + 'px', top: z.y * vp.zoom + 'px', width: z.w * vp.zoom + 'px', height: z.h * vp.zoom + 'px' }" />
       </div>
       <!-- 여러 개 고름: 전체를 감싸는 상자(손잡이로 함께 크기 바꾸기) + 크기 -->
-      <div v-if="xAllWorld && !multi.length" class="sel group" :style="box({ x: xAllWorld.x, y: xAllWorld.y, width: xAllWorld.w, height: xAllWorld.h })"><span class="sq size">{{ fmt(xAllWorld.w) }} × {{ fmt(xAllWorld.h) }}</span></div>
-      <div v-else-if="selBoxes.length > 1 && selWorld && !multi.length" class="sel group" :class="{ comp: selComp }" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
+      <div v-if="xAllWorld && !multi.length && !vedit" class="sel group" :style="box({ x: xAllWorld.x, y: xAllWorld.y, width: xAllWorld.w, height: xAllWorld.h })"><span class="sq size">{{ fmt(xAllWorld.w) }} × {{ fmt(xAllWorld.h) }}</span></div>
+      <div v-else-if="selBoxes.length > 1 && selWorld && !multi.length && !vedit" class="sel group" :class="{ comp: selComp }" :style="box({ x: selWorld.x, y: selWorld.y, width: selWorld.w, height: selWorld.h })">
         <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startResizeMany($event, h)" />
         <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, 0) }" @pointerdown.stop.prevent="startResizeMany($event, c)" />
         <span class="sq size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
@@ -3271,9 +3276,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <svg v-if="vhandles" class="vedit" width="100%" height="100%">
         <defs><pattern id="vhatch" :width="vshape?.pw ?? 6" :height="vshape?.pw ?? 6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" :y2="vshape?.pw ?? 6" class="vh-line" :stroke-width="(vshape?.pw ?? 6) / 6" /></pattern></defs>
         <!-- 편집 중: 모양은 회색 선, 칠이 있으면 파란 빗금(피그마와 같아요) -->
+        <!-- 피그마와 같아요: 모양 칠 위에 마우스를 올렸을 때만 파란 빗금. 둥근 모양 윤곽선 · 바깥 상자는 그리지 않고 점 사이 선(회색)만 -->
         <path v-if="vshape?.filled" :d="vshape.d" :transform="vshape.tf" class="vhatch" />
-        <path v-if="vshape" :d="vshape.d" :transform="vshape.tf" class="vline" vector-effect="non-scaling-stroke" />
-        <polygon v-if="vbox" :points="vbox" class="vbox" />
         <rect v-if="vmarq" :x="vmarq.x" :y="vmarq.y" :width="vmarq.w" :height="vmarq.h" class="vmarq" />
         <!-- 선 손잡이: 보이지 않는 굵은 선(누르기 쉬움) · 고른 선은 파란 2px -->
         <g v-for="g in vsegs ?? []" :key="'s' + g.pi + ':' + g.qi" :class="['vseg', { on: segOn(g.pi, g.qi) }]">
@@ -3405,13 +3409,12 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .vedit .vmarq { fill: color-mix(in srgb, var(--iris-select) 8%, transparent); stroke: var(--iris-select); stroke-width: 1; pointer-events: none; }
 /* 선 손잡이: 누를 자리는 12px 굵기(투명), 마우스를 올리면 파란 1px, 고르면 파란 2px(피그마와 같아요) */
 .vedit .vs-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: default; }
-.vedit .vs-line { fill: none; stroke: transparent; stroke-width: 1; pointer-events: none; }
+.vedit .vs-line { fill: none; stroke: #B3B3B3; stroke-width: 1; pointer-events: none; }
 .vedit .vseg:hover .vs-line { stroke: var(--iris-select); }
 .vedit .vseg.on .vs-line { stroke: var(--iris-select); stroke-width: 2; }
 /* 아직 도형인 채 점 편집: 모양 대신 회색 상자 선(피그마와 같아요) */
-.vedit .vbox { fill: none; stroke: var(--sys-color-neutral-400); stroke-width: 1; }
-.vedit .vhatch { fill: url(#vhatch); pointer-events: none; }
-.vedit .vline { fill: none; stroke: var(--sys-color-neutral-500); stroke-width: 1; pointer-events: none; }
+.vedit .vhatch { fill: transparent; pointer-events: fill; }
+.vedit .vhatch:hover { fill: url(#vhatch); }
 .shape-ol { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .shape-ol path { fill: none; stroke: var(--iris-select); }
 .vedit .vh-line { stroke: var(--iris-select); opacity: .7; }
