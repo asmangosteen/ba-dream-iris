@@ -1727,7 +1727,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
 /* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
 .follow-ring { position: fixed; top: var(--iris-tabs-h, 44px); left: 0; right: 0; bottom: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
-.follow-band { position: fixed; top: calc(var(--iris-tabs-h, 44px) + 12px); left: 50%; transform: translateX(-50%); z-index: 41; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-03, 3px) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-05); --sq-fill: var(--c); color: #FFFFFF; font-size: 12px; font-weight: 500; white-space: nowrap; filter: drop-shadow(0 2px 6px rgb(3 9 26 / 18%)); }
+.follow-band { position: fixed; top: calc(var(--iris-tabs-h, 44px) + 12px); left: 50%; transform: translateX(-50%); z-index: 41; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-03, 3px) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-05); --sq-fill: var(--c); color: #FFFFFF; font-size: 12px; font-weight: 500; white-space: nowrap; filter: drop-shadow(0 2px 6px rgb(3 9 26 / 18%)); }
 .fb-stop { height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); --sq-fill: rgb(255 255 255 / 18%); color: #FFFFFF; font-size: 12px; font-weight: 500; }
 .fb-stop:hover { --sq-fill: rgb(255 255 255 / 28%); }
 .fb-stop:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 1px; }
