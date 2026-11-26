@@ -1104,7 +1104,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         <div :class="['split', { on: splitting }]" role="separator" aria-orientation="horizontal" :aria-label="tr('Resize pages and layers')" :title="tr('Drag to resize · double-click to reset')" @pointerdown="startSplit" @dblclick="resetSplit" />
         <section v-ovscroll class="layers">
           <div class="sec-h"><span>{{ tr('Layers') }}</span></div>
-          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
+          <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" :cover-id="project.data.value?.cover_screen_id ?? null" @thumbnail="onThumbnail" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
             <span class="tx-meta">{{ tr('No frames yet') }}</span>
             <TextButton size="s" color="blue" @click="tool = 'frame'">{{ tr('Draw frame') }}</TextButton>
@@ -1391,7 +1391,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .reader { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-16); }
 .none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .self-start { align-self: flex-start; }
-.toast-wrap { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 10; pointer-events: none; }
+/* 토스트: 도구 막대(아래 16 + 높이 44 = 60) 위로 16 띄워서 */
+.toast-wrap { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 10; pointer-events: none; }
 /* 라이트 · 다크 모두 어두운 토스트(neutral-800 · white 토큰은 다크에서 뒤집혀서 고정값을 써요). 다크에선 옅은 흰 테두리로 캔버스와 구분 */
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 /* 피그마 UI3 토스트: 도구 막대 바로 위, 3초, 애니메이션 없이 바로 나타나고 사라져요 */

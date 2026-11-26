@@ -55,6 +55,9 @@ export function useTabs() {
   /** 탭이 너무 많아 자동으로 닫은 횟수(탭 막대가 알림을 띄워요) */
   const evicted = useState<number>('iris-tabs-evicted', () => 0)
 
+  /** 닫은 프로젝트 탭은 불러온 데이터를 잊어요 — 다시 열면 새로 여는 것이라 로딩 화면이 뜨고 최신으로 다시 받아요(열린 탭끼리 옮길 땐 바로) */
+  const forget = (id: string) => { if (id !== NEW_TAB_ID) forgetEditorCache(id) }
+
   function load() {
     if (loaded.value || !import.meta.client) return
     loaded.value = true
@@ -90,6 +93,7 @@ export function useTabs() {
           const old = next.find((x) => !x.pinned && x.id !== id)
           if (!old) break
           next = next.filter((x) => x !== old)
+          forget(old.id)
           evicted.value = (evicted.value ?? 0) + 1
         }
         tabs.value = next
@@ -116,6 +120,7 @@ export function useTabs() {
     if (i < 0) return
     const next = tabs.value[i + 1] ?? tabs.value[i - 1]
     tabs.value = tabs.value.filter((t) => t.id !== id)
+    forget(id)
     save()
     if (activeId === id) await navigateTo(next ? next.path : homePath.value)
   }
@@ -145,6 +150,7 @@ export function useTabs() {
   /** 다른 탭 닫기 · 모든 탭 닫기(고정한 탭은 남아요). 보고 있던 탭이 닫히면 남은 탭(없으면 홈)으로 */
   async function closeMany(keep: string | null, activeId: string | null) {
     const next = tabs.value.filter((t) => t.pinned || t.id === keep)
+    for (const t of tabs.value) if (!next.includes(t)) forget(t.id)
     tabs.value = next
     save()
     if (activeId && !next.some((t) => t.id === activeId)) await navigateTo(next.find((t) => t.id === keep)?.path ?? next[next.length - 1]?.path ?? homePath.value)

@@ -7,7 +7,7 @@ import type { LayerStyle } from './schema'
 export function scaledStyle(o: LayerStyle, k: number): LayerStyle {
   const sc = (v?: number) => (v === undefined ? v : Math.round(v * k * 100) / 100)
   const st: LayerStyle = { ...o }
-  st.strokeWidth = sc(o.strokeWidth); st.radius = sc(o.radius); st.fontSize = sc(o.fontSize); st.lineHeight = sc(o.lineHeight)
+  st.strokeWidth = sc(o.strokeWidth); st.radius = sc(o.radius); st.fontSize = sc(o.fontSize); st.lineHeight = o.lineHeightUnit === 'percent' ? o.lineHeight : sc(o.lineHeight) // % 는 글자 크기를 따라가니 그대로
   st.letterSpacing = sc(o.letterSpacing); st.paraSpacing = sc(o.paraSpacing)
   if (o.radii) st.radii = o.radii.map((r) => sc(r)!) as [number, number, number, number]
   if (o.dash) st.dash = [sc(o.dash[0])!, sc(o.dash[1])!]

@@ -10,8 +10,9 @@ import RenameLayers from '~/components/editor/RenameLayers.vue'
 import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
-const props = defineProps<{ screens: ScreenRow[]; multi?: string[]; canvasId?: string | null }>()
-const emit = defineEmits<{ 'pick-screen': [id: string]; 'toggle-screen': [id: string]; 'screen-order': [ids: string[]]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'front' | 'back' | 'forward' | 'backward' | 'section'] }>()
+/** coverId: 프로젝트 썸네일로 정한 화면(프레임 메뉴에 'Set as thumbnail' · 'Restore default thumbnail') */
+const props = defineProps<{ screens: ScreenRow[]; multi?: string[]; canvasId?: string | null; coverId?: string | null }>()
+const emit = defineEmits<{ thumbnail: [screenId: string | null]; 'pick-screen': [id: string]; 'toggle-screen': [id: string]; 'screen-order': [ids: string[]]; 'screen-action': [action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'front' | 'back' | 'forward' | 'backward' | 'section'] }>()
 const store = useLayerStore()
 
 /** 펼친 화면 · 프레임(피그마처럼 처음엔 접혀 있어요 — 캔버스에서 고르면 그 레이어까지 펼치고 목록을 그 줄로 옮겨요) */
@@ -495,6 +496,9 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
     { label: tr('Bring forward'), shortcut: '⌘]', action: () => emit('screen-action', 'forward') },
     { label: tr('Send backward'), shortcut: '⌘[', action: () => emit('screen-action', 'backward') },
     { label: tr('Send to back'), shortcut: '[', action: () => emit('screen-action', 'back') },
+    'sep',
+    // 프로젝트 썸네일(캔버스 프레임 메뉴와 같아요)
+    props.coverId === s.id ? { label: tr('Restore default thumbnail'), action: () => emit('thumbnail', null) } : { label: tr('Set as thumbnail'), action: () => emit('thumbnail', s.id) },
     'sep',
     { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => emit('screen-action', 'remove') },
   ])

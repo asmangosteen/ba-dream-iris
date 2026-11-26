@@ -12,7 +12,7 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
  * - 토큰이 연결된 색은 토큰 박스로(바꾸면 모두 다른 토큰으로 · 풀기), 아니면 색 값 + 투명도
  * - 칠 · 선 · 글자 색, 덧붙인 칠 · 선, 그라디언트 지점, 그림자 색을 모두 봐요
  * targets: 화면마다 고른 레이어(ids 가 비면 그 화면 프레임 전체 — 프레임 모양 + 모든 레이어)
- * lazy: 처음엔 'Show selection colors' 버튼만(프레임처럼 색이 많을 때 — 피그마와 같아요)
+ * lazy: 색이 5개 이상이면 처음엔 'Show selection colors' 버튼만(프레임처럼 색이 많을 때 — 피그마와 같아요), 4개 이하면 바로 보여요
  */
 const props = defineProps<{ targets: { sid: string; ids: string[] }[]; lazy?: boolean }>()
 const store = useLayerStore()
@@ -50,8 +50,7 @@ const scopes = computed(() => props.targets.map(({ sid, ids }) => {
   const layerIds = ids.length ? [...new Set(ids.flatMap((id) => descendants(d, id)))] : Object.keys(d.nodes)
   return { sid, frame: !ids.length, layerIds }
 }))
-const rows = computed(() => {
-  if (!shown.value) return []
+const allRows = computed(() => {
   const hits: Hit[] = []
   for (const sc of scopes.value) {
     const d = store.doc(sc.sid)
@@ -62,6 +61,10 @@ const rows = computed(() => {
   for (const h of hits) { const r = seen.get(h.key); if (r) r.n++; else seen.set(h.key, { ...h, n: 1 }) }
   return [...seen.values()]
 })
+/** lazy 라도 색이 몇 개 안 되면(5개 미만) 버튼 없이 바로 보여요 */
+const LAZY_MIN = 5
+const open = computed(() => shown.value || allRows.value.length < LAZY_MIN)
+const rows = computed(() => (open.value ? allRows.value : []))
 const visible = computed(() => (all.value ? rows.value : rows.value.slice(0, LIMIT)))
 const label = (r: Hit) => (r.token ? catalog.find(r.token)?.name ?? r.token : hexOf(r.color).slice(1))
 
@@ -143,9 +146,9 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 </script>
 
 <template>
-  <section v-if="!shown || rows.length" class="s">
+  <section v-if="!open || rows.length" class="s">
     <div class="sec-h h24"><span>{{ tr('Selection colors') }}</span></div>
-    <button v-if="!shown" type="button" class="sq show" @click="shown = true">{{ tr('Show selection colors') }}</button>
+    <button v-if="!open" type="button" class="sq show" @click="shown = true">{{ tr('Show selection colors') }}</button>
     <template v-else>
       <!-- 피그마 Selection colors 행: [견본 + 이름(토큰) · 색 값 | 투명도] -->
       <div v-for="(r, i) in visible" :key="i" class="srow">

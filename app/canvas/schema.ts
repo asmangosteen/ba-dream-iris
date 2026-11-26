@@ -48,6 +48,10 @@ export type Sizing = 'fixed' | 'hug' | 'fill'
 /** 제약 (v6): 부모 프레임 크기가 바뀔 때 */
 export interface Constraints { h: 'left' | 'right' | 'leftright' | 'center' | 'scale'; v: 'top' | 'bottom' | 'topbottom' | 'center' | 'scale' }
 /** 레이아웃 그리드 (v6) */
+/** 줄 높이 → CSS 값: % 면 '125%'(글자 크기 따라감), px 면 '24px', 없으면 글자 크기 × 1.5 */
+export const lineHeightCss = (s: LayerStyle) => (s.lineHeight === undefined ? Math.round((s.fontSize ?? 16) * 1.5) + 'px' : s.lineHeightUnit === 'percent' ? s.lineHeight + '%' : s.lineHeight + 'px')
+/** 줄 높이 → px 숫자(계산용) */
+export const lineHeightPx = (s: LayerStyle) => (s.lineHeight === undefined ? Math.round((s.fontSize ?? 16) * 1.5) : s.lineHeightUnit === 'percent' ? ((s.fontSize ?? 16) * s.lineHeight) / 100 : s.lineHeight)
 /** 레이아웃 그리드의 칸(Columns · Rows) — 프레임 안 좌표. 그리기(GridOverlay)와 가이드선 붙기가 같이 써요 */
 export function gridBands(grids: LayoutGrid[] | undefined, w: number, h: number): { x: number; y: number; w: number; h: number; c: string }[] {
   const out: { x: number; y: number; w: number; h: number; c: string }[] = []
@@ -103,6 +107,8 @@ export interface LayerStyle {
   fontSize?: number
   fontWeight?: number
   lineHeight?: number
+  /** 줄 높이 단위: 'percent' 면 lineHeight 는 글자 크기의 %(100 = 글자 크기와 같음), 비어 있으면 px(피그마와 같아요) */
+  lineHeightUnit?: 'percent'
   /** 자간(px) (v3) */
   letterSpacing?: number
   align?: 'left' | 'center' | 'right' | 'justify'
@@ -327,7 +333,7 @@ export function normAngle(r: number) {
 export const DEFAULT_STYLE: Record<LayerType, LayerStyle> = {
   frame: { fill: '#FFFFFF', radius: 0, clip: true },
   rect: { fill: '#E9EBED', radius: 0 },
-  text: { color: '#202837', fontSize: 16, fontWeight: 400, lineHeight: 24, align: 'left', autoWidth: true },
+  text: { color: '#202837', fontSize: 16, fontWeight: 400, lineHeight: 100, lineHeightUnit: 'percent', align: 'left', autoWidth: true },
   image: { radius: 0 },
   ellipse: { fill: '#E9EBED' },
   line: { stroke: '#202837', strokeWidth: 1 },

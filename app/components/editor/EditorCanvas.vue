@@ -3691,11 +3691,17 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .shape-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .shape-line path { fill: none; stroke: var(--iris-select); }
 /* 올린 프레임 · 그룹의 바로 아래 자식: 1px 점선 */
-.kid { position: absolute; pointer-events: none; outline: 1px dashed var(--iris-select); outline-offset: -1px; }
+/* 점선 상자(그룹 · 프레임 안 레이어 표시): 브라우저 dashed 는 마디가 길어서, 2 칠 · 2 빔의 짧고 촘촘한 점선을 직접 그려요(가장자리 1px 네 줄) */
+.kid, .parent { --dl: var(--iris-select); background:
+  repeating-linear-gradient(90deg, var(--dl) 0 2px, transparent 2px 4px) top left / 100% 1px no-repeat,
+  repeating-linear-gradient(90deg, var(--dl) 0 2px, transparent 2px 4px) bottom left / 100% 1px no-repeat,
+  repeating-linear-gradient(180deg, var(--dl) 0 2px, transparent 2px 4px) top left / 1px 100% no-repeat,
+  repeating-linear-gradient(180deg, var(--dl) 0 2px, transparent 2px 4px) top right / 1px 100% no-repeat; }
+.kid { position: absolute; pointer-events: none; }
 /* 오토 레이아웃 안쪽 여백: 파란 빗금 */
 .pad { position: absolute; pointer-events: none; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--iris-select) 30%, transparent) 0 1px, transparent 1px 4px), color-mix(in srgb, var(--iris-select) 8%, transparent); }
 /* 고른 레이어의 부모: 옅은 1px 점선 */
-.parent { position: absolute; pointer-events: none; outline: 1px dashed color-mix(in srgb, var(--iris-select) 70%, transparent); }
+.parent { position: absolute; pointer-events: none; --dl: color-mix(in srgb, var(--iris-select) 70%, transparent); }
 /* 오토 레이아웃 간격: 분홍 빗금 + 가운데 짧은 손잡이 선 */
 .gap { position: absolute; pointer-events: none; display: grid; place-items: center; background: repeating-linear-gradient(-45deg, rgb(242 72 156 / 32%) 0 1px, transparent 1px 4px), rgb(242 72 156 / 8%); }
 .gap i { position: relative; width: 8px; height: 1px; background: rgb(242 72 156); pointer-events: auto; }

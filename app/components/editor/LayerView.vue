@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { clipsContent, isContainer, isVector, type ArrowHead, type LayerDoc } from '~/canvas/schema'
+import { clipsContent, isContainer, isVector, lineHeightCss, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { textShortcut } from '~/canvas/textKeys'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
@@ -94,7 +94,7 @@ const style = computed(() => {
   }
   if (v.type === 'text') {
     Object.assign(css, {
-      color: color(s.color), fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: (s.lineHeight ?? Math.round((s.fontSize ?? 16) * 1.5)) + 'px',
+      color: color(s.color), fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: lineHeightCss(s),
       letterSpacing: s.letterSpacing ? s.letterSpacing + 'px' : undefined, textAlign: s.align ?? 'left', whiteSpace: s.autoWidth ? 'pre' : 'pre-wrap',
       textDecoration: s.decoration === 'underline' ? 'underline' : s.decoration === 'strike' ? 'line-through' : undefined,
       textTransform: s.textCase === 'upper' ? 'uppercase' : s.textCase === 'lower' ? 'lowercase' : s.textCase === 'title' ? 'capitalize' : undefined,

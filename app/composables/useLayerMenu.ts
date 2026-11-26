@@ -43,7 +43,7 @@ export function cssOf(n: LayerNode, color: (v?: string) => string | undefined): 
   if (fx.filter.length) css.filter = fx.filter.join(' ')
   if (s.opacity !== undefined && s.opacity < 1) css.opacity = String(s.opacity)
   if (s.blend && s.blend !== 'normal') css['mix-blend-mode'] = s.blend
-  if (n.type === 'text') Object.assign(css, { color: color(s.color) ?? '', 'font-family': 'Pretendard', 'font-size': `${s.fontSize ?? 16}px`, 'font-weight': String(s.fontWeight ?? 400), 'line-height': s.lineHeight ? `${s.lineHeight}px` : 'normal', ...(s.letterSpacing ? { 'letter-spacing': `${s.letterSpacing}px` } : {}), 'text-align': s.align ?? 'left' })
+  if (n.type === 'text') Object.assign(css, { color: color(s.color) ?? '', 'font-family': 'Pretendard', 'font-size': `${s.fontSize ?? 16}px`, 'font-weight': String(s.fontWeight ?? 400), 'line-height': s.lineHeight ? (s.lineHeightUnit === 'percent' ? `${s.lineHeight}%` : `${s.lineHeight}px`) : 'normal', ...(s.letterSpacing ? { 'letter-spacing': `${s.letterSpacing}px` } : {}), 'text-align': s.align ?? 'left' })
   return `/* ${n.name} */\n` + Object.entries(css).filter(([, v]) => v).map(([k, v]) => `${k}: ${v};`).join('\n')
 }
 /** 레이어들 → SVG(피그마 'Copy as SVG'). 텍스트 · 이미지 · 인스턴스는 빼요 */

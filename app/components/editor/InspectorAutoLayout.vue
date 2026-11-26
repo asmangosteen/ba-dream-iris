@@ -20,15 +20,18 @@ onBeforeUnmount(() => { alHint.value = null })
 const hintOn = (h: AlHint) => ({ onPointerenter: () => (hovH.value = h), onPointerleave: () => { if (hovH.value === h) hovH.value = null }, onFocusin: () => (focH.value = h), onFocusout: () => { if (focH.value === h) focH.value = null } })
 const store = useLayerStore()
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
-/** 고른 것이 모두 오토 레이아웃일 때만 조절 칸, 아니면 + (여러 개 · 프레임 아닌 것은 새 프레임으로 감싸서 걸어요) */
-const l = computed(() => (nodes.value.length && nodes.value.every((n) => n.style.layout) ? nodes.value[0]!.style.layout : undefined))
+/**
+ * 오토 레이아웃 조절 칸('Auto layout')은 오토 레이아웃 하나를 골랐을 때만. 각자 오토 레이아웃인 것 여럿을 골라도 서로 관계없는 것이라
+ * 기본 'Layout' 칸 — + 로 새 오토 레이아웃 프레임에 함께 감싸야(⇧A) 그 프레임의 'Auto layout' 칸이 떠요(사용자 요청 2026-11-26)
+ */
+const l = computed(() => (nodes.value.length === 1 ? nodes.value[0]!.style.layout : undefined))
 const sepPad = ref(false)
 watch(() => props.ids.join(), () => { const p = l.value?.padding; sepPad.value = !!p && !(p[0] === p[2] && p[1] === p[3]) }, { immediate: true })
 
 // 섹션도 프레임처럼 오토 레이아웃을 넣을 수 있어요
 const allFrames = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.type === 'frame' || n.type === 'section'))
-/** Flow 줄: 프레임이거나 이미 오토 레이아웃일 때 */
-const flowOk = computed(() => !!l.value || allFrames.value)
+/** Flow 줄: 프레임(섹션) 하나이거나 이미 오토 레이아웃일 때 — 여러 개는 + 로 감싸요 */
+const flowOk = computed(() => !!l.value || (allFrames.value && nodes.value.length === 1))
 /** 오토 레이아웃 넣기 버튼: 프레임 · 여러 개(새 프레임으로 감싸요) */
 const addOk = computed(() => !!l.value || allFrames.value || nodes.value.length > 1)
 /** 내용에 맞추기: 안에 레이어가 있는 일반 프레임 */

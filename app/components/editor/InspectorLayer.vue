@@ -153,6 +153,19 @@ function setStyleNum(key: 'radius' | 'strokeWidth' | 'fontSize' | 'lineHeight' |
   if (!input.value.trim() || !Number.isFinite(v)) { input.value = show(same((n) => n.style[key] ?? '')); return }
   setStyle(key, Math.max(min, Math.round(v * 100) / 100))
 }
+/**
+ * 줄 높이(피그마와 같아요): '125%' 처럼 % 를 붙이면 글자 크기의 %, 숫자만이면 px. 비우면 그대로 되돌려요.
+ * 칸에는 % 값은 '100%', px 값은 '24' 로 보여요. ↑↓ 는 지금 단위 그대로 1씩
+ */
+const lhText = (n: LayerNode) => (n.style.lineHeight === undefined ? '' : n.style.lineHeightUnit === 'percent' ? `${Math.round(n.style.lineHeight * 100) / 100}%` : String(Math.round(n.style.lineHeight * 100) / 100))
+function setLineHeight(e: Event) {
+  const input = e.target as HTMLInputElement
+  const raw = input.value.trim()
+  const pct = raw.endsWith('%')
+  const v = Number(raw.replace(/[%px\s]/gi, ''))
+  if (!raw || !Number.isFinite(v)) { input.value = show(same(lhText)); return }
+  store.style(sid.value, ids.value, { lineHeight: Math.max(1, Math.round(v * 100) / 100), lineHeightUnit: pct ? 'percent' : undefined })
+}
 function setOpacity(e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value.replace('%', ''))
@@ -223,7 +236,7 @@ function pickNum(key: BindKey, t: CatalogToken) {
       radii[i] = v
       return { style: { radii } }
     })
-  } else store.bind(...S(), key, t.id, () => ({ style: { [key]: v } }))
+  } else store.bind(...S(), key, t.id, () => ({ style: { [key]: v, ...(key === 'lineHeight' ? { lineHeightUnit: undefined } : {}) } })) // 줄 높이 변수는 px
 }
 // --- 글자: 피그마 Typography ---
 const tsBound = computed(() => vb('textStyle'))
@@ -259,7 +272,7 @@ const sizeOptionsT = computed(() => [...SIZES.map((z) => ({ value: String(z), la
 function onSize(v: string) { if (v === VAR_OPT) nextTick(() => typoVar.fontSize?.show()); else setStyle('fontSize', Number(v)) }
 function pickTextStyle(t: CatalogToken) {
   const x = t.text!
-  store.bind(...S(), 'textStyle', t.id, () => ({ style: { fontSize: x.size, lineHeight: x.lineHeight, letterSpacing: x.letterSpacing, ...(x.weight ? { fontWeight: x.weight } : {}) } }))
+  store.bind(...S(), 'textStyle', t.id, () => ({ style: { fontSize: x.size, lineHeight: x.lineHeight, lineHeightUnit: undefined, letterSpacing: x.letterSpacing, ...(x.weight ? { fontWeight: x.weight } : {}) } }))
 }
 function unbind(key: BindKey | BindKey[]) {
   const keys = Array.isArray(key) ? key : [key]
@@ -834,7 +847,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         </div>
         <div class="ig-l"><span>{{ tr('Line height') }}</span><span>{{ tr('Letter spacing') }}</span></div>
         <div class="ig">
-        <label class="sq fld" :title="tr('Line height')"><EditorIcon name="line_height" /><input v-if="!vb('lineHeight')" :value="show(same((n) => n.style.lineHeight ?? ''))" :placeholder="same((n) => n.style.lineHeight ?? '') === 'Mixed' ? tr('Mixed') : tr('Auto')" inputmode="decimal" :aria-label="tr('Line height')" @change="setStyleNum('lineHeight', $event, 1)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
+        <label class="sq fld" :title="tr('Line height')"><EditorIcon name="line_height" /><input v-if="!vb('lineHeight')" :key="'lh' + show(same(lhText))" :value="show(same(lhText))" :placeholder="same(lhText) === 'Mixed' ? tr('Mixed') : tr('Auto')" :aria-label="tr('Line height')" @change="setLineHeight" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
         <label class="sq fld u" :title="tr('Letter spacing')"><EditorIcon name="letter_spacing" /><template v-if="!vb('letterSpacing')"><input :value="show(same((n) => n.style.letterSpacing ?? 0))" :placeholder="same((n) => n.style.letterSpacing ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Letter spacing')" @change="setStyleNum('letterSpacing', $event, -100)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('letterSpacing', d / 10, -100))"><span v-if="same((n) => n.style.letterSpacing ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['letterSpacing']" :bound="vb('letterSpacing')" reveal label="Letter spacing" @pick="(t) => pickNum('letterSpacing', t)" @unbind="unbind('letterSpacing')" @step="(d) => stepStyle('letterSpacing', d / 10, -100)" /></label>
           <span />
         </div>
@@ -842,7 +855,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <div class="ig-l"><span>{{ tr('Alignment') }}</span></div>
       <div class="ig">
         <div class="grp" role="group" :aria-label="tr('Text alignment')">
-          <button v-for="a in (['left', 'center', 'right'] as const)" :key="a" :class="['ib', { on: textAlignNow === a }]" :aria-pressed="textAlignNow === a" :aria-label="tr(ALIGN_LABEL[a])" :data-tip="tr(ALIGN_LABEL[a])" @click="setStyle('align', a)"><EditorIcon :name="`align_${a}`" :size="16" /></button>
+          <button v-for="a in (['left', 'center', 'right'] as const)" :key="a" :class="['ib', { on: textAlignNow === a }]" :aria-pressed="textAlignNow === a" :aria-label="tr(ALIGN_LABEL[a])" :data-tip="tr(ALIGN_LABEL[a])" @click="setStyle('align', a)"><EditorIcon :name="`text_align_${a}`" :size="16" /></button>
         </div>
         <div class="grp" role="group" :aria-label="tr('Vertical alignment')">
           <button v-for="a in (['top', 'middle', 'bottom'] as const)" :key="a" :class="['ib', { on: valignNow === a }]" :aria-pressed="valignNow === a" :aria-label="tr(VALIGN_LABEL[a])" :data-tip="tr(VALIGN_LABEL[a])" @click="setStyle('valign', a === 'top' ? undefined : a)"><EditorIcon :name="`valign_${a}`" :size="16" /></button>
