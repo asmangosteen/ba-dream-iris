@@ -506,4 +506,8 @@ export default {
   'Portrait 3:4': '세로 3:4',
   'Portrait 9:16': '세로 9:16',
   'Portrait 2:3': '세로 2:3',
+  // 인스턴스 하위 레이어 덮어쓰기
+  'Icon color': '아이콘 색',
+  'Text color': '글자 색',
+  'Locked — unlock in the layers panel to edit': '잠겨 있어요 — 레이어 목록에서 잠금을 풀면 고칠 수 있어요',
 } satisfies Record<string, string>

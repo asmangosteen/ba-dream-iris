@@ -7,6 +7,7 @@ import { radiiOf, rectPath, topImagePaint, vectorPath } from '~/canvas/paint'
 import { booleanPath } from '~/canvas/boolean'
 import { layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq, useToastReq } from '~/composables/useLayerMenu'
 import RenameLayers from '~/components/editor/RenameLayers.vue'
+import { instTick, readInstanceTree, subHover, subSel, type SubNode } from '~/composables/useInstanceTree'
 import { useLayerStore } from '~/canvas/store'
 
 /** 왼쪽 패널 · 레이어: 화면 → 레이어 트리 (위에 있는 레이어가 위). 이름 바꾸기 · 숨기기 · 잠그기 · 끌어서 순서 바꾸기 */
@@ -93,7 +94,60 @@ function rowsOf(s: ScreenRow, base = 1, forceUnder = false): Row[] {
  * 섹션을 상위로(피그마와 같아요): 캔버스 섹션 안에 완전히 들어간 화면은 그 섹션 아래에 한 단계 들여서.
  * 목록 한 줄 = 화면 줄 또는 레이어 줄. 섹션을 고르면 안의 화면 · 레이어까지 한 박스로 옅게 칠해요
  */
-type Item = { kind: 'screen'; s: ScreenRow; depth: number; under: boolean } | { kind: 'layer'; r: Row }
+/** sub: 디자인 시스템 인스턴스의 하위 줄(useInstanceTree — 기본은 읽기, 이름 · 숨김 · 글자 · 색은 덮어쓰기로) */
+type SubItem = { kind: 'sub'; pr: Row; sn: SubNode; depth: number; open: boolean; k: string }
+type Item = { kind: 'screen'; s: ScreenRow; depth: number; under: boolean } | { kind: 'layer'; r: Row } | SubItem
+/** 펼친 인스턴스 · 하위 줄(화면:레이어[:자리]) */
+const subOpen = ref<Set<string>>(new Set())
+function toggleSub(k: string) { const o = new Set(subOpen.value); if (o.has(k)) o.delete(k); else o.add(k); subOpen.value = o }
+/** 인스턴스 줄 다음에 올 하위 줄들(펼쳤을 때만) */
+function subItems(r: Row): SubItem[] {
+  if (r.n.type !== 'instance' || !subOpen.value.has(r.sid + ':' + r.n.id)) return []
+  void instTick.value
+  const out: SubItem[] = []
+  const walk = (l: SubNode[], d: number) => {
+    for (const sn of l) {
+      const k = `${r.sid}:${r.n.id}:${sn.key}`
+      const open = subOpen.value.has(k)
+      out.push({ kind: 'sub', pr: r, sn, depth: d, open, k })
+      if (open && sn.children.length) walk(sn.children, d + 1)
+    }
+  }
+  walk(readInstanceTree(r.sid, r.n.id), r.depth + 1)
+  return out
+}
+const subOv = (it: SubItem) => it.pr.n.subOverrides?.[it.sn.key]
+/** 줄 이름: 바꾼 이름 → (글자 줄이면) 바꾼 글자 → 기본 */
+const subName = (it: SubItem) => subOv(it)?.name || (it.sn.kind === 'text' ? subOv(it)?.text : undefined) || it.sn.name
+const subOn = (it: SubItem) => !!subSel.value && subSel.value.sid === it.pr.sid && subSel.value.id === it.pr.n.id && subSel.value.key === it.sn.key
+/** 하위 줄 고르기: 인스턴스를 고르고 그 줄을 오른쪽 패널에(글자 · 색 · 칠) */
+function pickSub(it: SubItem) {
+  store.selectLayer(it.pr.sid, it.pr.n.id)
+  subSel.value = { sid: it.pr.sid, id: it.pr.n.id, key: it.sn.key, kind: it.sn.kind, name: subName(it) }
+}
+/** 덮어쓰기 고치기(실행취소 한 번). 값이 다 비면 그 자리 덮어쓰기를 지워요 */
+function setSubOv(it: SubItem, patch: Record<string, unknown>) {
+  store.update(it.pr.sid, [it.pr.n.id], (n) => {
+    const all = { ...(n.subOverrides ?? {}) }
+    const cur: Record<string, unknown> = { ...all[it.sn.key], ...patch }
+    for (const k of Object.keys(cur)) if (cur[k] === undefined || cur[k] === '' || cur[k] === false) delete cur[k]
+    if (Object.keys(cur).length) all[it.sn.key] = cur; else delete all[it.sn.key]
+    return { subOverrides: Object.keys(all).length ? all : undefined }
+  })
+}
+const setSubHover = (el: Element | null) => { subHover.value = el }
+/** 잠근 화면(프레임) */
+const scrLocked = (s: { id: string }) => !!store.doc(s.id).frame?.locked
+/** 숨긴 화면(프레임) */
+const scrHidden = (s: { id: string }) => !!store.doc(s.id).frame?.hidden
+const renamingSub = ref<string | null>(null)
+function commitSubName(it: SubItem, e: Event) {
+  renamingSub.value = null
+  const v = (e.target as HTMLInputElement).value.trim()
+  setSubOv(it, { name: v && v !== it.sn.name ? v : undefined })
+}
+// 인스턴스를 더 고르지 않으면 고른 하위 줄도 풀어요
+watch(() => [store.screenId.value, store.layerIds.value.join()], () => { const s = subSel.value; if (s && !(store.screenId.value === s.sid && store.layerIds.value.length === 1 && store.layerIds.value[0] === s.id)) subSel.value = null })
 const canvasRow = computed(() => props.screens.find(isCanvasRow) ?? null)
 /** 화면 id → 그 화면을 감싼 가장 안쪽 섹션 id */
 const screenSection = computed(() => {
@@ -116,7 +170,7 @@ const items = computed<Item[]>(() => {
   const inSec = screenSection.value
   const pushScreen = (s: ScreenRow, depth: number, under: boolean) => {
     out.push({ kind: 'screen', s, depth, under })
-    for (const r of rowsOf(s, depth + 1, under)) out.push({ kind: 'layer', r })
+    for (const r of rowsOf(s, depth + 1, under)) { out.push({ kind: 'layer', r }); out.push(...subItems(r)) }
   }
   // 피그마처럼: 캔버스 맨 위 항목(섹션 · 캔버스 위 레이어)이 먼저, 그다음 섹션 밖 화면들
   const c = canvasRow.value
@@ -127,7 +181,9 @@ const items = computed<Item[]>(() => {
       for (const id of [...ids].reverse()) {
         const n = d.nodes[id]
         if (!n) continue
-        out.push({ kind: 'layer', r: { sid: c.id, n, depth, under } })
+        const lr: Row = { sid: c.id, n, depth, under }
+        out.push({ kind: 'layer', r: lr })
+        out.push(...subItems(lr))
         if (shut(c.id + ':' + id, n)) continue
         if (isContainer(n)) walk(n.children ?? [], depth + 1, under || sel.has(id))
         if (n.type === 'section') for (const s of [...props.screens].reverse()) if (inSec.get(s.id) === id) pushScreen(s, depth + 1, under || sel.has(id))
@@ -146,7 +202,7 @@ const treeMin = computed(() => {
   const deepest = Math.max(0, ...items.value.map((it) => (it.kind === 'layer' ? it.r.depth : it.depth)))
   return `calc(var(--ref-spacing-06) + ${deepest * 18}px + 180px)`
 })
-const itemKey = (it: Item) => (it.kind === 'screen' ? 's:' + it.s.id : it.r.sid + ':' + it.r.n.id)
+const itemKey = (it: Item) => (it.kind === 'screen' ? 's:' + it.s.id : it.kind === 'sub' ? 'sub:' + it.k : it.r.sid + ':' + it.r.n.id)
 const mixScreens = useMixScreens()
 /** 고른 화면: 여러 화면 · 레이어와 함께 고른 화면(섞어 고르기)도 */
 const screenOn = (s: ScreenRow) => mixScreens.value.includes(s.id) || (props.multi?.length ? props.multi.includes(s.id) : store.screenId.value === s.id && !store.layerIds.value.length)
@@ -196,11 +252,13 @@ function rowKey(it: Item, e: KeyboardEvent) {
   e.preventDefault()
   e.stopPropagation()
   const key = itemKey(it)
+  if (it.kind === 'sub') return
   if (k === 'Enter' || k === ' ') { if (it.kind === 'layer') pick(it.r, e); else emit('pick-screen', it.s.id); return }
   if (k === 'ArrowUp' || k === 'ArrowDown') {
     const list = items.value
     const nx = list[list.findIndex((x) => itemKey(x) === key) + (k === 'ArrowDown' ? 1 : -1)]
     if (!nx) return
+    if (nx.kind === 'sub') return
     if (nx.kind === 'layer') { if (e.shiftKey && store.screenId.value === nx.r.sid) store.selectLayer(nx.r.sid, nx.r.n.id, true); else store.selectLayer(nx.r.sid, nx.r.n.id) }
     else emit('pick-screen', nx.s.id)
     nextTick(() => document.querySelector<HTMLElement>(`.tree [data-key="${itemKey(nx).replace(/^s:/, '')}"]`)?.focus())
@@ -376,8 +434,8 @@ const groups = computed(() => {
   const out: { top: number; on: boolean[] }[] = []
   let g: { top: number; on: boolean[] } | null = null
   items.value.forEach((it, i) => {
-    const on = it.kind === 'screen' ? screenOn(it.s) : isSel(it.r)
-    const under = it.kind === 'screen' ? it.under : it.r.under
+    const on = it.kind === 'screen' ? screenOn(it.s) : it.kind === 'sub' ? subOn(it) : isSel(it.r)
+    const under = it.kind === 'screen' ? it.under : it.kind === 'sub' ? isSel(it.pr) || it.pr.under : it.r.under
     if (on && g) g.on.push(true)
     else if (on) { g = { top: i, on: [true] }; out.push(g) }
     else if (under && g) g.on.push(false)
@@ -513,15 +571,24 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
     <div v-if="dropY !== null" class="drop-line" :style="{ top: dropY - 1 + 'px' }" aria-hidden="true" />
     <div v-for="(g, i) in groups" :key="'g' + i" class="sqc grp-bg" :style="{ top: g.top * 28 + 'px', height: g.on.length * 28 + 'px', background: groupBg(g.on) }" aria-hidden="true" />
     <template v-for="it in items" :key="itemKey(it)">
-      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id && over.into }]" :style="{ '--d': it.depth }" :draggable="!isCanvasRow(s)" @dragstart="screenDrag = s.id; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')" @dragend="screenDrag = null; over = null" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" :data-key="s.id" @keydown.self="rowKey(it, $event)" @mouseenter="hover = { sid: s.id, id: null }" @mouseleave="hover = null">
+      <div v-if="it.kind === 'screen'" v-for="s in [it.s]" :key="s.id" role="treeitem" tabindex="0" :aria-selected="screenOn(s)" :class="['sq', 'nav-item', 's', 'row', 'lr', 'srow', { faded: scrHidden(s), on: screenOn(s), under: !screenOn(s) && it.under, 'drop-into': over?.id === 'screen:' + s.id && over.into }]" :style="{ '--d': it.depth }" :draggable="!isCanvasRow(s)" @dragstart="screenDrag = s.id; $event.dataTransfer && ($event.dataTransfer.effectAllowed = 'move')" @dragend="screenDrag = null; over = null" @click="$event.shiftKey || $event.metaKey || $event.ctrlKey ? emit('toggle-screen', s.id) : emit('pick-screen', s.id)" @dragover="onDragOverScreen($event, s)" @dragleave="over = null" @drop.prevent="onDropScreen(s)" @contextmenu="screenMenu(s, $event)" :data-key="s.id" @keydown.self="rowKey(it, $event)" @mouseenter="hover = { sid: s.id, id: null }" @mouseleave="hover = null">
         <button v-if="s.source === 'native' && store.doc(s.id).rootIds.length" class="sq chev" :aria-label="closed.has(s.id) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(s.id, null, $event.altKey)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: closed.has(s.id) }" /></button>
         <span v-else class="chev" />
         <EditorIcon name="frame" :size="16" class="ic" />
         <span class="name">{{ s.name }}</span>
         <span v-if="s.source === 'figma'" class="muted ext" role="img" :aria-label="tr('Figma frame')" :title="tr('Figma frame')"><EditorIcon name="arrow_up_right" :size="12" /></span>
+        <!-- 프레임(화면) 잠금: 레이어 줄과 같은 자리 · 모양(캔버스에서 잡히지 않아요) -->
+        <span v-if="!isCanvasRow(s)" class="tools" :class="{ keep: scrLocked(s) || scrHidden(s) }">
+          <button class="sq mini" :class="{ act2: scrLocked(s) }" :aria-label="scrLocked(s) ? tr('Unlock') : tr('Lock')" :title="scrLocked(s) ? tr('Unlock') : tr('Lock')" @click.stop="store.frameStyle(s.id, { locked: scrLocked(s) ? undefined : true })">
+            <EditorIcon :name="scrLocked(s) ? 'lock' : 'unlock'" />
+          </button>
+          <button class="sq mini" :class="{ act2: scrHidden(s) }" :aria-label="scrHidden(s) ? tr('Show') : tr('Hide')" :title="scrHidden(s) ? tr('Show') : tr('Hide')" @click.stop="store.frameStyle(s.id, { hidden: scrHidden(s) ? undefined : true })">
+            <EditorIcon :name="scrHidden(s) ? 'eye_off' : 'eye'" />
+          </button>
+        </span>
       </div>
       <div
-        v-else
+        v-else-if="it.kind === 'layer'"
         v-for="r in [it.r]"
         :key="r.n.id"
         role="treeitem"
@@ -545,6 +612,8 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         @dragend="dragging = null; over = null"
       >
         <button v-if="(isContainer(r.n) && r.n.children?.length) || (r.n.type === 'section' && hasScreens(r.n.id))" class="sq chev" :aria-label="shut(r.sid + ':' + r.n.id, r.n) ? tr('Expand') : tr('Collapse')" @click.stop="toggle(r.sid + ':' + r.n.id, r.n, $event.altKey)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: shut(r.sid + ':' + r.n.id, r.n) }" /></button>
+        <!-- 디자인 시스템 인스턴스: 하위 레이어 펼치기(피그마 인스턴스처럼) -->
+        <button v-else-if="r.n.type === 'instance'" class="sq chev" :aria-label="subOpen.has(r.sid + ':' + r.n.id) ? tr('Collapse') : tr('Expand')" @click.stop="toggleSub(r.sid + ':' + r.n.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !subOpen.has(r.sid + ':' + r.n.id) }" /></button>
         <span v-else class="chev" />
         <span class="icw">
         <!-- 마스크(피그마와 같아요): 마스크 레이어는 마스크 아이콘, 그 위 가려지는 레이어는 아래로 ↓ 표시 -->
@@ -570,6 +639,36 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
           </button>
           <button class="sq mini" :class="{ act2: r.n.hidden }" :aria-label="r.n.hidden ? tr('Show') : tr('Hide')" :title="r.n.hidden ? tr('Show') : tr('Hide')" @click.stop @pointerdown.stop="paintStart(r, 'hidden', $event)" @pointerenter="paintOver(r, 'hidden')" @keydown.enter.stop.prevent="store.update(r.sid, [r.n.id], { hidden: !r.n.hidden })">
             <EditorIcon :name="r.n.hidden ? 'eye_off' : 'eye'" />
+          </button>
+        </span>
+      </div>
+      <!-- 인스턴스 하위 줄: 기본은 읽기 — 이름(두 번 누르기) · 숨김(눈)은 여기서, 글자 · 색 · 칠은 오른쪽 패널에서(고르면) -->
+      <div
+        v-else-if="it.kind === 'sub'"
+        v-for="u in [it]"
+        :key="u.k"
+        role="treeitem"
+        tabindex="-1"
+        :aria-selected="subOn(u)"
+        :class="['sq', 'nav-item', 's', 'row', 'lr', 'comp', 'subrow', { on: subOn(u), under: !subOn(u), faded: !!subOv(u)?.hidden }]"
+        :style="{ paddingLeft: `calc(var(--ref-spacing-06) + ${u.depth * 18}px)` }"
+        :data-key="u.k"
+        @click="pickSub(u)"
+        @dblclick="!subOv(u)?.locked && (renamingSub = u.k)"
+        @mouseenter="setSubHover(u.sn.el)"
+        @mouseleave="setSubHover(null)"
+      >
+        <button v-if="u.sn.children.length" class="sq chev" :aria-label="u.open ? tr('Collapse') : tr('Expand')" @click.stop="toggleSub(u.k)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !u.open }" /></button>
+        <span v-else class="chev" />
+        <span class="icw"><EditorIcon :name="u.sn.kind === 'text' ? 'text' : 'component'" :size="16" :class="['ic', { subic: u.sn.kind !== 'text' }]" /></span>
+        <input v-if="renamingSub === u.k" v-select class="sqc txt-in ren" :value="subName(u)" :aria-label="tr('Layer name')" @click.stop @dblclick.stop @keydown.stop @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renamingSub = null" @blur="commitSubName(u, $event)">
+        <span v-else class="name">{{ subName(u) }}</span>
+        <span class="tools" :class="{ keep: !!subOv(u)?.hidden || !!subOv(u)?.locked }">
+          <button class="sq mini" :class="{ act2: !!subOv(u)?.locked }" :aria-label="subOv(u)?.locked ? tr('Unlock') : tr('Lock')" :title="subOv(u)?.locked ? tr('Unlock') : tr('Lock')" @click.stop="setSubOv(u, { locked: !subOv(u)?.locked })">
+            <EditorIcon :name="subOv(u)?.locked ? 'lock' : 'unlock'" />
+          </button>
+          <button class="sq mini" :class="{ act2: !!subOv(u)?.hidden }" :aria-label="subOv(u)?.hidden ? tr('Show') : tr('Hide')" :title="subOv(u)?.hidden ? tr('Show') : tr('Hide')" @click.stop="setSubOv(u, { hidden: !subOv(u)?.hidden })">
+            <EditorIcon :name="subOv(u)?.hidden ? 'eye_off' : 'eye'" />
           </button>
         </span>
       </div>
@@ -602,6 +701,8 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
 .lr.on .ic { color: var(--sys-color-neutral-700); }
 /* 컴포넌트(인스턴스): 피그마처럼 보라 이름 · 아이콘 */
 .lr.comp .name, .lr.comp .ic { color: var(--iris-component); }
+/* 인스턴스 하위 줄: 피그마처럼 옅은 보라 아이콘(하위 인스턴스는 속 빈 다이아몬드 느낌으로 흐리게) */
+.subrow .subic { opacity: .6; }
 .chev { width: 16px; height: 16px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-01); color: var(--sys-color-neutral-500); }
 button.chev:hover { color: var(--sys-color-neutral-800); --sq-fill: var(--interaction-light-gray-hover); }
 button.chev:active { --sq-fill: var(--interaction-light-gray-pressed); }

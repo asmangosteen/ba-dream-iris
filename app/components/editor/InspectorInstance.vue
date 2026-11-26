@@ -7,6 +7,9 @@ import { useLayerStore } from '~/canvas/store'
 import { SLOT_KEY, dsComponent, dsProps, instDefault, slotFallback } from '~/components/editor/InstanceView.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 import IconPicker from '~/components/editor/IconPicker.vue'
+import ColorField from '~/components/editor/ColorField.vue'
+import { fromRgba } from '~/canvas/color'
+import { instTick, readInstanceTree, subSel, type SubNode } from '~/composables/useInstanceTree'
 
 /** 인스턴스 속성(피그마 Instance 패널): 변형(선택) · 켜고 끄기 · 글자 · 숫자. 기본값은 컴포넌트 기본값을 보여 줘요 */
 const props = defineProps<{ sid: string; ids: string[] }>()
@@ -14,6 +17,43 @@ const store = useLayerStore()
 const node = computed<LayerNode | null>(() => (props.ids[0] ? store.node(props.sid, props.ids[0]) ?? null : null))
 const name = computed(() => node.value?.component ?? '')
 const known = computed(() => !!dsComponent(name.value))
+
+// --- 고른 하위 줄(레이어 목록에서): 글자 · 글자 색 · 칠을 덮어쓰기로(피그마 인스턴스 override). 이름 · 숨김은 레이어 목록에서 ---
+const sub = computed(() => { const s = subSel.value, n = node.value; return s && n && s.sid === props.sid && s.id === n.id ? s : null })
+const subNode = computed<SubNode | null>(() => {
+  void instTick.value
+  const s = sub.value
+  if (!s) return null
+  const find = (l: SubNode[]): SubNode | null => { for (const x of l) { if (x.key === s.key) return x; const f = find(x.children); if (f) return f } return null }
+  return find(readInstanceTree(s.sid, s.id))
+})
+const subOv = computed(() => (sub.value ? node.value?.subOverrides?.[sub.value.key] ?? {} : {}))
+/** 그려진 색(rgb) → '#RRGGBB(AA)' — 덮어쓰기 전 기본값 보여 주기 */
+function cssHex(v: string | undefined): string | null {
+  const m = v?.match(/rgba?\(([^)]+)\)/)
+  if (!m) return null
+  const [r, g, b, a] = m[1]!.split(/[ ,/]+/).filter(Boolean).map(Number)
+  if (a === 0) return null
+  return fromRgba({ r: r ?? 0, g: g ?? 0, b: b ?? 0, a: a ?? 1 })
+}
+const subColor = computed(() => { void instTick.value; const el = subNode.value?.el as HTMLElement | null; return subOv.value.color ?? (el ? cssHex(getComputedStyle(el).color) : null) ?? '#000000' })
+const subFill = computed(() => { void instTick.value; const el = subNode.value?.el as HTMLElement | null; return subOv.value.fill ?? (el ? cssHex(getComputedStyle(el).backgroundColor) : null) })
+/** 덮어쓰기 고치기(실행취소 한 번). 값이 다 비면 그 자리 덮어쓰기를 지워요 */
+function setSub(patch: Record<string, unknown>) {
+  const s = sub.value
+  if (!s) return
+  store.update(props.sid, [s.id], (n) => {
+    const all = { ...(n.subOverrides ?? {}) }
+    const cur: Record<string, unknown> = { ...all[s.key], ...patch }
+    for (const k of Object.keys(cur)) if (cur[k] === undefined || cur[k] === '' || cur[k] === false) delete cur[k]
+    if (Object.keys(cur).length) all[s.key] = cur; else delete all[s.key]
+    return { subOverrides: Object.keys(all).length ? all : undefined }
+  })
+}
+function onSubText(e: Event) {
+  const v = (e.target as HTMLInputElement).value
+  setSub({ text: v === subNode.value?.name ? undefined : v })
+}
 
 // 캔버스에서 고칠 일이 없는 것: 객체 · 함수 · 이벤트, class · style · id
 const HIDDEN = new Set(['class', 'style', 'id', 'key', 'ref'])
@@ -236,6 +276,30 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
       </button>
     </div>
 
+    <!-- 고른 하위 줄(레이어 목록): 이름 · 글자 · 색 · 칠 덮어쓰기 -->
+    <div v-if="sub" class="subsec">
+      <div class="subh">
+        <EditorIcon :name="sub.kind === 'text' ? 'text' : 'component'" :size="16" class="dia" />
+        <span class="ell">{{ subOv.name || (sub.kind === 'text' ? subOv.text : undefined) || subNode?.name || sub.name }}</span>
+        <button v-if="Object.keys(subOv).length" class="ib s24" :aria-label="tr('Reset all changes')" :title="tr('Reset all changes')" @click="setSub({ name: undefined, hidden: undefined, locked: undefined, color: undefined, fill: undefined, text: undefined })"><EditorIcon name="renew" /></button>
+      </div>
+      <p v-if="subOv.locked" class="note">{{ tr('Locked — unlock in the layers panel to edit') }}</p>
+      <fieldset class="subfs" :disabled="!!subOv.locked">
+      <div v-if="sub.kind === 'text'" :class="['row', { mod: subOv.text !== undefined }]">
+        <span class="lbl">{{ tr('Text') }}</span>
+        <label class="sq fld"><input :key="'st' + (subOv.text ?? '')" :value="subOv.text ?? subNode?.name ?? ''" :aria-label="tr('Text')" @change="onSubText" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+      </div>
+      <div :class="['row', { mod: !!subOv.color }]">
+        <span class="lbl">{{ sub.kind === 'icon' ? tr('Icon color') : tr('Text color') }}</span>
+        <ColorField :model-value="subColor" :sid="sid" :label="sub.kind === 'icon' ? 'Icon color' : 'Text color'" @update:model-value="(v) => setSub({ color: v })" />
+      </div>
+      <div v-if="sub.kind === 'component'" :class="['row', { mod: !!subOv.fill }]">
+        <span class="lbl">{{ tr('Fill') }}</span>
+        <ColorField :model-value="subFill ?? '#FFFFFF00'" :sid="sid" label="Fill" @update:model-value="(v) => setSub({ fill: v })" />
+      </div>
+      </fieldset>
+    </div>
+
     <p v-if="!known" class="note">{{ tr("This component isn't in the design system library.") }}</p>
     <p v-else-if="!rows.length" class="note">{{ tr('No editable properties') }}</p>
 
@@ -281,6 +345,12 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
 .dia { flex: none; color: var(--iris-component); }
 .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .note { margin: 0; font-size: 12px; color: var(--sys-color-neutral-500); }
+/* 고른 하위 줄 칸: 인스턴스 속성 위, 아래 선으로 나눠요 */
+.subsec { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding-bottom: var(--ref-spacing-06); border-bottom: 1px solid var(--iris-line); }
+.subh { display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 28px; font-size: 12px; font-weight: 600; color: var(--iris-component); }
+.subh .ell { flex: 1; min-width: 0; }
+.subfs { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.subfs:disabled { opacity: .5; }
 /* 라벨 | 값 — 아이콘이 없는 줄이라 값 칸은 패널 오른쪽 끝까지 */
 .row { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-06); min-height: 28px; }
 .row:has(> .cb) { display: flex; }

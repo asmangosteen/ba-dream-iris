@@ -31,7 +31,9 @@ const props = withDefaults(defineProps<{
   highlight?: string | null
   /** 에디터 오른쪽 패널(288px) 안에서 쓸 때 */
   compact?: boolean
-}>(), { highlight: null, compact: false })
+  /** 화면이 하나라도 연결된 요구사항 id — 없는 것(프레임을 지워 연결이 끊긴 것 등)은 번호를 빨갛게. 안 주면 색 구분 안 함 */
+  linked?: string[] | null
+}>(), { highlight: null, compact: false, linked: null })
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
@@ -42,7 +44,8 @@ const emit = defineEmits<{
   edit: []
 }>()
 const editHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}?edit=1`)
-const wideHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}`)
+/** 넓게 보기: 고르던 REQ 도 함께 넘겨요(돌아올 때도 그대로) */
+const wideHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}` + (props.highlight ? `?req=${encodeURIComponent(props.highlight)}` : ''))
 
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
@@ -118,6 +121,17 @@ function headerReqs(b: ViewBlock): ReqRow[] {
   return (reqsByBlock.value.get(b.id) ?? []).filter((r) => !new RegExp('\\b' + r.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(b.text))
 }
 const blockReqIds = (b: ViewBlock) => (reqsByBlock.value.get(b.id) ?? []).map((r) => r.id).join(' ')
+const linkedSet = computed(() => (props.linked ? new Set(props.linked) : null))
+/** 연결된 화면이 없는 요구사항(빨간 번호) */
+const unlinked = (id: string) => !!linkedSet.value && !linkedSet.value.has(id)
+/** 이 블록의 요구사항이 모두 연결된 화면이 없으면 카드도 빨강 계열(배경 · 선택선) */
+const blockUnlinked = (b: ViewBlock) => { const rs = reqsByBlock.value.get(b.id) ?? []; return !!rs.length && rs.every((r) => unlinked(r.id)) }
+/** 카드 아무 데나 눌러도 그 요구사항으로(번호 버튼은 자기가 처리 · 글자를 끌어 고르는 중이면 무시) — 사용자 요청 2026-11-26 */
+function pickBlock(b: ViewBlock, e: MouseEvent) {
+  const rs = reqsByBlock.value.get(b.id)
+  if (!rs?.length || (e.target as HTMLElement).closest('button, a') || window.getSelection()?.toString()) return
+  emit('pick-req', rs[0]!.id)
+}
 const isOn = (b: ViewBlock) => !!props.highlight && (reqsByBlock.value.get(b.id) ?? []).some((r) => r.id === props.highlight)
 
 // ---------------------------------------------------------------------------
@@ -275,16 +289,17 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         :key="b.id"
         :data-block="b.id"
         :data-reqs="blockReqIds(b) || undefined"
-        :class="['blk', b.type, { sq: reqsByBlock.has(b.id), marked: reqsByBlock.has(b.id), on: isOn(b) }]"
+        :class="['blk', b.type, { sq: reqsByBlock.has(b.id), marked: reqsByBlock.has(b.id), on: isOn(b), nolink: blockUnlinked(b) }]"
         @mouseenter="reqsByBlock.has(b.id) && emit('hover-req', reqsByBlock.get(b.id)![0]!.id)"
         @mouseleave="reqsByBlock.has(b.id) && emit('hover-req', null)"
+        @click="pickBlock(b, $event)"
       >
         <span v-if="headerReqs(b).length" class="codes">
-          <button v-for="r in headerReqs(b)" :key="r.id" type="button" class="sq code num" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
+          <button v-for="r in headerReqs(b)" :key="r.id" type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? tr('Not drawn in any frame') : undefined" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
           <template v-for="(s, i) in segments(b.text)" :key="i">
-            <button v-if="s.req" type="button" class="sq code num" :aria-pressed="highlight === s.req.id" :title="s.req.title" @click="emit('pick-req', s.req.id)" @mouseenter="emit('hover-req', s.req.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ s.t }}</button>
+            <button v-if="s.req" type="button" :class="['sq', 'code', 'num', { nolink: unlinked(s.req.id) }]" :aria-pressed="highlight === s.req.id" :title="unlinked(s.req.id) ? s.req.title + ' · ' + tr('Not drawn in any frame') : s.req.title" @click="emit('pick-req', s.req.id)" @mouseenter="emit('hover-req', s.req.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ s.t }}</button>
             <template v-else>{{ s.t }}</template>
           </template>
         </component>
@@ -320,10 +335,14 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .blk.h1:first-child, .blk.h2:first-child { margin-top: 0; }
 .blk.li > p { position: relative; padding-left: var(--ref-spacing-10); }
 .blk.li > p::before { content: ''; position: absolute; left: 4px; top: 9px; width: 3px; height: 3px; border-radius: 50%; background: var(--sys-color-neutral-500); }
-.blk.marked { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); scroll-margin: var(--ref-spacing-16); }
+.blk.marked { cursor: pointer; display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); scroll-margin: var(--ref-spacing-16); }
 /* 요구사항 색은 청록(캔버스에서 그 항목을 보여 주는 선과 같은 색 --iris-peek): 올리면 옅은 청록 선, 고르면 옅은 청록 칠 + 청록 선 */
 .blk.marked:hover { --sq-line: color-mix(in srgb, var(--iris-peek) 45%, transparent); --sq-line-w: 0.5px; }
 .blk.marked.on { --sq-fill: var(--iris-peek-bg); --sq-line: var(--iris-peek); --sq-line-w: 0.5px; }
+/* 연결된 화면이 없는 요구사항 카드: 마우스 올림 · 고름의 선과 배경을 빨강 계열로 */
+/* 그려지지 않은 요구사항 카드: 고를 수 없어서 마우스를 올려도 선 · 손가락 모양 없음(번호만 빨강) */
+.blk.marked.nolink { cursor: default; }
+.blk.marked.nolink:hover { --sq-line: transparent; }
 .blk.marked.li > p::before { display: none; }
 .blk.marked.li > p { padding-left: 0; }
 .blk p, .blk h3 { margin: 0; }
@@ -332,6 +351,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); text-align: inherit; }
 .code:hover, .code[aria-pressed='true'] { --sq-fill: var(--iris-peek-bg-strong); }
 .code:focus-visible { outline: 2px solid var(--iris-peek); outline-offset: 1px; }
+/* 연결된 화면이 없는 요구사항(프레임을 지워 연결이 끊긴 것 등): 빨간 번호 */
+.code.nolink { color: var(--sys-color-theme-error-default); --sq-fill: color-mix(in srgb, var(--sys-color-theme-error-default) 11%, transparent); }
+.code.nolink:hover, .code.nolink[aria-pressed='true'] { --sq-fill: color-mix(in srgb, var(--sys-color-theme-error-default) 20%, transparent); }
 
 .card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; min-width: 0; }
 .chip { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; color: var(--sys-color-neutral-800); }

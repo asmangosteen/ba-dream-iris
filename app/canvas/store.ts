@@ -190,6 +190,13 @@ export function createLayerStore(opts: {
     layoutDoc(doc(sid))
     scheduleSave(sid)
   }
+  /** 요구사항 ↔ 레이어 짝 기억(실행취소 기록 없이 저장만 — 보기만 해도 생기는 정보라서) */
+  function setReqBind(sid: string, reqId: string, ids: string[]) {
+    const d = doc(sid)
+    if (JSON.stringify(d.reqBind?.[reqId] ?? null) === JSON.stringify(ids)) return
+    d.reqBind = { ...(d.reqBind ?? {}), [reqId]: ids }
+    scheduleSave(sid)
+  }
   /** 끄는 중(기록 없이) 오토 레이아웃 다시 계산 */
   const relayout = (sid: string) => layoutDoc(doc(sid))
 
@@ -1269,7 +1276,7 @@ export function createLayerStore(opts: {
     pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, dispose, hasUnsaved, recoverDoc, pushAction,
-    hold, release, tidy, selectInverse, selectMatching, hasMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
+    hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,

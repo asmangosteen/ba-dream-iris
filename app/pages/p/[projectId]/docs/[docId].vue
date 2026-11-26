@@ -29,6 +29,10 @@ useHead({ title: computed(() => (doc.value ? `${doc.value.title} · Iris` : 'Iri
 const activeReq = ref<string | null>(null)
 const activeScreen = ref<string | null>(null)
 watch(docId, () => { activeReq.value = null; activeScreen.value = null; editing.value = false; dirty.value = false; gone.value = []; closeBars() })
+/** 편집기로 돌아가기: 왼쪽 Docs 탭에 이 문서를 연 채로, 고른 REQ 도 그대로(사용자 요청 2026-11-26) */
+const backHref = computed(() => ({ path: `/p/${projectId}`, query: { doc: docId.value, ...(activeReq.value ? { req: activeReq.value } : {}) } }))
+// 편집기에서 '넓게 보기'로 왔으면(?req=) 고르던 REQ 를 그대로
+onMounted(() => { if (typeof route.query.req === 'string') activeReq.value = route.query.req })
 
 /** 이 문서의 요구사항과 연결된 화면만 보여 줍니다 */
 const frames = computed(() => {
@@ -221,8 +225,8 @@ async function removeDoc() {
   <div class="split" :aria-hidden="addOpen ? 'true' : undefined">
     <!-- 왼쪽 위: 돌아가기 알약 -->
     <div class="sq float s pill">
-      <NuxtLink :to="`/p/${projectId}`" class="ib" :aria-label="tr('Back to editor')"><Icon name="chevron_left" :size="16" /></NuxtLink>
-      <NuxtLink :to="`/p/${projectId}`" class="tx-meta crumb ellipsis">{{ projectName || tr('Project') }}</NuxtLink>
+      <NuxtLink :to="backHref" class="ib" :aria-label="tr('Back to editor')"><Icon name="chevron_left" :size="16" /></NuxtLink>
+      <NuxtLink :to="backHref" class="tx-meta crumb ellipsis">{{ projectName || tr('Project') }}</NuxtLink>
       <Icon name="chevron_right" :size="12" color="var(--sys-color-neutral-400)" />
       <span class="tx-head">{{ tr('Split view') }}</span>
     </div>
@@ -319,6 +323,7 @@ async function removeDoc() {
             :doc="doc"
             :reqs="docReqs"
             :highlight="activeReq"
+            :linked="links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))] : null"
             @pick-req="pickReq"
             @create-req="createReq"
             @edit="startEdit"

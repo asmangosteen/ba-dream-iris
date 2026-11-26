@@ -75,9 +75,9 @@ function createProject() { newOpen.value = true }
 </template>
 
 <style scoped>
-/* 프로젝트 목록: 사이드바 오른쪽 흰 면 — 안쪽 위 24 · 좌우 32, 제목 줄 32, 카드 3열(좁으면 2 · 1열) */
+/* 프로젝트 목록: 사이드바 오른쪽 흰 면 — 안쪽 위 24 · 좌우 32(요구사항 화면과 같아요), 제목 줄 32, 카드는 폭 240 이상으로 칸을 꽉 채워요 */
 .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-19); }
-.inner { max-width: 1120px; margin: 0 auto; }
+.inner { min-width: 0; } /* 요구사항 화면처럼 오른쪽 흰 면 전체를 써요(사용자 요청 2026-11-26) — 카드는 칸이 넓어지면 열이 늘어요 */
 .head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
 .filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { fmtNum } from '~/canvas/num'
-import { matchReqLayers } from '~/canvas/reqMatch'
+import { guessReqLayers, matchReqLayers, reqLost } from '~/canvas/reqMatch'
 import { topImagePaint } from '~/canvas/paint'
+import { descendants } from '~/canvas/schema'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
@@ -54,6 +55,8 @@ const rulersShown = useState('iris-rulers', () => false)
 // 페이지 우클릭 메뉴 · 지우기 확인
 const pageCtx = useContextMenu()
 const confirmPage = ref<{ id: string; name: string; count: number } | null>(null)
+/** 요구사항이 연결된 프레임 지우기 확인(공용 확인 창): 확인하면 연결도 함께 끊고 지워요 — ⌘Z 로 프레임 · 연결 함께 되살려요 */
+const confirmFrames = ref<{ frames: ScreenRow[]; links: number; kept: number } | null>(null)
 function pageMenu(p: { id: string; name: string }, e: MouseEvent) {
   pageCtx.open(e, [
     { label: tr('Rename'), action: () => (renaming.value = p.id) },
@@ -70,7 +73,7 @@ async function doRemovePage() {
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const allScreens = useProjectScreens(projectId)
-const { addRequirement, setLink } = useIrisMutations()
+const { addRequirement, setLink, removeLink } = useIrisMutations()
 
 // ---------------------------------------------------------------------------
 // 상태
@@ -143,7 +146,7 @@ const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; focusOn: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
@@ -187,7 +190,39 @@ provide(LAYER_STORE, store)
 const selected = store.screenId
 const current = computed(() => list.value.find((s) => s.id === selected.value) ?? null)
 const openDoc = computed(() => (docs.data.value ?? []).find((d) => d.id === docId.value) ?? null)
+/** 문서를 왼쪽 Docs 탭에서 읽는 중인가(다른 탭으로 가면 청록 선 · 카드 포커스도 쉬어요 — 돌아오면 그대로) */
+const docShown = computed(() => left.value === 'docs' && !!openDoc.value)
 const docReqs = computed(() => (reqs.data.value ?? []).filter((r) => r.document_id === docId.value))
+/** 화면이 하나라도 연결된 요구사항 — 문서에서 없는 것은 번호를 빨갛게(프레임을 지우면 연결이 끊겨요) */
+/**
+ * 그린 요소를 지운 요구사항(사용자 요청 2026-11-26): 프레임 안에서 그 REQ 를 그린 요소를 지우면 문서에서 번호 · 카드를 빨갛게(팝업 없이 지워요).
+ * 처음 짝지을 때(직접 연결 · 이름 · 글자 짐작) 그 레이어를 문서 데이터에 기억해 둬요(reqBind) — 새로고침해도 유지, ⌘Z 로 요소가 돌아오면 원래 색
+ */
+const reqDocSig = computed(() => {
+  const sids = [...new Set((links.data.value ?? []).map((l) => l.screen_id))].filter((sid) => store.docs[sid])
+  return sids.map((sid) => sid + ':' + Object.keys(store.docs[sid]!.nodes).length).join('|') + '#' + (reqs.data.value ?? []).length
+})
+watch(reqDocSig, () => {
+  for (const l of links.data.value ?? []) {
+    const d = store.docs[l.screen_id]
+    const scr = list.value.find((v) => v.id === l.screen_id)
+    if (!d || scr?.source !== 'native' || d.reqBind?.[l.requirement_id]) continue
+    const r = (reqs.data.value ?? []).find((x) => x.id === l.requirement_id)
+    if (!r) continue
+    const ids = guessReqLayers(d, r.id, [r.title, r.body ?? ''].join(' '))
+    if (ids.length && !ids.every((id) => d.nodes[id]?.reqs?.includes(r.id))) store.setReqBind(l.screen_id, r.id, ids)
+  }
+}, { immediate: true })
+const lostReqs = computed(() => {
+  const out = new Set<string>()
+  for (const l of links.data.value ?? []) { const d = store.docs[l.screen_id]; if (d && reqLost(d, l.requirement_id)) out.add(l.requirement_id) }
+  return out
+})
+/** 그려지지 않은 REQ(연결된 프레임이 없거나 그린 요소를 지움): 고를 수 없고, 캔버스 청록 선 · 카드 선택선도 없어요(사용자 요청 2026-11-26) */
+const reqGone = (id: string) => links.status.value === 'success' && (lostReqs.value.has(id) || !(links.data.value ?? []).some((l) => l.requirement_id === id))
+watch(() => docReq.value && reqGone(docReq.value), (gone) => { if (gone) docReq.value = null })
+/** 화면이 연결돼 있고, 그린 요소도 지우지 않은 요구사항 — 문서에서 나머지는 번호 · 카드를 빨갛게 */
+const linkedReqIds = computed(() => (links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))].filter((id) => !lostReqs.value.has(id)) : null))
 /**
  * 문서에서 고른 요구사항에 연결된 화면을 캔버스에서 강조 — 지금 고른 화면(REQ 를 눌러 그 안 항목으로 포커스한 화면)은 빼요.
  * 그 화면은 고른 항목만 선택선으로 보이고, 화면 전체 색 · 테두리는 덮지 않아요
@@ -198,10 +233,10 @@ const highlight = computed(() => (docReq.value ? (links.data.value ?? []).filter
  * 지금 고른 요구사항이 그 화면에도 연결돼 있으면 그대로, 연결된 게 없으면 포커스를 풀어요
  */
 watch(selected, (sid, old) => {
-  if (!sid || sid === old || !docId.value || isPageCanvas(sid)) return
+  if (!sid || sid === old || !docShown.value || isPageCanvas(sid)) return
   const linked = new Set((links.data.value ?? []).filter((l) => l.screen_id === sid).map((l) => l.requirement_id))
   if (docReq.value && linked.has(docReq.value)) return
-  const first = [...docReqs.value].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true })).find((r) => linked.has(r.id))
+  const first = [...docReqs.value].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true })).find((r) => linked.has(r.id) && !reqGone(r.id))
   docReq.value = first?.id ?? null
 })
 
@@ -567,37 +602,59 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
       return
     }
     if (action === 'remove') {
-      // 고른 화면 전부 지우기. 피그마 화면 · 요구사항이 연결된 화면은 남기고 알려요
+      // 고른 화면 전부 지우기. 피그마 화면은 남기고 알려요. 요구사항이 연결된 화면이 있으면 확인 창으로 물은 뒤 연결도 함께 끊고 지워요
       const linkedIds = new Set((links.data.value ?? []).map((l) => l.screen_id))
-      const ok = targets.filter((v) => v.source === 'native' && !linkedIds.has(v.id))
+      const ok = targets.filter((v) => v.source === 'native')
       const kept = targets.length - ok.length
-      if (!ok.length) {
-        tab.value = 'design'
-        say(targets.some((v) => linkedIds.has(v.id)) ? tr('This frame has linked requirements. Delete it from the Design tab') : tr('Figma frames can be deleted from the Design tab'))
-        return
-      }
-      const order = list.value.map((v) => v.id)
-      const snaps = ok.map((v) => ({ id: v.id, rect: { x: v.x, y: v.y, width: v.width, height: v.height }, name: v.name, status: v.status, layers: JSON.parse(JSON.stringify(store.doc(v.id))) }))
-      let cur = snaps.map((v) => v.id)
-      await Promise.all(cur.map((id) => removeScreen(id)))
-      store.selectScreen(null)
-      multiScreens.value = []
-      say(ok.length === 1 ? tr('Deleted {name} · ⌘Z to undo', { name: ok[0]!.name }) : tr('Deleted {n} frames · ⌘Z to undo', { n: ok.length }))
-      if (kept) setTimeout(() => say(tr('Figma frames and frames with linked requirements were kept')), 1600)
-      store.pushAction(null, async () => {
-        // 되살리기: 같은 자리 · 같은 앞뒤 순서로
-        const made = await Promise.all(snaps.map(async (sn) => {
-          const r = await addScreen(sn.rect, sn.name)
-          if (r) { await updateScreen(r.id, { layers: sn.layers, status: sn.status }); delete store.docs[r.id] }
-          return r?.id ?? null
-        }))
-        const swap = new Map(snaps.map((sn, k) => [sn.id, made[k]]))
-        cur = made.filter((v): v is string => !!v)
-        await setScreenOrder(order.map((id) => swap.get(id) ?? id).filter((v): v is string => !!v))
-        if (cur.length) { store.selectScreen(cur[0]!); multiScreens.value = cur.length > 1 ? cur : [] }
-      }, async () => { await Promise.all(cur.map((id) => removeScreen(id))); store.selectScreen(null); multiScreens.value = [] })
+      if (!ok.length) { tab.value = 'design'; say(tr('Figma frames can be deleted from the Design tab')); return }
+      const nLinks = (links.data.value ?? []).filter((l) => ok.some((v) => v.id === l.screen_id)).length
+      if (ok.some((v) => linkedIds.has(v.id))) { confirmFrames.value = { frames: ok, links: nLinks, kept }; return }
+      await removeFrames(ok, kept)
     }
   } catch { sayFail(tr('Something went wrong. Try again')) }
+}
+/** 프레임 지우기(⌘Z 로 같은 자리 · 같은 순서로 되살려요). 연결된 요구사항은 함께 끊고, 되살릴 때 연결도 다시 이어요 */
+async function removeFrames(ok: ScreenRow[], kept: number) {
+  const okIds = new Set(ok.map((v) => v.id))
+  const linkSnap = (links.data.value ?? []).filter((l) => okIds.has(l.screen_id)).map((l) => ({ ...l }))
+  if (linkSnap.length) await Promise.all(linkSnap.map((l) => removeLink(l.screen_id, l.requirement_id)))
+  const order = list.value.map((v) => v.id)
+  const snaps = ok.map((v) => ({ id: v.id, rect: { x: v.x, y: v.y, width: v.width, height: v.height }, name: v.name, status: v.status, layers: JSON.parse(JSON.stringify(store.doc(v.id))) }))
+  let cur = snaps.map((v) => v.id)
+  await Promise.all(cur.map((id) => removeScreen(id)))
+  store.selectScreen(null)
+  multiScreens.value = []
+  say(ok.length === 1 ? tr('Deleted {name} · ⌘Z to undo', { name: ok[0]!.name }) : tr('Deleted {n} frames · ⌘Z to undo', { n: ok.length }))
+  if (linkSnap.length) await links.refresh()
+  if (kept) setTimeout(() => say(tr('Figma frames were kept')), 1600)
+  store.pushAction(null, async () => {
+    // 되살리기: 같은 자리 · 같은 앞뒤 순서로
+    const made = await Promise.all(snaps.map(async (sn) => {
+      const r = await addScreen(sn.rect, sn.name)
+      if (r) { await updateScreen(r.id, { layers: sn.layers, status: sn.status }); delete store.docs[r.id] }
+      return r?.id ?? null
+    }))
+    const swap = new Map(snaps.map((sn, k) => [sn.id, made[k]]))
+    // 연결도 새 화면으로 다시 이어요
+    await Promise.all(linkSnap.filter((l) => swap.get(l.screen_id)).map((l) => setLink({ ...l, screen_id: swap.get(l.screen_id)! })))
+    if (linkSnap.length) await links.refresh()
+    cur = made.filter((v): v is string => !!v)
+    await setScreenOrder(order.map((id) => swap.get(id) ?? id).filter((v): v is string => !!v))
+    if (cur.length) { store.selectScreen(cur[0]!); multiScreens.value = cur.length > 1 ? cur : [] }
+  }, async () => {
+    // 다시 하기: 연결도 다시 끊고 지워요
+    const again = (links.data.value ?? []).filter((l) => cur.includes(l.screen_id))
+    if (again.length) await Promise.all(again.map((l) => removeLink(l.screen_id, l.requirement_id)))
+    await Promise.all(cur.map((id) => removeScreen(id))); store.selectScreen(null); multiScreens.value = []
+    if (again.length) await links.refresh()
+  })
+}
+/** 확인 창에서 '지우기' */
+async function doConfirmFrames() {
+  const c = confirmFrames.value
+  confirmFrames.value = null
+  if (!c) return
+  try { await removeFrames(c.frames, c.kept) } catch { sayFail(tr('Couldn\'t delete the frame')) }
 }
 /** 레이어 목록에서 화면을 끌어 순서를 바꿨을 때(그리는 순서 그대로) — 실행취소 한 번 */
 async function onScreenOrder(order: string[]) {
@@ -644,6 +701,8 @@ const docGroups = computed(() => {
 })
 const reqCount = (id: string) => (reqs.data.value ?? []).filter((r) => r.document_id === id).length
 function showDoc(id: string, reqId?: string | null) {
+  // 문서는 왼쪽 Docs 탭(목록 자리)에서 읽어요 — 오른쪽 패널은 그대로(사용자 요청 2026-11-26)
+  left.value = 'docs'
   docId.value = id
   docReq.value = reqId ?? null
 }
@@ -654,7 +713,9 @@ function closeDoc() { docId.value = null; docReq.value = null }
 const hoverReq = ref<string | null>(null)
 watch(docId, () => (hoverReq.value = null))
 const peek = computed(() => {
-  const id = hoverReq.value
+  // 문서를 열어 두면 고른(포커스된) REQ 도 늘 청록 선으로 — 마우스를 올린 REQ 가 있으면 그것(사용자 요청 2026-11-26)
+  const id0 = hoverReq.value ?? (docShown.value ? docReq.value : null)
+  const id = id0 && !reqGone(id0) ? id0 : null
   const r = id ? (reqs.data.value ?? []).find((x) => x.id === id) : null
   if (!id || !r) return null
   const sids = (links.data.value ?? []).filter((l) => l.requirement_id === id).map((l) => l.screen_id).filter((sid) => list.value.some((s) => s.id === sid))
@@ -669,7 +730,38 @@ watch(peek, (p) => {
   peekTimer = window.setTimeout(() => canvas.value?.reveal(it.sid, it.ids), 180)
 })
 /** 문서에서 REQ 를 누르면: 그 REQ 로 포커스(다시 누르면 풀기) + 캔버스도 그 REQ 를 그린 레이어(컴포넌트 · 항목)로 */
+// 빈 캔버스를 눌러 선택이 모두 풀리면 문서에서 고른 요구사항(카드 강조)도 함께 풀어요(사용자 요청 2026-11-26)
+watch(() => [store.screenId.value, store.layerIds.value.length, multiScreens.value.length] as const, ([sid, n, m]) => { if (!sid && !n && !m && docReq.value) docReq.value = null })
+/**
+ * 문서를 연 채 캔버스에서 요소 · 프레임을 고르면 오른쪽 문서에서 연결된 REQ 카드로 포커스(화면은 움직이지 않아요) — 사용자 요청 2026-11-26.
+ * 요소: 그 요소(또는 그 안 · 바깥 레이어)를 그린 REQ, 프레임: 그 프레임에 연결된 REQ 중 이 문서의 첫 번째
+ */
+watch(() => [docShown.value, store.screenId.value, store.layerIds.value.join(',')] as const, ([did, sid, ids]) => {
+  if (!did || !sid) return
+  const d = store.docs[sid]
+  const mine = docReqs.value.filter((r) => !reqGone(r.id) && (links.data.value ?? []).some((l) => l.requirement_id === r.id && l.screen_id === sid))
+  if (!d || !mine.length) return
+  const sel = ids ? ids.split(',') : []
+  const sorted = [...mine].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }))
+  let hit: string | undefined
+  if (sel.length) {
+    const ms = new Map(sorted.map((r) => [r.id, matchReqLayers(d, r.id, [r.title, r.body ?? ''].join(' '))]))
+    const near = (a: string, b: string) => a === b || descendants(d, a).includes(b) || descendants(d, b).includes(a)
+    const exact = (id: string) => ms.get(id)!.some((m) => sel.includes(m))
+    const close = (id: string) => ms.get(id)!.some((m) => sel.some((x) => near(m, x)))
+    // 고른 요소를 딱 그린 REQ 가 먼저(지금 것이 딱 맞으면 그대로) → 없으면 안 · 바깥으로 맞는 것(지금 것이 맞으면 그대로)
+    const cur = docReq.value && ms.has(docReq.value) ? docReq.value : null
+    if (cur && exact(cur)) return
+    hit = sorted.find((r) => exact(r.id))?.id
+    if (!hit) { if (cur && close(cur)) return; hit = sorted.find((r) => close(r.id))?.id }
+  } else {
+    if (docReq.value && mine.some((r) => r.id === docReq.value)) return
+    hit = sorted[0]?.id
+  }
+  if (hit && hit !== docReq.value) docReq.value = hit
+})
 function pickReq(id: string) {
+  if (reqGone(id)) { say(tr('Not drawn in any frame')); return }
   docReq.value = docReq.value === id ? null : id
   if (docReq.value) focusReq(docReq.value)
 }
@@ -685,8 +777,8 @@ function focusReq(id: string) {
   const ids = matchReqLayers(store.doc(sid), id, [r.title, r.body ?? ''].join(' '))
   if (ids.length) ids.forEach((lid, i) => store.selectLayer(sid, lid, i > 0))
   else store.selectScreen(sid)
-  // 이미 잘 보이면 화면은 그대로(선택선만), 멀거나 가려져 있으면 스르륵 그 자리로
-  nextTick(() => canvas.value?.reveal(sid, ids))
+  // 누르면 그 항목을 화면 가운데로 크게 확대해 보여 줘요(마우스 올림은 미리보기 선만 — 사용자 요청 2026-11-26)
+  nextTick(() => canvas.value?.focusOn(sid, ids))
 }
 
 async function onCreateReq(p: { text: string; block: string | null }) {
@@ -1153,6 +1245,19 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
       <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" @insert="(name: string) => canvas?.insertInstance(name)" />
 
+      <!-- 문서 읽기(왼쪽): 위에 뒤로(목록으로) · 같이 보는 화면 -->
+      <div v-else-if="openDoc" class="docs-read">
+        <div class="sec-h doc-h">
+          <!-- ‹ Docs 를 한 덩어리 뒤로 버튼으로(사용자 요청 2026-11-26) -->
+          <button type="button" class="sq hov back" :aria-label="tr('Back to docs')" @click="closeDoc"><EditorIcon name="chevron_right" :size="16" class="flip" /><span>{{ tr('Docs') }}</span></button>
+          <span class="f1" />
+          <span v-if="current" class="tx-meta ellipsis doc-with">{{ tr('Viewing with {name}', { name: current.name }) }}</span>
+        </div>
+        <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
+        <div v-ovscroll class="scroll doc-scroll">
+          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
+        </div>
+      </div>
       <div v-else v-ovscroll class="docs">
         <div class="sec-h"><span>{{ tr('Docs') }}</span><button class="ib s24" :aria-label="tr('Add doc')" :title="tr('Add doc')" @click="addDocOpen = true"><EditorIcon name="plus" /></button></div>
         <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
@@ -1180,7 +1285,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     </aside>
 
     <!-- 오른쪽 패널 -->
-    <aside :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick && !docId }]">
+    <aside :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick }]">
       <!-- 맨 위: 나 · Share — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
       <div class="panel-top r line-b">
         <MemberAvatar :size="24" :name="myName" :src="me?.avatar_url" :title="myName" />
@@ -1188,21 +1293,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <Button size="s" type="primary" @click="share">{{ tr('Share') }}</Button>
         </span>
       </div>
-      <!-- 문서 읽기 -->
-      <template v-if="openDoc">
-        <div class="panel-h line-b">
-          <span class="tx-head flex-none">{{ tr('Docs') }}</span>
-          <span class="tx-meta ellipsis f1">{{ current ? tr('Viewing with {name}', { name: current.name }) : '' }}</span>
-          <button class="ib s24" :aria-label="tr('Close doc')" :title="tr('Close doc')" @click="closeDoc"><EditorIcon name="close" /></button>
-        </div>
-        <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
-        <div v-ovscroll class="scroll reader">
-          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="pickReq" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
-        </div>
-      </template>
-
-      <!-- 인스펙터 -->
-      <template v-else>
+      <!-- 인스펙터(문서를 열어도 그대로) -->
+      <template v-if="true">
         <div role="tablist" :aria-label="tr('Properties tabs')" class="seg tabs">
           <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; expandPanels()">{{ tr(t[1]) }}</button>
           <div class="zoom-wrap">
@@ -1328,6 +1420,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
     <AppConfirm
+      v-if="confirmFrames"
+      :title="confirmFrames.frames.length === 1 ? tr('Delete the frame &quot;{name}&quot;?', { name: confirmFrames.frames[0]!.name }) : tr('Delete {n} frames?', { n: confirmFrames.frames.length })"
+      :desc="tr('{n} linked requirements will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
+      :actions="[{ label: tr('Cancel'), onClick: () => (confirmFrames = null) }, { label: confirmFrames.frames.length === 1 ? tr('Delete frame') : tr('Delete frames'), kind: 'destructed', onClick: doConfirmFrames }]"
+      @close="confirmFrames = null"
+    />
+    <AppConfirm
       v-if="confirmPage"
       :title="tr('Delete &quot;{name}&quot;?', { name: confirmPage.name })"
       :desc="confirmPage.count >= 0 ? tr('All frames and layers on this page will be deleted ({n} frames). This can\'t be undone.', { n: confirmPage.count }) : tr('All frames and layers on this page will be deleted. This can\'t be undone.')"
@@ -1392,6 +1491,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 /* 왼쪽 패널 열: 행 바탕은 패널 안쪽 8(탭 줄과 같아요), 글자 · 섹션 제목 · ▸ 는 x 16+8 한 줄에 맞춰요 */
 .pages { display: flex; flex-direction: column; box-sizing: border-box; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: inset 0 -1px 0 var(--iris-line); flex: none; max-height: 40%; overflow: auto; }
 .pages > .sec-h, .layers > .sec-h, .docs > .sec-h { flex: none; height: 32px; padding: 0 0 0 var(--ref-spacing-06); }
+.docs-read { padding-top: var(--ref-spacing-04); }
+.docs-read > .sec-h { flex: none; height: 32px; padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-06); }
 .prow, .drow { padding: 5px var(--ref-spacing-06); }
 /* 페이지 끌기: 놓을 자리에 레이어 목록과 같은 선(2px · 파랑 55% · 행 좌우 안쪽 4) */
 .pages { position: relative; }
@@ -1433,7 +1534,15 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .obj-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .badge { flex: none; height: 20px; line-height: 20px; white-space: nowrap; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-weight: 500; }
 .scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; }
-.reader { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-16); }
+/* 왼쪽 문서 읽기: 머리(뒤로 · Docs · 같이 보는 화면) 아래 본문이 스크롤 */
+.docs-read { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* 본문 좌우 16 — 오른쪽 패널 섹션과 같아요(DocReader 안쪽에도 .reader 가 있어 이름을 따로 둬요) */
+.doc-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-16); }
+.doc-h { gap: var(--ref-spacing-02); }
+/* 뒤로(‹ Docs): 화살표 왼쪽 간격을 Pages 의 + 오른쪽 간격(13)과 같게 */
+.doc-h .back { display: flex; align-items: center; gap: var(--ref-spacing-02); height: 24px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-02); margin-left: 3px; border-radius: var(--ref-radius-03); font-weight: 600; color: var(--sys-color-neutral-800); }
+.doc-h .back .flip { transform: scaleX(-1); color: var(--sys-color-neutral-600); }
+.doc-with { flex: none; max-width: 50%; }
 .none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .self-start { align-self: flex-start; }
 /* 토스트: 도구 막대(아래 16 + 높이 44 = 60) 위로 16 띄워서 */

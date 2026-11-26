@@ -102,6 +102,8 @@ export function slotFallback(name: string | undefined): string | undefined {
 </script>
 
 <script setup lang="ts">
+import type { ComponentInternalInstance } from 'vue'
+import { applyOverrides, instKey, instTick, registerInstance, treeOf, unregisterInstance } from '~/composables/useInstanceTree'
 import type { LayerNode } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 
@@ -162,6 +164,17 @@ onMounted(() => {
   ro.observe(box.value)
 })
 onBeforeUnmount(() => ro?.disconnect())
+// 레이어 목록의 하위 줄(읽기 전용): 그린 컴포넌트를 등록하고, 다시 그리면 알려요(useInstanceTree)
+const compRef = ref<{ $: ComponentInternalInstance } | null>(null)
+const regKey = computed(() => instKey(props.screenId, props.node.id))
+onMounted(() => registerInstance(regKey.value, () => compRef.value?.$ ?? null))
+watch(regKey, (k, old) => { unregisterInstance(old); registerInstance(k, () => compRef.value?.$ ?? null) })
+// 하위 덮어쓰기(이름 · 숨김 · 색 · 칠 · 글자): 바뀌면 컴포넌트를 새로 그리고(이전 덮어쓰기를 지우려고) 그린 뒤 다시 입혀요
+const ovKey = computed(() => JSON.stringify(props.node.subOverrides ?? {}))
+const applyOv = () => nextTick(() => applyOverrides(treeOf(compRef.value?.$), props.node.subOverrides, store.color))
+onMounted(applyOv)
+onUpdated(() => { instTick.value++; applyOv() })
+onBeforeUnmount(() => unregisterInstance(regKey.value))
 // 크기 방식을 hug 로 바꾸면 바로 다시 재요(내용 크기가 그대로면 ResizeObserver 가 안 불려요)
 watch([hugH, hugV, scale], () => nextTick(() => { if (box.value) { const cs = getComputedStyle(box.value); measure(parseFloat(cs.width) || box.value.offsetWidth, parseFloat(cs.height) || box.value.offsetHeight) } }))
 </script>
@@ -170,7 +183,7 @@ watch([hugH, hugV, scale], () => nextTick(() => { if (box.value) { const cs = ge
   <!-- inert + pointer-events:none — 안쪽 버튼 · 입력칸은 반응하지 않고, 누르면 바깥 .ly 가 받아요 -->
   <div class="inst" inert aria-hidden="true">
     <div v-if="comp && !failed" ref="box" data-preview :class="['box', { hw: hugH, hh: hugV }]" :style="boxStyle">
-      <component :is="comp" v-bind="bound">
+      <component :is="comp" :key="ovKey" ref="compRef" v-bind="bound">
         <template v-if="slotText !== undefined" #default>{{ slotText }}</template>
       </component>
     </div>

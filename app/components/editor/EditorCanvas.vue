@@ -28,6 +28,7 @@ import type { ExportSetting, Paint } from '~/canvas/schema'
 import ImageCropOverlay from '~/components/editor/ImageCropOverlay.vue'
 import { rotCursor } from '~/canvas/cursors'
 import { cropFromFit, startCrop, useImageEdit } from '~/composables/useImageEdit'
+import { subHover } from '~/composables/useInstanceTree'
 
 /**
  * 무한 캔버스 + 화면 안 레이어 편집.
@@ -162,6 +163,23 @@ function animateVp(to: { x: number; y: number; zoom: number }, ms = 320) {
  * - 프레임 안 항목(ids): 가운데 영역(양쪽 패널 사이, 가장자리 24 안쪽)에 다 보이면 그대로, 아니면 그 항목이 가운데 오게 스르륵 옮겨요
  * - 화면(프레임) 단위(ids 없음 · 못 찾음): 이미 절반 넘게 보이면 그대로, 아니면 화면 가운데로 옮겨요
  */
+/**
+ * 문서 REQ 를 눌렀을 때(사용자 요청 2026-11-26): 그 항목(레이어들, 없으면 화면)을 가운데 영역 한가운데로, 크게 확대해 보여 줘요.
+ * 항목이 가운데 영역의 60%(화면 단위는 90%)를 채우는 배율 — 레이어는 최대 400%, 화면은 최대 100%. 스르륵 움직여요
+ */
+function focusOn(sid: string, ids: string[]) {
+  const s = props.screens.find((v) => v.id === sid)
+  const area = viewArea()
+  if (!s || !area) return
+  const boxes = ids.map((id) => layerWorld(s, id)).filter((b): b is Rect => !!b)
+  const rs = boxes.length ? boxes : [rectOf(s)]
+  const x0 = Math.min(...rs.map((b) => b.x)), y0 = Math.min(...rs.map((b) => b.y)), x1 = Math.max(...rs.map((b) => b.x + b.w)), y1 = Math.max(...rs.map((b) => b.y + b.h))
+  const aw = area.right - area.left, ah = area.bottom - area.top
+  const fill = boxes.length ? 0.6 : 0.9
+  const z = Math.min(boxes.length ? 4 : 1, Math.max(0.02, Math.min((aw * fill) / Math.max(1, x1 - x0), (ah * fill) / Math.max(1, y1 - y0))))
+  const cx = (area.left + area.right) / 2, cy = (area.top + area.bottom) / 2
+  animateVp({ zoom: z, x: cx - ((x0 + x1) / 2) * z, y: cy - ((y0 + y1) / 2) * z }, 420)
+}
 function reveal(sid: string, ids: string[]) {
   const s = props.screens.find((v) => v.id === sid)
   const area = viewArea()
@@ -250,7 +268,8 @@ let drag: Drag | null = null
 
 const isNative = (s: ScreenRow) => s.source === 'native'
 const isCanvas = (s: { id: string }) => isPageCanvas(s.id)
-const realScreens = computed(() => props.screens.filter((s) => !isCanvas(s)))
+/** 캔버스에 그리는 화면들: 캔버스 층 · 숨긴 화면(레이어 목록 눈)은 빼요 — 숨긴 화면은 그리지도, 붙지도, 잡히지도 않아요 */
+const realScreens = computed(() => props.screens.filter((s) => !isCanvas(s) && !store.doc(s.id).frame?.hidden))
 const canvasDoc = computed(() => props.screens.find(isCanvas) ?? null)
 /** 캔버스 위 맨 위 단계 레이어: 섹션은 화면 아래(under), 나머지는 화면 위(over) */
 const canvasRoots = computed(() => {
@@ -908,6 +927,8 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   hover.value = null
   // 캔버스 위 레이어 층에서 레이어가 아닌 곳을 누르면 빈 캔버스와 같아요
   if (screen && isCanvas(screen) && !(e.target as HTMLElement).closest('[data-layer]')) screen = undefined
+  // 잠근 화면(프레임): 캔버스에서는 빈 곳처럼 — 화면 · 안의 레이어가 잡히지 않아요(피그마와 같아요, 레이어 목록에서만 골라요)
+  if (screen && !isCanvas(screen) && store.doc(screen.id).frame?.locked && (tool.value === 'move' || tool.value === 'scale')) screen = undefined
   if (e.button === 1 || space.value || tool.value === 'hand') {
     drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: vp.value.x, vy: vp.value.y, moved: false }
     panning.value = true
@@ -1733,7 +1754,7 @@ function move(e: PointerEvent) {
       const groups: [string, string[]][] = []
       if (canvasDoc.value) { const c = canvasDoc.value; const hs = deepHits(c, store.doc(c.id).rootIds, r); if (hs.length) groups.push([c.id, hs]) }
       for (const v of realScreens.value) {
-        if (!isNative(v) || !hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })) continue
+        if (!isNative(v) || store.doc(v.id).frame?.locked || !hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })) continue
         const hs = deepHits(v, store.doc(v.id).rootIds, r)
         if (hs.length) groups.push([v.id, hs])
       }
@@ -1746,7 +1767,7 @@ function move(e: PointerEvent) {
       return
     }
     // 화면이 걸리면 화면들, 아니면 캔버스 위 레이어들
-    const scr = [...new Set([...drag.baseScreens, ...realScreens.value.filter((v) => hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })).map((v) => v.id)])]
+    const scr = [...new Set([...drag.baseScreens, ...realScreens.value.filter((v) => !store.doc(v.id).frame?.locked && hitBox({ x: v.x, y: v.y, w: v.width, h: v.height })).map((v) => v.id)])]
     if (scr.length) {
       store.selectScreen(scr[0]!)
       multi.value = scr.length > 1 ? scr : []
@@ -2668,7 +2689,7 @@ function fitSelection(maxZoom = 4) {
   if (!boxes.length) return fit([s.id])
   fitRect(Math.min(...boxes.map((b) => b!.x)), Math.min(...boxes.map((b) => b!.y)), Math.max(...boxes.map((b) => b!.x + b!.w)), Math.max(...boxes.map((b) => b!.y + b!.h)), maxZoom)
 }
-defineExpose({ fit, zoomAt, fitSelection, reveal, insertInstance, sectionScreens, paste: doPaste })
+defineExpose({ fit, zoomAt, fitSelection, reveal, focusOn, insertInstance, sectionScreens, paste: doPaste })
 
 let gz = 1
 const onGestureStart = (e: Event) => { e.preventDefault(); gz = vp.value.zoom }
@@ -2772,7 +2793,7 @@ function layerWorld(s: ScreenRow, id: string): Rect | null {
 const tick = ref(0) // 텍스트 크기 다시 재기
 watch(() => [store.docs, store.editing.value], () => nextTick(() => tick.value++), { deep: true })
 const selScreen = computed(() => props.screens.find((s) => s.id === store.screenId.value) ?? null)
-const selFrame = computed(() => (selScreen.value && !isCanvas(selScreen.value) ? selScreen.value : null))
+const selFrame = computed(() => (selScreen.value && !isCanvas(selScreen.value) && !store.doc(selScreen.value.id).frame?.hidden ? selScreen.value : null))
 const multiBoxes = computed(() => [...multi.value, ...mix.value].map((id) => props.screens.find((s) => s.id === id)).filter((s): s is ScreenRow => !!s))
 /** 함께 고른 다른 문서의 레이어(맨 위 것만)를 끌기 시작할 때의 자리 · 부모 행렬 · 기록 시작점 */
 function xCarryStart() {
@@ -3522,6 +3543,15 @@ function insertInstance(component: string, at?: { x: number; y: number }) {
 }
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
 const frameImg = useImageSrc()
+/** 레이어 목록의 인스턴스 하위 줄에 올렸을 때: 그 부분을 캔버스에서 보라 테두리로(피그마와 같아요) */
+const subBox = computed(() => {
+  void vp.value
+  const t = subHover.value
+  if (!t || !t.isConnected || !el.value) return null
+  const r = t.getBoundingClientRect(), c = el.value.getBoundingClientRect()
+  if (!r.width && !r.height) return null
+  return { left: r.left - c.left + 'px', top: r.top - c.top + 'px', width: r.width + 'px', height: r.height + 'px' }
+})
 /** 이미지 자르기 화면: 자르는 레이어 자리(레이어 안 좌표 → 캔버스 화면 좌표) */
 const imgEdit = useImageEdit()
 const cropView = computed(() => {
@@ -3737,6 +3767,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <span class="sq size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
       </div>
       <!-- 점 편집 중에는 상자 · 손잡이 · 크기 표시를 숨겨요(피그마와 같아요) -->
+      <div v-if="subBox" class="hover-ol comp" :style="subBox" />
       <ImageCropOverlay v-if="cropView" :edit="cropView.e" :node="cropView.n" :mat="cropView.mat" />
       <template v-if="single && !vhandles && !cropView">
         <div class="sel none" :class="{ comp: selComp }" :style="rbox(single)">
@@ -3889,7 +3920,8 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--iris-select) 45%, transparent); }
 .sel.none { box-shadow: none; }
 /* 문서 REQ 미리 보기(마우스 올림): 청록(turquoise) 2px 선 + 바깥 은은한 번짐 + 옅은 칠, 왼쪽 위에 REQ 번호 꼬리표 — 파란 선택선과 겹쳐도 잘 보이게 */
-.peek { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-peek), 0 0 0 5px color-mix(in srgb, var(--iris-peek) 28%, transparent); background: color-mix(in srgb, var(--iris-peek) 14%, transparent); border-radius: 2px; }
+/* 문서 REQ 가 가리키는 항목: 청록 선만(안은 칠하지 않아요 — 사용자 요청 2026-11-26) */
+.peek { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-peek), 0 0 0 5px color-mix(in srgb, var(--iris-peek) 28%, transparent); border-radius: 2px; }
 .peek-tag { position: absolute; left: -2px; bottom: calc(100% + 4px); padding: 0 6px; border-radius: 4px; background: var(--iris-peek); color: #fff; font-size: 11px; line-height: 18px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 3px rgb(3 9 26 / 18%); }
 .hl { position: absolute; box-shadow: 0 0 0 2px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); }
 .handle.live { pointer-events: auto; width: 7px; height: 7px; border-radius: 1px; box-shadow: 0 0 0 1px var(--iris-select); }

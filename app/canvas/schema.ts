@@ -112,6 +112,10 @@ export interface LayerStyle {
   lockRatio?: boolean
   /** 화면(맨 위 프레임) 회전(도, 가운데 기준 — 피그마와 같아요). 레이어는 LayerNode.rotation */
   rotation?: number
+  /** 화면(맨 위 프레임) 숨기기: 캔버스에 그리지 않고 잡히지도 않아요(레이어 목록 눈) */
+  hidden?: boolean
+  /** 화면(맨 위 프레임) 잠금: 캔버스에서 누르거나 끌어도 잡히지 않아요(안의 레이어 포함) — 레이어 목록에서만 골라요 */
+  locked?: boolean
   /** 화면(맨 위 프레임) 뒤집기(가운데 기준 — 안의 레이어가 거울처럼) */
   flipX?: boolean
   flipY?: boolean
@@ -249,6 +253,11 @@ export interface LayerNode {
   props?: Record<string, unknown>
   /** 스케일(K)로 키운 배율(인스턴스): 디자인 시스템 컴포넌트를 이 배율로 확대해 그려요(안의 글자 · 아이콘까지 — 피그마와 같아요) */
   instScale?: number
+  /**
+   * 인스턴스 하위 레이어 덮어쓰기(피그마 인스턴스 override): 하위 자리 키(useInstanceTree SubNode.key) → 이름 · 숨김 · 글자 색 · 칠 · 글자.
+   * 컴포넌트는 디자인 시스템 그대로 그리고, 그린 뒤 그 자리에 입혀요(InstanceView)
+   */
+  subOverrides?: Record<string, SubOverride>
   /** 레이어 내보내기 설정(피그마 Export) */
   exports?: ExportSetting[]
   /** 마스크: 같은 부모 안에서 이 레이어 위에 있는 형제들을 이 모양으로 잘라요 */
@@ -267,6 +276,11 @@ export interface LayerDoc {
   frame?: LayerStyle
   /** 화면(프레임) 내보내기 설정(피그마 Export) */
   exports?: ExportSetting[]
+  /**
+   * 요구사항(REQ id) → 그것을 그린 레이어 id 들. 처음 짝지을 때(직접 연결 · 이름 · 글자 짐작) 기억해 두고, 그 뒤엔 이것만 봐요 —
+   * 그린 요소를 지우면 다시 짐작하지 않고 '그려지지 않음'(문서에서 빨강)으로 남아요. 새로고침해도 유지(사용자 요청 2026-11-26)
+   */
+  reqBind?: Record<string, string[]>
 }
 
 /**
@@ -291,6 +305,9 @@ export function migrate(raw: unknown): LayerDoc {
   // v4 → v5: 원 · 선 · 다각형 · 별 · 연필 · 섹션, 여러 칠 · 그라디언트 · 효과 · 선 위치 · 점선 · 혼합 모드 · 텍스트 고급이 더해졌어요. 모두 비어 있어도 되는 값입니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   if (d.frame && typeof d.frame === 'object' && !Array.isArray(d.frame)) doc.frame = { ...d.frame }
+  // 요구사항 ↔ 레이어 짝(그린 요소를 지우면 문서에서 빨강 — 새로고침해도 유지)
+  const rb = (d as { reqBind?: unknown }).reqBind
+  if (rb && typeof rb === 'object' && !Array.isArray(rb)) doc.reqBind = Object.fromEntries(Object.entries(rb as Record<string, unknown>).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((x): x is string => typeof x === 'string')]))
   for (const [id, n] of Object.entries(d.nodes)) {
     if (!n || typeof n !== 'object') continue
     const node: LayerNode = { ...(n as LayerNode), id, style: { ...((n as LayerNode).style ?? {}) } }
@@ -325,6 +342,9 @@ function imageToRect(n: LayerNode) {
   delete st.fill
   st.fills = [...(st.fills ?? []), paint]
 }
+
+/** 인스턴스 하위 레이어 덮어쓰기 하나 */
+export interface SubOverride { name?: string; hidden?: boolean; locked?: boolean; color?: string; fill?: string; text?: string }
 
 export const newId = () => 'n' + Math.random().toString(36).slice(2, 9)
 

@@ -26,6 +26,22 @@ export function matchReqLayers(doc: LayerDoc, reqId: string, reqText: string): s
   const nodes = Object.values(doc.nodes).filter((n) => !n.hidden)
   const direct = nodes.filter((n) => n.reqs?.includes(reqId)).map((n) => n.id)
   if (direct.length) return direct
+  // 기억해 둔 짝이 있으면 그것만(그린 요소를 지웠으면 빈 목록 — 다른 레이어로 다시 짐작하지 않아요)
+  const bound = doc.reqBind?.[reqId]
+  if (bound) return bound.filter((id) => doc.nodes[id] && !doc.nodes[id]!.hidden)
+  return guessReqLayers(doc, reqId, reqText)
+}
+/** 그린 요소를 지워서 '그려지지 않음'인가: 짝을 기억해 뒀는데 그 요소가 모두 사라졌고, 직접 연결도 없을 때 */
+export function reqLost(doc: LayerDoc, reqId: string): boolean {
+  const bound = doc.reqBind?.[reqId]
+  if (!bound?.length || bound.some((id) => doc.nodes[id])) return false
+  return !Object.values(doc.nodes).some((n) => n.reqs?.includes(reqId))
+}
+/** 짝을 아직 기억하지 않았을 때: 직접 연결 → 이름 · 글자 짐작 */
+export function guessReqLayers(doc: LayerDoc, reqId: string, reqText: string): string[] {
+  const nodes = Object.values(doc.nodes).filter((n) => !n.hidden)
+  const direct = nodes.filter((n) => n.reqs?.includes(reqId)).map((n) => n.id)
+  if (direct.length) return direct
   const text = compact(reqText)
   const grams = bigrams(reqText)
   if (!text) return []
