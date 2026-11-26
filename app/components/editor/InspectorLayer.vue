@@ -37,7 +37,8 @@ import { useTextRange } from '~/composables/useTextRange'
  * 오른쪽 패널 · 디자인 탭(레이어를 골랐을 때): 위치 · 크기(비율 고정) · 회전 · 뒤집기 · 정렬 · 균등 분배 · 모양(모서리 따로) · 채우기 · 선 · 텍스트 · 순서
  * 값마다 디자인 시스템 변수(토큰)를 연결할 수 있어요(TokenPicker). 연결하면 입력칸 대신 토큰 칩이 보입니다.
  */
-const props = defineProps<{ screen: ScreenRow }>()
+/** scaleMode: 스케일 도구(K) 중 — 피그마처럼 Position · Layout 만 남기고(인스턴스 속성 · 모양 · 칠 · 선 · 효과 등은 숨겨요) 아래 Scale 이 주인공 */
+const props = defineProps<{ screen: ScreenRow; scaleMode?: boolean }>()
 const emit = defineEmits<{ 'replace-image': [id: string] }>()
 const store = useLayerStore()
 const catalog = useTokenCatalog()
@@ -500,9 +501,11 @@ function setSizing(axis: 'w' | 'h', v: Sizing) {
   // 피그마처럼: 그 방향이 Hug 인 부모 안에서 Fill 을 고르면 부모를 그 방향 Fixed 로 바꿔요(Hug 부모는 채울 크기가 없어요). 실행취소 한 번
   const key = axis === 'w' ? 'sizeH' : 'sizeV'
   const hugParents = v === 'fill' ? [...new Set(nodes.value.map((n) => parentOf(n)).filter((p): p is LayerNode => !!p && p[key] === 'hug').map((p) => p.id))] : []
-  if (hugParents.length) { store.hold(sid.value); store.update(sid.value, hugParents, { [key]: undefined }) }
+  // 내용 크기(Hug)로 재던 값을 고정으로 바꿀 땐 정수로 — 손으로 바꾸지 않은 크기는 소수점을 보이지 않아요(사용자 요청 2026-11-26)
+  if (hugParents.length) { store.hold(sid.value); store.update(sid.value, hugParents, (p) => ({ [key]: undefined, [axis]: Math.round(p[axis]) })) }
   store.update(sid.value, ids.value, (n) => {
     const p: Partial<LayerNode> = axis === 'w' ? { sizeH: v === 'fixed' ? undefined : v } : { sizeV: v === 'fixed' ? undefined : v }
+    if (v === 'fixed') p[axis] = Math.round(dim(n, axis))
     if (n.type === 'text' && axis === 'w') n.style.autoWidth = v === 'hug'
     return p
   })
@@ -739,7 +742,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     </section>
 
     <!-- 컴포넌트 속성(피그마처럼 맨 위): 변형 · 켜고 끄기 · 글자 -->
-    <InspectorInstance v-if="one?.type === 'instance'" :sid="sid" :ids="ids" />
+    <InspectorInstance v-if="one?.type === 'instance' && !scaleMode" :sid="sid" :ids="ids" />
 
     <section v-if="!editing" class="s">
       <div class="sec-h h24"><span>{{ tr('Position') }}</span>
@@ -805,7 +808,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     </InspectorAutoLayout>
 
 
-    <section v-if="!editing" class="s">
+    <section v-if="!editing && !scaleMode" class="s">
       <div class="sec-h h24"><span>{{ tr('Appearance') }}</span>
         <span class="acts">
           <button :class="['ib', 's24', 'tog', { on: same((n) => !!n.hidden) === true }]" :aria-pressed="same((n) => !!n.hidden) === true" :aria-label="(same((n) => !!n.hidden) === true ? tr('Show') : tr('Hide')) + ' (⇧⌘H)'" :title="(same((n) => !!n.hidden) === true ? tr('Show') : tr('Hide')) + ' ⇧⌘H'" @click="store.update(sid, ids, { hidden: same((n) => !!n.hidden) !== true })">
@@ -865,7 +868,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 
     </section>
 
-    <section v-if="has('text') && !editing" class="s">
+    <section v-if="has('text') && !editing && !scaleMode" class="s">
       <!-- 피그마 Typography: 스타일이 걸렸으면 [Ag 스타일 칸 | 떼기] 하나만, 떼면 스타일 속 변수가 칸마다 칩으로 —
            [글꼴 (한 줄)] / [굵기 | 크기 ▾] / 줄 높이 · 자간 / 정렬 · 세로 정렬 | 상세 ⚙ -->
       <div class="sec-h h24"><span>{{ tr('Typography') }}</span><TokenPicker v-if="!tsBound" variant="icon" icon="styles" :kinds="['textStyle']" label="Text styles" @pick="pickTextStyle" /></div>
@@ -908,9 +911,9 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <TextDetails v-if="tdOpen" :anchor="tdBtn" :sid="sid" :ids="ids" @close="tdOpen = false" />
     </section>
 
-    <InspectorPaints v-if="!has('line', 'path') || has('path')" :sid="sid" :ids="ids" :kind="has('text') ? 'text' : 'fill'" title="Fill" />
+    <InspectorPaints v-if="(!has('line', 'path') || has('path')) && !scaleMode" :sid="sid" :ids="ids" :kind="has('text') ? 'text' : 'fill'" title="Fill" />
 
-    <InspectorPaints :sid="sid" :ids="ids" kind="stroke" title="Stroke">
+    <InspectorPaints v-if="!scaleMode" :sid="sid" :ids="ids" kind="stroke" title="Stroke">
       <!-- 컴포넌트가 그린 선: 읽기 전용(켜고 끄기 · 바꾸기는 위 컴포넌트 속성에서) -->
       <template v-if="compStroke && !hasStroke">
         <div class="sq cstroke" :title="tr('From the component — change it in the component properties above')">
@@ -951,13 +954,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       </template>
     </InspectorPaints>
 
-    <InspectorEffects v-if="!editing" :sid="sid" :ids="ids" />
+    <InspectorEffects v-if="!editing && !scaleMode" :sid="sid" :ids="ids" />
     <!-- 여러 개 · 프레임 · 그룹을 고르면: 안에 쓰인 색 모아 보기 · 한꺼번에 바꾸기(피그마 Selection colors) -->
-    <InspectorSelectionColors v-if="!editing && (nodes.length > 1 || (one && isContainer(one) && !!one.children?.length))" :targets="[{ sid, ids }]" />
+    <InspectorSelectionColors v-if="!editing && !scaleMode && (nodes.length > 1 || (one && isContainer(one) && !!one.children?.length))" :targets="[{ sid, ids }]" />
 
-    <InspectorGrids v-if="(one?.type === 'frame' || one?.type === 'section') && !editing" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
+    <InspectorGrids v-if="(one?.type === 'frame' || one?.type === 'section') && !editing && !scaleMode" :grids="one.style.grids ?? []" @change="(g) => setStyle('grids', g)" />
 
-    <section v-if="one?.type === 'image' && !editing" class="s">
+    <section v-if="one?.type === 'image' && !editing && !scaleMode" class="s">
       <div class="sec-h h24"><span>{{ tr('Image') }}</span></div>
       <div class="ig">
         <div class="grp span2" role="radiogroup" :aria-label="tr('Image fit')">

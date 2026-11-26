@@ -474,8 +474,9 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
   const fail = () => sayFail(tr('Couldn\'t save. Try again'))
-  // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요(실행취소는 레이어 기록이 따로)
-  if (s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
+  // 크기가 바뀌면 맨 위 레이어들이 제약대로 따라와요 — 화면 크기와 함께 실행취소 한 번으로
+  const resized = s.source === 'native' && ((patch.width ?? s.width) !== s.width || (patch.height ?? s.height) !== s.height)
+  if (resized && scrubbing) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
   if (scrubbing) {
     const b = frameScrub.get(s.id) ?? {}
     for (const [k, v] of Object.entries(before)) if (!(k in b)) b[k] = v
@@ -483,8 +484,11 @@ function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' 
     Object.assign(s, patch)
     return
   }
-  updateScreen(s.id, patch).catch(fail)
-  store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
+  store.batch(() => {
+    if (resized) store.constrainRoot(s.id, s.width, s.height, patch.width ?? s.width, patch.height ?? s.height)
+    updateScreen(s.id, patch).catch(fail)
+    store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, patch).catch(fail))
+  })
 }
 /** 스케일(K) Scale 칸에서 화면(프레임) 키우기 · 줄이기: 안의 내용(레이어 기록) + 화면 크기 · 자리(화면 기록) */
 function onScaleScreen(k: number, anchor: [number, number]) {
@@ -494,9 +498,12 @@ function onScaleScreen(k: number, anchor: [number, number]) {
   const before = { x: s.x, y: s.y, width: s.width, height: s.height }
   const after = { x: Math.round(s.x + (s.width - w) * anchor[0]), y: Math.round(s.y + (s.height - h) * anchor[1]), width: w, height: h }
   const fail = () => sayFail(tr('Couldn\'t save. Try again'))
-  store.scaleScreenContent(s.id, w / s.width)
-  updateScreen(s.id, after).catch(fail)
-  store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, after).catch(fail))
+  // 안의 내용 + 화면 크기 · 자리를 실행취소 한 번으로(⌘Z 하면 내용까지 함께 돌아와요)
+  store.batch(() => {
+    store.scaleScreenContent(s.id, w / s.width)
+    updateScreen(s.id, after).catch(fail)
+    store.pushAction(s.id, () => updateScreen(s.id, before).catch(fail), () => updateScreen(s.id, after).catch(fail))
+  })
 }
 /** 캔버스 이름표에서 바로 고친 화면 이름 (실행 취소 가능) */
 function onRenameScreen(id: string, name: string) {
@@ -1191,7 +1198,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     </div>
 
     <!-- 왼쪽 패널 -->
-    <aside :aria-label="tr('Left sidebar')" :class="['sq', 'float', 'panel-left', { collapsed: collapsed.left }]">
+    <!-- 패널 칸(숫자 · 이름 · 설정)은 맞춤법 검사 빨간 줄이 필요 없어요(예: Scale 칸 '1x') — 안쪽 입력칸이 모두 물려받아요 -->
+    <aside spellcheck="false" :aria-label="tr('Left sidebar')" :class="['sq', 'float', 'panel-left', { collapsed: collapsed.left }]">
       <!-- 맨 위: 파일 줄(메인 메뉴 · 프로젝트 이름 · 저장 상태) — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
       <div class="panel-top line-b">
         <div class="home-wrap">
@@ -1285,7 +1293,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     </aside>
 
     <!-- 오른쪽 패널 -->
-    <aside :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick }]">
+    <aside spellcheck="false" :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick }]">
       <!-- 맨 위: 나 · Share — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
       <div class="panel-top r line-b">
         <MemberAvatar :size="24" :name="myName" :src="me?.avatar_url" :title="myName" />
@@ -1333,10 +1341,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <template v-else-if="store.layerIds.value.length">
-              <InspectorLayer :screen="current" @replace-image="pickImage" />
-              <!-- 스케일 도구(K): 패널 아래 Scale 칸(피그마와 같아요) -->
-              <InspectorScale v-if="tool === 'scale'" :sid="current.id" :ids="store.layerIds.value" />
-              <InspectorExport :sid="current.id" :ids="store.layerIds.value" @toast="say" />
+              <InspectorLayer :screen="current" :scale-mode="tool === 'scale'" @replace-image="pickImage" />
+              <!-- 스케일 도구(K): Position · Layout 만 남기고 아래 Scale 칸이 주인공(피그마와 같아요) -->
+              <InspectorScale v-if="tool === 'scale'" :sid="current.id" :ids="store.layerIds.value" @close="tool = 'move'" />
+              <InspectorExport v-else :sid="current.id" :ids="store.layerIds.value" @toast="say" />
             </template>
             <!-- 프레임 여러 개: 한 개일 때와 같은 패널(값이 다르면 Mixed) — 고치면 모두에 한꺼번에(피그마와 같아요) -->
             <template v-else-if="multiList.length > 1">
@@ -1344,19 +1352,19 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
               <InspectorExport :sid="multiList[0]!.id" :ids="[]" :screen="multiList[0]" :screens="multiList" @toast="say" />
             </template>
             <template v-else>
-              <InspectorDesign :screen="current" @update="onUpdate" @remove="onRemove" />
+              <InspectorDesign :screen="current" :scale-mode="tool === 'scale' && current.source === 'native'" @update="onUpdate" @remove="onRemove" />
               <!-- 스케일 도구(K) + 화면(프레임) 고름: 화면과 안의 내용을 같은 비율로 -->
-              <InspectorScale v-if="tool === 'scale' && current.source === 'native'" :sid="current.id" :ids="[]" :screen="current" @scale-screen="onScaleScreen" />
+              <InspectorScale v-if="tool === 'scale' && current.source === 'native'" :sid="current.id" :ids="[]" :screen="current" @scale-screen="onScaleScreen" @close="tool = 'move'" />
               <!-- 완성한 화면 내보내기(피그마 Export) -->
-              <InspectorExport :sid="current.id" :ids="[]" :screen="current" @toast="say" />
+              <InspectorExport v-else :sid="current.id" :ids="[]" :screen="current" @toast="say" />
             </template>
           </div>
         </template>
         <!-- 캔버스 위 레이어를 골랐을 때: 디자인 속성만 -->
         <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll insp">
-          <InspectorLayer :screen="canvasScreen" @replace-image="pickImage" />
-          <InspectorScale v-if="tool === 'scale'" :sid="canvasScreen.id" :ids="store.layerIds.value" />
-          <InspectorExport :sid="canvasScreen.id" :ids="store.layerIds.value" @toast="say" />
+          <InspectorLayer :screen="canvasScreen" :scale-mode="tool === 'scale'" @replace-image="pickImage" />
+          <InspectorScale v-if="tool === 'scale'" :sid="canvasScreen.id" :ids="store.layerIds.value" @close="tool = 'move'" />
+          <InspectorExport v-else :sid="canvasScreen.id" :ids="store.layerIds.value" @toast="say" />
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
         <div v-else-if="tab === 'design' && currentPage" class="scroll insp">

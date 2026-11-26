@@ -401,6 +401,8 @@ export default {
   'Scaled width': '조정한 너비',
   'Scaled height': '조정한 높이',
   'Scale factor': '배율',
+  'Anchor point': '기준점',
+  'Close scale tool': '스케일 도구 끝내기',
   'Anchor': '기준점',
 
   // 컴포넌트 속성(InspectorInstance) · 개발 탭(InspectorDev)

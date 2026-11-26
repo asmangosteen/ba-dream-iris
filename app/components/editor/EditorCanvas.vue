@@ -1913,11 +1913,12 @@ function endDrag(e: PointerEvent, d: NonNullable<typeof drag>) {
   if (d.kind === 'layers') mixGhosts.value = []
   // 선 · 화살표는 한 번 긋고 선택 도구로, 연필은 계속 연필(피그마와 같아요)
   if (d.kind === 'drawLine' || d.kind === 'pencil') { draftPts.value = null; if (d.kind === 'drawLine') tool.value = 'move'; finishPoints(d) }
-  if (d.kind === 'resizeScreen' && d.moved && d.before) store.commit(d.id, d.before)
-  if (d.kind === 'resizeScreen' && d.moved) {
+  // 화면 크기 조절: 안 레이어(제약 · 스케일) 기록 + 화면 크기 기록을 실행취소 한 번으로
+  if (d.kind === 'resizeScreen' && d.moved) store.batch(() => {
+    if (d.before) store.commit(d.id, d.before)
     const s = props.screens.find((x) => x.id === d.id)
     if (s) emit('resize-screen', d.id, { x: s.x, y: s.y, width: s.width, height: s.height }, true)
-  }
+  })
   if (d.kind === 'marquee') {
     draft.value = null; marqueeOn.value = false
     if (!d.moved && d.deep) {
@@ -3454,7 +3455,8 @@ watch(() => [vp.value.x, vp.value.y, vp.value.zoom] as const, (now, before) => {
 /** 크기 숫자: 정수면 그대로, 아니면 소수 한 자리(피그마와 같아요) */
 // 크기 · 각도 표시: 피그마처럼 정수로(실제 크기는 소수 그대로) — app/canvas/num.ts
 const fmt = fmtNum
-/** 크기 표시 옆 크기 방식: 피그마처럼 "120 Hug × 40 Fill". 고정이면 비워요(인스펙터 W · H ▾ 와 같은 규칙) */
+/** 크기 표시 옆 크기 방식: 피그마처럼 "120 Hug × 40 Fill". 고정이면 비워요(인스펙터 W · H ▾ 와 같은 규칙).
+ *  Hug · Fill(내용 · 부모가 정한 크기)은 숫자를 늘 정수로 — 손으로 바꾼 크기만 소수점(픽셀 맞춤을 껐을 때) 보여요(사용자 요청 2026-11-26) */
 const singleModes = computed(() => {
   const sid = store.screenId.value
   const id = store.layerIds.value.length === 1 ? store.layerIds.value[0] : null
@@ -3780,7 +3782,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </div>
         <span class="sq size below" :class="{ comp: selComp }" :style="single.angle ? tagsFor(single).size : belowBox(single)">
           <template v-if="rotating">{{ fmt(single.rotation) }}°</template>
-          <template v-else>{{ fmt(single.w) }}<span v-if="singleModes.w" class="mode">{{ singleModes.w }}</span> × {{ fmt(single.h) }}<span v-if="singleModes.h" class="mode">{{ singleModes.h }}</span></template>
+          <template v-else>{{ singleModes.w ? Math.round(single.w) : fmt(single.w) }}<span v-if="singleModes.w" class="mode">{{ singleModes.w }}</span> × {{ singleModes.h ? Math.round(single.h) : fmt(single.h) }}<span v-if="singleModes.h" class="mode">{{ singleModes.h }}</span></template>
         </span>
       </template>
       <svg v-if="shown" class="guides" width="100%" height="100%">

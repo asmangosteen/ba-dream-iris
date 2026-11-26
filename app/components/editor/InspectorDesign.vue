@@ -21,7 +21,8 @@ import { currentGap, guessAxis, type ArrangeOp, type Rect } from '~/canvas/geom'
  * multi: 프레임을 여러 개 골랐을 때(피그마와 같아요) — 같은 패널을 그대로 보여 주고, 값이 서로 다르면 Mixed.
  * 고치면 고른 프레임 모두에 한꺼번에(실행취소 한 번). screen 은 그중 첫 프레임
  */
-const props = defineProps<{ screen: ScreenRow; multi?: ScreenRow[] }>()
+/** scaleMode: 스케일 도구(K) 중 — Position · Layout 만(모양 · 칠 · 선 · 효과 · 격자는 숨겨요) */
+const props = defineProps<{ screen: ScreenRow; multi?: ScreenRow[]; scaleMode?: boolean }>()
 const emit = defineEmits<{ update: [patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>]; remove: []; arrange: [op: ArrangeOp]; step: [key: 'x' | 'y' | 'width' | 'height', d: number] }>()
 const all = computed<ScreenRow[]>(() => (props.multi && props.multi.length > 1 ? props.multi : [props.screen]))
 const isMulti = computed(() => all.value.length > 1)
@@ -333,7 +334,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <button v-if="native" :class="['cb', { on: !mixClip && look.clip !== false, mix: mixClip }]" role="checkbox" :aria-checked="mixClip ? 'mixed' : look.clip !== false" @click="fstyle({ clip: !mixClip && look.clip !== false ? false : undefined })"><i class="sq" />{{ tr('Clip content') }}</button>
     </section>
 
-    <template v-if="native">
+    <template v-if="native && !scaleMode">
       <section class="s">
         <div class="sec-h h24"><span>{{ tr('Appearance') }}</span></div>
         <div class="ig-l"><span>{{ tr('Opacity') }}</span><span>{{ tr('Corner radius') }}</span></div>
