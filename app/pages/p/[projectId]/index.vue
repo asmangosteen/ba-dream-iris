@@ -245,12 +245,36 @@ const confirmThread = ref<CommentRow | null>(null)
 const mentionPeople = computed(() => access.members.value.map((m) => ({ id: m.member_id, name: m.member?.name || m.member?.email || '?', avatar: m.member?.avatar_url ?? null, role: ROLE_NAME[m.role] })))
 // 핀 · 스레드는 늘 보여요. 코멘트 모드(도구 막대 · C)는 '새 코멘트 달기'만: 커서가 내 프로필 핀으로 바뀌고 어디든 누르면 달아요
 watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else draft.value = null })
-/** 코멘트 달기 커서: 내 이름 첫 글자가 든 핀(누르는 점 = 왼쪽 아래 뾰족한 끝) */
-const commentCursor = computed(() => {
-  const ch = (myName.value || '?').trim().charAt(0).toUpperCase().replace(/[<>&"']/g, '')
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='38' height='38' viewBox='0 0 30 30'><path transform='translate(1 1)' d='M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z' fill='%23fff' stroke='%232C7BE2' stroke-width='1.5'/><circle cx='15' cy='15' r='10' fill='%23EEF4FC'/><text x='15' y='19' text-anchor='middle' font-family='Pretendard, -apple-system, sans-serif' font-size='11' font-weight='600' fill='%232C7BE2'>${encodeURIComponent(ch)}</text></svg>`
-  return `url("data:image/svg+xml,${svg.replace(/#/g, '%23')}") 1 36, crosshair`
-})
+/**
+ * 코멘트 달기 커서: 내 이름 첫 글자가 든 핀(누르는 점 = 왼쪽 아래 뾰족한 끝).
+ * 글자가 든 SVG 커서는 움직일 때마다 다시 그려져 깜빡여서, 한 번만 PNG(1배 · 2배)로 그려 두고 그대로 써요
+ */
+const commentCursor = ref('crosshair')
+async function drawCommentCursor() {
+  if (!import.meta.client) return
+  try { await document.fonts?.ready } catch { /* 글꼴을 못 기다려도 그려요 */ }
+  const ch = (myName.value || '?').trim().charAt(0).toUpperCase() || '?'
+  const make = (k: number) => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 38 * k
+    const g = c.getContext('2d')
+    if (!g) return ''
+    g.scale((38 * k) / 30, (38 * k) / 30)
+    g.translate(1, 1)
+    const pin = new Path2D('M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z')
+    g.fillStyle = '#FFFFFF'; g.fill(pin)
+    g.lineWidth = 1.5; g.strokeStyle = '#2C7BE2'; g.stroke(pin)
+    g.beginPath(); g.arc(14, 14, 10, 0, Math.PI * 2); g.fillStyle = '#EEF4FC'; g.fill()
+    g.fillStyle = '#2C7BE2'; g.font = '600 11px Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.fillText(ch, 14, 14.5)
+    return c.toDataURL('image/png')
+  }
+  const x1 = make(1), x2 = make(2)
+  if (!x1) return
+  const set = `image-set(url("${x1}") 1x, url("${x2}") 2x) 1 36, crosshair`
+  commentCursor.value = CSS.supports('cursor', set) ? set : `url("${x1}") 1 36, crosshair`
+}
+onMounted(() => { drawCommentCursor(); watch(myName, drawCommentCursor) })
 /** 코멘트 모드에서 캔버스를 누르면: 그 자리(위에 있는 화면 기준)에 새 코멘트 */
 function onCommentDown(e: PointerEvent) {
   if (!commentMode.value || e.button !== 0) return
