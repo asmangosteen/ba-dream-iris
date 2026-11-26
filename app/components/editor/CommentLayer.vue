@@ -64,6 +64,11 @@ function parts(body: string) {
 }
 const moreOpen = ref(false)
 watch(() => props.openId, () => { moreOpen.value = false })
+/**
+ * 핀 모양: 오른쪽 위는 원, 왼쪽 · 아래 변은 곡률이 서서히 줄어 뾰족한 끝(왼쪽 아래, 누른 자리)으로 이어져요 —
+ * 원과 곧은 변이 바로 만나 꺾여 보이던 것을 부드럽게. 끝은 곡률 1px 정도
+ */
+const PIN = 'M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z'
 const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canModerate
 </script>
 
@@ -76,12 +81,13 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
       :aria-label="tr('Comment #{no} by {name}', { no: p.t.root.no ?? '', name: nameOf(p.t.root.author_id) })"
       @click="emit('open', p.t.root.id === openId ? null : p.t.root.id)"
     >
+      <svg class="pin-bg" viewBox="0 0 28 28" aria-hidden="true"><path :d="PIN" /></svg>
       <MemberAvatar :name="nameOf(p.t.root.author_id)" :src="person(p.t.root.author_id)?.avatar" :size="22" />
     </button>
 
     <!-- 새 코멘트 — 팝업 양식(.pop-*: 머리 48 · 제목 14/600 · 닫기 28 · 본문 16 · DS 버튼) -->
     <template v-if="draft && draftPos">
-      <span class="pin draft" :style="{ left: sx(draftPos.x) + 'px', top: sy(draftPos.y) - 28 + 'px' }" aria-hidden="true" />
+      <span class="pin draft" :style="{ left: sx(draftPos.x) + 'px', top: sy(draftPos.y) - 28 + 'px' }" aria-hidden="true"><svg class="pin-bg" viewBox="0 0 28 28"><path :d="PIN" /></svg></span>
       <section class="sq pop th" role="dialog" aria-labelledby="cmtNewT" :style="boxAt(draftPos)">
         <div class="pop-top">
           <h2 id="cmtNewT" class="pop-ttl">{{ tr('New comment') }}</h2>
@@ -126,13 +132,17 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
 <style scoped>
 .cl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .cl > * { pointer-events: auto; }
-/* 핀: 왼쪽 아래만 직각(누른 자리 = 뾰족한 끝, 곡률 0). 나머지는 원형이라 squircle 예외 */
-.pin { position: absolute; width: 28px; height: 28px; padding: 3px; border-radius: 14px 14px 14px 0; background: var(--sys-color-common-white-emphasis); box-shadow: 0 0 0 0.5px var(--iris-float-line), 0 2px 6px rgb(3 9 26 / 18%); display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
+/* 핀: 모양은 위 PIN 경로(svg) — 곡률이 이어지게 그린 모양이라 squircle 처리 대신 */
+.pin { position: absolute; width: 28px; height: 28px; padding: 0; border: 0; background: none; display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
+.pin > :not(.pin-bg) { position: relative; }
+.pin-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 3px rgb(3 9 26 / 18%)); }
+.pin-bg path { fill: var(--sys-color-common-white-emphasis); stroke: var(--iris-float-line); stroke-width: .5px; }
 .pin:hover { transform: scale(1.08); }
-.pin.on { box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default), 0 2px 6px rgb(3 9 26 / 18%); }
+.pin.on .pin-bg path { stroke: var(--sys-color-brand-primary-default); stroke-width: 2px; }
 .pin.unread::after { content: ''; position: absolute; top: -1px; right: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
 .pin.done { opacity: .6; }
-.pin.draft { background: var(--sys-color-brand-primary-default); pointer-events: none; }
+.pin.draft { pointer-events: none; }
+.pin.draft .pin-bg path { fill: var(--sys-color-brand-primary-default); stroke: none; }
 .pin:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .th.pop { overflow: visible; --pop-w: 320px; }
 .th { position: absolute; width: 320px; max-height: min(520px, calc(100% - 72px)); z-index: 4; }

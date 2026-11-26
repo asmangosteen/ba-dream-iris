@@ -210,6 +210,8 @@ provide(LAYER_STORE, store)
 const access = useProjectAccess(projectId)
 const readOnly = computed(() => access.data.status.value === 'success' && !access.can.value.editDesign && !access.gate.value)
 watchEffect(() => { store.readonly.value = readOnly.value })
+/** 권한 안내 화면이 떠 있나(그때는 코멘트 핀도 숨겨요) */
+const gateActive = computed(() => !!access.gate.value)
 // 저장 충돌(PRD/16 J-2): 같은 화면을 다른 사람이 먼저 저장했어요 — 그 사람 것 / 내 것
 const members = useMembers()
 const conflict = ref<{ sid: string; remote: ScreenConflict['remote'] } | null>(null)
@@ -241,7 +243,14 @@ const openThread = ref<string | null>(null)
 const draft = ref<{ screenId: string | null; x: number; y: number } | null>(null)
 const confirmThread = ref<CommentRow | null>(null)
 const mentionPeople = computed(() => access.members.value.map((m) => ({ id: m.member_id, name: m.member?.name || m.member?.email || '?', avatar: m.member?.avatar_url ?? null, role: ROLE_NAME[m.role] })))
-watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else { draft.value = null; openThread.value = null } })
+// 핀 · 스레드는 늘 보여요. 코멘트 모드(도구 막대 · C)는 '새 코멘트 달기'만: 커서가 내 프로필 핀으로 바뀌고 어디든 누르면 달아요
+watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else draft.value = null })
+/** 코멘트 달기 커서: 내 이름 첫 글자가 든 핀(누르는 점 = 왼쪽 아래 뾰족한 끝) */
+const commentCursor = computed(() => {
+  const ch = (myName.value || '?').trim().charAt(0).toUpperCase().replace(/[<>&"']/g, '')
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'><path transform='translate(1 1)' d='M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z' fill='%23fff' stroke='%232C7BE2' stroke-width='1.5'/><circle cx='15' cy='15' r='10' fill='%23EEF4FC'/><text x='15' y='19' text-anchor='middle' font-family='Pretendard, -apple-system, sans-serif' font-size='11' font-weight='600' fill='%232C7BE2'>${encodeURIComponent(ch)}</text></svg>`
+  return `url("data:image/svg+xml,${svg.replace(/#/g, '%23')}") 1 28, crosshair`
+})
 /** 코멘트 모드에서 캔버스를 누르면: 그 자리(위에 있는 화면 기준)에 새 코멘트 */
 function onCommentDown(e: PointerEvent) {
   if (!commentMode.value || e.button !== 0) return
@@ -260,7 +269,7 @@ function onCommentKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
   if (e.code === 'KeyC' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); commentMode.value = !commentMode.value; return }
-  if (e.key === 'Escape' && commentMode.value) {
+  if (e.key === 'Escape' && (commentMode.value || openThread.value)) {
     e.stopPropagation()
     if (draft.value) draft.value = null
     else if (openThread.value) openThread.value = null
@@ -1341,7 +1350,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </script>
 
 <template>
-  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady, rulers: rulersShown }]">
+  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady, rulers: rulersShown, commenting: commentMode }]" :style="commentMode ? { '--cm-cursor': commentCursor } : undefined">
     <Transition name="ld"><IrisLoading v-if="booting" :progress="bootP" /></Transition>
     <EditorCanvas
       ref="canvas"
@@ -1376,7 +1385,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @reload="tabReload.reload(projectId)"
     />
  <CommentLayer
-      v-if="commentMode"
+      v-if="!gateActive"
       :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :my-id="comments.myId.value"
       :can-moderate="access.can.value.manage" :draft="draft" :open-id="openThread"
       @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
@@ -1681,6 +1690,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </template>
 
 <style scoped>
+.editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }

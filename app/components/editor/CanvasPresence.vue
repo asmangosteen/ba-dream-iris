@@ -49,6 +49,8 @@ const marks = computed(() => {
 .tag { position: absolute; right: 0; bottom: calc(100% + 4px); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 16px; font-weight: 500; color: var(--c); }
 /* 커서: 화살표 + 이름표. 움직임은 50ms 마다 오니 살짝 이어 줘요 */
 .cur { position: absolute; left: 0; top: 0; display: flex; align-items: flex-start; transition: transform .08s linear; will-change: transform; }
+/* 화살표 · 이름표 아래 옅은 그림자(흰 바탕 · 화면 위에서도 떠 보이게) */
+.cur > svg, .cur > .name { filter: drop-shadow(0 1px 2px rgb(3 9 26 / 24%)) drop-shadow(0 2px 6px rgb(3 9 26 / 12%)); }
 .name { margin: 14px 0 0 -2px; height: 20px; padding: 0 6px; border-radius: var(--ref-radius-03); --sq-fill: var(--c); color: #FFFFFF; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .cur { transition: none; } }
 </style>
