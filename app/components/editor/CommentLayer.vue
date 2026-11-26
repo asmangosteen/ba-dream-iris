@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
-import EditorIcon from '~/components/editor/EditorIcon.vue'
+import { Icon } from '@ba-dream/design-system'
 import CommentComposer, { type MentionPerson } from '~/components/editor/CommentComposer.vue'
 import type { Thread, CommentRow } from '~/composables/useComments'
 import type { Viewport } from '~/components/editor/canvas/types'
@@ -79,27 +79,35 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
       <MemberAvatar :name="nameOf(p.t.root.author_id)" :src="person(p.t.root.author_id)?.avatar" :size="22" />
     </button>
 
-    <!-- 새 코멘트 -->
+    <!-- 새 코멘트 — 팝업 양식(.pop-*: 머리 48 · 제목 14/600 · 닫기 28 · 본문 16 · DS 버튼) -->
     <template v-if="draft && draftPos">
       <span class="pin draft" :style="{ left: sx(draftPos.x) + 'px', top: sy(draftPos.y) - 28 + 'px' }" aria-hidden="true" />
-      <section class="sq pop th new" :style="boxAt(draftPos)" :aria-label="tr('New comment')">
-        <CommentComposer :people="people" placeholder="Add a comment. @ to mention" autofocus @send="(b, m) => emit('create', b, m)" @cancel="emit('cancelDraft')" />
+      <section class="sq pop th" role="dialog" aria-labelledby="cmtNewT" :style="boxAt(draftPos)">
+        <div class="pop-top">
+          <h2 id="cmtNewT" class="pop-ttl">{{ tr('New comment') }}</h2>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('cancelDraft')"><Icon name="close" :size="16" /></button>
+        </div>
+        <div class="foot">
+          <CommentComposer :people="people" placeholder="Add a comment. @ to mention" submit-label="Post" cancel-label="Cancel" autofocus @send="(b, m) => emit('create', b, m)" @cancel="emit('cancelDraft')" />
+        </div>
       </section>
     </template>
 
     <!-- 열린 스레드 -->
-    <section v-if="open && openPos" class="sq pop th" :style="boxAt(openPos)" :aria-label="tr('Comment thread')" @keydown.esc.stop="emit('open', null)">
-      <header class="hd">
-        <span class="tx-meta f1">{{ frameName(open) }} · #{{ open.root.no }}</span>
-        <button type="button" :class="['sq', 'ib', { ok: !!open.root.resolved_at }]" :aria-pressed="!!open.root.resolved_at" :aria-label="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="emit('resolve', open.root, !open.root.resolved_at)"><EditorIcon name="check" :size="16" /></button>
-        <div v-if="canDelete(open.root)" class="more-w">
-          <button type="button" class="sq ib" :aria-label="tr('More')" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen"><EditorIcon name="menu_kebab" :size="16" /></button>
-          <div v-if="moreOpen" class="sq menu mm" role="menu"><button type="button" role="menuitem" class="sq menu-item red" @click="emit('remove', open.root)"><EditorIcon name="trashbin" :size="16" />{{ tr('Delete thread') }}</button></div>
-        </div>
-        <button type="button" class="sq ib" :aria-label="tr('Close')" @click="emit('open', null)"><EditorIcon name="close" :size="16" /></button>
-      </header>
-      <p v-if="open.root.resolved_at" class="sq done-note">{{ tr('Resolved by {name} · {ago}', { name: nameOf(open.root.resolved_by), ago: relativeTime(open.root.resolved_at) }) }}</p>
-      <div class="msgs">
+    <section v-if="open && openPos" class="sq pop th" role="dialog" aria-labelledby="cmtT" :style="boxAt(openPos)" @keydown.esc.stop="emit('open', null)">
+      <div class="pop-top">
+        <h2 id="cmtT" class="pop-ttl">{{ tr('Comment #{no}', { no: open.root.no ?? '' }) }}<span class="where">{{ frameName(open) }}</span></h2>
+        <span class="tools">
+          <button type="button" :class="['sq', 'pop-x', { ok: !!open.root.resolved_at }]" :aria-pressed="!!open.root.resolved_at" :aria-label="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="emit('resolve', open.root, !open.root.resolved_at)"><Icon name="check" :size="16" /></button>
+          <span v-if="canDelete(open.root)" class="more-w">
+            <button type="button" class="sq pop-x" :aria-label="tr('More')" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen"><Icon name="menu_kebab" :size="16" /></button>
+            <div v-if="moreOpen" class="sq menu mm" role="menu"><button type="button" role="menuitem" class="sq menu-item danger" @click="emit('remove', open.root)">{{ tr('Delete thread') }}</button></div>
+          </span>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('open', null)"><Icon name="close" :size="16" /></button>
+        </span>
+      </div>
+      <div class="pop-body msgs">
+        <p v-if="open.root.resolved_at" class="pop-desc done-note">{{ tr('Resolved by {name} · {ago}', { name: nameOf(open.root.resolved_by), ago: relativeTime(open.root.resolved_at) }) }}</p>
         <div v-for="c in [open.root, ...open.replies]" :key="c.id" class="msg">
           <MemberAvatar :name="nameOf(c.author_id)" :src="person(c.author_id)?.avatar" :size="24" />
           <div class="mb">
@@ -108,7 +116,9 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
           </div>
         </div>
       </div>
-      <div class="rp"><CommentComposer :key="open.root.id" up :people="people" placeholder="Reply. @ to mention" @send="(b, m) => emit('reply', open!.root, b, m)" @cancel="emit('open', null)" /></div>
+      <div class="foot">
+        <CommentComposer :key="open.root.id" up :people="people" placeholder="Reply. @ to mention" submit-label="Reply" @send="(b, m) => emit('reply', open!.root, b, m)" @cancel="emit('open', null)" />
+      </div>
     </section>
   </div>
 </template>
@@ -116,34 +126,31 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
 <style scoped>
 .cl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .cl > * { pointer-events: auto; }
-/* 핀: 왼쪽 아래만 뾰족한 원(누른 자리 = 뾰족한 끝). 원형이라 squircle 예외 */
-.pin { position: absolute; width: 28px; height: 28px; padding: 3px; border-radius: 14px 14px 14px 2px; background: var(--sys-color-common-white-emphasis); box-shadow: 0 0 0 0.5px var(--iris-float-line), 0 2px 6px rgb(3 9 26 / 18%); display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
+/* 핀: 왼쪽 아래만 직각(누른 자리 = 뾰족한 끝, 곡률 0). 나머지는 원형이라 squircle 예외 */
+.pin { position: absolute; width: 28px; height: 28px; padding: 3px; border-radius: 14px 14px 14px 0; background: var(--sys-color-common-white-emphasis); box-shadow: 0 0 0 0.5px var(--iris-float-line), 0 2px 6px rgb(3 9 26 / 18%); display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
 .pin:hover { transform: scale(1.08); }
 .pin.on { box-shadow: 0 0 0 2px var(--sys-color-brand-primary-default), 0 2px 6px rgb(3 9 26 / 18%); }
-.pin.unread::after { content: ''; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
+.pin.unread::after { content: ''; position: absolute; top: -1px; right: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
 .pin.done { opacity: .6; }
 .pin.draft { background: var(--sys-color-brand-primary-default); pointer-events: none; }
 .pin:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
-.th.pop { overflow: visible; }
-.th { position: absolute; width: 320px; max-height: min(480px, calc(100% - 72px)); border-radius: var(--ref-radius-06, 16px); z-index: 4; }
-.th.new { padding: var(--ref-spacing-04); }
-.hd { flex: none; height: 44px; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-07, 14px); box-shadow: 0 1px 0 var(--iris-line); }
-.f1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
-.ib:hover { --sq-fill: var(--sys-color-neutral-100); }
-.ib.ok { color: var(--sys-color-theme-success-default, #24A638); }
-.ib:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.th.pop { overflow: visible; --pop-w: 320px; }
+.th { position: absolute; width: 320px; max-height: min(520px, calc(100% - 72px)); z-index: 4; }
+.where { margin-left: var(--ref-spacing-04); font-size: 12px; font-weight: 400; color: var(--sys-color-neutral-500); }
+.tools { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); }
+.pop-x.ok { color: var(--sys-color-theme-success-default, #24A638); }
 .more-w { position: relative; }
 .mm { top: calc(100% + 4px); left: auto; right: 0; width: 160px; z-index: 6; }
-.red { color: var(--sys-color-theme-error-default); }
-.done-note { margin: var(--ref-spacing-05) var(--ref-spacing-07, 14px) 0; padding: var(--ref-spacing-03, 6px) var(--ref-spacing-05); border-radius: var(--ref-radius-04); --sq-fill: color-mix(in srgb, var(--sys-color-theme-success-default, #24A638) 12%, transparent); color: var(--sys-color-theme-success-default, #1B7A2B); font-weight: 500; }
-.msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--ref-spacing-05) var(--ref-spacing-07, 14px); display: flex; flex-direction: column; gap: var(--ref-spacing-07, 14px); }
-.msg { display: flex; gap: var(--ref-spacing-04); }
+.done-note { color: var(--sys-color-theme-success-default, #1B7A2B); }
+/* 본문: 팝업 본문(.pop-body 위 4 · 좌우 16 · 아래 12 · 사이 16) 안에서 글이 길면 스크롤 */
+.msgs { flex: 1 1 auto; min-height: 0; }
+.msg { display: flex; gap: var(--ref-spacing-06); }
 .mb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.mh { display: flex; gap: var(--ref-spacing-03, 6px); align-items: baseline; }
+.mh { display: flex; gap: var(--ref-spacing-04); align-items: baseline; }
 .mh b { font-weight: 600; color: var(--sys-color-neutral-800); }
 .body { margin: 0; color: var(--sys-color-neutral-700); white-space: pre-wrap; overflow-wrap: anywhere; }
 .at { font-weight: 500; color: var(--sys-color-brand-primary-default); }
-.rp { flex: none; padding: var(--ref-spacing-04) var(--ref-spacing-05) var(--ref-spacing-05); }
+/* 아래 입력 + 버튼 줄: 팝업 아래 버튼 줄과 같은 안쪽(좌우 16 · 아래 16) */
+.foot { flex: none; padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-10); }
 @media (prefers-reduced-motion: reduce) { .pin { transition: none; } }
 </style>

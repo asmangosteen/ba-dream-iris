@@ -73,4 +73,7 @@ export default {
   'Unresolved': '진행 중',
   'New reply': '새 답글',
   'Comment (C)': '코멘트 (C)',
+  'Comment #{no}': '코멘트 #{no}',
+  'Post': '올리기',
+  'Reply': '답글 달기',
 }

@@ -70,17 +70,18 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
 
 <style scoped>
 .cp { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.hd { flex: none; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); }
+/* 여백은 왼쪽 패널(Pages · Layers)과 같아요: 바깥 8 + 줄 안쪽 8 → 글자는 패널 끝에서 16 */
+.hd { flex: none; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
 .ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
 .ib:hover { --sq-fill: var(--sys-color-neutral-100); }
-.bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-04); }
+.bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); }
 .n { margin-left: 2px; color: var(--sys-color-neutral-500); font-weight: 400; }
 .scope { height: 28px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-700); white-space: nowrap; }
 .scope:hover { --sq-fill: var(--sys-color-neutral-100); }
-.row2 { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-08); }
+.row2 { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-04) var(--ref-spacing-10); }
 .chk { color: var(--sys-color-neutral-700); }
-.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--ref-spacing-04) var(--ref-spacing-04); display: flex; flex-direction: column; gap: 2px; }
-.item { display: flex; gap: var(--ref-spacing-04); padding: var(--ref-spacing-05) var(--ref-spacing-04); border-radius: var(--ref-radius-05); text-align: left; }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--ref-spacing-06) var(--ref-spacing-06); display: flex; flex-direction: column; gap: 2px; }
+.item { display: flex; gap: var(--ref-spacing-06); padding: var(--ref-spacing-05) var(--ref-spacing-06); border-radius: var(--ref-radius-05); text-align: left; }
 .item:hover { --sq-fill: var(--sys-color-neutral-100); }
 .item.on { --sq-fill: var(--sys-color-brand-primary-lightest); }
 .item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
@@ -90,6 +91,6 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
 .f1 { flex: 1; }
 .txt { color: var(--sys-color-neutral-700); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .blue { color: var(--sys-color-brand-primary-default); }
-.dot { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
+.dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
 .empty { padding: 40px 16px; display: flex; flex-direction: column; gap: 4px; text-align: center; }
 </style>

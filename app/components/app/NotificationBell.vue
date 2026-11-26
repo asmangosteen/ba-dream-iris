@@ -111,12 +111,12 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
 /* 안 읽은 수: 종 오른쪽 위 작은 원(원형이라 squircle 예외) */
 .cnt { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; display: grid; place-items: center; background: var(--sys-color-theme-error-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 600; box-shadow: 0 0 0 2px var(--iris-canvas); }
 .panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 360px; max-height: min(520px, calc(100vh - 80px)); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.hd { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 var(--ref-spacing-08) 0 var(--ref-spacing-10); }
+.hd { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
 .hd .tx-head { font-size: 14px; line-height: 22px; }
 .act { height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-weight: 500; color: var(--sys-color-brand-primary-default); }
 .act:hover { --sq-fill: var(--sys-color-neutral-100); }
-.items { list-style: none; margin: 0; padding: 0 var(--ref-spacing-04) var(--ref-spacing-04); overflow-y: auto; }
-.item { width: 100%; display: flex; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); text-align: left; }
+.items { list-style: none; margin: 0; padding: 0 var(--ref-spacing-06) var(--ref-spacing-06); overflow-y: auto; }
+.item { width: 100%; display: flex; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-04); text-align: left; }
 .item:hover { --sq-fill: var(--sys-color-neutral-100); }
 .item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -124,7 +124,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
 .item.unread .txt { color: var(--sys-color-neutral-800); font-weight: 500; }
 .quote { padding: 2px var(--ref-spacing-04); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask { color: var(--sys-color-brand-primary-default); }
-.dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
+.dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-12) var(--ref-spacing-10) var(--ref-spacing-14); text-align: center; }
 .empty .muted { color: var(--sys-color-neutral-400); margin-bottom: var(--ref-spacing-04); }
 </style>

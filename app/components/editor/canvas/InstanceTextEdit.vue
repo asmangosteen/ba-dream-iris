@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useLayerStore } from '~/canvas/store'
 import { SLOT_KEY, slotFallback } from '~/components/editor/InstanceView.vue'
-import { instEdit, readInstanceTree, subRect, type SubNode } from '~/composables/useInstanceTree'
+import { instEdit, instTick, readInstanceTree, subRect, type SubNode } from '~/composables/useInstanceTree'
 
 /**
  * 디자인 시스템 인스턴스 안 글자를 캔버스에서 바로 고치기(피그마처럼 두 번 누르면).
  * 인스턴스는 실제 컴포넌트를 그려서 글자를 직접 고칠 수 없어요 → 그 글자 자리에 같은 모양 입력칸을 띄우고, 끝나면
- * 컴포넌트 글자 속성(Text)이면 그 속성을, 아니면 하위 줄 글자 덮어쓰기(subOverrides)를 바꿔요(실행취소 한 번)
+ * 컴포넌트 글자 속성(Text)이면 그 속성을, 아니면 하위 줄 글자 덮어쓰기(subOverrides)를 바꿔요(실행취소 한 번).
+ * 치는 동안에도 그린 컴포넌트 글자를 바로 바꿔서(기록 없이) 인스턴스 너비가 글자를 따라 바로 늘고 줄어요 — 일반 글자 레이어와 같아요
  */
 const store = useLayerStore()
 const el = ref<HTMLElement | null>(null)
@@ -54,16 +55,41 @@ watch(instEdit, (e) => {
   })
 })
 
+/** 그린 컴포넌트의 글자를 바로 바꿔요(저장 · 기록 없이 — 크기는 InstanceView 가 재서 맞춰요) */
+function paint(t: NonNullable<typeof target>, v: string) {
+  const node = t.sn.tnode ?? t.host
+  if (node) node.textContent = v || '\u200B' // 다 지워도 줄 높이는 남게
+}
+let raf = 0
+/** 치는 대로: 컴포넌트 글자를 바꾸고, 인스턴스 크기가 맞춰진 뒤 입력칸을 바뀐 글자 자리로 옮겨요 */
+function onInput() {
+  const t = target
+  if (!t || !el.value) return
+  paint(t, (el.value.textContent ?? '').replace(/\n/g, ' '))
+  cancelAnimationFrame(raf)
+  const follow = (n: number) => {
+    raf = requestAnimationFrame(() => {
+      if (target !== t || !box.value) return
+      const r = subRect(t.sn)
+      if (r && r.height) { box.value = { ...box.value, left: r.left, top: r.top } }
+      instTick.value++
+      if (n > 0) follow(n - 1) // 크기 재기(ResizeObserver) → 자리 맞추기가 끝날 때까지 몇 프레임 더
+    })
+  }
+  follow(3)
+}
+
 function finish() {
   const t = target
   target = null
   if (!t) return
+  cancelAnimationFrame(raf)
   const v = (el.value?.textContent ?? t.start).replace(/\n/g, ' ')
   if (t.host) t.host.style.color = t.prevColor
   box.value = null
-  if (v === t.start) return
+  if (v === t.start) { paint(t, t.start); return }
   const n = store.node(t.sid, t.id)
-  if (!n) return
+  if (!n) { paint(t, t.start); return }
   const ov = n.subOverrides?.[t.key]
   const slotVal = n.props?.[SLOT_KEY] ?? slotFallback(n.component)
   // 컴포넌트 글자 속성(Text 칸)으로 그린 글자면 그 속성을 — 오른쪽 패널 Text 와 같이 바뀌어요
@@ -109,6 +135,7 @@ onBeforeUnmount(() => { window.removeEventListener('wheel', onWheel, { capture: 
     :aria-label="tr('Text')"
     :style="{ left: box.left + 'px', top: box.top + 'px', height: box.height + 'px', ...box.font }"
     @keydown="key"
+    @input="onInput"
     @paste="paste"
     @blur="close"
     @pointerdown.stop

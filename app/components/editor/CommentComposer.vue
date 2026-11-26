@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
-import { Icon } from '@ba-dream/design-system'
+import { Button } from '@ba-dream/design-system'
 import { mentionIds } from '~/composables/useComments'
 
 /**
  * 코멘트 입력칸: Enter 보내기 · ⇧Enter 줄바꿈 · Esc 닫기. @ 를 치면 이 프로젝트 멤버를 골라 넣어요(멘션 → 알림)
+ * 모양은 디자인 시스템 입력칸(TextInput s: 흰 바탕 · 회색 10% 선 · radius-05 · 안쪽 6/10, 누르면 파란 선) + 아래 팝업 버튼 줄(DS Button s)
  */
 export interface MentionPerson { id: string; name: string; avatar?: string | null; role?: string }
-const props = withDefaults(defineProps<{ people: MentionPerson[]; placeholder?: string; autofocus?: boolean; busy?: boolean; up?: boolean }>(), { placeholder: 'Add a comment', autofocus: false, busy: false, up: false })
+const props = withDefaults(defineProps<{ people: MentionPerson[]; placeholder?: string; autofocus?: boolean; busy?: boolean; up?: boolean; submitLabel?: string; cancelLabel?: string }>(), { placeholder: 'Add a comment', autofocus: false, busy: false, up: false, submitLabel: 'Post', cancelLabel: undefined })
 const emit = defineEmits<{ send: [body: string, mentions: string[]]; cancel: [] }>()
 const text = ref('')
 const ta = ref<HTMLTextAreaElement | null>(null)
@@ -62,13 +63,12 @@ onMounted(() => { if (props.autofocus) nextTick(() => ta.value?.focus()) })
 
 <template>
   <div class="cc">
-    <div class="sq box">
+    <div class="sq box" @click="ta?.focus()">
       <textarea
         ref="ta" v-model="text" rows="1" class="ta" :placeholder="tr(placeholder)" :aria-label="tr(placeholder)"
         :aria-controls="matches.length ? `${uid}-m` : undefined" :aria-expanded="!!matches.length" aria-autocomplete="list"
         @input="readQuery(); grow()" @click="readQuery" @keydown="onKey"
       />
-      <button type="button" class="sq send" :disabled="!text.trim() || busy" :aria-label="tr('Send')" @click="send"><Icon name="arrow_up" :size="16" /></button>
     </div>
     <div v-if="matches.length" :id="`${uid}-m`" :class="['sq', 'menu', 'mm', { up }]" role="listbox" :aria-label="tr('Mention someone')">
       <button v-for="(p, i) in matches" :key="p.id" type="button" role="option" :aria-selected="i === pick" :class="['sq', 'menu-item', { on: i === pick }]" @mousedown.prevent="choose(p)">
@@ -76,19 +76,22 @@ onMounted(() => { if (props.autofocus) nextTick(() => ta.value?.focus()) })
       </button>
       <p class="tx-meta note">{{ tr('Only people in this project are listed') }}</p>
     </div>
+    <div class="acts">
+      <Button v-if="cancelLabel" size="s" type="tertiary" @click="emit('cancel')">{{ tr(cancelLabel) }}</Button>
+      <Button size="s" type="primary" :disabled="!text.trim()" :loading="busy" @click="send">{{ tr(submitLabel) }}</Button>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .cc { position: relative; }
-.box { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); padding: var(--ref-spacing-03, 6px) var(--ref-spacing-03, 6px) var(--ref-spacing-03, 6px) var(--ref-spacing-05); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.box { display: flex; padding: var(--ref-spacing-05) var(--ref-spacing-07); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; cursor: text; }
+.box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
-.ta { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; padding: 5px 0; font: inherit; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); max-height: 120px; }
+.ta { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; padding: 0; font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-800); min-height: 36px; max-height: 120px; }
+.acts { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-08); }
 .ta::placeholder { color: var(--sys-color-neutral-500); }
-.send { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); }
-.send:disabled { --sq-fill: var(--sys-color-neutral-300); }
-.send:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.mm { top: calc(100% + 4px); left: 0; right: auto; width: 240px; z-index: 5; }
+.mm { top: calc(100% - 36px); left: 0; right: auto; width: 240px; z-index: 5; }
 .mm.up { top: auto; bottom: calc(100% + 4px); }
 .mm .menu-item { height: 32px; }
 .f1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }

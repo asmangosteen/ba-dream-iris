@@ -128,7 +128,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
 
 <style scoped>
 .rail-btn { position: relative; }
-.cdot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 1.5px var(--sys-color-common-white-emphasis); }
+.cdot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 1.5px var(--sys-color-common-white-emphasis); }
 .locked { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 32px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-500); cursor: not-allowed; }
 .locked:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 /* 도구 막대는 늘 맨 앞(z 8): 캔버스 · 좌우 패널(4 · 3) 위, 팝오버 · 메뉴 · 변수 화면(20~) 아래 */
