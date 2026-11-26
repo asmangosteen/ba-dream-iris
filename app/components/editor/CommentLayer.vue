@@ -136,7 +136,7 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
 .pin { position: absolute; width: 36px; height: 36px; padding: 0; border: 0; background: none; display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
 .pin > :not(.pin-bg) { position: relative; }
 .pin-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 3px rgb(3 9 26 / 18%)); }
-.pin-bg path { fill: var(--sys-color-common-white-emphasis); stroke: var(--iris-float-line); stroke-width: .5px; }
+.pin-bg path { fill: var(--sys-color-common-white-emphasis); stroke: var(--ref-color-gray-900-20); stroke-width: 1.25px; vector-effect: non-scaling-stroke; }
 .pin:hover { transform: scale(1.08); }
 .pin.on .pin-bg path { stroke: var(--sys-color-brand-primary-default); stroke-width: 2px; }
 .pin.unread::after { content: ''; position: absolute; top: 0; right: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
