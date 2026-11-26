@@ -109,6 +109,11 @@ export interface LayerStyle {
   opacity?: number // 0~1
   /** 화면(맨 위 프레임) 비율 잠금 — 화면은 레이어가 아니라 frame 모양에 둬요(레이어는 LayerNode.lockRatio) */
   lockRatio?: boolean
+  /** 화면(맨 위 프레임) 회전(도, 가운데 기준 — 피그마와 같아요). 레이어는 LayerNode.rotation */
+  rotation?: number
+  /** 화면(맨 위 프레임) 뒤집기(가운데 기준 — 안의 레이어가 거울처럼) */
+  flipX?: boolean
+  flipY?: boolean
   // 텍스트
   color?: string
   fontSize?: number

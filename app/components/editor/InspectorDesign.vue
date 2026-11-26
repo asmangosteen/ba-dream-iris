@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
-import type { LayerStyle } from '~/canvas/schema'
+import { normAngle, type LayerStyle } from '~/canvas/schema'
 import { useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
@@ -191,6 +191,25 @@ const strokeBtn = ref<HTMLElement | null>(null)
 watch(() => ids.value.join(), () => { strokeOpen.value = false })
 /** 프레임마다 다른 값으로 고치기(실행취소 한 번) */
 const fEach = (fn: (l: LayerStyle) => Partial<LayerStyle>) => store.batch(() => { for (const id of ids.value) store.frameStyle(id, fn(store.doc(id).frame ?? {})) })
+/** 화면 회전(피그마 Rotation): Iris 화면만, 여러 개면 같은 값일 때만 숫자 */
+const allNative = computed(() => all.value.every((s) => s.source === 'native'))
+const rotNow = computed(() => { const v = looks.value.map((l) => Math.round((l.rotation ?? 0) * 10) / 10); return v.every((x) => x === v[0]) ? v[0]! : null })
+const setRot = (v: number) => fEach(() => ({ rotation: normAngle(v) || undefined }))
+function onRot(e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace('°', ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = rotNow.value === null ? '' : String(rotNow.value); return }
+  setRot(v)
+}
+const rotBy = (d: number) => fEach((l) => ({ rotation: normAngle((l.rotation ?? 0) + d) || undefined }))
+/** 화면 뒤집기(레이어 Flip 과 같아요): 가운데 기준, 안의 레이어가 거울처럼 */
+const flipBy = (ax: 'x' | 'y') => fEach((l) => (ax === 'x' ? { flipX: l.flipX ? undefined : true } : { flipY: l.flipY ? undefined : true }))
+function rotKey(e: KeyboardEvent) {
+  if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); return }
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  rotBy((e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1))
+}
 const SIDE_KEYS = ['top', 'right', 'bottom', 'left'] as const
 const SIDE_LABEL = ['Top', 'Right', 'Bottom', 'Left']
 type SideMode = 'all' | 'top' | 'right' | 'bottom' | 'left' | 'custom'
@@ -285,6 +304,19 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         <label class="sq fld"><span>Y</span><input :key="'y' + same('y')" :value="same('y') ?? ''" :placeholder="same('y') === null ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="num('y', $event)" @keydown="step('y', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
         <span />
       </div>
+      <!-- Rotation(피그마와 같아요): 화면 가운데 기준, 캔버스 모서리 바깥을 끌어도 돌아가요(⇧ 15° 씩) -->
+      <template v-if="allNative">
+        <div class="ig-l"><span>{{ tr('Rotation') }}</span></div>
+        <div class="ig">
+          <label class="sq fld u" :title="tr('Rotation')"><EditorIcon name="rotation" /><input :key="'r' + rotNow" :value="rotNow ?? ''" :placeholder="rotNow === null ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="onRot" @keydown="rotKey"><span v-if="rotNow !== null" class="unit">°</span></label>
+          <div class="grp" role="group" :aria-label="tr('Rotate and flip')">
+            <button class="ib" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="rotBy(90)"><EditorIcon name="rotate_90" class="keep" /></button>
+            <button class="ib" :aria-label="tr('Flip horizontal')" :data-tip="tr('Flip horizontal')" @click="flipBy('x')"><EditorIcon name="flip_horizontal" class="keep" /></button>
+            <button class="ib" :aria-label="tr('Flip vertical')" :data-tip="tr('Flip vertical')" @click="flipBy('y')"><EditorIcon name="flip_vertical" class="keep" /></button>
+          </div>
+          <span />
+        </div>
+      </template>
     </section>
 
     <section class="s">

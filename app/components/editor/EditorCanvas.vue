@@ -15,7 +15,7 @@ import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize, shapeVnet } from '~/canvas/vector'
 import { vk, vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
-import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
+import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, localMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
 import { INSERT_SIZE, STORY_SIZE } from '~/components/editor/InstanceView.vue'
 import { GHOST_KEY, ZOOM_KEY } from '~/canvas/ghost'
@@ -206,6 +206,25 @@ function onWheel(e: WheelEvent) {
 // 끌기
 // ---------------------------------------------------------------------------
 const CORNERS = ['nw', 'ne', 'sw', 'se'] as const
+/**
+ * 돌리기 커서(피그마와 같아요): 모서리를 감싸는 굽은 화살표 — 왼쪽 위 모양을 기준으로 모서리마다 90° 씩, 돌린 상자면 그 각도만큼 더 돌려요
+ */
+const ROT_BASE: Record<(typeof CORNERS)[number], number> = { nw: 0, ne: 90, se: 180, sw: 270 }
+const rotCursorCache = new Map<number, string>()
+function rotCursor(c: (typeof CORNERS)[number], angle = 0) {
+  const a = ((Math.round(ROT_BASE[c] + angle) % 360) + 360) % 360
+  let v = rotCursorCache.get(a)
+  if (!v) {
+    // 양쪽 화살표 굽은 선(피그마 돌리기 커서): 사분원(90°) 곡선 + 양 끝 채운 삼각 화살촉 — 흰 테두리 + 검은 선, 옅은 그림자
+    const arc = 'M7.5 17A10 10 0 0 1 17.5 7'
+    const heads = 'M17 3.2L21.6 7L17 10.8Z M3.7 16.5L7.5 21.1L11.3 16.5Z'
+    const g = `<path d='${arc}' stroke='white' stroke-width='4.5'/><path d='${heads}' fill='white' stroke='white' stroke-width='3'/><path d='${arc}' stroke='black' stroke-width='1.6'/><path d='${heads}' fill='black'/>`
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><defs><filter id='s' x='-20%' y='-20%' width='140%' height='140%'><feDropShadow dx='0' dy='0.6' stdDeviation='0.6' flood-opacity='0.35'/></filter></defs><g fill='none' stroke-linecap='round' stroke-linejoin='round' filter='url(#s)' transform='rotate(${a} 12 12)'>${g}</g></svg>`
+    v = `url("data:image/svg+xml,${encodeURIComponent(svg)}") 12 12, alias`
+    rotCursorCache.set(a, v)
+  }
+  return v
+}
 const EDGES = ['n', 's', 'e', 'w'] as const
 type Targets = { sibs: Rect[]; parents: Rect[] }
 /** 그리는 중 Space(피그마와 같아요): 누른 순간의 포인터 · 시작점 — 손을 뗄 때까지 그리던 것을 통째로 옮겨요 */
@@ -239,6 +258,7 @@ type Drag =
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number }; w0: number; h0: number; rot: number; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }[]; targets: Targets; before: string; moved: boolean }
   | { kind: 'resizeScreen'; id: string; handle: Handle; sx: number; sy: number; o: Rect; targets: Rect[]; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; before?: string; scale0?: string }
   | { kind: 'rotate'; sid: string; id: string; cx: number; cy: number; a0: number; r0: number; sign: number; before: string; moved: boolean }
+  | { kind: 'rotateScreen'; sid: string; cx: number; cy: number; a0: number; r0: number; before: string; moved: boolean }
   | { kind: 'drawLayer'; sid: string; type: LayerType; parentId: string | null; px: number; py: number; lx: number; ly: number; moved: boolean; sp?: SpaceMove }
   | { kind: 'marquee'; sid: string; wx: number; wy: number; base: string[]; moved: boolean; deep?: boolean; click?: string; add?: boolean; pick?: boolean; within?: string }
   | { kind: 'vmarquee'; x0: number; y0: number; base: VKey[]; moved: boolean }
@@ -1249,6 +1269,14 @@ function startResize(e: PointerEvent, handle: Handle) {
   const top = n.type === 'rect' && !n.rotation && !n.flipX && !n.flipY ? topImagePaint(n.style) : null
   const img0 = top ? { i: top.i, x: n.x, y: n.y, R: (() => { const c = cropFromFit(top.p, n.w, n.h); return { x: c.x * n.w, y: c.y * n.h, w: c.w * n.w, h: c.h * n.h } })(), p: JSON.parse(JSON.stringify(top.p)) as Paint } : undefined
   drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n) || tool.value === 'scale', targets: tg, before: store.begin(s.id), moved: false, kids0: kids.length ? boxes0(kids) : undefined, sub0: tool.value === 'scale' ? JSON.stringify(descendants(d0, id).map((k) => d0.nodes[k])) : undefined, img0 }
+  // 예전 파일의 이미지 칠은 원래 크기(iw · ih)가 없어요 — 읽어 와서 이번 끌기의 자석에 써요
+  const p0 = img0?.p
+  if (p0?.type === 'image' && (!p0.iw || !p0.ih)) {
+    const d = drag
+    const im = new Image()
+    im.onload = () => { if (drag === d && im.naturalWidth && im.naturalHeight) { p0.iw = im.naturalWidth; p0.ih = im.naturalHeight } }
+    im.src = frameImg(p0.src) ?? ''
+  }
 }
 /** 여러 개 고른 상자의 변 · 모서리: 모두 같은 비율로(피그마와 같아요) */
 function startResizeMany(e: PointerEvent, handle: Handle) {
@@ -1306,11 +1334,24 @@ function startRotate(e: PointerEvent) {
   rotating.value = true
 }
 
+/** 화면(맨 위 프레임) 돌리기: 화면 가운데 기준, ⇧ 15° 씩 — 실행취소 한 번 */
+function startScreenRotate(e: PointerEvent) {
+  if (e.button !== 0) return
+  const f = selFrame.value
+  if (!f || !el.value || !isNative(f)) return
+  try { el.value.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
+  const r = el.value.getBoundingClientRect()
+  const cx = r.left + (f.x + f.width / 2) * vp.value.zoom + vp.value.x, cy = r.top + (f.y + f.height / 2) * vp.value.zoom + vp.value.y
+  drag = { kind: 'rotateScreen', sid: f.id, cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), r0: scrRot(f), before: store.begin(f.id), moved: false }
+  rotating.value = true
+}
+
 /**
  * 크기 바꾸기 공통: 상자 자신의 좌표(angle 만큼 돈)에서 손잡이를 (du, dv) 끌었을 때 새 상자.
  * 돌지 않은 상자면 형제 · 부모 가장자리에 붙이고 가이드를 그려요
  */
-function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: number }, handle: Handle, dxw: number, dyw: number, e: PointerEvent, ratio: boolean, targets: Rect[]) {
+/** natural: 이미지 칠(Fill) 사각형의 원래 사진 크기 — 그 폭 · 높이 근처(화면 6px)면 붙어요(어느 손잡이든) */
+function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: number }, handle: Handle, dxw: number, dyw: number, e: PointerEvent, ratio: boolean, targets: Rect[], natural?: { w: number; h: number }) {
   const t = (g.angle * Math.PI) / 180
   const cos = Math.cos(t), sin = Math.sin(t)
   let du = dxw * cos + dyw * sin, dv = -dxw * sin + dyw * cos
@@ -1334,8 +1375,22 @@ function resizeBox(g: { cx: number; cy: number; w: number; h: number; angle: num
     guide = alignGuides(fb, targets, { x: ex === null ? [] : [sx > 0 ? fb.x + fb.w : fb.x], y: ey === null ? [] : [sy > 0 ? fb.y + fb.h : fb.y] })
   }
   const r = resizeLocal(g.w, g.h, handle, du, dv, keep, center)
+  // 원래 사진 크기에 붙기: 비율을 지키면 폭 · 높이 중 가까운 쪽으로 함께, 아니면 축마다 따로
+  let rw = r.w, rh = r.h
+  if (natural && !snapOff(e)) {
+    const t0 = thr()
+    const nx = sx !== 0 && Math.abs(rw - natural.w) < t0, ny = sy !== 0 && Math.abs(rh - natural.h) < t0
+    if (keep) {
+      const k = nx && (!ny || Math.abs(rw - natural.w) <= Math.abs(rh - natural.h)) ? natural.w / rw : ny ? natural.h / rh : 1
+      rw *= k; rh *= k
+      if (k !== 1) guide = null
+    } else {
+      if (nx) { rw = natural.w; guide = null }
+      if (ny) { rh = natural.h; guide = null }
+    }
+  }
   // 정수 크기로(픽셀 그리드를 끄면 소수 둘째 자리까지) 맞춘 뒤 붙어 있는 쪽이 그대로이도록 가운데를 다시 계산
-  const w = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(r.w)), h = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(r.h))
+  const w = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(rw)), h = Math.max(store.pixelSnap.value ? 1 : 0.01, store.snapPx(rh))
   const ox = center || !sx ? 0 : (sx * (w - g.w)) / 2, oy = center || !sy ? 0 : (sy * (h - g.h)) / 2
   return { w, h, cx: g.cx + ox * cos - oy * sin, cy: g.cy + ox * sin + oy * cos, guide }
 }
@@ -1540,7 +1595,10 @@ function move(e: PointerEvent) {
     // 이미지 자르기(⌘ + 이미지 칠 사각형): 끈 변만 잘리거나 넓어지고 이미지는 그대로 — 비율 잠금도 풀려요
     const cropping = !!drag.img0 && e.metaKey
     // 비율이 잠겨 있어도 ⌃ 를 누르는 동안은 풀려요(피그마와 같아요)
-    const r = resizeBox(drag.g, drag.handle, dx, dy, e, drag.ratio && !e.ctrlKey && !cropping, [...drag.targets.sibs, ...drag.targets.parents])
+    // 이미지 칠(Fill) 사각형: 원래 사진 크기 근처에서 붙어요(자석)
+    const ip = drag.img0?.p
+    const natural = !cropping && ip?.type === 'image' && (ip.fit ?? 'fill') === 'fill' && ip.iw && ip.ih ? { w: ip.iw, h: ip.ih } : undefined
+    const r = resizeBox(drag.g, drag.handle, dx, dy, e, drag.ratio && !e.ctrlKey && !cropping, [...drag.targets.sibs, ...drag.targets.parents], natural)
     guides.value = r.guide
     const c = apply(drag.pinv, r.cx, r.cy)
     const n = store.node(drag.sid, drag.id)
@@ -1633,6 +1691,15 @@ function move(e: PointerEvent) {
     deg = e.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg * 10) / 10 // Shift: 15° 씩
     const n = store.node(drag.sid, drag.id)
     if (n) n.rotation = normAngle(deg) || undefined
+  } else if (drag.kind === 'rotateScreen') {
+    drag.moved = true
+    let deg = drag.r0 + ((Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx) - drag.a0) * 180) / Math.PI
+    deg = e.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg * 10) / 10 // Shift: 15° 씩
+    const d = store.doc(drag.sid)
+    const v = normAngle(deg)
+    const f = { ...(d.frame ?? {}) }
+    if (v) f.rotation = v; else delete f.rotation
+    d.frame = f
   } else if (drag.kind === 'placeImage') {
     const w = toWorld(e.clientX, e.clientY)
     if (!drag.moved && (Math.abs(w.x - drag.wx) + Math.abs(w.y - drag.wy)) * z < 4) return
@@ -1803,7 +1870,7 @@ function end(e: PointerEvent) {
     if (s) emit('move', d.id, s.x, s.y, true)
   }
   if (d.kind === 'layers' && d.moved && d.xbefore?.length) { const xb = d.xbefore; store.batch(() => { store.commit(d.sid, d.before); for (const [s2, b2] of xb) store.commit(s2, b2) }) }
-  else if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
+  else if ((d.kind === 'layers' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'rotateScreen' || d.kind === 'resizeMany' || d.kind === 'vpt') && d.moved) store.commit(d.sid, d.before)
   // 여러 점을 고른 채 하나를 끌지 않고 눌렀다 떼면: 그 점만 남겨요(피그마와 같아요)
   if (d.kind === 'vpt' && !d.moved && d.collapse && vedit.value) { vedit.value.pts = [d.collapse]; vedit.value.segs = []; vedit.value.sel = d.collapse }
   dragOut.value = null
@@ -2658,11 +2725,43 @@ function layerSize(sid: string, id: string) {
   return { w: n.w, h: n.h }
 }
 /** 레이어 안쪽 좌표 → 캔버스 좌표 (부모들의 회전 · 뒤집기까지) */
-const worldMat = (s: ScreenRow, id: string) => mul(translate(s.x, s.y), layerMatrix(store.doc(s.id), id, (k) => layerSize(s.id, k)))
+/** 화면 이름표 자리: 돌린 화면은 돌린 왼쪽 위 모서리에서 같은 각도로(피그마와 같아요) */
+function labelPos(s: ScreenRow) {
+  const t = frameTags(s)
+  return t ? t.label : { left: box(s).left, top: `calc(${box(s).top} - 20px)` }
+}
+/**
+ * 돌린 화면의 이름표 · 크기 표시(피그마와 같아요): 화면 각도를 따라 기울되 거꾸로 서지 않게 — 각도를 ±45° 안으로 줄이고
+ * 그때 위에 오는 변의 왼쪽 끝에 이름표, 아래에 오는 변 가운데 아래에 크기 표시
+ */
+function frameTags(s: ScreenRow) {
+  const rot = scrRot(s)
+  if (!rot) return null
+  const k = Math.round(rot / 90), eff = rot - k * 90
+  const odd = Math.abs(k) % 2 === 1
+  const W = odd ? s.height : s.width, H = odd ? s.width : s.height
+  const t = (eff * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t)
+  const cx = s.x + s.width / 2, cy = s.y + s.height / 2
+  const at = (u: number, v: number) => ({ x: (cx + u * cos - v * sin) * vp.value.zoom + vp.value.x, y: (cy + u * sin + v * cos) * vp.value.zoom + vp.value.y })
+  const tl = at(-W / 2, -H / 2), bc = at(0, H / 2)
+  return {
+    label: { left: tl.x + 'px', top: tl.y - 20 + 'px', transform: eff ? `rotate(${eff}deg)` : undefined, transformOrigin: '0 20px' },
+    size: { left: bc.x + 'px', top: bc.y + 'px', marginTop: '0', transformOrigin: '0 0', transform: `rotate(${eff}deg) translate(-50%, 8px)` },
+  }
+}
+/** 화면(맨 위 프레임) 회전(도) — Iris 화면만 */
+const scrRot = (s: { id: string; source?: string }) => (s.source === 'native' && !isPageCanvas(s.id) ? store.doc(s.id).frame?.rotation ?? 0 : 0)
+/** 화면 안쪽 좌표 → 캔버스 좌표(돌린 화면은 가운데 기준으로 돌려요) */
+/** 화면 뒤집기(Iris 화면만) */
+const scrFlip = (s: { id: string; source?: string }) => { const f = s.source === 'native' && !isPageCanvas(s.id) ? store.doc(s.id).frame : undefined; return { x: !!f?.flipX, y: !!f?.flipY } }
+/** 화면 모양 변환(CSS): 돌리기 · 뒤집기, 가운데 기준 */
+const scrTf = (s: ScreenRow) => { const r = scrRot(s), f = scrFlip(s); const t = [r ? `rotate(${r}deg)` : '', f.x ? 'scaleX(-1)' : '', f.y ? 'scaleY(-1)' : ''].filter(Boolean).join(' '); return t || undefined }
+const screenMat = (s: ScreenRow): Mat => { const r = scrRot(s), f = scrFlip(s); return r || f.x || f.y ? localMatrix({ x: s.x, y: s.y, rotation: r, flipX: f.x, flipY: f.y }, s.width, s.height) : translate(s.x, s.y) }
+const worldMat = (s: ScreenRow, id: string) => mul(screenMat(s), layerMatrix(store.doc(s.id), id, (k) => layerSize(s.id, k)))
 function parentWorld(s: ScreenRow, id: string): Mat {
   const d = store.doc(s.id)
   const p = d.nodes[id]?.parentId
-  return p && d.nodes[p] ? worldMat(s, p) : translate(s.x, s.y)
+  return p && d.nodes[p] ? worldMat(s, p) : screenMat(s)
 }
 /** 레이어의 가운데 · 크기 · 캔버스에서 돈 각도 */
 function layerGeom(s: ScreenRow, id: string) {
@@ -3474,7 +3573,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         role="button"
         tabindex="-1"
         :data-screen="s.id"
-        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor, ...frameLook(s) }"
+        :style="{ left: s.x + 'px', top: s.y + 'px', width: s.width + 'px', height: s.height + 'px', cursor: space || panning ? 'inherit' : cursor, ...frameLook(s), transform: scrTf(s) }"
         :aria-label="tr('{name} frame', { name: s.name })"
         @pointerdown.stop="start($event, s)"
       >
@@ -3550,7 +3649,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         class="label"
         :data-screen="s.id"
         :class="{ on: (store.screenId.value === s.id && !store.layerIds.value.length) || hoverOutline?.frame === s.id }"
-        :style="{ left: box(s).left, top: `calc(${box(s).top} - 20px)`, maxWidth: s.source === 'figma' ? `calc(${box(s).width} - ${figTagW(s)}px)` : box(s).width }"
+        :style="{ ...labelPos(s), maxWidth: s.source === 'figma' ? `calc(${box(s).width} - ${figTagW(s)}px)` : box(s).width }"
         @pointerdown.stop="tool = 'move'; start($event, s)"
       >
         <input
@@ -3602,14 +3701,18 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <div v-for="(b, i) in peekBoxes" :key="'pk' + i" class="peek" :style="b"><span class="peek-tag num">{{ peek?.label }}</span></div>
       <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
       <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="box(m)" />
-      <div v-if="selFrame && !multi.length && !selBoxes.length" class="sel" :style="box(selFrame)">
+      <div v-if="selFrame && !multi.length && !selBoxes.length" class="sel" :style="{ ...box(selFrame), transform: scrRot(selFrame) ? `rotate(${scrRot(selFrame)}deg)` : undefined }">
         <template v-if="!selBoxes.length">
+          <!-- 모서리 바깥: 돌리기(레이어와 같아요 — ⇧ 15° 씩) -->
+          <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" :style="{ cursor: rotCursor(c, scrRot(selFrame)) }" @pointerdown.stop.prevent="startScreenRotate($event)" />
           <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, 0) }" @pointerdown.stop.prevent="startScreenResize($event, h)" />
           <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" @pointerdown.stop.prevent="startScreenResize($event, c)" />
-          <span class="sq size">{{ fmt(selFrame.width) }} × {{ fmt(selFrame.height) }}</span>
+          <span v-if="!scrRot(selFrame)" class="sq size">{{ rotating ? fmt(scrRot(selFrame)) + '°' : `${fmt(selFrame.width)} × ${fmt(selFrame.height)}` }}</span>
           <span v-for="h in screenRad ?? []" :key="'srh' + h.c" class="rh" :style="{ left: h.x + 'px', top: h.y + 'px' }" :title="tr('Corner radius (⌥ one corner)')" @pointerdown.stop.prevent="startScreenRadius($event, h.c)" />
         </template>
       </div>
+      <!-- 돌린 화면의 크기 · 각도 표시: 아래에 오는 변 가운데 아래, 각도를 따라 기울되 거꾸로 서지 않게(피그마와 같아요) -->
+      <span v-if="selFrame && !multi.length && !selBoxes.length && scrRot(selFrame)" class="sq size below" :style="frameTags(selFrame)!.size">{{ rotating ? fmt(scrRot(selFrame)) + '°' : `${fmt(selFrame.width)} × ${fmt(selFrame.height)}` }}</span>
       <!-- 점 편집 중에는 선택 상자 · 크기를 감춰요(피그마와 같아요 — 점 · 선만) -->
       <div v-for="b in vedit ? [] : selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
       <div v-for="b in vedit ? [] : xBoxes" :key="'x' + b.id" class="sel" :style="rbox(b)" />
@@ -3629,7 +3732,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <template v-if="single && !vhandles && !cropView">
         <div class="sel none" :class="{ comp: selComp }" :style="rbox(single)">
           <template v-if="!single.locked">
-            <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" @pointerdown.stop.prevent="startRotate($event)" />
+            <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" :style="{ cursor: rotCursor(c, single.angle) }" @pointerdown.stop.prevent="startRotate($event)" />
             <span v-for="h in EDGES" :key="h" :class="['edge', h]" :style="{ cursor: handleCursor(h, single.angle) }" @pointerdown.stop.prevent="startResize($event, h)" @dblclick.stop="edgeDbl(h)" />
             <span v-for="c in CORNERS" :key="c" :class="['handle', 'live', 'at-' + c]" :style="{ cursor: handleCursor(c, single.angle) }" @pointerdown.stop.prevent="startResize($event, c)" />
             <span v-for="h in radHandles ?? []" :key="'rh' + h.c" class="rh" :style="{ left: h.x + 'px', top: h.y + 'px' }" :title="tr('Corner radius (⌥ one corner)')" @pointerdown.stop.prevent="startRadius($event, h.c)" />
