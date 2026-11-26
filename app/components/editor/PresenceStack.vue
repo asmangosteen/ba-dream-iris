@@ -12,6 +12,7 @@ const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 const shown = computed(() => props.people.slice(0, 3))
 const more = computed(() => Math.max(0, props.people.length - 3))
+const peopleLabel = computed(() => (props.people.length === 1 ? tr('1 person here') : tr('{n} people here', { n: props.people.length })))
 
 function doingOf(p: Peer) {
   if (p.doing === 'away') return tr('Away')
@@ -28,14 +29,14 @@ function follow(p: Peer) { emit('follow', props.following === p.key ? null : p.k
 
 <template>
   <div v-if="people.length" ref="root" class="ps" @keydown.esc.stop="open = false">
-    <button type="button" class="sq stack" :aria-label="tr('{n} people here', { n: people.length })" :data-tip="tr('{n} people here', { n: people.length })" :aria-expanded="open" aria-haspopup="menu" @click="open = !open">
+    <button type="button" class="sq stack" :aria-label="peopleLabel" :data-tip="peopleLabel" :aria-expanded="open" aria-haspopup="menu" @click="open = !open">
       <span v-for="(p, i) in shown" :key="p.key" class="ring" :style="{ '--c': p.color, zIndex: 3 - i }" :class="{ away: p.doing === 'away', fol: following === p.key }">
         <MemberAvatar :name="p.name" :src="p.avatar" :size="20" />
       </span>
       <span v-if="more" class="ring more num">+{{ more }}</span>
     </button>
     <div v-if="open" class="sq menu list" role="menu" :aria-label="tr('People here')">
-      <div class="hd"><span class="tx-head">{{ tr('{n} people here', { n: people.length }) }}</span></div>
+      <div class="hd"><span class="tx-head">{{ peopleLabel }}</span></div>
       <div v-for="p in people" :key="p.key" class="row" role="none">
         <span class="ring" :style="{ '--c': p.color }"><MemberAvatar :name="p.name" :src="p.avatar" :size="24" /></span>
         <span class="who"><b>{{ p.name }}</b><span>{{ doingOf(p) }}</span></span>

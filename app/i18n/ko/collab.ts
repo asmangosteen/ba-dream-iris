@@ -76,4 +76,5 @@ export default {
   'Comment #{no}': '코멘트 #{no}',
   'Post': '올리기',
   'Reply': '답글 달기',
+  '1 person here': '1명이 함께 보는 중',
 }

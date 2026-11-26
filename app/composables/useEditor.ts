@@ -296,6 +296,11 @@ export function useEditor(projectId: string) {
           s.layers = row.layers
           remember(row.id, row.updated_at, row.layers)
         })
+        // 지우기 신호는 page_id 로 거를 수 없어서(Supabase) 따로 받아요 — 이 페이지 화면이면 목록을 다시 읽어요
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'screens' }, (msg) => {
+          const id = (msg.old as { id?: string }).id
+          if (id && (screens.data.value ?? []).some((x) => x.id === id)) screens.refresh()
+        })
         .subscribe()
     }, { immediate: true })
     onBeforeUnmount(off)

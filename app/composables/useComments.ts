@@ -70,6 +70,12 @@ export function useComments(projectId: string) {
         else arr.push(row)
         list.data.value = arr
       })
+      // 지우기 신호는 거를 수 없어서(Supabase) 따로 받아요 — 지운 줄의 id 만 오니 내 목록에 있을 때만 빼요
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, (msg) => {
+        const id = (msg.old as { id?: string }).id
+        const arr = list.data.value ?? []
+        if (id && arr.some((c) => c.id === id || c.thread_id === id)) list.data.value = arr.filter((c) => c.id !== id && c.thread_id !== id)
+      })
       .subscribe()
   })
   onBeforeUnmount(() => { if (ch) supabase.removeChannel(ch) })
