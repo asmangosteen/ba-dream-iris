@@ -10,7 +10,7 @@ import { booleanPath } from '~/canvas/boolean'
 import { boxes0, constrain, slotIndex } from '~/canvas/layout'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
-import { layerMenuItems, markIrisClip, pickedLayers, svgOf, useAlHint, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
+import { layerMenuItems, markIrisClip, pickedLayers, selectMatchingSay, svgOf, useAlHint, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { DS_DRAG } from '~/composables/useDsInstances'
 import { denorm, normalize, shapeVnet } from '~/canvas/vector'
@@ -927,14 +927,14 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     const el0 = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
     const add = e.shiftKey
     const base = add && store.screenId.value === screen.id ? [...store.layerIds.value] : []
-    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base, moved: false, deep: true, click: pickLayer(screen.id, el0?.dataset.layer, true), add }
+    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base, moved: false, deep: true, click: diveBoolean(screen, pickLayer(screen.id, el0?.dataset.layer, true), e.clientX, e.clientY, true), add }
     marqueeOn.value = true
     return
   }
   // 레이어 고르기 · 끌기
   const layerEl = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
   // 피그마처럼 화면 바로 아래 것부터(⌘ 를 누르면 가장 안쪽)
-  const lid = pickLayer(screen.id, layerEl?.dataset.layer, e.metaKey)
+  const lid = diveBoolean(screen, pickLayer(screen.id, layerEl?.dataset.layer, e.metaKey), e.clientX, e.clientY, e.metaKey)
   // 캔버스에 바로 놓인 프레임의 빈 곳(안 고른 상태)을 끌면 그 안 상자 고르기, 누르기만 하면 그 프레임 고르기(맨 위 프레임과 같아요 — 피그마와 같아요)
   const topF = isCanvas(screen) && lid && layerEl?.dataset.layer === lid ? store.node(screen.id, lid) : undefined
   if (topF && topF.type === 'frame' && !isGroupNode(topF) && !topF.parentId && !e.shiftKey && !e.altKey && !(store.screenId.value === screen.id && store.layerIds.value.includes(lid!))) {
@@ -1872,6 +1872,28 @@ function booleanChildAt(screen: ScreenRow, bid: string, cx: number, cy: number, 
   }
   return null
 }
+/**
+ * 불리언 안으로 들어가 고르기(피그마와 같아요): 불리언은 모양 하나로 그려져서 누르면 늘 불리언이 잡혀요.
+ * - ⌘(가장 안쪽 고르기)이면: 누른 자리의 안쪽 도형
+ * - 불리언 안 도형을 이미 골라 둔 상태(불리언이 열린 상태)면: ⇧ · ⌘ · ⌘⇧ · 그냥 누르기 모두 누른 자리의 안쪽 도형
+ * 불리언 안에 불리언이 있으면 같은 규칙으로 더 안으로 들어가요
+ */
+function diveBoolean(screen: ScreenRow, lid: string | undefined, cx: number, cy: number, deep: boolean): string | undefined {
+  if (!lid) return lid
+  const d = store.doc(screen.id)
+  const sel = store.screenId.value === screen.id ? store.layerIds.value : []
+  let cur = lid
+  for (let i = 0; i < 8; i++) {
+    if (d.nodes[cur]?.type !== 'boolean') break
+    const inner = descendants(d, cur)
+    if (!deep && !sel.some((id) => id !== cur && inner.includes(id))) break
+    const c = booleanChildAt(screen, cur, cx, cy)
+    // 안쪽 도형이 없는 자리(불리언 상자 안 빈 곳): 불리언을 잡지 않아요 — 아무것도 안 골라요(피그마와 같아요)
+    if (!c) return i === 0 ? undefined : cur
+    cur = c
+  }
+  return cur
+}
 function onDbl(target: HTMLElement, screen: ScreenRow, ev?: MouseEvent) {
   const deepest = (target.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
   if (!deepest || !isNative(screen)) return
@@ -2351,7 +2373,7 @@ function onKeyDown(e: KeyboardEvent) {
   // 모두 고르기 ⌘A(같은 단계 — 레이어를 골랐으면 그 형제, 화면이나 아무것도 안 골랐으면 모든 화면) · 반전 ⇧⌘A · 같은 것 모두 ⌥⌘A
   if (mod && e.code === 'KeyA') {
     stop()
-    if (e.altKey) { if (layerMode) store.selectMatching(sid!); return }
+    if (e.altKey) { if (layerMode) selectMatchingSay(store, sid!, (t) => emit('hint', t)); return }
     if (layerMode) { if (e.shiftKey) store.selectInverse(sid!); else store.selectAll(sid!); return }
     const all = realScreens.value.map((v) => v.id)
     const cur = new Set(multi.value.length ? multi.value : sid ? [sid] : [])
@@ -2706,7 +2728,10 @@ function trackHover(e: PointerEvent) {
   const scr = t?.closest?.('[data-screen]') as HTMLElement | null
   // 캔버스 위 프레임 이름표에 올리면 그 프레임(화면 이름표와 같아요)
   const lab = t?.closest?.('[data-label-layer]') as HTMLElement | null
-  const next = lab && canvasDoc.value ? { sid: canvasDoc.value.id, id: lab.dataset.labelLayer! } : scr?.dataset.screen ? { sid: scr.dataset.screen, id: pickLayer(scr.dataset.screen, (t!.closest('[data-layer]') as HTMLElement | null)?.dataset.layer, e.metaKey) ?? null } : null
+  const hscr = scr?.dataset.screen ? props.screens.find((v) => v.id === scr.dataset.screen) : undefined
+  // 불리언 안 도형: ⌘ 이거나 안쪽 도형을 고른 상태면 불리언 대신 그 자리의 안쪽 도형에 올린 것으로(누르기와 같아요)
+  const hid = hscr ? diveBoolean(hscr, pickLayer(hscr.id, (t!.closest('[data-layer]') as HTMLElement | null)?.dataset.layer, e.metaKey), e.clientX, e.clientY, e.metaKey) : undefined
+  const next = lab && canvasDoc.value ? { sid: canvasDoc.value.id, id: lab.dataset.labelLayer! } : scr?.dataset.screen ? { sid: scr.dataset.screen, id: hid ?? null } : null
   if (next?.sid !== hover.value?.sid || next?.id !== hover.value?.id) hover.value = next
   const r = el.value?.getBoundingClientRect()
   ptr.value = r ? { x: e.clientX - r.left, y: e.clientY - r.top } : null
@@ -2791,6 +2816,17 @@ function updateCmd() {
     return
   }
   if (ly.classList.contains('text')) { cmdMarks.value = { lines: lines(ly.querySelector('.txt') ?? ly), boxes: [], comp: false }; return }
+  // 불리언(Union 등)은 모양 하나로 그려져요 — ⌘ 면 불리언 테두리 대신 그 자리의 안쪽 도형 테두리만(누르면 그 도형이 골라져요)
+  const lsid = (ly.closest('[data-screen]') as HTMLElement | null)?.dataset.screen
+  const lscr = lsid ? props.screens.find((v) => v.id === lsid) : undefined
+  if (lscr && ly.dataset.layer && store.node(lscr.id, ly.dataset.layer)?.type === 'boolean') {
+    const inner = diveBoolean(lscr, ly.dataset.layer, lastClient.x, lastClient.y, true)
+    if (inner && inner !== ly.dataset.layer) {
+      const g = layerGeom(lscr, inner)
+      cmdMarks.value = g && !g.angle ? { lines: [], boxes: [rbox(g)], comp: false } : null
+      return
+    }
+  }
   cmdMarks.value = { lines: [], boxes: [box(ly)], comp: false }
 }
 watch(() => [vp.value.x, vp.value.y, vp.value.zoom], () => { cmdMarks.value = null })

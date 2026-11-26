@@ -9,6 +9,7 @@ import { colorLabel, parseColor, useTokenCatalog, WEIGHT_LABEL, type CatalogToke
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import TextDetails from '~/components/editor/TextDetails.vue'
 import { useLayerStore } from '~/canvas/store'
+import { selectMatchingSay, useToastReq } from '~/composables/useLayerMenu'
 import { currentGap, guessAxis, type ArrangeOp } from '~/canvas/geom'
 import ArrangeControls from '~/components/editor/ArrangeControls.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
@@ -41,6 +42,10 @@ const catalog = useTokenCatalog()
 
 const sid = computed(() => props.screen.id)
 const ids = computed(() => store.layerIds.value)
+/** 같은 레이어 모두 고르기: 고른 것 말고 같은 게 없으면 버튼을 숨겨요. 고르면 몇 개인지 토스트로 */
+const toastReq = useToastReq()
+const hasMatch = computed(() => !!ids.value.length && store.hasMatching(sid.value))
+const selectMatching = () => selectMatchingSay(store, sid.value, (t) => (toastReq.value = { text: t, at: Date.now() }))
 const nodes = computed(() => ids.value.map((id) => store.node(sid.value, id)).filter((n): n is LayerNode => !!n))
 // 다른 문서(캔버스 ↔ 프레임 안)에서 함께 고른 것이 있으면 하나가 아니에요(여러 개 패널 — 칠 · 선 등은 함께 고쳐져요)
 const one = computed(() => (nodes.value.length === 1 && !store.xsel.value.length ? nodes.value[0]! : null))
@@ -665,7 +670,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <span v-else class="ttl ell">{{ headTitle }}</span>
         <span class="acts">
           <!-- 같은 레이어 모두 고르기(⌥⌘A): 종류 · 모양이 같은 것(인스턴스는 같은 컴포넌트) -->
-          <button class="ib s24" :aria-label="tr('Select matching layers') + ' (⌥⌘A)'" :title="tr('Select matching layers') + ' ⌥⌘A'" @click="store.selectMatching(sid)"><EditorIcon name="select_matching" /></button>
+          <button v-if="hasMatch" class="ib s24" :aria-label="tr('Select matching layers') + ' (⌥⌘A)'" :title="tr('Select matching layers') + ' ⌥⌘A'" @click="selectMatching"><EditorIcon name="select_matching" /></button>
           <template v-if="nodes.length">
             <button :class="['ib', 's24', 'tog', { on: maskOn }]" :aria-pressed="maskOn" :aria-label="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' (⌃⌘M)'" :title="(maskOn ? tr('Remove mask') : tr('Use as mask')) + ' ⌃⌘M'" @click="store.toggleMask(sid, ids)"><EditorIcon name="mask" /></button>
             <button type="button" class="ib boolbtn" :aria-label="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" :title="one?.type === 'boolean' ? tr('Boolean operation') : tr('Boolean groups')" @click="boolMenu"><EditorIcon :name="boolNow.icon" /><EditorIcon name="chevron_down" :size="12" class="muted" /></button>

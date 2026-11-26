@@ -17,10 +17,8 @@ onMounted(() => {
   if (!el) return
   const fit = () => {
     size.value = { w: el.clientWidth, h: el.clientHeight }
-    // 떠 있는 왼쪽 패널에 가리지 않게 그 오른쪽에 붙여요
-    const pl = document.querySelector('.panel-left')?.getBoundingClientRect()
-    const r = el.getBoundingClientRect()
-    inset.value = pl && pl.width ? Math.max(0, Math.round(pl.right - r.left + 8)) : 0
+    // 눈금자는 늘 캔버스 전체(피그마와 같아요) — 대신 떠 있는 양쪽 패널이 눈금자 두께만큼 안으로 들어와요(editor.rulers, 사용자 요청 2026-11-26)
+    inset.value = 0
   }
   fit()
   ro = new ResizeObserver(fit)
@@ -120,7 +118,7 @@ const shownY = computed(() => props.guides.y.map((v, i) => ({ v, i })).filter((g
     </template>
     <div v-if="drag && !drag.out" :class="['guide', 'live', drag.axis === 'x' ? 'gx' : 'gy']" :style="drag.axis === 'x' ? { left: sx(drag.v) + 'px' } : { top: sy(drag.v) + 'px' }"><span class="sq gv">{{ fmt(drag.v) }}</span></div>
 
-    <!-- 눈금자 -->
+    <!-- 눈금자: 캔버스 전체(가로 · 세로). 양쪽 패널은 눈금자 두께만큼 안으로 들어와요 -->
     <template v-if="rulers">
       <div class="bar top" @pointerdown="start('y', null, $event)">
         <div v-if="sel" class="band" :style="{ left: sx(sel.x) + 'px', width: sel.w * vp.zoom + 'px' }" />

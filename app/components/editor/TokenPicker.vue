@@ -333,10 +333,10 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 </template>
 
 <style scoped>
-/* 변수 버튼: 줄 끝 아이콘 버튼 24 · 아이콘 16. 상태 표시 색(neutral-500) → 호버 800 (PRD/08 색 규칙) */
+/* 변수 버튼: 줄 끝 아이콘 버튼 24 · 아이콘 16. 누르는 아이콘 색 neutral-600 → 호버 · 열림 700 (PRD/08 색 규칙, 사용자 요청으로 한 단계 옅게) */
 .eic { flex: none; display: block; }
-.vb { width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
-.vb:hover, .vb.open { color: var(--sys-color-neutral-800); }
+.vb { width: 24px; height: 24px; color: var(--sys-color-neutral-600); }
+.vb:hover, .vb.open { color: var(--sys-color-neutral-700); }
 .vb.open { --sq-fill: var(--sys-color-neutral-300); }
 /* 입력칸 안: 칸 오른쪽 안쪽 8 에 아이콘 끝이 오게(버튼 24 − 아이콘 16 = 4 를 당겨요). 칸에 올리거나 포커스가 있을 때만, 바로(애니메이션 없음) */
 .vb.reveal { margin-right: calc(-1 * var(--ref-spacing-04)); opacity: 0; }

@@ -1226,14 +1226,25 @@ export function createLayerStore(opts: {
     screenId.value = sid
   }
   /** 같은 것 모두 고르기(⌥⌘A, 피그마와 같아요): 고른 레이어와 종류 · 모양(스타일)이 같은 것(인스턴스는 같은 컴포넌트) — 화면 안 모든 단계에서 */
-  function selectMatching(sid: string) {
+  function matchingIds(sid: string): string[] {
     const d = doc(sid)
     const refs = layerIds.value.map((id) => d.nodes[id]).filter((n): n is LayerNode => !!n)
-    if (!refs.length) return
+    if (!refs.length) return []
     const look = (st: LayerStyle) => JSON.stringify(Object.keys(st).filter((k) => k !== 'vars' && k !== 'layout').sort().map((k) => [k, st[k as keyof LayerStyle]]))
     const key = (n: LayerNode) => (n.type === 'instance' ? 'i:' + (n.component ?? n.name) : n.type + ':' + look(n.style))
     const want = new Set(refs.map(key))
-    layerIds.value = Object.values(d.nodes).filter((n) => !n.locked && !n.hidden && want.has(key(n))).map((n) => n.id)
+    return Object.values(d.nodes).filter((n) => !n.locked && !n.hidden && want.has(key(n))).map((n) => n.id)
+  }
+  /** 고른 것 말고도 같은 레이어가 있나(없으면 버튼을 숨기고 메뉴는 흐리게) */
+  function hasMatching(sid: string): boolean {
+    const cur = new Set(layerIds.value)
+    return matchingIds(sid).some((id) => !cur.has(id))
+  }
+  /** 같은 것 모두 고르기 — 고른 개수를 돌려줘요(늘어난 게 없으면 0) */
+  function selectMatching(sid: string): number {
+    if (!hasMatching(sid)) return 0
+    layerIds.value = matchingIds(sid)
+    return layerIds.value.length
   }
   function distribute(sid: string, ids: string[], axis: Axis) { if (ids.length >= 3) place(sid, ids, (rs) => distributeRects(rs, axis)) }
   function space(sid: string, ids: string[], axis: Axis, gap: number) { if (ids.length >= 2) place(sid, ids, (rs) => spaceRects(rs, axis, gap)) }
@@ -1252,7 +1263,7 @@ export function createLayerStore(opts: {
     pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, dispose, hasUnsaved, recoverDoc, pushAction,
-    hold, release, tidy, selectInverse, selectMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
+    hold, release, tidy, selectInverse, selectMatching, hasMatching, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,

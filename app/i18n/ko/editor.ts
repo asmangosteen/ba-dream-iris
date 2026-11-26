@@ -170,6 +170,8 @@ export default {
   'Select all': '모두 선택',
   'Select inverse': '선택 반전',
   'Select all matching layers': '같은 레이어 모두 선택',
+  'Selected {n} matching layers': '같은 레이어 {n}개를 선택했어요',
+  'No other matching layers': '같은 레이어가 더 없어요',
   'Group selection': '선택 항목 그룹으로 묶기',
   'Frame selection': '선택 항목 프레임으로 감싸기',
   'Section selection': '선택 항목 섹션으로 감싸기',

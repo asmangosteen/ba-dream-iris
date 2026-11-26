@@ -18,6 +18,13 @@ export const useMixScreens = () => useState<string[]>('iris-mix-screens', () => 
  */
 export type AlHint = 'gap' | 'rowGap' | 'padH' | 'padV' | 0 | 1 | 2 | 3
 export const useAlHint = () => useState<AlHint | null>('iris-al-hint', () => null)
+/** 어디서든 토스트 안내(편집기 화면 아래 알림) — index 페이지가 받아서 띄워요 */
+export const useToastReq = () => useState<{ text: string; at: number } | null>('iris-toast-req', () => null)
+/** 같은 레이어 모두 고르기(버튼 · 우클릭 · ⌥⌘A 공용): 고른 뒤 몇 개인지 안내, 없으면 없다고 */
+export function selectMatchingSay(store: LayerStore, sid: string, say: (t: string) => void) {
+  const n = store.selectMatching(sid)
+  say(n ? tr('Selected {n} matching layers', { n }) : tr('No other matching layers'))
+}
 export const useRenameReq = () => useState<{ sid: string; id: string }[] | null>('iris-rename-req', () => null)
 /** 지금 고른 레이어 전부(이 문서 + 다른 프레임에서 함께 고른 것) */
 export const pickedLayers = (store: LayerStore, sid: string, ids: string[]) => [...ids.map((id) => ({ sid, id })), ...store.xsel.value]
@@ -77,7 +84,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     ...(nodes.some((n) => isContainer(n) && n.children?.length) ? [{ label: tr('Select children'), shortcut: '↵', action: () => store.selectChildren(sid) }] : []),
     { label: tr('Select all'), shortcut: '⌘A', action: () => store.selectAll(sid) },
     { label: tr('Select inverse'), shortcut: '⇧⌘A', action: () => store.selectInverse(sid) },
-    { label: tr('Select all matching layers'), shortcut: '⌥⌘A', action: () => store.selectMatching(sid) },
+    { label: tr('Select all matching layers'), shortcut: '⌥⌘A', action: () => selectMatchingSay(store, sid, (t) => opts.hint?.(t)), disabled: !store.hasMatching(sid) },
     'sep',
     { label: tr('Bring to front'), shortcut: ']', action: () => store.arrange(sid, ids, 'top') },
     { label: tr('Bring forward'), shortcut: '⌘]', action: () => store.arrange(sid, ids, 1) },

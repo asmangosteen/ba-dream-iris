@@ -5,7 +5,7 @@ import { descendants, isContainer, isGroupNode, type LayerNode } from '~/canvas/
 import { LAYER_ICON } from '~/canvas/icons'
 import { radiiOf, rectPath, vectorPath } from '~/canvas/paint'
 import { booleanPath } from '~/canvas/boolean'
-import { layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq } from '~/composables/useLayerMenu'
+import { layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq, useToastReq } from '~/composables/useLayerMenu'
 import RenameLayers from '~/components/editor/RenameLayers.vue'
 import { useLayerStore } from '~/canvas/store'
 
@@ -474,10 +474,11 @@ const arrowLen = (span: number) => Math.abs(span) * ROW - 20
 // 우클릭 메뉴(캔버스와 같은 항목 + 이름 바꾸기)
 const ctx = useContextMenu()
 const lastCopy = useLastCopy()
+const toastReq = useToastReq()
 const paste = () => { if (lastCopy.value !== 'screen' && store.hasClipboard()) store.paste(); else emit('screen-action', 'paste') }
 function rowMenu(r: Row, e: MouseEvent) {
   if (!isSel(r)) store.selectLayer(r.sid, r.n.id)
-  ctx.open(e, layerMenuItems(store, r.sid, [...store.layerIds.value], { lastCopy, paste }))
+  ctx.open(e, layerMenuItems(store, r.sid, [...store.layerIds.value], { lastCopy, paste, hint: (t) => (toastReq.value = { text: t, at: Date.now() }) }))
 }
 function screenMenu(s: ScreenRow, e: MouseEvent) {
   if (s.id.startsWith('page:')) return

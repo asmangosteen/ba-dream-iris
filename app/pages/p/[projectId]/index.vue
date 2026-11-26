@@ -16,7 +16,7 @@ import InspectorExport from '~/components/editor/InspectorExport.vue'
 import InspectorPage from '~/components/editor/InspectorPage.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
-import { useMixScreens } from '~/composables/useLayerMenu'
+import { useMixScreens, useToastReq } from '~/composables/useLayerMenu'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
 import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, uploadImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
@@ -196,6 +196,9 @@ function say(text: string, ms = 3000) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (toast.value = ''), ms)
 }
+// 패널 · 레이어 목록 등 다른 부품이 보낸 안내(useToastReq)
+const toastReq = useToastReq()
+watch(toastReq, (v) => { if (v) say(v.text) })
 /** 실패 알림: 인터넷이 끊겨 있으면 그 이유를 붙여요 */
 function sayFail(text: string) {
   say(online.value ? text : `${text} · ${tr('You\'re offline')}`, 4000)
@@ -950,7 +953,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </script>
 
 <template>
-  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady }]">
+  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady, rulers: rulersShown }]">
     <Transition name="ld"><IrisLoading v-if="booting" :progress="bootP" /></Transition>
     <EditorCanvas
       ref="canvas"
@@ -1250,10 +1253,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .pmenu { left: 0; right: auto; width: 232px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.panel-left { position: absolute; left: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 4; overflow: visible; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
+/* 눈금자를 켜면(⇧R) 피그마처럼 양쪽 패널이 눈금자 두께(18)만큼 안으로 — 왼쪽 패널은 위 · 왼쪽, 오른쪽 패널은 위만 */
+.editor.rulers { --iris-rul: 18px; }
+.panel-left { position: absolute; left: calc(var(--iris-gap) + var(--iris-rul, 0px)); top: calc(var(--iris-gap) + var(--iris-rul, 0px)); bottom: var(--iris-gap); width: 264px; display: flex; flex-direction: column; z-index: 4; overflow: visible; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
 /* 접기: 아래 변이 위로 올라가서 맨 위 줄(40) + 탭 줄(42)만 남아요 */
 .editor.ui-hidden .panel-left, .editor.ui-hidden .panel-right, .editor.ui-hidden :deep(.bar[role="toolbar"]) { display: none; }
-.panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - var(--iris-gap) - 40px - 42px); }
+.panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - var(--iris-gap) - var(--iris-rul, 0px) - 40px - 42px); }
 .fold { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
 .panel-left .fold { margin-left: auto; }
 /* 탭(26)과 같은 높이 · 아이콘 18 */
@@ -1263,7 +1268,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 /* 왼쪽 위 로고 버튼(24)과 같은 높이 */
 .pill-acts :deep(.bd-button) { height: 24px; min-height: 24px; }
 .panel-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); height: 42px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
-.panel-right { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: clip; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
+.panel-right { position: absolute; right: var(--iris-gap); top: calc(var(--iris-gap) + var(--iris-rul, 0px)); bottom: var(--iris-gap); width: 288px; display: flex; flex-direction: column; z-index: 3; overflow: clip; transition: bottom 0.24s cubic-bezier(0.2, 0, 0, 1); }
 .tabs { padding: var(--ref-spacing-06); flex: none; }
 .line-b { box-shadow: 0 1px 0 var(--iris-line); }
 /* 왼쪽 패널 열: 행 바탕은 패널 안쪽 8(탭 줄과 같아요), 글자 · 섹션 제목 · ▸ 는 x 16+8 한 줄에 맞춰요 */
