@@ -93,3 +93,19 @@ export function applyOverrides(tree: SubNode[], ov: Record<string, SubOverride> 
     if (o.fill) el.style.backgroundColor = color(o.fill) ?? o.fill
   }
 }
+
+/** 하위 줄의 화면 위 자리(글자는 글자 자체 크기) */
+export function subRect(n: SubNode): DOMRect | null {
+  if (n.kind === 'text' && n.tnode) { const r = document.createRange(); r.selectNodeContents(n.tnode); return r.getBoundingClientRect() }
+  return n.el?.getBoundingClientRect() ?? null
+}
+/** 캔버스에서 누른 자리(화면 좌표)의 하위 줄 — 글자를 먼저, 없으면 가장 안쪽 컴포넌트 */
+export function subAt(sid: string, id: string, x: number, y: number): SubNode | null {
+  const all: SubNode[] = []
+  const visit = (l: SubNode[]) => { for (const n of l) { all.push(n); visit(n.children) } }
+  visit(readInstanceTree(sid, id))
+  const hit = (n: SubNode) => { const r = subRect(n); return !!r && r.width > 0 && x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2 }
+  return all.filter((n) => n.kind === 'text').reverse().find(hit) ?? all.filter((n) => n.kind !== 'text').reverse().find(hit) ?? null
+}
+/** 캔버스에서 두 번 눌러 고치는 인스턴스 글자(InstanceTextEdit 가 그 자리에 입력칸을 띄워요) */
+export const instEdit = shallowRef<{ sid: string; id: string; key: string } | null>(null)

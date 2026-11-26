@@ -2,6 +2,7 @@ import type { ScreenRow } from '~/composables/useEditor'
 import { isContainer } from '~/canvas/schema'
 import { topImagePaint } from '~/canvas/paint'
 import { startCrop } from '~/composables/useImageEdit'
+import { instEdit, subAt, subSel } from '~/composables/useInstanceTree'
 import type { CanvasBase } from './types'
 import type { CanvasGeom } from './useCanvasGeom'
 import type { CanvasPick } from './useCanvasPick'
@@ -96,6 +97,17 @@ export function useCanvasLabels(canvas: Ctx) {
       let c: string | null | undefined = deepest
       while (c && d.nodes[c]?.parentId !== lid) c = d.nodes[c]?.parentId
       if (c) { store.selectLayer(screen.id, c); return }
+    }
+    // 디자인 시스템 인스턴스(피그마와 같아요): 두 번 누르면 누른 자리의 하위 줄을 고르고, 글자면 그 자리에서 바로 고치기
+    if (n.type === 'instance' && ev) {
+      const sn = subAt(screen.id, lid, ev.clientX, ev.clientY)
+      if (sn) {
+        store.selectLayer(screen.id, lid)
+        subSel.value = { sid: screen.id, id: lid, key: sn.key, kind: sn.kind, name: sn.name }
+        const ov = n.subOverrides?.[sn.key]
+        if (sn.kind === 'text' && !n.locked && !ov?.locked && !ov?.hidden && !store.readonly.value) instEdit.value = { sid: screen.id, id: lid, key: sn.key }
+        return
+      }
     }
     if (n.type === 'text' && !n.locked) {
       // 여러 글자를 함께 골라 둔 채면 선택은 그대로 — 고치는 글자가 함께 고른 글자에도 똑같이 들어가요(다른 프레임 것도)

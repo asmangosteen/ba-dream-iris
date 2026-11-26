@@ -32,6 +32,7 @@ import { useCanvasLabels } from './canvas/useCanvasLabels'
 import { useCanvasMenu } from './canvas/useCanvasMenu'
 import { useCanvasKeys } from './canvas/useCanvasKeys'
 import { usePixelGrid } from './canvas/usePixelGrid'
+import InstanceTextEdit from './canvas/InstanceTextEdit.vue'
 
 /**
  * 무한 캔버스 + 화면 안 레이어 편집.
@@ -436,6 +437,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <svg v-if="draftPts" class="guides draw" width="100%" height="100%"><polyline :points="draftPts.map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ')" /></svg>
     </div>
     <CanvasRulers :vp="vp" :guides="props.guides ?? { x: [], y: [] }" :frames="guideFrames" :active="guideActive" :snaps="guideSnaps" :sel="selWorld" :rulers="rulersShown" @change="onGuides" />
+    <!-- 디자인 시스템 인스턴스 안 글자를 두 번 눌러 그 자리에서 고치기 -->
+    <InstanceTextEdit />
   </main>
 </template>
 
