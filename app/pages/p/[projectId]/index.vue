@@ -1720,7 +1720,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 <style scoped>
 .editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
 /* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
-.follow-ring { position: absolute; inset: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
+.follow-ring { position: fixed; top: var(--iris-tabs-h, 44px); left: 0; right: 0; bottom: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
