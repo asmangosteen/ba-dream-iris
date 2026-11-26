@@ -1,22 +1,10 @@
 <script setup lang="ts">
-import type { LayoutGrid } from '~/canvas/schema'
+import { gridBands, type LayoutGrid } from '~/canvas/schema'
 
 /** 레이아웃 그리드 그리기(프레임 · 화면 위). ⇧G 로 모두 숨기기 — useLayoutGridsShown() */
 const props = defineProps<{ grids?: LayoutGrid[]; w: number; h: number }>()
 const shown = useLayoutGridsShown()
-const bands = computed(() => {
-  const out: { x: number; y: number; w: number; h: number; c: string }[] = []
-  for (const g of (props.grids ?? []).filter((x) => x.visible !== false && x.type !== 'grid')) {
-    const n = Math.max(1, g.count ?? 4), gut = g.gutter ?? 16, m = g.margin ?? 16
-    const total = g.type === 'columns' ? props.w : props.h
-    const size = Math.max(0, (total - m * 2 - gut * (n - 1)) / n)
-    for (let i = 0; i < n; i++) {
-      const at = m + i * (size + gut)
-      out.push(g.type === 'columns' ? { x: at, y: 0, w: size, h: props.h, c: g.color ?? '#FF000019' } : { x: 0, y: at, w: props.w, h: size, c: g.color ?? '#FF000019' })
-    }
-  }
-  return out
-})
+const bands = computed(() => gridBands(props.grids, props.w, props.h))
 const squares = computed(() => (props.grids ?? []).filter((x) => x.visible !== false && x.type === 'grid'))
 </script>
 

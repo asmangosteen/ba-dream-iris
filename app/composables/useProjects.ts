@@ -5,6 +5,8 @@ export interface ProjectRow {
   name: string
   status: ProjectStatus
   updated_at: string
+  /** 홈 카드 썸네일로 정한 화면(프레임 우클릭 'Set as thumbnail'). 없으면 첫 페이지의 첫 화면 */
+  cover_screen_id?: string | null
 }
 
 /** 진행 상태 이름(영어 원문 — 화면에서는 statusLabel() 로 지금 언어로) */

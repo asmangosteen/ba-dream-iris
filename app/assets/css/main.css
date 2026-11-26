@@ -76,7 +76,7 @@ button:active{cursor:grabbing}
    pen.dev 기반 앱 셸 — 화면 전체가 회색 캔버스이고, 패널은 그 위에 떠 있는 흰 카드
    ============================================================ */
 /* 떠 있는 패널 테두리: 라이트는 얇고 진하게(0.5px — 레티나에서 한 화소), 다크는 1px 옅은 흰 선 */
-:root{--iris-sel:color-mix(in srgb,var(--sys-color-brand-primary-default) 11%,transparent);--iris-sel-under:color-mix(in srgb,var(--sys-color-brand-primary-default) 5%,transparent);--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%));--iris-float-line:rgb(3 9 26 / 22%);--iris-float-line-w:.5px}
+:root{--iris-peek:#0BB5A6;--iris-peek-ink:#07857A;--iris-peek-bg:color-mix(in srgb,#0BB5A6 11%,transparent);--iris-peek-bg-strong:color-mix(in srgb,#0BB5A6 22%,transparent);--iris-sel:color-mix(in srgb,var(--sys-color-brand-primary-default) 11%,transparent);--iris-sel-under:color-mix(in srgb,var(--sys-color-brand-primary-default) 5%,transparent);--iris-gap:8px;--iris-float-shadow:drop-shadow(0 1px 2px rgb(3 9 26 / 4%)) drop-shadow(0 6px 16px rgb(3 9 26 / 5%));--iris-float-line:rgb(3 9 26 / 22%);--iris-float-line-w:.5px}
 .float{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-float-line);--sq-line-w:var(--iris-float-line-w);border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
 .float.s{border-radius:var(--ref-radius-06)}
 .seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
@@ -111,6 +111,10 @@ button:active{cursor:grabbing}
 .prop-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:var(--ref-spacing-06);min-height:28px}
 .prop-row>.k{color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd{font-variant-numeric:proportional-nums;display:flex;align-items:center;justify-content:space-between;gap:var(--ref-spacing-04);width:100%;height:28px;box-sizing:border-box;padding:0 var(--ref-spacing-04) 0 var(--ref-spacing-06);border-radius:var(--iris-field-r);--sq-fill:var(--sys-color-neutral-200);font-size:12px;line-height:18px;color:var(--sys-color-neutral-800);text-align:left;--sq-line-w:0.5px}
+/* 떠 있는 창(팝오버 · 변수 목록) 안 드롭다운: 회색 입력칸과 구분되게 흰 바탕 + 테두리(피그마와 같아요 — 칠 · 선 설정 · 글자 설정 · 레이아웃 그리드 · 변수 목록 모두 같게) */
+:is([role="dialog"],.tp) .esel>.dd{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-line-strong);--sq-line-w:1px}
+:is([role="dialog"],.tp) .esel>.dd:hover{--sq-line:var(--ref-color-gray-900-20)}
+:is([role="dialog"],.tp) .esel>.dd.open{--sq-line:var(--sys-color-brand-primary-default)}
 .dd:hover{--sq-line:var(--ref-color-gray-900-10)}
 .dd.open{--sq-line:var(--sys-color-brand-primary-default);--sq-line-w:0.5px}
 .menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;padding:var(--ref-spacing-02);--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-float-line);--sq-line-w:var(--iris-float-line-w);border-radius:var(--ref-radius-04);filter:var(--iris-float-shadow)}
@@ -205,6 +209,8 @@ button:active{cursor:grabbing}
 .menu:not(.tp) .menu-item{flex:none;padding:0 var(--ref-spacing-06);height:24px !important;min-height:24px;border-radius:var(--ref-radius-03) !important;color:#FFFFFF !important;font-weight:400 !important;--sq-fill:transparent !important;transition:none}
 .menu:not(.tp) .menu-item:is(:hover,.kb,:focus-visible):not(:disabled),.menu:not(.tp) .menu-item:is(:hover,.kb,:focus-visible).on:not(:disabled){--sq-fill:var(--iris-select,#0D99FF) !important;color:#FFFFFF !important}
 .menu:not(.tp) .menu-item:focus-visible{outline:0}
+/* 모든 메뉴(펼침 메뉴 · 드롭다운 · 우클릭 메뉴 .ctx)의 행 호버는 보기 설정(⚙) 메뉴와 같게 — 페이드 없이 바로 파랑. 편집기 밖(계정 메뉴 · 요구사항 보드 · 문서 화면)과 우클릭 메뉴도 같아요 */
+:is(.menu:not(.tp),.ctx) :is(.menu-item,button),:is(.menu:not(.tp),.ctx) :is(.menu-item,button)::before{transition:none !important}
 .menu:not(.tp) .menu-item:disabled{color:rgb(255 255 255 / 40%) !important;opacity:1}
 .menu:not(.tp) .menu-item.danger:is(:hover,:focus-visible):not(:disabled){--sq-fill:#E5484D !important}
 .menu:not(.tp) .menu-item :is(svg,.eic){color:inherit !important}
@@ -294,6 +300,7 @@ button:active{cursor:grabbing}
   --ref-color-blue-50:#16263D;--ref-color-blue-100:#1B3352;--sys-color-brand-primary-default:#3D8AEE;
   --iris-float-shadow:drop-shadow(0 1px 2px rgb(0 0 0 / 30%)) drop-shadow(0 8px 20px rgb(0 0 0 / 28%));
   --iris-float-line:rgb(255 255 255 / 10%);--iris-float-line-w:1px;
+  --iris-peek-ink:#3FD8C8;
   --dimmed-bg:rgb(0 0 0 / 60%);
   --iris-grid-pixel:rgb(255 255 255 / 5%);
   color-scheme:dark;
@@ -306,6 +313,7 @@ button:active{cursor:grabbing}
   --ref-color-blue-50:#16263D;--ref-color-blue-100:#1B3352;--sys-color-brand-primary-default:#3D8AEE;
   --iris-float-shadow:drop-shadow(0 1px 2px rgb(0 0 0 / 30%)) drop-shadow(0 8px 20px rgb(0 0 0 / 28%));
   --iris-float-line:rgb(255 255 255 / 10%);--iris-float-line-w:1px;
+  --iris-peek-ink:#3FD8C8;
   --dimmed-bg:rgb(0 0 0 / 60%);
   --iris-grid-pixel:rgb(255 255 255 / 5%);
   color-scheme:dark;

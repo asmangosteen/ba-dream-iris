@@ -522,6 +522,8 @@ function setSideMode(m: SideMode) {
   })
 }
 function sidesMenu(e: MouseEvent) {
+  // Custom(변마다 칸이 열린 상태)에서 다시 누르면 칸을 닫고 네 변 모두(All)로 — 두께는 가장 두꺼운 변
+  if (sideMode.value === 'custom') { setSideMode('all'); return }
   // Custom 아이콘은 지금 켜진 변 모양(Custom 이 아니면 네 변 다)
   const icon = (m: SideMode) => (m === 'all' ? 'stroke_all' : m === 'custom' ? (sideMode.value === 'custom' ? sidesIcon.value : 'stroke_sides_1111') : `stroke_${m}`)
   const item = (m: SideMode, label: string) => ({ label: (sideMode.value === m ? '✓ ' : '') + tr(label), icon: { name: icon(m) }, action: () => setSideMode(m) })

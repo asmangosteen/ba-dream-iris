@@ -309,7 +309,11 @@ function onEmptyDbl(e: MouseEvent) { if (e.target === e.currentTarget) openNew()
 @media (prefers-reduced-motion: reduce) { .tabmv-move, .lift.settle { transition: none; } }
 .list::-webkit-scrollbar { display: none; }
 .tab { flex: none; height: 32px; box-sizing: border-box; display: flex; align-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
-.tab:hover { --sq-fill: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+/* 인터랙션은 편집기 다른 버튼 · 줄과 같아요: 올리면 회색 덧칠(hover), 누르면 한 단계 진하게(pressed), 색 · 바탕 .12s 로 바뀜 */
+.tab, .x, .add { transition: background-color .12s ease, color .12s ease, opacity .12s ease; }
+.tab:hover { --sq-overlay: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.tab:not(.on):active { --sq-overlay: var(--interaction-light-gray-pressed); }
+.tab.on:hover { --sq-overlay: transparent; } /* 고른 탭은 흰 그대로 */
 .tab.on { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--sys-color-neutral-800); }
 .home { width: 32px; justify-content: center; }
 .home:focus-visible, .lnk:focus-visible, .x:focus-visible, .add:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
@@ -326,11 +330,13 @@ function onEmptyDbl(e: MouseEvent) { if (e.target === e.currentTarget) openNew()
 .x { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-600); visibility: hidden; }
 .proj:hover .x, .proj.on .x, .x:focus-visible, .x.busy { visibility: visible; }
 .x.busy .spin { margin: 0; }
-.x:hover { --sq-fill: var(--sys-color-neutral-200); color: var(--sys-color-neutral-800); }
+.x:hover { --sq-overlay: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.x:active { --sq-overlay: var(--interaction-light-gray-pressed); }
 /* + 새 탭(New file): 탭 바로 뒤. 막대(탭 뒤 빈 곳)에 올렸을 때만 보여요 */
-.add { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); opacity: 0; transition: opacity .12s ease; }
+.add { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); opacity: 0; }
 .tabbar:hover .add, .add:focus-visible { opacity: 1; }
-.add:hover { --sq-fill: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.add:hover { --sq-overlay: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
+.add:active { --sq-overlay: var(--interaction-light-gray-pressed); }
 /* 불러오는 중: 탭 아이콘 자리에 도는 고리(12) — 움직임을 줄이면 깜빡이지 않고 옅게만 */
 .spin { flex: none; box-sizing: border-box; width: 12px; height: 12px; margin: 0 2px; border-radius: 50%; border: 1.5px solid currentColor; border-top-color: transparent; opacity: .7; animation: tabspin .8s linear infinite, tabspin-in .2s ease both; }
 @keyframes tabspin { to { transform: rotate(360deg); } }

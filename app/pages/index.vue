@@ -57,7 +57,7 @@ function createProject() { newOpen.value = true }
         />
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
-            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]" class="sq cover"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
+            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" class="sq cover"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
             <button class="ib more" :aria-label="tr('{name} settings', { name: p.name })" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
@@ -81,17 +81,23 @@ function createProject() { newOpen.value = true }
 .filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08); }
 .card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
-.thumb { height: 176px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
+/* 썸네일 칸은 화면 폭과 상관없이 딱 3:2 — 썸네일용 프레임도 3:2(예: 1200 × 800)로 만들면 그대로 꽉 차요 */
+.thumb { aspect-ratio: 3 / 2; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 /* 화면 표지: 바깥 1px 선(.cover) 안에 squircle 로 자른 그림. 아래 두 모서리는 썸네일(.sq-clip) 밖으로 내려 감춤 */
 .cover { position: absolute; inset: 11px calc(24% - 1px) -14px; border-radius: 7px; --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .sq-clip-inner { position: absolute; inset: 1px; overflow: hidden; border-radius: 6px; }
+/* 썸네일로 정한 프레임: 칸을 꽉 채워 확대(가운데 기준, 넘치는 곳은 잘림) — 테두리 선(.thumb ::after)은 그 위에 */
+.full { position: absolute; inset: 0; }
 .no-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-06); }
 .ghost { width: 44px; height: 72px; border-radius: 6px; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; --sq-fill: var(--sys-color-common-white-default); }
 .proj:focus-visible { outline: 0; }
 .proj:focus-visible .thumb { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
 .proj:hover .name { color: var(--sys-color-neutral-900, var(--sys-color-neutral-800)); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--ref-color-gray-900-20); }
 .thumb { transition: box-shadow .12s ease; }
-.more { position: absolute; top: var(--ref-spacing-04); right: var(--ref-spacing-04); opacity: 0; --sq-fill: var(--sys-color-common-white-emphasis); }
+/* 카드 ⋮ 버튼: 흰 바탕 + 1px 테두리(썸네일 그림 위에서도 버튼 경계가 보이게), 올리면 테두리 진하게.
+   카드 가장자리에서 6 띄우고, 모서리는 카드(12)에서 6 뺀 6 — 바깥 곡선과 나란해요 */
+.more { position: absolute; top: var(--ref-spacing-05); right: var(--ref-spacing-05); border-radius: var(--ref-radius-03); opacity: 0; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.more:hover { --sq-line: var(--ref-color-gray-900-20); }
 .proj:hover .more, .more:focus-visible { opacity: 1; }
 .proj:hover .thumb { --sq-line: var(--ref-color-gray-900-20); }
 .col { display: flex; flex-direction: column; }

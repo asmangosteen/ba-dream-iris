@@ -23,7 +23,6 @@ const imageSrc = useImageSrc()
 const base = computed(() => (props.kind === 'fill' ? 'fill' : props.kind === 'stroke' ? 'stroke' : 'color') as 'fill' | 'stroke' | 'color')
 const extraKey = computed(() => (props.kind === 'stroke' ? 'strokes' : 'fills') as 'fills' | 'strokes')
 const nodes = computed(() => props.ids.map((id) => store.node(props.sid, id)).filter((n): n is LayerNode => !!n))
-const look = computed<LayerStyle>(() => store.doc(props.sid).frame ?? {})
 const frameIds = computed(() => (props.sids?.length ? props.sids : [props.sid]))
 const styles = computed<LayerStyle[]>(() => (props.frame ? frameIds.value.map((id) => store.doc(id).frame ?? {}) : nodes.value.map((n) => n.style)))
 /** 프레임 모양 고치기: 고른 프레임 모두에(실행취소 한 번) */
@@ -55,7 +54,7 @@ function add() {
   if (mixed.value) {
     const v = props.kind === 'stroke' ? '#000000' : props.kind === 'text' ? '#000000' : props.frame ? '#FFFFFF' : '#D9D9D9'
     const unbound = (s: LayerStyle) => { const vars: Record<string, string> = { ...(s.vars as Record<string, string> | undefined) }; delete vars[base.value]; return Object.keys(vars).length ? vars : undefined }
-    if (props.frame) frameAll({ fill: v, fills: undefined }, { fill: null })
+    if (props.frame) frameAll((s) => ({ [base.value]: v, [extraKey.value]: undefined, ...(props.kind === 'stroke' ? { strokeWidth: s.strokeWidth || 1 } : {}) }), { [base.value]: null })
     else patchAll((s) => ({ [base.value]: v, [extraKey.value]: undefined, vars: unbound(s), ...(props.kind === 'stroke' ? { strokeWidth: s.strokeWidth || 1 } : {}) }))
     return
   }
@@ -70,7 +69,7 @@ function remove(i: number) {
   if (open.value === i) open.value = null
   if (i < 0) {
     if (props.kind === 'text' && !extras.value.length) return
-    if (props.frame) patchAll(() => ({ fill: '' }), { fill: null })
+    if (props.frame && base.value === 'fill') patchAll(() => ({ fill: '' }), { fill: null })
     else patchAll((s) => ({ [base.value]: undefined, ...(props.kind === 'stroke' && !(s.strokes ?? []).length ? { strokeWidth: undefined } : {}) }))
   } else setExtras((l) => l.filter((_, k) => k !== i))
 }
@@ -79,7 +78,8 @@ function baseToExtra(change: (p: Paint) => Paint) {
   const c = baseVal.value
   if (!c) return
   const p = change({ type: 'solid', color: hexOf(store.color(c) ?? c), opacity: alphaOf(store.color(c) ?? c) < 1 ? alphaOf(store.color(c) ?? c) : undefined, ...(bound.value ? { token: bound.value } : {}) })
-  if (props.frame) { patchAll((s) => ({ fill: '', fills: [p, ...(s.fills ?? [])] }), { fill: null }); return }
+  // 프레임 바탕 칠은 '' 가 칠 없음(비워 두면 흰 바탕), 선은 지우면 없음
+  if (props.frame) { patchAll((s) => ({ [base.value]: base.value === 'fill' ? '' : undefined, [extraKey.value]: [p, ...(s[extraKey.value] ?? [])] }), { [base.value]: null }); return }
   patchAll((s) => {
     const vars = { ...s.vars }
     delete vars[base.value]
@@ -119,7 +119,7 @@ function applyList(list: Paint[]) {
   const ex = solidB ? list.slice(1) : list
   const val = solidB ? withAlpha(solidB.color, solidB.opacity ?? 1) : undefined
   const tok = solidB?.token
-  if (props.frame) { frameAll({ fill: val ?? '', fills: ex.length ? ex : undefined }, { fill: tok ?? null }); return }
+  if (props.frame) { frameAll({ [base.value]: val ?? (base.value === 'fill' ? '' : undefined), [extraKey.value]: ex.length ? ex : undefined }, { [base.value]: tok ?? null }); return }
   patchAll((s) => {
     const vars: Record<string, string> = { ...(s.vars as Record<string, string> | undefined) }
     delete vars[base.value]
@@ -158,16 +158,16 @@ const bound = computed(() => {
   return c?.startsWith('token:') ? 'db:' + c.slice(6) : null
 })
 function pick(t: CatalogToken) {
-  if (props.frame) frameAll({ fill: t.color }, { fill: t.id })
+  if (props.frame) frameAll({ [base.value]: t.color }, { [base.value]: t.id })
   else store.bind(props.sid, props.ids, base.value, t.id, () => ({ style: { [base.value]: t.color } }))
 }
 function unbind() {
-  if (props.frame) frameAll({ fill: store.color(look.value.fill) ?? look.value.fill }, { fill: null })
+  if (props.frame) frameAll((s) => ({ [base.value]: store.color(s[base.value]) ?? s[base.value] }), { [base.value]: null })
   else store.unbind(props.sid, props.ids, [base.value], (n) => ({ style: n.style[base.value]?.startsWith('token:') ? { [base.value]: store.color(n.style[base.value]) } : {} }))
 }
 function createdStyle(id: string) {
   const v = store.color(baseVal.value) ?? baseVal.value
-  if (props.frame) frameAll({ fill: v }, { fill: id })
+  if (props.frame) frameAll({ [base.value]: v }, { [base.value]: id })
   else store.bind(props.sid, props.ids, base.value, id, () => ({ style: { [base.value]: v } }))
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { fmtNum } from '~/canvas/num'
+import { matchReqLayers } from '~/canvas/reqMatch'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
@@ -140,7 +141,7 @@ const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: () => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
@@ -185,8 +186,22 @@ const selected = store.screenId
 const current = computed(() => list.value.find((s) => s.id === selected.value) ?? null)
 const openDoc = computed(() => (docs.data.value ?? []).find((d) => d.id === docId.value) ?? null)
 const docReqs = computed(() => (reqs.data.value ?? []).filter((r) => r.document_id === docId.value))
-/** 문서에서 고른 요구사항에 연결된 화면을 캔버스에서 강조 */
-const highlight = computed(() => (docReq.value ? (links.data.value ?? []).filter((l) => l.requirement_id === docReq.value).map((l) => l.screen_id) : []))
+/**
+ * 문서에서 고른 요구사항에 연결된 화면을 캔버스에서 강조 — 지금 고른 화면(REQ 를 눌러 그 안 항목으로 포커스한 화면)은 빼요.
+ * 그 화면은 고른 항목만 선택선으로 보이고, 화면 전체 색 · 테두리는 덮지 않아요
+ */
+const highlight = computed(() => (docReq.value ? (links.data.value ?? []).filter((l) => l.requirement_id === docReq.value && l.screen_id !== selected.value).map((l) => l.screen_id) : []))
+/**
+ * 문서를 읽는 중에 다른 화면(프레임)을 고르면: 그 화면에 연결된 이 문서의 요구사항(문서 순서로 첫 번째)으로 포커스를 옮겨요.
+ * 지금 고른 요구사항이 그 화면에도 연결돼 있으면 그대로, 연결된 게 없으면 포커스를 풀어요
+ */
+watch(selected, (sid, old) => {
+  if (!sid || sid === old || !docId.value || isPageCanvas(sid)) return
+  const linked = new Set((links.data.value ?? []).filter((l) => l.screen_id === sid).map((l) => l.requirement_id))
+  if (docReq.value && linked.has(docReq.value)) return
+  const first = [...docReqs.value].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true })).find((r) => linked.has(r.id))
+  docReq.value = first?.id ?? null
+})
 
 // 토스트
 const toast = ref('')
@@ -327,6 +342,13 @@ async function onProjRename(e: Event) {
   const name = (e.target as HTMLInputElement).value.trim()
   if (!name || name === project.data.value?.name) return
   try { await projActions.update(projectId, { name }) } catch { sayFail(tr('Couldn\'t rename the project')) }
+}
+/** 프레임 우클릭 'Set as thumbnail' · 'Restore default thumbnail': 홈 목록 카드에 보일 화면(null 이면 첫 페이지의 첫 화면) */
+async function onThumbnail(id: string | null) {
+  try {
+    await projActions.update(projectId, { cover_screen_id: id })
+    say(id ? tr('Set as the project thumbnail') : tr('Restored the default thumbnail'))
+  } catch { sayFail(tr('Couldn\'t change the thumbnail. Try again')) }
 }
 /** 이름 바꾸기 입력칸: 열리면 바로 포커스하고 글자를 모두 골라요(피그마와 같아요) */
 const vSelect = { mounted: (el: HTMLInputElement) => nextTick(() => { el.focus(); el.select() }) }
@@ -624,6 +646,46 @@ function showDoc(id: string, reqId?: string | null) {
   docReq.value = reqId ?? null
 }
 function closeDoc() { docId.value = null; docReq.value = null }
+/**
+ * 문서에서 REQ 에 마우스를 올리면: 연결된 화면마다 그 REQ 를 그린 항목(못 찾으면 화면)을 캔버스에 청록 선으로 미리 보여 줘요(누르지 않아도)
+ */
+const hoverReq = ref<string | null>(null)
+watch(docId, () => (hoverReq.value = null))
+const peek = computed(() => {
+  const id = hoverReq.value
+  const r = id ? (reqs.data.value ?? []).find((x) => x.id === id) : null
+  if (!id || !r) return null
+  const sids = (links.data.value ?? []).filter((l) => l.requirement_id === id).map((l) => l.screen_id).filter((sid) => list.value.some((s) => s.id === sid))
+  return { label: r.code, items: sids.map((sid) => ({ sid, ids: matchReqLayers(store.doc(sid), id, [r.title, r.body ?? ''].join(' ')) })) }
+})
+// 마우스를 올린 REQ 항목이 멀리 있으면(가운데 영역 밖) 잠깐 머문 뒤 스르륵 그쪽으로 — 훑고 지나갈 때는 움직이지 않게 180ms 기다려요
+let peekTimer = 0
+watch(peek, (p) => {
+  clearTimeout(peekTimer)
+  const it = p?.items[0]
+  if (!it) return
+  peekTimer = window.setTimeout(() => canvas.value?.reveal(it.sid, it.ids), 180)
+})
+/** 문서에서 REQ 를 누르면: 그 REQ 로 포커스(다시 누르면 풀기) + 캔버스도 그 REQ 를 그린 레이어(컴포넌트 · 항목)로 */
+function pickReq(id: string) {
+  docReq.value = docReq.value === id ? null : id
+  if (docReq.value) focusReq(docReq.value)
+}
+/**
+ * REQ 가 연결된 화면(지금 고른 화면이 연결돼 있으면 그것, 아니면 첫 번째)에서 그 REQ 를 그린 레이어를 골라 그 자리로 확대해요.
+ * 레이어는 직접 연결(레이어 reqs) → 없으면 REQ 문장과 레이어 이름 · 글자로 짐작(app/canvas/reqMatch.ts). 못 찾으면 화면을 골라요
+ */
+function focusReq(id: string) {
+  const r = (reqs.data.value ?? []).find((x) => x.id === id)
+  const linked = (links.data.value ?? []).filter((l) => l.requirement_id === id).map((l) => l.screen_id).filter((sid) => list.value.some((s) => s.id === sid))
+  if (!r || !linked.length) return
+  const sid = selected.value && linked.includes(selected.value) ? selected.value : linked[0]!
+  const ids = matchReqLayers(store.doc(sid), id, [r.title, r.body ?? ''].join(' '))
+  if (ids.length) ids.forEach((lid, i) => store.selectLayer(sid, lid, i > 0))
+  else store.selectScreen(sid)
+  // 이미 잘 보이면 화면은 그대로(선택선만), 멀거나 가려져 있으면 스르륵 그 자리로
+  nextTick(() => canvas.value?.reveal(sid, ids))
+}
 
 async function onCreateReq(p: { text: string; block: string | null }) {
   if (!docId.value) return
@@ -633,6 +695,8 @@ async function onCreateReq(p: { text: string; block: string | null }) {
   try {
     const id = await addRequirement(projectId, { document_id: docId.value, code, title, anchor: p.block ? { block: p.block } : null })
     if (current.value) await setLink({ screen_id: current.value.id, requirement_id: id, status: 'missing', note: null })
+    // 레이어를 고른 채 만들면 그 레이어가 이 REQ 를 그린 것으로 기억해요(REQ 를 누르면 그 레이어로 포커스)
+    if (current.value && store.screenId.value === current.value.id && store.layerIds.value.length) store.update(current.value.id, [...store.layerIds.value], (n) => ({ reqs: [...new Set([...(n.reqs ?? []), id])] }))
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
@@ -965,7 +1029,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :pixel-grid="currentPage?.viewport?.pixelGrid !== false"
       :snap-pixel="currentPage?.viewport?.snapPixel !== false"
       @view="(k: 'pixelGrid' | 'snapPixel') => onPageSettings({ [k]: currentPage?.viewport?.[k] === false })"
+      :cover-id="project.data.value?.cover_screen_id ?? null"
+      @thumbnail="onThumbnail"
       :highlight="highlight"
+      :peek="peek"
       :guides="currentPage?.viewport?.guides ?? { x: [], y: [] }"
       @guides="(g) => onPageSettings({ guides: g })"
       @clone-screen="async (id: string, x: number, y: number) => { const r = await cloneScreen(id, { x, y }); if (r) screenDup = { src: id, copy: r.id } }"
@@ -1022,7 +1089,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       </div>
 
       <template v-if="left === 'file'">
-        <section ref="pagesEl" class="pages" :style="pagesH ? { height: pagesH + 'px', maxHeight: 'none' } : undefined">
+        <!-- 페이지 · 레이어 · 문서 목록: 팝오버와 같은 얇은 스크롤 막대(v-ovscroll) -->
+        <section ref="pagesEl" v-ovscroll class="pages" :style="pagesH ? { height: pagesH + 'px', maxHeight: 'none' } : undefined">
           <div class="sec-h"><span>{{ tr('Pages') }}</span><button class="ib s24" :aria-label="tr('Add new page')" :title="tr('Add new page')" @click="onAddPage"><EditorIcon name="plus" /></button></div>
           <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
           <div v-if="pageOver" class="pdrop" :style="{ top: pageOver.y - 1 + 'px' }" aria-hidden="true" />
@@ -1034,7 +1102,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           </template>
         </section>
         <div :class="['split', { on: splitting }]" role="separator" aria-orientation="horizontal" :aria-label="tr('Resize pages and layers')" :title="tr('Drag to resize · double-click to reset')" @pointerdown="startSplit" @dblclick="resetSplit" />
-        <section class="layers">
+        <section v-ovscroll class="layers">
           <div class="sec-h"><span>{{ tr('Layers') }}</span></div>
           <LayerTree :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
           <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
@@ -1046,7 +1114,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
       <EditorAssets v-else-if="left === 'assets'" v-model:open="asset" :screen-ids="list.map((s) => s.id)" :screen-name="screenName" @pick-screen="(id: string) => pickScreen(id, true)" @insert="(name: string) => canvas?.insertInstance(name)" />
 
-      <div v-else class="docs">
+      <div v-else v-ovscroll class="docs">
         <div class="sec-h"><span>{{ tr('Docs') }}</span><button class="ib s24" :aria-label="tr('Add doc')" :title="tr('Add doc')" @click="addDocOpen = true"><EditorIcon name="plus" /></button></div>
         <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
@@ -1088,8 +1156,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <span class="tx-meta ellipsis f1">{{ current ? tr('Viewing with {name}', { name: current.name }) : '' }}</span>
           <button class="ib s24" :aria-label="tr('Close doc')" :title="tr('Close doc')" @click="closeDoc"><EditorIcon name="close" /></button>
         </div>
-        <div class="scroll reader">
-          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="(id: string) => (docReq = docReq === id ? null : id)" @create-req="onCreateReq" />
+        <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
+        <div v-ovscroll class="scroll reader">
+          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" compact @pick-req="pickReq" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
         </div>
       </template>
 
@@ -1229,7 +1298,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </template>
 
 <style scoped>
-.editor { height: calc(100vh - var(--iris-tabs-h, 0px)); position: relative; overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
+.editor { height: calc(100vh - var(--iris-tabs-h, 0px)); position: relative; overflow: clip; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
 /* 캔버스 나타나기: 보던 자리를 놓은 뒤 .28s 로 옅게 → 또렷이. 페이지를 바꿀 땐 바로 감췄다가 다시 나타나요 */
 .editor :deep(.canvas) { transition: opacity .28s cubic-bezier(.2, .7, .2, 1); }
 .editor.unready :deep(.canvas) { opacity: 0; transition: none; }
@@ -1243,7 +1312,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .panel-top { flex: none; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); position: relative; z-index: 2; }
 .panel-top.r { padding: 0 var(--ref-spacing-06); }
 /* 왼쪽 패널 본문: 메인 메뉴(검은 메뉴)가 접힌 패널 밖으로도 보이게 패널은 넘침을 보이고, 본문만 잘라요 */
-.pbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* clip: hidden 과 달리 코드로도 스크롤되지 않아요 — 접힌 채 레이어를 고르면 scrollIntoView 가 이 칸을 밀어 올려 탭 줄 대신 페이지 · 레이어가 보이던 문제 */
+.pbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: clip; }
 /* 좌측 패널 맨 아래 Variables: 위 구분선 + 안쪽 6 · 8 여백 안에 행 32(모서리 6, 호버 · 연 상태 회색) — 패널 둥근 모서리 밖으로 칠이 나가지 않게 */
 .vars-foot { flex: none; margin-top: auto; padding: var(--ref-spacing-05) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .vars-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); width: 100%; height: 32px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-800); text-align: left; }
@@ -1259,6 +1329,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 /* 접기: 아래 변이 위로 올라가서 맨 위 줄(40) + 탭 줄(42)만 남아요 */
 .editor.ui-hidden .panel-left, .editor.ui-hidden .panel-right, .editor.ui-hidden :deep(.bar[role="toolbar"]) { display: none; }
 .panel-left.collapsed, .panel-right.collapsed { bottom: calc(100% - var(--iris-gap) - var(--iris-rul, 0px) - 40px - 42px); }
+/* 접힌 오른쪽 패널: 자르지 않아서 머리 줄의 펼침 메뉴(줌 · 보기 설정)가 패널 밖 맨 위로 보여요 — 대신 머리 아래 내용은 숨겨요 */
+.panel-right.collapsed { overflow: visible; }
+.panel-right.collapsed > :not(.panel-top):not(.tabs) { visibility: hidden; }
 .fold { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-500); margin-left: var(--ref-spacing-02); }
 .panel-left .fold { margin-left: auto; }
 /* 탭(26)과 같은 높이 · 아이콘 18 */

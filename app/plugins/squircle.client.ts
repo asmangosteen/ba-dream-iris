@@ -20,19 +20,25 @@ function irisSquircle(): void {
     const b = (p - L - c - d) / 3, a = 2 * b;
     return { r, a, b, c, d, p, L };
   };
-  const path = (w: number, h: number, rad: number, x: number, y: number): string => {
+  /**
+   * rev: 좌우로 뒤집어 그려요(같은 모양, 반대 방향). 테두리 고리(--sq-ring)의 안쪽 경로를 반대 방향으로 그려서
+   * 채우기 규칙(evenodd · nonzero)과 상관없이 늘 고리만 남게 해요 — 규칙이 빠지면 상자 전체가 선 색(회색)으로 덮이던 문제
+   */
+  const path = (w: number, h: number, rad: number, x: number, y: number, rev = false): string => {
     const budget = Math.min(w, h) / 2;
     const k = corner(Math.min(rad, budget), budget);
-    if (!k) return 'M ' + f(x) + ' ' + f(y) + ' h ' + f(w) + ' v ' + f(h) + ' h ' + f(-w) + ' Z';
-    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 1 ';
-    return 'M ' + f(x + w - p) + ' ' + f(y) +
-      ' c ' + f(a) + ' 0 ' + f(a + b) + ' 0 ' + f(A) + ' ' + f(d) + ' a ' + R + f(L) + ' ' + f(L) + ' c ' + f(d) + ' ' + f(c) + ' ' + f(d) + ' ' + f(b + c) + ' ' + f(d) + ' ' + f(A) +
-      ' L ' + f(x + w) + ' ' + f(y + h - p) +
-      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + f(-d) + ' ' + f(A) + ' a ' + R + f(-L) + ' ' + f(L) + ' c ' + f(-c) + ' ' + f(d) + ' ' + f(-(b + c)) + ' ' + f(d) + ' ' + f(-A) + ' ' + f(d) +
-      ' L ' + f(x + p) + ' ' + f(y + h) +
-      ' c ' + f(-a) + ' 0 ' + f(-(a + b)) + ' 0 ' + f(-A) + ' ' + f(-d) + ' a ' + R + f(-L) + ' ' + f(-L) + ' c ' + f(-d) + ' ' + f(-c) + ' ' + f(-d) + ' ' + f(-(b + c)) + ' ' + f(-d) + ' ' + f(-A) +
-      ' L ' + f(x) + ' ' + f(y + p) +
-      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + f(d) + ' ' + f(-A) + ' a ' + R + f(L) + ' ' + f(-L) + ' c ' + f(c) + ' ' + f(-d) + ' ' + f(b + c) + ' ' + f(-d) + ' ' + f(A) + ' ' + f(-d) + ' Z';
+    const X = (v: number) => f(rev ? 2 * x + w - v : v);
+    const D = (v: number) => f(rev ? -v : v);
+    if (!k) return 'M ' + X(x) + ' ' + f(y) + ' h ' + D(w) + ' v ' + f(h) + ' h ' + D(-w) + ' Z';
+    const { r, a, b, c, d, p, L } = k, A = a + b + c, R = f(r) + ' ' + f(r) + ' 0 0 ' + (rev ? '0 ' : '1 ');
+    return 'M ' + X(x + w - p) + ' ' + f(y) +
+      ' c ' + D(a) + ' 0 ' + D(a + b) + ' 0 ' + D(A) + ' ' + f(d) + ' a ' + R + D(L) + ' ' + f(L) + ' c ' + D(d) + ' ' + f(c) + ' ' + D(d) + ' ' + f(b + c) + ' ' + D(d) + ' ' + f(A) +
+      ' L ' + X(x + w) + ' ' + f(y + h - p) +
+      ' c 0 ' + f(a) + ' 0 ' + f(a + b) + ' ' + D(-d) + ' ' + f(A) + ' a ' + R + D(-L) + ' ' + f(L) + ' c ' + D(-c) + ' ' + f(d) + ' ' + D(-(b + c)) + ' ' + f(d) + ' ' + D(-A) + ' ' + f(d) +
+      ' L ' + X(x + p) + ' ' + f(y + h) +
+      ' c ' + D(-a) + ' 0 ' + D(-(a + b)) + ' 0 ' + D(-A) + ' ' + f(-d) + ' a ' + R + D(-L) + ' ' + f(-L) + ' c ' + D(-d) + ' ' + f(-c) + ' ' + D(-d) + ' ' + f(-(b + c)) + ' ' + D(-d) + ' ' + f(-A) +
+      ' L ' + X(x) + ' ' + f(y + p) +
+      ' c 0 ' + f(-a) + ' 0 ' + f(-(a + b)) + ' ' + D(d) + ' ' + f(-A) + ' a ' + R + D(L) + ' ' + f(-L) + ' c ' + D(c) + ' ' + f(-d) + ' ' + D(b + c) + ' ' + f(-d) + ' ' + D(A) + ' ' + f(-d) + ' Z';
   };
   const last = new WeakMap<HTMLElement, string>(), seen = new WeakSet<HTMLElement>();
   const apply = (el: HTMLElement) => {
@@ -58,7 +64,7 @@ function irisSquircle(): void {
     }
     const outer = path(ow, oh, r, 1, 1);
     el.style.setProperty('--sq-path', "path('" + outer + "')");
-    el.style.setProperty('--sq-ring', lw > 0 && ow > lw * 2 && oh > lw * 2 ? "path(evenodd, '" + outer + ' ' + path(ow - lw * 2, oh - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw) + "')" : 'inset(50%)');
+    el.style.setProperty('--sq-ring', lw > 0 && ow > lw * 2 && oh > lw * 2 ? "path('" + outer + ' ' + path(ow - lw * 2, oh - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw, true) + "')" : 'inset(50%)');
     if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(ow, oh, r, 0, 0) + "')");
     if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');
   };

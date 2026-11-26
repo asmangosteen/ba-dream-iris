@@ -35,6 +35,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
+  /** 요구사항 블록 · 번호에 마우스를 올리면 그 REQ, 벗어나면 null — 캔버스가 그 항목을 청록 선으로 미리 보여 줘요 */
+  'hover-req': [reqId: string | null]
   'create-req': [payload: { text: string; block: string | null }]
   /** 빈 문서에서 "내용 쓰기"를 눌렀을 때(넓은 화면 전용, compact 는 고치기 링크로 갑니다) */
   edit: []
@@ -274,13 +276,15 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         :data-block="b.id"
         :data-reqs="blockReqIds(b) || undefined"
         :class="['blk', b.type, { sq: reqsByBlock.has(b.id), marked: reqsByBlock.has(b.id), on: isOn(b) }]"
+        @mouseenter="reqsByBlock.has(b.id) && emit('hover-req', reqsByBlock.get(b.id)![0]!.id)"
+        @mouseleave="reqsByBlock.has(b.id) && emit('hover-req', null)"
       >
         <span v-if="headerReqs(b).length" class="codes">
-          <button v-for="r in headerReqs(b)" :key="r.id" type="button" class="sq code num" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)">{{ r.code }}</button>
+          <button v-for="r in headerReqs(b)" :key="r.id" type="button" class="sq code num" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
           <template v-for="(s, i) in segments(b.text)" :key="i">
-            <button v-if="s.req" type="button" class="sq code num" :aria-pressed="highlight === s.req.id" :title="s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
+            <button v-if="s.req" type="button" class="sq code num" :aria-pressed="highlight === s.req.id" :title="s.req.title" @click="emit('pick-req', s.req.id)" @mouseenter="emit('hover-req', s.req.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ s.t }}</button>
             <template v-else>{{ s.t }}</template>
           </template>
         </component>
@@ -317,15 +321,17 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .blk.li > p { position: relative; padding-left: var(--ref-spacing-10); }
 .blk.li > p::before { content: ''; position: absolute; left: 4px; top: 9px; width: 3px; height: 3px; border-radius: 50%; background: var(--sys-color-neutral-500); }
 .blk.marked { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); scroll-margin: var(--ref-spacing-16); }
-.blk.marked.on { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
+/* 요구사항 색은 청록(캔버스에서 그 항목을 보여 주는 선과 같은 색 --iris-peek): 올리면 옅은 청록 선, 고르면 옅은 청록 칠 + 청록 선 */
+.blk.marked:hover { --sq-line: color-mix(in srgb, var(--iris-peek) 45%, transparent); --sq-line-w: 0.5px; }
+.blk.marked.on { --sq-fill: var(--iris-peek-bg); --sq-line: var(--iris-peek); --sq-line-w: 0.5px; }
 .blk.marked.li > p::before { display: none; }
 .blk.marked.li > p { padding-left: 0; }
 .blk p, .blk h3 { margin: 0; }
 .compact .blk.marked { padding: var(--ref-spacing-06) var(--ref-spacing-07); }
 .codes { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
-.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest); text-align: inherit; }
-.code:hover, .code[aria-pressed='true'] { --sq-fill: var(--sys-color-brand-primary-lighter); }
-.code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); text-align: inherit; }
+.code:hover, .code[aria-pressed='true'] { --sq-fill: var(--iris-peek-bg-strong); }
+.code:focus-visible { outline: 2px solid var(--iris-peek); outline-offset: 1px; }
 
 .card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; min-width: 0; }
 .chip { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; color: var(--sys-color-neutral-800); }

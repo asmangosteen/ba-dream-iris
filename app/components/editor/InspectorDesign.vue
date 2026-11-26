@@ -2,12 +2,14 @@
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import type { LayerStyle } from '~/canvas/schema'
-import { colorLabel, parseColor, type CatalogToken } from '~/canvas/tokens'
+import type { CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
 import InspectorPaints from '~/components/editor/InspectorPaints.vue'
-import ColorField from '~/components/editor/ColorField.vue'
+import EditorSelect from '~/components/editor/EditorSelect.vue'
+import StrokeSettings from '~/components/editor/StrokeSettings.vue'
+import { useContextMenu } from '~/composables/useContextMenu'
 import InspectorEffects from '~/components/editor/InspectorEffects.vue'
 import CornerSmoothing from '~/components/editor/CornerSmoothing.vue'
 import InspectorSelectionColors from '~/components/editor/InspectorSelectionColors.vue'
@@ -76,15 +78,11 @@ const differs = (fn: (l: LayerStyle) => unknown) => looks.value.some((l) => JSON
 const mixOpacity = computed(() => differs((l) => [l.opacity, (l.vars as Record<string, string> | undefined)?.opacity]))
 const mixRadius = computed(() => differs((l) => [l.radius, l.radii]))
 const mixClip = computed(() => differs((l) => l.clip !== false))
-const mixStroke = computed(() => differs((l) => [l.stroke, l.strokeWidth]))
+const mixStroke = computed(() => differs((l) => [l.stroke, l.strokes]))
 const mixGrids = computed(() => differs((l) => l.grids ?? []))
 const vb = (key: string) => (look.value.vars as Record<string, string> | undefined)?.[key] ?? null
-const hasFill = computed(() => look.value.fill !== '')
-const fillColor = computed(() => look.value.fill ?? '#FFFFFF')
-const hasStroke = computed(() => !!(look.value.stroke && look.value.strokeWidth))
-const hex = (v?: string) => parseColor(store.color(v))?.hex ?? '#000000'
-/** 색 값 글자: Fill 행(InspectorPaints)처럼 # 없이 'FFFFFF' */
-const colorText = (v?: string) => (!v ? tr('None') : v.startsWith('token:') ? v.slice(6) : colorLabel(v).replace(/^#/, ''))
+/** 선이 하나라도 있나(바탕 선 또는 덧붙인 선) */
+const hasStroke = computed(() => !!(look.value.stroke || look.value.strokes?.length))
 const blurOnEnter = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 /** 입력칸 공통: Esc 는 고치던 값을 버리고 칸에서 나가요(포커스할 때 값을 기억했다가 되돌리고, 그 사이 change 는 막아요) */
 function onFocusIn(e: FocusEvent) { const t = e.target as HTMLInputElement; if (t.tagName === 'INPUT') t.dataset.orig = t.value }
@@ -98,14 +96,6 @@ function onEsc(e: KeyboardEvent) {
   delete t.dataset.esc
 }
 function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.stopPropagation() }
-function setHex(key: 'fill' | 'stroke', e: Event) {
-  const input = e.target as HTMLInputElement
-  let v = input.value.trim()
-  if (!v.startsWith('#')) v = '#' + v
-  if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map((c) => c + c).join('')
-  if (/^#[0-9a-f]{6}$/i.test(v)) fstyle({ [key]: v.toUpperCase() })
-  else input.value = colorText(key === 'fill' ? fillColor.value : look.value.stroke)
-}
 function setNumber(key: 'radius' | 'strokeWidth' | 'opacity', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
@@ -124,7 +114,6 @@ function keyStep(key: 'radius' | 'strokeWidth' | 'opacity', e: KeyboardEvent) {
   stepNumber(key, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1))
 }
 const numText = (key: 'radius' | 'strokeWidth' | 'opacity') => String(key === 'opacity' ? Math.round((look.value.opacity ?? 1) * 100) : Math.round((look.value[key] ?? 0) * 10) / 10)
-function pickColor(key: 'fill' | 'stroke', t: CatalogToken) { fstyle({ [key]: t.color }, { [key]: t.id }) }
 function pickNum(key: 'radius' | 'strokeWidth' | 'opacity', t: CatalogToken) { fstyle({ [key]: t.num!, ...(key === 'radius' ? { radii: undefined } : {}) }, { [key]: t.id }) }
 function unbindKey(key: string) { fstyle({}, { [key]: null }) }
 
@@ -169,6 +158,80 @@ function pickCorner(i: number | null, t: CatalogToken) {
   const r = [...radiiNow.value] as [number, number, number, number]
   if (i === null) r.fill(t.num!); else r[i] = t.num!
   fstyle({ radii: r }, cornerVars(i, t.id))
+}
+// --- Stroke 설정(레이어 Stroke 와 같아요): 위치 · 두께 · 세부 설정 창 · 변마다 두께 ---
+const mixAlign = computed(() => differs((l) => l.strokeAlign ?? 'inside'))
+const mixWeight = computed(() => differs((l) => l.strokeWidth ?? 0))
+const strokeOpen = ref(false)
+const strokeBtn = ref<HTMLElement | null>(null)
+watch(() => ids.value.join(), () => { strokeOpen.value = false })
+/** 프레임마다 다른 값으로 고치기(실행취소 한 번) */
+const fEach = (fn: (l: LayerStyle) => Partial<LayerStyle>) => store.batch(() => { for (const id of ids.value) store.frameStyle(id, fn(store.doc(id).frame ?? {})) })
+const SIDE_KEYS = ['top', 'right', 'bottom', 'left'] as const
+const SIDE_LABEL = ['Top', 'Right', 'Bottom', 'Left']
+type SideMode = 'all' | 'top' | 'right' | 'bottom' | 'left' | 'custom'
+const sideMode = computed<SideMode>(() => {
+  const sd = look.value.strokeSides
+  if (!sd) return 'all'
+  const on = sd.map((x) => x > 0)
+  return on.filter(Boolean).length === 1 ? SIDE_KEYS[on.indexOf(true)]! : 'custom'
+})
+const sidesIcon = computed(() => {
+  const sd = look.value.strokeSides
+  if (!sd) return 'stroke_all'
+  const on = sd.map((x) => x > 0)
+  if (on.filter(Boolean).length === 1) return `stroke_${SIDE_KEYS[on.indexOf(true)]!}`
+  return `stroke_sides_${on.map((b) => (b ? 1 : 0)).join('')}`
+})
+const sidesNow = computed(() => { const w = look.value.strokeWidth ?? 1; return look.value.strokeSides ?? [w, w, w, w] })
+function setSideMode(m: SideMode) {
+  fEach((l) => {
+    const w = l.strokeWidth || 1
+    return { strokeSides: m === 'all' ? undefined : m === 'custom' ? [w, w, w, w] : (SIDE_KEYS.map((k) => (k === m ? w : 0)) as [number, number, number, number]) }
+  })
+}
+const ctxMenu = useContextMenu()
+function sidesMenu(e: MouseEvent) {
+  // Custom(변마다 칸이 열린 상태)에서 다시 누르면 칸을 닫고 네 변 모두(All)로 — 두께는 가장 두꺼운 변
+  if (sideMode.value === 'custom') { setSideMode('all'); return }
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const at = { clientX: r.left, clientY: r.bottom + 4, preventDefault() {}, stopPropagation() {} } as unknown as MouseEvent
+  const icon = (m: SideMode) => (m === 'all' ? 'stroke_all' : m === 'custom' ? (sideMode.value === 'custom' ? sidesIcon.value : 'stroke_sides_1111') : `stroke_${m}`)
+  const item = (m: SideMode, label: string) => ({ label: (sideMode.value === m ? '✓ ' : '') + tr(label), icon: { name: icon(m) }, action: () => setSideMode(m) })
+  ctxMenu.open(at, [item('all', 'All'), item('top', 'Top'), item('bottom', 'Bottom'), item('left', 'Left'), item('right', 'Right'), 'sep' as const, item('custom', 'Custom')])
+}
+/** 두께를 바꾸면 켜진 변들도 같은 두께로(꺼진 변은 그대로 0) */
+const syncSides = () => fEach((l) => (l.strokeSides ? { strokeSides: l.strokeSides.map((x) => (x > 0 ? l.strokeWidth ?? 1 : 0)) as [number, number, number, number] } : {}))
+const onWeight = (e: Event) => store.batch(() => { setNumber('strokeWidth', e); syncSides() })
+function weightKey(e: KeyboardEvent) {
+  blurOnEnter(e)
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  // 여러 프레임 두께가 다르면 각자 값에 더해요
+  const d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+  store.batch(() => { fEach((l) => ({ strokeWidth: Math.max(0.5, (l.strokeWidth ?? 0) + d) })); syncSides() })
+}
+/** Custom 한 변: 두께(strokeWidth)는 가장 두꺼운 변 */
+function setSideAt(i: number, fn: (cur: number) => number) {
+  fEach((l) => {
+    const w = l.strokeWidth ?? 1
+    const sd = [...(l.strokeSides ?? [w, w, w, w])] as [number, number, number, number]
+    sd[i] = fn(sd[i]!)
+    return { strokeSides: sd, strokeWidth: Math.max(...sd) || l.strokeWidth }
+  })
+}
+function setSide(i: number, e: Event) {
+  const input = e.target as HTMLInputElement
+  const v = Number(input.value.replace(/[^\d.]/g, ''))
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = String(sidesNow.value[i]); return }
+  setSideAt(i, () => Math.max(0, Math.round(v * 10) / 10))
+}
+function sideKey(i: number, e: KeyboardEvent) {
+  blurOnEnter(e)
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  e.preventDefault()
+  const d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)
+  setSideAt(i, (cur) => Math.max(0, cur + d))
 }
 const smoothOpen = ref(false)
 const smoothBtn = ref<HTMLElement[] | HTMLElement | null>(null)
@@ -233,24 +296,28 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 
       <InspectorPaints :sid="screen.id" :sids="ids" :ids="[]" kind="fill" title="Fill" frame />
 
-      <section class="s">
-        <div :class="['sec-h', 'h24', { empty: !hasStroke && !mixStroke }]"><span>{{ tr('Stroke') }}</span><button v-if="!hasStroke || mixStroke" class="ib s24" :aria-label="tr('Add stroke')" :title="tr('Add stroke')" @click="fstyle({ stroke: '#202837', strokeWidth: 1 })"><EditorIcon name="plus" :size="16" /></button></div>
-        <p v-if="mixStroke" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
+      <!-- Stroke: Fill 과 같은 칠 목록(견본 · HEX | % · 👁 · −, 여러 칠 · 스타일) + 선 설정(피그마와 같아요: Position · Weight · ⚙ 세부 설정 · ▢ 변마다) -->
+      <InspectorPaints :sid="screen.id" :sids="ids" :ids="[]" kind="stroke" title="Stroke" frame>
         <template v-if="hasStroke && !mixStroke">
-          <!-- 피그마 Stroke 행: [견본 + 값] [변수 24] [− 24] -->
-          <div class="prow">
-            <label class="sq fld"><ColorField :model-value="store.color(look.stroke) ?? look.stroke" :sid="screen.id" :sids="ids" bindable label="Frame stroke color" @update:model-value="(v) => fstyle({ stroke: v })" @token="(t) => pickColor('stroke', t)" /><input v-if="!vb('stroke')" :key="'s' + look.stroke" :value="colorText(look.stroke)" :aria-label="tr('Frame stroke color value')"@change="setHex('stroke', $event)" @keydown="blurOnEnter"><TokenPicker v-else :kinds="['color']" :bound="vb('stroke')" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" @unbind="unbindKey('stroke')" /></label>
-            <TokenPicker v-if="!vb('stroke')" :kinds="['color']" label="Frame stroke color" @pick="(t) => pickColor('stroke', t)" />
-            <span v-else />
-            <button class="ib s24" :aria-label="tr('Remove stroke')" :title="tr('Remove stroke')" @click="fstyle({ stroke: undefined, strokeWidth: undefined })"><EditorIcon name="minus" :size="16" /></button>
+          <div class="ig-l ig4"><span>{{ tr('Position') }}</span><span>{{ tr('Weight') }}</span></div>
+          <div class="ig ig4">
+            <EditorSelect :model-value="mixAlign ? null : look.strokeAlign ?? 'inside'" :options="[{ value: 'center', label: 'Center' }, { value: 'inside', label: 'Inside' }, { value: 'outside', label: 'Outside' }]" ariaLabel="Stroke position" placeholder="Mixed" @update:model-value="(v) => fstyle({ strokeAlign: v === 'inside' ? undefined : (v as LayerStyle['strokeAlign']) })" />
+            <label class="sq fld u" :title="tr('Stroke weight')"><EditorIcon name="stroke_weight" class="keep" /><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth') + mixWeight" :value="mixWeight ? '' : numText('strokeWidth')" :placeholder="mixWeight ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Frame stroke weight')" @change="onWeight($event)" @keydown="weightKey($event)"><span v-if="!mixWeight" class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => store.batch(() => { pickNum('strokeWidth', t); syncSides() })" @unbind="unbindKey('strokeWidth')" @step="(d) => store.batch(() => { stepNumber('strokeWidth', d); syncSides() })" /></label>
+            <span class="ig4-acts">
+              <button ref="strokeBtn" type="button" :class="['ib', 's24', 'tog', { on: strokeOpen }]" :aria-expanded="strokeOpen" aria-haspopup="dialog" :aria-label="tr('Stroke settings')" :data-tip="tr('Stroke settings')" @click="strokeOpen = !strokeOpen"><EditorIcon name="filter" /></button>
+              <button type="button" :class="['ib', 's24', 'tog', { on: sideMode !== 'all' }]" aria-haspopup="menu" :aria-label="tr('Individual strokes')" :data-tip="tr('Individual strokes')" @click="sidesMenu"><EditorIcon :name="sidesIcon" class="keep" /></button>
+            </span>
           </div>
-          <div class="ig-l"><span>{{ tr('Weight') }}</span></div>
-          <div class="ig">
-            <label class="sq fld u" :title="tr('Stroke weight')"><EditorIcon name="stroke_weight" class="keep" /><template v-if="!vb('strokeWidth')"><input :key="'w' + numText('strokeWidth')" :value="numText('strokeWidth')" inputmode="decimal" :aria-label="tr('Frame stroke weight')" @change="setNumber('strokeWidth', $event)" @keydown="keyStep('strokeWidth', $event)"><span class="unit">px</span></template><TokenPicker :kinds="['borderWidth']" :bound="vb('strokeWidth')" reveal label="Frame stroke weight" @pick="(t) => pickNum('strokeWidth', t)" @unbind="unbindKey('strokeWidth')" @step="(d) => stepNumber('strokeWidth', d)" /></label>
-            <span /><span />
-          </div>
+          <!-- Custom: 변마다 두께 [왼쪽 · 위] [오른쪽 · 아래](피그마 순서) -->
+          <template v-if="sideMode === 'custom'">
+            <div v-for="row in ([[3, 0], [1, 2]] as const)" :key="row[0]" class="ig">
+              <label v-for="i in row" :key="i" class="sq fld" :title="tr(SIDE_LABEL[i]!)"><EditorIcon :name="`stroke_${SIDE_KEYS[i]!}`" class="keep" /><input :key="'sd' + i + sidesNow[i]" :value="sidesNow[i]" inputmode="decimal" :aria-label="tr(SIDE_LABEL[i]!)" @change="setSide(i, $event)" @keydown="sideKey(i, $event)"></label>
+              <span />
+            </div>
+          </template>
+          <StrokeSettings v-if="strokeOpen" :anchor="strokeBtn" :styles="looks" :open-path="false" default-join="miter" default-cap="butt" @set="(p) => fstyle(p)" @close="strokeOpen = false" />
         </template>
-      </section>
+      </InspectorPaints>
 
       <InspectorEffects :sid="screen.id" :sids="ids" :ids="[]" frame />
 
@@ -278,9 +345,6 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 .h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s24 { width: 28px; height: 28px; }
-/* Stroke 행: Fill 행(InspectorPaints)과 같아요 — [견본 + 값 | 8 | 변수 24 | − 24] */
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
-.prow > .fld { margin-right: var(--ref-spacing-06); }
 /* 단위(% px)는 숫자 바로 뒤에 */
 .design .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }
 .fld.u > .unit { flex: 1 1 0; min-width: 0; margin-left: calc(var(--ref-spacing-03) * -1); color: var(--sys-color-neutral-500); }
@@ -289,6 +353,11 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 .cb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 .m0 { margin: 0; }
+/* Stroke 줄(레이어 Stroke 와 같아요): [Position][Weight][⚙ · ▢] — Position ▾ 는 흰 바탕 + 테두리 */
+.ig4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 56px !important; }
+.ig4-acts { display: flex; align-items: center; }
+.ig4 > :deep(.esel) > .dd { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--sys-color-brand-primary-default); }
 /* 자르기 Mixed: 상자 안 가로줄(피그마와 같아요) */
 .cb.mix > i::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' stroke='%23202837' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-position: center; background-size: 12px; background-repeat: no-repeat; }
 </style>

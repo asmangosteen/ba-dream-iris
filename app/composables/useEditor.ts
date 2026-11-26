@@ -42,9 +42,9 @@ export function useEditor(projectId: string) {
       if (!p) { p = { id: projectId, name: 'Untitled', status: 'planning', updated_at: new Date().toISOString() }; PREVIEW_PROJECTS.push(p); refreshNuxtData('projects') }
       return p
     }
-    const { data, error } = await supabase.from('projects').select('id, name').eq('id', projectId).single()
+    const { data, error } = await supabase.from('projects').select('id, name, cover_screen_id').eq('id', projectId).single()
     if (error) throw error
-    return data as { id: string; name: string }
+    return data as { id: string; name: string; cover_screen_id?: string | null }
   }, { deep: true, getCachedData: fromCache(() => `project-${projectId}`) })
   const pages = useAsyncData(`pages-${projectId}`, async () => {
     if (preview) return PREVIEW_PROJECT_PAGES[projectId] ?? PREVIEW_PAGES

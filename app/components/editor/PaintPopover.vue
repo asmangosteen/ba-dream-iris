@@ -623,10 +623,6 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 .lr-n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .empty { padding: var(--ref-spacing-06) 0; text-align: center; font-size: 12px; }
 .fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
-/* 창 안 드롭다운(Linear · Hex · 맞춤 · 라이브러리): 회색 입력칸과 구분되게 흰 바탕 + 테두리(Constraints 드롭다운과 같아요) */
-.paint-pop :deep(.esel > .dd) { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.paint-pop :deep(.esel > .dd:hover) { --sq-line: var(--ref-color-gray-900-20, rgb(3 9 26 / 20%)); }
-.paint-pop :deep(.esel > .dd.open) { --sq-line: var(--sys-color-brand-primary-default); }
 /* 아이콘 버튼의 비활성은 공통 규칙(neutral-400)만 — 겹쳐 흐리게 하지 않아요 */
 button:disabled:not(.ib) { opacity: 0.35; pointer-events: none; }
 .ib:disabled { pointer-events: none; }

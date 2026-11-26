@@ -50,7 +50,8 @@ function reveal(sid: string, ids: string[]) {
   if (!sid.startsWith('page:')) s.add(sid)
   for (const id of ids) for (let p = d.nodes[id]?.parentId; p; p = d.nodes[p]?.parentId) s.add(sid + ':' + p)
   if (s.size !== before) expanded.value = s
-  nextTick(() => document.querySelector<HTMLElement>(`.tree [data-key="${sid}:${ids[ids.length - 1]}"]`)?.scrollIntoView({ block: 'nearest' }))
+  // 사이드바가 접혀 있으면 스크롤하지 않아요(보이지 않는 목록 때문에 패널 · 편집기가 밀리지 않게)
+  nextTick(() => { const el = document.querySelector<HTMLElement>(`.tree [data-key="${sid}:${ids[ids.length - 1]}"]`); if (el && !el.closest('.collapsed')) el.scrollIntoView({ block: 'nearest' }) })
 }
 watch(() => [store.screenId.value, store.layerIds.value.join()] as const, ([sid]) => { if (sid && store.layerIds.value.length) reveal(sid, [...store.layerIds.value]) })
 /** ⌥L 모든 레이어 접기(피그마와 같아요) */

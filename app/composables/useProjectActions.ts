@@ -50,16 +50,17 @@ export function useProjectActions() {
     return data as ProjectDetail
   }
 
-  async function update(id: string, patch: Partial<Omit<ProjectDetail, 'id'>>) {
+  /** cover_screen_id: 홈 카드 썸네일로 쓸 화면(null 이면 기본 — 첫 페이지의 첫 화면) */
+  async function update(id: string, patch: Partial<Omit<ProjectDetail, 'id'>> & { cover_screen_id?: string | null }) {
     if (preview) {
       let p = PREVIEW_PROJECTS.find((x) => x.id === id)
       if (!p) { p = { id, name: 'Untitled', status: 'planning', updated_at: new Date().toISOString() }; PREVIEW_PROJECTS.push(p) }
-      Object.assign(p, { ...(patch.name ? { name: patch.name } : {}), ...(patch.status ? { status: patch.status } : {}), updated_at: new Date().toISOString() })
+      Object.assign(p, { ...(patch.name ? { name: patch.name } : {}), ...(patch.status ? { status: patch.status } : {}), ...('cover_screen_id' in patch ? { cover_screen_id: patch.cover_screen_id ?? null } : {}), updated_at: new Date().toISOString() })
     } else {
       const { error } = await supabase.from('projects').update(patch).eq('id', id)
       if (error) throw error
     }
-    await Promise.all([refreshNuxtData('projects'), refreshNuxtData(`project-${id}`)])
+    await Promise.all([refreshNuxtData('projects'), refreshNuxtData(`project-${id}`), ...('cover_screen_id' in patch ? [refreshNuxtData('project-covers')] : [])])
   }
 
   /** 페이지 · 화면 · 문서 · 요구사항이 함께 지워집니다(DB cascade) */
@@ -77,7 +78,8 @@ export function useProjectActions() {
   return { create, detail, update, remove }
 }
 
-export interface CoverScreen { project_id: string; id: string; source: 'figma' | 'native'; width: number; height: number; thumbnail_path: string | null; layers: unknown }
+/** custom: 프레임 우클릭 'Set as thumbnail' 로 정한 화면(홈 카드에 꽉 차게) */
+export interface CoverScreen { project_id: string; id: string; source: 'figma' | 'native'; width: number; height: number; thumbnail_path: string | null; layers: unknown; custom?: boolean }
 
 /** 홈 카드 썸네일: 프로젝트마다 대표 화면(cover_screen_id, 없으면 첫 페이지의 첫 화면) */
 export function useProjectCovers() {
@@ -88,6 +90,12 @@ export function useProjectCovers() {
     if (preview) {
       const s = PREVIEW_SCREENS['pg-1']?.[0]
       if (s) out['preview-1'] = { project_id: 'preview-1', id: s.id, source: s.source, width: s.width, height: s.height, thumbnail_path: s.thumbnail_path ?? null, layers: s.layers ?? null }
+      // 썸네일로 정한 화면(미리보기 화면 어디서든)
+      const all = Object.values(PREVIEW_SCREENS).flat()
+      for (const p of PREVIEW_PROJECTS) {
+        const c = p.cover_screen_id ? all.find((x) => x.id === p.cover_screen_id) : null
+        if (c) out[p.id] = { project_id: p.id, id: c.id, source: c.source, width: c.width, height: c.height, thumbnail_path: c.thumbnail_path ?? null, layers: c.layers ?? null, custom: true }
+      }
       return out
     }
     const { data, error } = await supabase
@@ -100,6 +108,14 @@ export function useProjectCovers() {
     for (const s of (data ?? []) as unknown as (CoverScreen & { pages: { project_id: string } })[]) {
       const pid = s.pages.project_id
       if (!out[pid]) out[pid] = { project_id: pid, id: s.id, source: s.source, width: s.width, height: s.height, thumbnail_path: s.thumbnail_path, layers: s.layers }
+    }
+    // 썸네일로 정한 화면이 있으면 그것으로(지워진 화면이면 기본 그대로)
+    const { data: ps } = await supabase.from('projects').select('id, cover_screen_id').not('cover_screen_id', 'is', null)
+    const want = (ps ?? []) as { id: string; cover_screen_id: string }[]
+    if (want.length) {
+      const { data: cs } = await supabase.from('screens').select('id, source, width, height, thumbnail_path, layers').in('id', want.map((p) => p.cover_screen_id))
+      const byId = new Map(((cs ?? []) as Omit<CoverScreen, 'project_id'>[]).map((c) => [c.id, c]))
+      for (const p of want) { const c = byId.get(p.cover_screen_id); if (c) out[p.id] = { ...c, project_id: p.id, custom: true } }
     }
     return out
   }, { server: false })

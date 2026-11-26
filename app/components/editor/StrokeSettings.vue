@@ -140,7 +140,4 @@ const JOINS = [
 .seg-b:hover { color: var(--sys-color-neutral-800); }
 .seg-b.on { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; color: var(--sys-color-neutral-800); }
 .seg-b:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
-/* 창 안 드롭다운: 흰 바탕 + 테두리(칠 창과 같아요) */
-.ss-pop :deep(.esel > .dd) { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.ss-pop :deep(.esel > .dd.open) { --sq-line: var(--sys-color-brand-primary-default); }
 </style>

@@ -2,7 +2,7 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-import { backgroundCss, effectCss, radiiOf, STAR_INNER, strokeColors, strokeShadows } from './paint'
+import { backgroundCss, effectCss, radiiOf, rectPath, STAR_INNER, strokeColors, strokeShadows } from './paint'
 import { squirclePath } from './squircle'
 
 export const SCHEMA_VERSION = 7
@@ -48,6 +48,20 @@ export type Sizing = 'fixed' | 'hug' | 'fill'
 /** 제약 (v6): 부모 프레임 크기가 바뀔 때 */
 export interface Constraints { h: 'left' | 'right' | 'leftright' | 'center' | 'scale'; v: 'top' | 'bottom' | 'topbottom' | 'center' | 'scale' }
 /** 레이아웃 그리드 (v6) */
+/** 레이아웃 그리드의 칸(Columns · Rows) — 프레임 안 좌표. 그리기(GridOverlay)와 가이드선 붙기가 같이 써요 */
+export function gridBands(grids: LayoutGrid[] | undefined, w: number, h: number): { x: number; y: number; w: number; h: number; c: string }[] {
+  const out: { x: number; y: number; w: number; h: number; c: string }[] = []
+  for (const g of (grids ?? []).filter((x) => x.visible !== false && x.type !== 'grid')) {
+    const n = Math.max(1, g.count ?? 4), gut = g.gutter ?? 16, m = g.margin ?? 16
+    const total = g.type === 'columns' ? w : h
+    const size = Math.max(0, (total - m * 2 - gut * (n - 1)) / n)
+    for (let i = 0; i < n; i++) {
+      const at = m + i * (size + gut)
+      out.push(g.type === 'columns' ? { x: at, y: 0, w: size, h, c: g.color ?? '#FF000019' } : { x: 0, y: at, w, h: size, c: g.color ?? '#FF000019' })
+    }
+  }
+  return out
+}
 export interface LayoutGrid {
   type: 'columns' | 'rows' | 'grid'
   /** 연결된 색 토큰 id(color 에는 그 값) */
@@ -140,6 +154,8 @@ export interface LayerStyle {
   layout?: AutoLayout
   /** 레이아웃 그리드(프레임 · 화면) */
   grids?: LayoutGrid[]
+  /** 화면(프레임)에 붙은 가이드선 — 프레임 왼쪽 · 위에서 잰 거리. 프레임과 함께 옮겨지고 복사돼요(피그마와 같아요) */
+  guides?: { x: number[]; y: number[] }
   /**
    * 변수(토큰) 연결 (v3): 속성 키 → 토큰 id. 연결할 때 실제 값도 그 속성에 함께 써 두어서
    * 그리기 · 내보내기는 연결을 몰라도 됩니다. 속성 값을 직접 고치면 그 키의 연결이 풀려요(store 의 record()).
@@ -205,6 +221,8 @@ export interface LayerNode {
   vnet?: VPath[]
   /** 벡터 채우기 규칙(겹친 부분 구멍) */
   evenodd?: boolean
+  /** 이 레이어가 그리는 요구사항(REQ id들) — 문서에서 REQ 를 누르면 이 레이어로 포커스해요(app/canvas/reqMatch.ts) */
+  reqs?: string[]
   /** 디자인 시스템 컴포넌트 인스턴스: 컴포넌트 이름 · 속성 값 */
   component?: string
   props?: Record<string, unknown>
@@ -347,8 +365,22 @@ export function frameSmoothLayers(f: LayerStyle | undefined, w: number, h: numbe
   const cols = f.strokeWidth ? strokeColors(f, color) : []
   const sw = f.strokeWidth ?? 0
   const inset = (f.strokeAlign ?? 'inside') === 'inside' ? sw / 2 : f.strokeAlign === 'outside' ? -sw / 2 : 0
-  const stroke = cols.length ? { d: squirclePath(w, h, sq.r, sq.sm, inset), w: sw, colors: cols.reverse() } : null
+  const stroke = cols.length ? { d: squirclePath(w, h, sq.r, sq.sm, inset), w: sw, colors: cols.reverse(), ...dashOf(f) } : null
   return { bg, shadow, stroke, clip: f.clip !== false && !shadow ? `path('${sq.path}')` : null }
+}
+/** 점선(Stroke settings · Dashed): SVG stroke-dasharray · 끝 모양 */
+const dashOf = (f: LayerStyle): { dash?: string; cap?: 'round' | 'square' | 'butt' } => (f.dash ? { dash: f.dash.join(' '), cap: f.cap === 'round' ? 'round' : f.cap === 'square' ? 'square' : 'butt' } : {})
+/**
+ * 점선 화면 테두리(모서리 smoothing 이 없을 때) — box-shadow 로는 점선을 못 그려서, 둥근 사각형 경로의 SVG 선으로(자식 위 · 위치 Inside/Center/Outside)
+ * smoothing 이 있으면 frameSmoothLayers 의 선이 같은 점선을 그려요
+ */
+export function frameDashStroke(f: LayerStyle | undefined, w: number, h: number, color: (v?: string) => string | undefined) {
+  if (!f?.dash || !f.strokeWidth || frameSmooth(f, w, h)) return null
+  const cols = strokeColors(f, color)
+  if (!cols.length) return null
+  const sw = f.strokeWidth
+  const inset = (f.strokeAlign ?? 'inside') === 'inside' ? sw / 2 : f.strokeAlign === 'outside' ? -sw / 2 : 0
+  return { d: rectPath(w, h, radiiOf(f), inset), w: sw, colors: cols.reverse(), ...dashOf(f) }
 }
 
 export function frameStroke(f: LayerStyle | undefined, color: (v?: string) => string | undefined, w = 0, h = 0): string | undefined {

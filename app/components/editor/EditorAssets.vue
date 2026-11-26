@@ -80,7 +80,8 @@ async function copyCode() {
         <button v-if="q" type="button" class="sq qx" :aria-label="tr('Clear search')" @click="clearQ"><EditorIcon name="close" :size="12" /></button>
       </label>
     </div>
-    <div class="list">
+    <!-- 목록 · 상세는 팝오버와 같은 얇은 스크롤 막대(v-ovscroll: 내용 위에 뜨고, 올리거나 스크롤할 때만) -->
+    <div v-ovscroll class="list">
       <section v-for="g in groups" :key="g.label" class="grp-sec">
         <span class="glabel">{{ tr(g.label) }}</span>
         <div class="grid">
@@ -103,7 +104,7 @@ async function copyCode() {
       <button class="ib s24" :aria-label="tr('Back to assets')" :data-tip="tr('Back to assets')" @click="emit('update:open', null)"><EditorIcon name="chevron_right" :size="16" class="flip" /></button>
       <span class="tx-head ell" :title="detail.name">{{ detail.name }}</span>
     </div>
-    <div class="dbody">
+    <div v-ovscroll class="dbody">
       <div class="pad">
         <span class="sq sq-clip big" data-preview><DsPreview :names="[detail.name, detail.code_name, ...(detail.match_aliases ?? [])]" :label="detail.name" /></span>
         <div v-if="detailExport" class="ins mt8">
