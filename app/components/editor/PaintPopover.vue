@@ -8,7 +8,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { GradStop, LayerStyle, Paint } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { paintLayer } from '~/canvas/paint'
-import { useImageSrc, uploadImage } from '~/canvas/images'
+import { useImageSrc, prepareImage } from '~/canvas/images'
 import { fromRgba, hexOf, alphaOf, normHex, toRgba, withAlpha } from '~/canvas/color'
 import { parseColor, useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
 import ColorPicker from '~/components/editor/ColorPicker.vue'
@@ -270,11 +270,15 @@ async function useFile(f?: File | null) {
   if (!f || props.paint.type !== 'image') return
   if (!f.type.startsWith('image/')) return
   uploading.value = true
+  const before = props.paint
   try {
-    const img = await uploadImage(f, (props.sid ?? 'fills').replace(':', '-'), { supabase, preview })
+    // 크기 재기 · 4096 줄이기만 기다리고 바로 바꿔 보여 줘요. 올리기는 뒤에서(img.done)
+    const img = await prepareImage(f, (props.sid ?? 'fills').replace(':', '-'), { supabase, preview })
     // 그림을 바꾸면 원래 크기도 새로, 자르기는 새 그림 비율로 다시 덮게
     if (props.paint.type === 'image') { const { crop: _c, ...rest } = props.paint; emit('update', { ...rest, src: img.src, iw: img.w, ih: img.h }) }
-  } finally { uploading.value = false }
+    // 올리기에 실패하면 원래 그림으로 되돌려요(그새 다른 그림을 골랐으면 그대로)
+    await img.done.catch(() => { if (props.paint.type === 'image' && props.paint.src === img.src) emit('update', before) })
+  } catch { /* 크기 한도 등 — 그림은 그대로 */ } finally { uploading.value = false }
 }
 function onFile(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; input.value = ''; useFile(f) }
 function onDrop(e: DragEvent) { dropping.value = false; useFile([...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('image/'))) }

@@ -20,7 +20,7 @@ import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { useMixScreens, useToastReq } from '~/composables/useLayerMenu'
 import { createLayerStore, LAYER_STORE } from '~/canvas/store'
-import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, uploadImage } from '~/canvas/images'
+import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUploads, prepareImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
@@ -769,15 +769,26 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
   const hitScreen = at ? list.value.find((v) => v.source === 'native' && at.x >= v.x && at.y >= v.y && at.x <= v.x + v.width && at.y <= v.y + v.height) : null
   const s = (place ? list.value.find((v) => v.id === place.sid) : null) ?? (at ? hitScreen : current.value) ?? canvasScreen.value
   if (!s) return
+  const failMsg = () => say(isVideoFile(file) ? tr('Couldn\'t upload the video. Try again') : tr('Couldn\'t upload the image. Try again'))
   try {
-    const img = await uploadImage(file, s.id.replace(':', '-'), { supabase, preview })
+    // 크기 재기 · 4096 줄이기만 기다리고 바로 캔버스에 넣어요. 올리기는 뒤에서(img.done) — 피그마처럼 놓자마자 보여요
+    const img = await prepareImage(file, s.id.replace(':', '-'), { supabase, preview })
     if (replaceId && !at) {
       const target = store.screenId.value ?? s.id; const id = replaceId; replaceId = null
       // 사각형 + 이미지 칠: 맨 위 이미지 칠의 그림만 바꿔요(맞춤 · 자르기는 그대로). 동영상 레이어는 src
       const n = store.node(target, id)
       const top = n && !img.video ? topImagePaint(n.style) : null
+      const before = n?.src
       if (n && top) store.update(target, [id], (nn) => ({ style: { ...nn.style, fills: (nn.style.fills ?? []).map((p, k) => (k === top.i ? { ...top.p, src: img.src, iw: img.w, ih: img.h } : p)) } }))
       else store.update(target, [id], { src: img.src })
+      // 올리기에 실패하면 원래 그림으로 되돌려요(그새 다른 그림으로 바꿨으면 그대로)
+      img.done.catch(() => {
+        const nn = store.node(target, id)
+        if (!nn) return failMsg()
+        if (top) { const was = top.p.src; store.update(target, [id], (x) => ({ style: { ...x.style, fills: (x.style.fills ?? []).map((p) => (p.type === 'image' && p.src === img.src ? { ...p, src: was } : p)) } })) }
+        else if (nn.src === img.src) store.update(target, [id], { src: before })
+        failMsg()
+      })
       return
     }
     const onCanvas = isPageCanvas(s.id)
@@ -794,12 +805,18 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
     const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || (img.video ? 'Video' : 'Image')
     const box = { name, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true }
     // 이미지는 사각형 + 이미지 칠(피그마와 같아요 — Fill 패널에서 이미지 · 맞춤을 고쳐요). 동영상은 영상 레이어
-    if (img.video) store.add(s.id, parentId, { type: 'image', src: img.src, ...box })
-    else store.add(s.id, parentId, { type: 'rect', ...box, style: { fill: undefined, fills: [{ type: 'image', src: img.src, iw: img.w, ih: img.h }] } })
+    const id = img.video
+      ? store.add(s.id, parentId, { type: 'image', src: img.src, ...box })
+      : store.add(s.id, parentId, { type: 'rect', ...box, style: { fill: undefined, fills: [{ type: 'image', src: img.src, iw: img.w, ih: img.h }] } })
     tab.value = 'design'
+    // 올리기에 실패하면 방금 넣은 레이어를 빼고 알려요(그새 지웠으면 안내만)
+    img.done.catch(() => {
+      if (store.node(s.id, id)) store.remove(s.id, [id])
+      failMsg()
+    })
   } catch (e) {
     if (e instanceof MediaTooLargeError) return tooLarge()
-    say(isVideoFile(file) ? tr('Couldn\'t upload the video. Try again') : tr('Couldn\'t upload the image. Try again'))
+    failMsg()
   }
 }
 /** 캔버스에 파일 끌어 놓기: 이미지 · 영상. 놓은 화면 · 프레임 안으로 */
@@ -853,7 +870,8 @@ function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?:
 onMounted(() => window.addEventListener('paste', onPaste))
 onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
 // 저장이 끝나기 전에 떠나면 알리기
-function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error') { e.preventDefault(); e.returnValue = '' } }
+// 저장 중 · 저장 실패 · 이미지를 뒤에서 올리는 중이면 닫기 전에 물어요(다 올라가기 전에 닫으면 그 이미지가 비어요)
+function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error' || pendingUploads.value > 0) { e.preventDefault(); e.returnValue = '' } }
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
 onBeforeUnmount(() => { window.removeEventListener('beforeunload', onBeforeUnload); store.dispose() })
 
