@@ -3618,7 +3618,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :aria-label="tr('{name} frame', { name: s.name })"
         @pointerdown.stop="start($event, s)"
       >
-        <img v-if="s.thumbnail_path && s.source === 'figma'" :src="s.thumbnail_path" alt="" draggable="false" class="thumb">
+        <img v-if="s.thumbnail_path && s.source === 'figma'" :src="frameImg(s.thumbnail_path)" alt="" draggable="false" class="thumb">
         <template v-else>
           <template v-for="sm in [frameSm(s)]" :key="'fsm'"><i v-if="sm" class="fsmw"><i class="fsmb" :style="sm.bg" /></i></template>
           <template v-for="rm in [rootMask(s.id)]" :key="'rm'">

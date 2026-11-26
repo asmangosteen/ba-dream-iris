@@ -1061,8 +1061,11 @@ onBeforeRouteLeave(async () => {
   if (!store.hasUnsaved()) return true
   await Promise.race([store.flushAll(), new Promise((r) => setTimeout(r, 2500))])
   if (!store.hasUnsaved() || !backupFailed) return true
-  return window.confirm(tr('Some changes aren\'t saved and couldn\'t be kept in this browser. Leave anyway? They\'ll be lost'))
+  // 공용 확인 창으로 묻고 고를 때까지 기다려요(브라우저 기본 창은 쓰지 않아요)
+  return new Promise<boolean>((resolve) => { leaveAsk.value = resolve })
 })
+const leaveAsk = ref<((ok: boolean) => void) | null>(null)
+function answerLeave(ok: boolean) { const r = leaveAsk.value; leaveAsk.value = null; r?.(ok) }
 
 /** 화면 단축키(피그마와 같아요): ⌘\\ UI 숨기기 · ⌥1 레이어 · ⌥2 에셋 · ⌥8 디자인 탭 · PageUp · PageDown 이전 · 다음 페이지 */
 function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev-page' | 'next-page') {
@@ -1433,6 +1436,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :desc="tr('{n} linked requirements will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmFrames = null) }, { label: confirmFrames.frames.length === 1 ? tr('Delete frame') : tr('Delete frames'), kind: 'destructed', onClick: doConfirmFrames }]"
       @close="confirmFrames = null"
+    />
+    <AppConfirm
+      v-if="leaveAsk"
+      :title="tr('Leave without saving?')"
+      :desc="tr('Some changes aren\'t saved and couldn\'t be kept in this browser. Leave anyway? They\'ll be lost')"
+      :actions="[{ label: tr('Stay'), kind: 'primary', onClick: () => answerLeave(false) }, { label: tr('Leave anyway'), kind: 'destructed', onClick: () => answerLeave(true) }]"
+      @close="answerLeave(false)"
     />
     <AppConfirm
       v-if="confirmPage"

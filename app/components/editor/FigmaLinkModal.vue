@@ -124,6 +124,8 @@ async function add() {
   }
   saving.value = true
   error.value = null
+  // 썸네일은 Iris 저장소에 복사해 둬요(피그마 이미지 주소는 만료돼요). 실패하면 피그마 주소 그대로
+  const thumb = r.thumbnailUrl ? await keepFigmaThumb(r.thumbnailUrl, r.fileKey, r.nodeId) : null
   const { data: screen, error: e1 } = await supabase.from('screens').insert({
     page_id: props.pageId,
     source: 'figma',
@@ -135,7 +137,7 @@ async function add() {
     figma_file_key: r.fileKey,
     figma_node_id: r.nodeId,
     figma_url: r.url,
-    thumbnail_path: r.thumbnailUrl,
+    thumbnail_path: thumb,
     figma_layer_summary: { components: r.components },
     figma_synced_at: new Date().toISOString(),
   }).select('id').single()

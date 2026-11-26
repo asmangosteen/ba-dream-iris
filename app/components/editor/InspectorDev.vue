@@ -78,7 +78,9 @@ async function resync() {
       for (const n of [c.name, c.code_name, ...(c.match_aliases ?? [])]) { const k = n?.trim().toLowerCase(); if (k && !byName.has(k)) byName.set(k, c.id) }
       if (c.figma_component_key) byKey.set(c.figma_component_key, c.id)
     }
-    const { error: e1 } = await supabase.from('screens').update({ thumbnail_path: f.thumbnailUrl, width: f.width, height: f.height, figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString() }).eq('id', props.screen.id)
+    const ids = figmaIds(props.screen.figma_url)
+    const thumb = f.thumbnailUrl && ids ? await keepFigmaThumb(f.thumbnailUrl, ids.fileKey, ids.nodeId) : f.thumbnailUrl
+    const { error: e1 } = await supabase.from('screens').update({ thumbnail_path: thumb, width: f.width, height: f.height, figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString() }).eq('id', props.screen.id)
     if (e1) throw e1
     await supabase.from('screen_component_usages').delete().eq('screen_id', props.screen.id)
     if (f.components.length) {
