@@ -19,25 +19,26 @@ npm install          # 처음 한 번
 npm start            # 앱 실행 (배포된 Iris)
 npm run dev          # 앱 실행 (로컬 개발 서버 localhost:3000)
 npm run icons        # 파비콘을 바꿨을 때 아이콘 다시 만들기
-npm run dist:mac     # 맥 설치 파일 → dist/Iris-버전-mac-universal.dmg
+npm run dist:mac     # 맥 설치 파일 → dist/Iris-버전-mac-arm64.dmg(Apple 실리콘) · Iris-버전-mac-x64.dmg(인텔)
 npm run dist:win     # 윈도우 설치 파일 → dist/Iris-버전-win-x64.exe
 ```
 
 버전을 올리려면 `package.json` 의 `version` 을 바꾸고 다시 빌드해요.
+맥은 칩별로 따로 만들어요(Apple 실리콘 · 인텔). 둘을 한 파일(universal)에 넣으면 앱 엔진이 두 벌 들어가 용량이 두 배(설치 후 약 480MB)가 돼요.
 
 ## 새 설치 파일 올리기 (GitHub Releases)
 
 설치 파일은 100MB 가 넘어서 git 에 넣지 않고 Releases 에 올려요. 저장소 README 의 내려받기 링크가 Releases 를 가리켜요.
 
 ```bash
-# 1. package.json 의 version 올리기 (예: 0.1.2) → 2. 빌드
+# 1. package.json 의 version 올리기 (예: 0.1.3) → 2. 빌드
 npm run dist
 # 3. Releases 에 올리기 (gh 로그인 필요)
-gh release create desktop-v0.1.2 dist/Iris-0.1.2-mac-universal.dmg dist/Iris-0.1.2-win-x64.exe \
-  --title "Iris 데스크탑 0.1.2" --notes "바뀐 점"
+gh release create desktop-v0.1.3 dist/Iris-0.1.3-mac-arm64.dmg dist/Iris-0.1.3-mac-x64.dmg dist/Iris-0.1.3-win-x64.exe \
+  --title "Iris 데스크탑 0.1.3" --notes "바뀐 점"
 ```
 
-4. 저장소 `README.md` 의 "데스크탑 앱" 표에서 버전 숫자 두 곳(파일 이름 · `desktop-v…`)을 새 버전으로 바꿔요.
+4. 저장소 `README.md` 의 "데스크탑 앱" 표에서 버전 숫자(파일 이름 · `desktop-v…`)를 새 버전으로 바꿔요.
 
 ## 단축키
 

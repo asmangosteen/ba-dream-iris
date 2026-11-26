@@ -8,6 +8,11 @@
 
 이름은 그리스 신화에서 무지개의 여신이자 신들과 인간 사이를 오가며 소식을 전하는 전령 이리스(Iris)에서 따왔습니다.
 
+## 접속
+
+- **웹**: https://ba-dream-iris.vercel.app — 회사 메일(@ba-dream.com)로 로그인해요
+- **데스크탑 앱(맥 · 윈도우)**: 아래 [데스크탑 앱](#데스크탑-앱-맥--윈도우)에서 설치 파일을 받아요
+
 ## 문서
 
 | 문서 | 내용 |
@@ -32,8 +37,11 @@
 
 | 운영체제 | 내려받기 |
 |---|---|
-| macOS (Apple 실리콘 · 인텔) | [Iris-0.1.1-mac-universal.dmg](https://github.com/asmangosteen/ba-dream-iris/releases/download/desktop-v0.1.1/Iris-0.1.1-mac-universal.dmg) |
-| Windows (64비트) | [Iris-0.1.1-win-x64.exe](https://github.com/asmangosteen/ba-dream-iris/releases/download/desktop-v0.1.1/Iris-0.1.1-win-x64.exe) |
+| macOS · Apple 실리콘 (M1 이후) | [Iris-0.1.2-mac-arm64.dmg](https://github.com/asmangosteen/ba-dream-iris/releases/download/desktop-v0.1.2/Iris-0.1.2-mac-arm64.dmg) |
+| macOS · 인텔 | [Iris-0.1.2-mac-x64.dmg](https://github.com/asmangosteen/ba-dream-iris/releases/download/desktop-v0.1.2/Iris-0.1.2-mac-x64.dmg) |
+| Windows (64비트) | [Iris-0.1.2-win-x64.exe](https://github.com/asmangosteen/ba-dream-iris/releases/download/desktop-v0.1.2/Iris-0.1.2-win-x64.exe) |
+
+맥이 어느 쪽인지 모르겠으면 왼쪽 위 애플 메뉴 › **이 Mac에 관하여**에서 "칩"이 Apple M… 이면 Apple 실리콘, "프로세서"가 Intel… 이면 인텔이에요.
 
 지난 버전은 [Releases](https://github.com/asmangosteen/ba-dream-iris/releases)에 있어요.
 
