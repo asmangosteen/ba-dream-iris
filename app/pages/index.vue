@@ -9,15 +9,19 @@ const isWide = (s: { width: number }) => s.width >= 768
 const { data: projects, status, error, refresh } = useProjects()
 const { data: progress } = useProjectProgress()
 /** 내 역할 · 승인 대기 수(방장 · 부방장만) — 목록은 DB 규칙상 내가 멤버인 프로젝트만 와요 */
-const { data: access } = useMyProjectRoles()
+const { data: access, refresh: refreshAccess } = useMyProjectRoles()
+// 새 프로젝트 · 승인된 초대가 바로 보이게: 홈에 올 때마다 다시 읽어요
+onMounted(() => { refreshAccess() })
 const filter = ref<'active' | 'done' | 'all'>('active')
 const filters = [
   { key: 'active', label: 'In progress' },
   { key: 'done', label: 'Done' },
   { key: 'all', label: 'All' },
 ] as const
-const list = computed(() => (projects.value ?? []).filter((p) => filter.value === 'all' || (filter.value === 'done' ? p.status === 'done' : p.status !== 'done')))
-const count = (k: string) => (projects.value ?? []).filter((p) => k === 'all' || (k === 'done' ? p.status === 'done' : p.status !== 'done')).length
+/** 내가 멤버인 프로젝트만(회사 멤버는 이름을 읽을 수 있지만 목록엔 내 것만, PRD/16) — 역할 표가 없는 DB면 전부 */
+const mine = computed(() => (projects.value ?? []).filter((p) => !access.value || access.value.all || !!access.value.roles[p.id]))
+const list = computed(() => mine.value.filter((p) => filter.value === 'all' || (filter.value === 'done' ? p.status === 'done' : p.status !== 'done')))
+const count = (k: string) => mine.value.filter((p) => k === 'all' || (k === 'done' ? p.status === 'done' : p.status !== 'done')).length
 
 const newOpen = ref(false)
 const settingsId = ref<string | null>(null)
