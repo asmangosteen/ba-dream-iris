@@ -74,7 +74,20 @@ function irisSquircle(): void {
     raf = 0;
     document.querySelectorAll<HTMLElement>(SEL).forEach((el) => { if (!seen.has(el)) { seen.add(el); ro.observe(el); } apply(el); });
   };
-  new MutationObserver(() => { if (!raf) raf = requestAnimationFrame(tick); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  // 문서 전체를 다시 훑는 건 대상(SEL)을 품은 요소가 새로 붙었거나 class 가 바뀔 때만. 크기 변화는 ResizeObserver 가 맡아요.
+  // 대상 요소 자신의 style 만 바뀌면(선택 상자 아래 크기 표시 · 확대 % 버튼처럼 확대마다 자리만 바뀌는 것) 그 요소만 다시 계산해요 —
+  // 캔버스를 확대 · 이동할 때마다 문서 전체를 훑으면 확대가 무거워져요
+  const hasSq = (n: Node) => n instanceof Element && (n.matches(SEL) || !!n.querySelector(SEL));
+  const own = new Set<HTMLElement>();
+  let ownRaf = 0;
+  const applyOwn = () => { ownRaf = 0; const els = [...own]; own.clear(); els.forEach((el) => { if (el.isConnected) apply(el); }); };
+  new MutationObserver((ms) => {
+    for (const m of ms) {
+      if (m.type === 'childList' ? [...m.addedNodes].some(hasSq) : m.attributeName === 'class') { if (!raf) raf = requestAnimationFrame(tick); return; }
+      if (m.target instanceof HTMLElement && m.target.matches(SEL)) own.add(m.target);
+    }
+    if (own.size && !ownRaf) ownRaf = requestAnimationFrame(applyOwn);
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
   // :focus-within · :focus-visible 로 --sq-line-w 가 바뀌는 요소(입력칸 · 카드 포커스 선): 포커스가 옮겨질 때 조상 · 자손만 다시 계산
   const refocus = (e: Event) => {
     const t = e.target;

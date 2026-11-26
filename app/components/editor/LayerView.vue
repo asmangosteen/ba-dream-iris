@@ -3,7 +3,7 @@ import { clipsContent, isContainer, isVector, lineHeightCss, type ArrowHead, typ
 import { useLayerStore } from '~/canvas/store'
 import { textShortcut } from '~/canvas/textKeys'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
-import { GHOST_KEY } from '~/canvas/ghost'
+import { GHOST_KEY, ZOOM_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
@@ -21,6 +21,8 @@ const store = useLayerStore()
 const imageSrc = useImageSrc()
 // 화면 밖으로 끄는 중이면 원래 자리는 숨겨요(캔버스가 맨 위에 따로 그려요)
 const ghostOf = inject(GHOST_KEY, null)
+// 섹션 이름표만 배율을 받아요(확대해도 같은 크기). 미리보기 썸네일 등 배율이 없으면 1
+const zoom = inject(ZOOM_KEY, null)
 const ghosted = computed(() => !props.ghost && !!ghostOf?.value && ghostOf.value.sid === props.screenId && ghostOf.value.ids.has(props.id))
 const video = computed(() => isVideoSrc(n.value?.src))
 const uid = useId()
@@ -375,7 +377,7 @@ function onKey(e: KeyboardEvent) {
 <template>
   <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="ghosted ? { ...style, visibility: 'hidden' } : style">
     <i v-if="smoothBg" class="smw" :style="{ filter: (!clipsSmooth && smoothShadow) || undefined }"><i class="smb" :style="smoothBg" /></i>
-    <span v-if="n.type === 'section'" class="sec-name" :data-sec="n.id">
+    <span v-if="n.type === 'section'" class="sec-name" :data-sec="n.id" :style="{ '--z': zoom ?? 1 }">
       <!-- 섹션 이름 두 번 누르기: 그 자리에서 고치기(화면 이름표 · 레이어 목록과 같아요 — Enter 저장 · Esc 취소 · 바깥 누르면 저장) -->
       <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
       <template v-else>{{ n.name }}</template>
@@ -455,7 +457,7 @@ function onKey(e: KeyboardEvent) {
 
 <style scoped>
 .ly { position: absolute; box-sizing: border-box; font-family: var(--font-family-base); }
-/* 마우스 올림 테두리는 EditorCanvas 바깥 층(.hov)이 그려요 — 확대해도 늘 1px */
+/* 마우스 올림 테두리는 EditorCanvas 바깥 층(.hover-ol)이 그려요 — 확대해도 늘 1px */
 .ly.line, .ly.path { outline-offset: 0; }
 .ly.line:hover, .ly.path:hover { outline: none !important; }
 .image img, .image video { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--sys-color-neutral-100); }

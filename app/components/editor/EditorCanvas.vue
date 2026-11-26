@@ -18,7 +18,7 @@ import { vk, vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
 import { aabb, alignGuides, angleOf, apply, applyVec, handed, handleCursor, handleDir, invert, layerMatrix, measureGuides, mul, resizeLocal, snapAxis, snapMove, translate, union, type AlignKind, type ArrangeOp, type Guides, type Handle, type Mat, type Rect } from '~/canvas/geom'
 import LayerView from '~/components/editor/LayerView.vue'
 import { INSERT_SIZE, STORY_SIZE } from '~/components/editor/InstanceView.vue'
-import { GHOST_KEY } from '~/canvas/ghost'
+import { GHOST_KEY, ZOOM_KEY } from '~/canvas/ghost'
 import { fmtNum } from '~/canvas/num'
 import { scaledStyle } from '~/canvas/scale'
 import { useImageSrc } from '~/canvas/images'
@@ -336,6 +336,7 @@ const ghost = computed(() => {
   return { sid, x: s.x ?? 0, y: s.y ?? 0, items, clip }
 })
 provide(GHOST_KEY, computed(() => (ghost.value ? { sid: ghost.value.sid, ids: new Set(dragOutIds.value) } : null)))
+provide(ZOOM_KEY, computed(() => vp.value.zoom))
 function screenUnder(wx: number, wy: number) {
   return [...realScreens.value].reverse().find((v) => isNative(v) && wx >= v.x && wy >= v.y && wx <= v.x + v.width && wy <= v.y + v.height) ?? null
 }
@@ -2842,7 +2843,8 @@ function pickLayer(sid: string, deepId: string | undefined, deep = false, selAt?
   }
   return target
 }
-function trackHover(e: PointerEvent) {
+type PointerLike = Pick<PointerEvent, 'target' | 'clientX' | 'clientY' | 'altKey' | 'metaKey'>
+function trackHover(e: PointerLike) {
   if (altOn.value !== e.altKey) altOn.value = e.altKey
   const t = e.target as HTMLElement | null
   const scr = t?.closest?.('[data-screen]') as HTMLElement | null
@@ -2858,6 +2860,26 @@ function trackHover(e: PointerEvent) {
   lastClient = { x: e.clientX, y: e.clientY }
   if (metaHeld.value !== e.metaKey) metaHeld.value = e.metaKey
   updateCmd()
+}
+/**
+ * 스크롤 · 확대로 캔버스가 움직이면 마우스는 그대로여도 그 아래 레이어가 바뀌어요 — 피그마처럼 그 자리를 다시 찾아 호버를 옮겨요.
+ * (pointermove 는 마우스가 움직일 때만 와서, 이게 없으면 스크롤 전에 올렸던 레이어에 테두리가 남아요)
+ * 화면이 새 배율로 그려진 직후(flush: 'post')에 같은 프레임 안에서 처리해요
+ */
+watch(() => [vp.value.x, vp.value.y, vp.value.zoom], () => {
+  if (drag || !lastClient || !el.value) return
+  const t = document.elementFromPoint(lastClient.x, lastClient.y)
+  // 마우스가 캔버스 밖(레이어 목록 등)이면 그쪽 호버를 건드리지 않아요
+  if (!t || !el.value.contains(t)) return
+  trackHover({ target: t, clientX: lastClient.x, clientY: lastClient.y, altKey: altOn.value, metaKey: metaHeld.value })
+}, { flush: 'post' })
+/** 캔버스 밖으로 나가면 캔버스 호버를 지워요(피그마와 같아요). 끄는 중이면 그대로 */
+function leave() {
+  if (drag) return
+  lastClient = null
+  ptr.value = null
+  hover.value = null
+  cmdMarks.value = null
 }
 
 // ---------------------------------------------------------------------------
@@ -2977,7 +2999,7 @@ const ptr = ref<{ x: number; y: number } | null>(null)
 const hoverOutline = computed(() => {
   void tick.value
   const h = hover.value
-  if (!h || moving.value || marqueeOn.value || draft.value || guides.value || store.editing.value || (tool.value !== 'move' && tool.value !== 'scale')) return null
+  if (!h || marqueeOn.value || draft.value || guides.value || store.editing.value || (tool.value !== 'move' && tool.value !== 'scale')) return null
   const s = props.screens.find((v) => v.id === h.sid)
   if (!s) return null
   if (!h.id) {
@@ -3283,11 +3305,17 @@ onMounted(() => window.addEventListener('resize', onPxResize))
 onBeforeUnmount(() => { window.removeEventListener('resize', onPxResize); if (pxRaf) cancelAnimationFrame(pxRaf) })
 /** 확대 · 이동 중인지: 멈춘 뒤 160ms 가 지나면 false → 브라우저가 지금 배율로 다시 그려 흐림이 없어요 */
 const moving = ref(false)
+/**
+ * 확대 · 축소 중인지. 이때는 캔버스를 그림 한 장으로 키우지 않고(will-change 끔) 매 프레임 지금 배율로 다시 그려요 —
+ * 그림으로 키우면 글자 · 선이 흐려졌다가 멈출 때 '툭' 선명해져요(피그마는 확대 중에도 선명). 옮기기만 할 때는 배율이 같아 흐림이 없으니 그림으로 빠르게
+ */
+const zooming = ref(false)
 let movingTimer: ReturnType<typeof setTimeout> | undefined
-watch(() => [vp.value.x, vp.value.y, vp.value.zoom], () => {
+watch(() => [vp.value.x, vp.value.y, vp.value.zoom] as const, (now, before) => {
   moving.value = true
+  if (now[2] !== before?.[2]) zooming.value = true
   clearTimeout(movingTimer)
-  movingTimer = setTimeout(() => (moving.value = false), 160)
+  movingTimer = setTimeout(() => { moving.value = false; zooming.value = false }, 160)
 })
 /** 크기 숫자: 정수면 그대로, 아니면 소수 한 자리(피그마와 같아요) */
 // 크기 · 각도 표시: 피그마처럼 정수로(실제 크기는 소수 그대로) — app/canvas/num.ts
@@ -3394,6 +3422,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     :style="{ cursor, ...gridStyle }"
     @pointerdown.self="start($event)"
     @pointermove="move"
+    @pointerleave="leave"
     @pointerup="end"
     @pointercancel="end"
     @dragover.prevent="onDragOver($event); onFileDragOver($event)"
@@ -3402,7 +3431,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @contextmenu="onContext"
     @dblclick="onDblAny"
   >
-    <div class="world" :class="{ moving }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`, '--z': vp.zoom }">
+    <div class="world" :class="{ moving: moving && !zooming }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }">
       <!-- 캔버스 위 섹션: 화면들 아래에 깔아요(피그마처럼 화면을 묶는 바탕) -->
       <div v-if="canvasDoc && canvasRoots.under.length" class="free" :data-screen="canvasDoc.id" @pointerdown.stop="start($event, canvasDoc)">
         <LayerView v-for="id in canvasRoots.under" :key="id" :doc="store.doc(canvasDoc.id)" :id="id" :screen-id="canvasDoc.id" />
@@ -3451,7 +3480,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         </div>
       </div>
       <!-- 파일 끌어 놓을 자리 -->
-      <div v-if="dropAt" class="drop-at" :class="{ line: dropLine }" :style="{ left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
+      <div v-if="dropAt" class="drop-at" :class="{ line: dropLine }" :style="{ '--z': vp.zoom, left: dropAt.x + 'px', top: dropAt.y + 'px', width: dropAt.w + 'px', height: dropAt.h + 'px' }" />
  <div v-if="draft && !marqueeOn" :class="['draft', { shape: !!draftShape }]" :style="{ left: draft.x + 'px', top: draft.y + 'px', width: draft.width + 'px', height: draft.height + 'px' }">
         <!-- 도형은 그리는 동안에도 그 모양 · 기본 칠 그대로 -->
         <svg v-if="draftShape" class="draft-svg" :width="draft.width" :height="draft.height" aria-hidden="true"><path :d="draftShape.d" :fill="draftShape.fill" /></svg>
@@ -3531,7 +3560,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <span v-if="bandLabel && bandDrag" class="sq glabel" :class="{ gapl: bandDrag.kind === 'gap' }" :style="bandLabel">{{ bandDrag.value }}</span>
       <template v-if="hoverOutline && !gapHot && !padHot && !cmdMarks"><div v-for="(k, i) in hoverKids" :key="'hk' + i" class="kid" :style="k" /></template>
       <template v-if="hoverTextLines.length && !gapHot && !padHot && !cmdMarks"><div v-for="(l, i) in hoverTextLines" :key="'ht' + i" class="cmd-ul" :style="l" /></template>
-      <div v-else-if="hoverOutline && !gapHot && !padHot && !cmdMarks" class="hov" :class="{ comp: hoverOutline.comp, shaped: 'path' in hoverOutline }" :style="hoverOutline.style"><svg v-if="'path' in hoverOutline" class="shape-line" aria-hidden="true"><path :d="hoverOutline.path" stroke-width="2" /></svg></div>
+      <div v-else-if="hoverOutline && !gapHot && !padHot && !cmdMarks" class="hover-ol" :class="{ comp: hoverOutline.comp, shaped: 'path' in hoverOutline }" :style="hoverOutline.style"><svg v-if="'path' in hoverOutline" class="shape-line" aria-hidden="true"><path :d="hoverOutline.path" stroke-width="2" /></svg></div>
       <!-- 고른 글자: 기준선 밑줄(마우스 올리면 굵게) -->
       <template v-if="!cmdMarks"><div v-for="(l, i) in selTextLines" :key="'st' + i" class="cmd-ul" :style="l" /></template>
       <!-- ⌘ + 마우스 올림: 글자 밑줄 · 요소 테두리(컴포넌트 안은 보라) -->
@@ -3685,9 +3714,10 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .cmd-box { position: absolute; pointer-events: none; box-shadow: 0 0 0 1px var(--iris-select); }
 .cmd-ul { position: absolute; pointer-events: none; background: var(--iris-select); }
 /* 마우스 올림: 모양(둥근 모서리 · 원)을 따라 2px — 피그마 UI3(선택 상자는 1px) */
-.hov { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-select); }
+/* 이름은 .hover-ol — 앱 공용 .hov(목록 줄 호버)에 걸린 0.12초 전환이 캔버스 테두리에 묻지 않게(피그마처럼 바로 바뀌어요) */
+.hover-ol { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-select); }
 /* Corner smoothing 모양: 상자 대신 squircle 경로로 그려요 */
-.hov.shaped, .cmd-box.shaped { box-shadow: none; }
+.hover-ol.shaped, .cmd-box.shaped { box-shadow: none; }
 .shape-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .shape-line path { fill: none; stroke: var(--iris-select); }
 /* 올린 프레임 · 그룹의 바로 아래 자식: 1px 점선 */
