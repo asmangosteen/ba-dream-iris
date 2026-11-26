@@ -29,6 +29,9 @@ import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
+import ShareModal from '~/components/project/ShareModal.vue'
+import AccessGate from '~/components/project/AccessGate.vue'
+import { ROLE_NAME } from '~/composables/useProjectAccess'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/canvas/types'
 import type { PageSettings, ScreenRow } from '~/composables/useEditor'
@@ -185,8 +188,22 @@ const store = createLayerStore({
     backupFailed = true
   },
   onSaved: (sid) => backup.drop(sid),
+  onBlocked: () => blockEdit(),
 })
 provide(LAYER_STORE, store)
+// 역할 · 보기 전용(PRD/12, 16 E): 디자인 편집 권한이 없으면 캔버스 · 디자인 패널을 잠가요(진짜로 막는 건 DB 규칙)
+const access = useProjectAccess(projectId)
+const readOnly = computed(() => access.data.status.value === 'success' && !access.can.value.editDesign && !access.gate.value)
+watchEffect(() => { store.readonly.value = readOnly.value })
+/** 보기 전용에서 쓸 수 있는 도구: 이동 · 손 */
+watch([tool, readOnly], () => { if (readOnly.value && tool.value !== 'move' && tool.value !== 'hand') tool.value = 'move' })
+let blockedAt = 0
+/** 보기 전용이면 안내하고 true(고치는 동작 맨 앞에서 불러요) */
+function blockEdit() {
+  if (!readOnly.value) return false
+  if (Date.now() - blockedAt > 2500) { blockedAt = Date.now(); say(tr('View only — only people who can edit design can change this')) }
+  return true
+}
 const selected = store.screenId
 const current = computed(() => list.value.find((s) => s.id === selected.value) ?? null)
 const openDoc = computed(() => (docs.data.value ?? []).find((d) => d.id === docId.value) ?? null)
@@ -343,6 +360,7 @@ onMounted(async () => {
 })
 
 async function onAddPage() {
+  if (blockEdit()) return
   try {
     const prev = pageId.value
     const row = await addPage()
@@ -382,6 +400,7 @@ async function onProjRename(e: Event) {
 }
 /** 프레임 우클릭 'Set as thumbnail' · 'Restore default thumbnail': 홈 목록 카드에 보일 화면(null 이면 첫 페이지의 첫 화면) */
 async function onThumbnail(id: string | null) {
+  if (blockEdit()) return
   try {
     await projActions.update(projectId, { cover_screen_id: id })
     say(id ? tr('Set as the project thumbnail') : tr('Restored the default thumbnail'))
@@ -392,6 +411,7 @@ const vSelect = { mounted: (el: HTMLInputElement) => nextTick(() => { el.focus()
 
 const moveFrom = new Map<string, { x: number; y: number }>()
 function onMove(id: string, x: number, y: number, done: boolean) {
+  if (blockEdit()) return
   const s = list.value.find((v) => v.id === id)
   if (!s) return
   if (!done) { if (!moveFrom.has(id)) moveFrom.set(id, { x: s.x, y: s.y }); s.x = x; s.y = y; return }
@@ -405,6 +425,7 @@ function onMove(id: string, x: number, y: number, done: boolean) {
 type ScreenRect = { x: number; y: number; width: number; height: number }
 const resizeFrom = new Map<string, ScreenRect>()
 function onResizeScreen(id: string, r: ScreenRect, done: boolean) {
+  if (blockEdit()) return
   const s = list.value.find((v) => v.id === id)
   if (!s) return
   if (!done) { if (!resizeFrom.has(id)) resizeFrom.set(id, { x: s.x, y: s.y, width: s.width, height: s.height }); Object.assign(s, r); return }
@@ -433,6 +454,7 @@ function toggleScreen(id: string) {
   multiScreens.value = next.length > 1 ? next : []
 }
 function onArrangeScreens(op: ArrangeOp) {
+  if (blockEdit()) return
   const rows = multiList.value
   if (rows.length < 2) return
   const out = arrangeRects(rows.map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height })), op)
@@ -446,6 +468,7 @@ function onArrangeScreens(op: ArrangeOp) {
   store.pushAction(null, () => apply(back), () => apply(after))
 }
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
+  if (blockEdit()) return
   try {
     // 이름은 캔버스 레이어 · 화면을 통틀어 'Frame' 가장 큰 번호 + 1(store.nextLabel)
     const row = await addScreen(rect, store.nextLabel('Frame'))
@@ -458,11 +481,13 @@ async function onCreate(rect: { x: number; y: number; width: number; height: num
 }
 /** 값이 서로 다른(Mixed) 프레임들의 칸에서 ↑ ↓: 각자 값에 더해요(실행취소 한 번) */
 function onStepMany(key: 'x' | 'y' | 'width' | 'height', d: number) {
+  if (blockEdit()) return
   const min = key === 'width' || key === 'height' ? 1 : -1e9
   store.batch(() => { for (const s of multiList.value) onUpdate({ [key]: Math.max(min, s[key] + d) }, s) })
 }
 /** 프레임 여러 개를 한꺼번에(실행취소 한 번) */
 function onUpdateMany(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>) {
+  if (blockEdit()) return
   const rows = multiList.value
   store.batch(() => { for (const s of rows) onUpdate(patch, s) })
 }
@@ -470,6 +495,7 @@ function onUpdateMany(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'heig
 let scrubbing = false
 const frameScrub = new Map<string, Record<string, unknown>>()
 function onUpdate(patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status'>>, target?: ScreenRow) {
+  if (blockEdit()) return
   const s = target ?? current.value
   if (!s) return
   const before = Object.fromEntries(Object.keys(patch).map((k) => [k, s[k as keyof typeof patch]])) as typeof patch
@@ -507,6 +533,7 @@ function onScaleScreen(k: number, anchor: [number, number]) {
 }
 /** 캔버스 이름표에서 바로 고친 화면 이름 (실행 취소 가능) */
 function onRenameScreen(id: string, name: string) {
+  if (blockEdit()) return
   const s = canvasList.value.find((v) => v.id === id)
   if (!s) return
   const before = s.name
@@ -515,6 +542,7 @@ function onRenameScreen(id: string, name: string) {
   store.pushAction(id, () => updateScreen(id, { name: before }).catch(fail), () => updateScreen(id, { name }).catch(fail))
 }
 async function onRemove() {
+  if (blockEdit()) return
   if (!current.value) return
   const name = current.value.name
   try { await removeScreen(current.value.id); store.selectScreen(null); say(tr('Deleted {name}', { name })) } catch { sayFail(tr('Couldn\'t delete the frame')) }
@@ -558,6 +586,7 @@ function spotRightOf(id: string): { x: number; y: number } {
  * withLayers: 레이어와 섞어 고른 경우 — 레이어 선택은 그대로 두고 새 화면들을 함께 골라요
  */
 async function cloneMany(items: { id: string; x: number; y: number }[], withLayers: boolean) {
+  if (blockEdit()) return
   const rows = (await Promise.all(items.map((it) => cloneScreen(it.id, { x: it.x, y: it.y }, false)))).filter((r): r is NonNullable<typeof r> => !!r)
   const ids = rows.map((r) => r.id)
   if (!ids.length) return
@@ -567,6 +596,7 @@ async function cloneMany(items: { id: string; x: number; y: number }[], withLaye
 }
 /** 복사한 화면들 붙여넣기(피그마처럼): 배치는 그대로, 원래 자리 바로 오른쪽 — 비어 있지 않으면 맨 오른쪽 끝 */
 async function pasteScreens(withLayers: boolean) {
+  if (blockEdit()) return
   const src = screenClip.value.map((id) => list.value.find((v) => v.id === id)).filter((v): v is ScreenRow => !!v)
   if (!src.length) return
   const minX = Math.min(...src.map((v) => v.x)), maxX = Math.max(...src.map((v) => v.x + v.width))
@@ -576,6 +606,7 @@ async function pasteScreens(withLayers: boolean) {
   await cloneMany(src.map((v) => ({ id: v.id, x: v.x + dx, y: v.y })), withLayers)
 }
 async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge' | 'front' | 'back' | 'forward' | 'backward' | 'section', dx = 0, dy = 0) {
+  if (action !== 'copy' && blockEdit()) return
   const s = current.value
   // 고른 화면 전부: 여러 화면을 골랐으면 그 화면들, 레이어와 섞어 골랐으면 함께 고른 화면들, 아니면 지금 화면
   const pickIds = multiScreens.value.length > 1 ? multiScreens.value : store.layerIds.value.length ? mixScreens.value : s ? [s.id] : []
@@ -665,6 +696,7 @@ async function doConfirmFrames() {
 }
 /** 레이어 목록에서 화면을 끌어 순서를 바꿨을 때(그리는 순서 그대로) — 실행취소 한 번 */
 async function onScreenOrder(order: string[]) {
+  if (blockEdit()) return
   const before = list.value.map((v) => v.id)
   try {
     await setScreenOrder(order)
@@ -921,6 +953,7 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
 }
 /** 캔버스에 파일 끌어 놓기: 이미지 · 영상. 놓은 화면 · 프레임 안으로 */
 async function onDropFiles(files: File[], at: { x: number; y: number }, place?: { sid: string; parentId: string | null }) {
+  if (blockEdit()) return
   const media = files.filter(isMediaFile)
   if (!media.length) return say(tr('Only image or video files (PNG, JPG, SVG, MP4…) can be added'))
   for (const [i, f] of media.entries()) {
@@ -1088,10 +1121,11 @@ function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   } else say(tr('Comments are coming soon'))
 }
 
-async function share() {
-  try { await navigator.clipboard.writeText(location.origin + route.path); say(tr('Link copied')) }
-  catch { sayFail(tr('Couldn\'t copy the link')) }
-}
+/** 공유 창(초대 · 승인 · 멤버 역할 · 링크 복사) */
+const shareOpen = ref(false)
+function share() { shareOpen.value = true }
+// 알림(초대 요청)에서 왔으면 공유 창을 바로 열어요
+watch(() => route.query.share, (v) => { if (v === '1') { shareOpen.value = true; router.replace({ query: { ...route.query, share: undefined } }) } }, { immediate: true })
 
 const zoomOpen = ref(false)
 const projMenu = ref(false)
@@ -1175,7 +1209,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :peek="peek"
       :guides="currentPage?.viewport?.guides ?? { x: [], y: [] }"
       @guides="(g) => onPageSettings({ guides: g })"
-      @clone-screen="async (id: string, x: number, y: number) => { const r = await cloneScreen(id, { x, y }); if (r) screenDup = { src: id, copy: r.id } }"
+      @clone-screen="async (id: string, x: number, y: number) => { if (blockEdit()) return; const r = await cloneScreen(id, { x, y }); if (r) screenDup = { src: id, copy: r.id } }"
       @clone-screens="(items: { id: string; x: number; y: number }[]) => cloneMany(items, store.layerIds.value.length > 0)"
       @clip-screens="(ids: string[]) => { screenClip = ids; say(ids.length > 1 ? tr('Copied {n} frames', { n: ids.length }) : tr('Copied')) }"
       @paste-screens="pasteScreens"
@@ -1304,6 +1338,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <Button size="s" type="primary" @click="share">{{ tr('Share') }}</Button>
         </span>
       </div>
+      <p v-if="readOnly && tab === 'design'" class="sq ro-note"><EditorIcon name="lock" :size="16" />{{ tr('View only. Only people who can edit design can change these') }}</p>
       <!-- 인스펙터(문서를 열어도 그대로) -->
       <template v-if="true">
         <div role="tablist" :aria-label="tr('Properties tabs')" class="seg tabs">
@@ -1340,7 +1375,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             </div>
             <span class="tx-meta">{{ current.source === 'figma' ? tr('Figma frame') : tr('Iris frame') }} · <span class="num">{{ fmtNum(current.width) }} × {{ fmtNum(current.height) }}</span></span>
           </div>
-          <div class="scroll insp">
+          <div :class="['scroll', 'insp', { ro: readOnly && tab === 'design' }]" :inert="(readOnly && tab === 'design') || undefined">
             <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <template v-else-if="store.layerIds.value.length">
@@ -1364,13 +1399,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           </div>
         </template>
         <!-- 캔버스 위 레이어를 골랐을 때: 디자인 속성만 -->
-        <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" class="scroll insp">
+        <div v-else-if="canvasScreen && selected === canvasScreen.id && store.layerIds.value.length" :class="['scroll', 'insp', { ro: readOnly }]" :inert="readOnly || undefined">
           <InspectorLayer :screen="canvasScreen" :scale-mode="tool === 'scale'" @replace-image="pickImage" />
           <InspectorScale v-if="tool === 'scale'" :sid="canvasScreen.id" :ids="store.layerIds.value" @close="tool = 'move'" />
           <InspectorExport v-else :sid="canvasScreen.id" :ids="store.layerIds.value" @toast="say" />
         </div>
         <!-- 아무것도 안 골랐을 때: 피그마의 Page 패널처럼 페이지 · 캔버스 설정 -->
-        <div v-else-if="tab === 'design' && currentPage" class="scroll insp">
+        <div v-else-if="tab === 'design' && currentPage" :class="['scroll', 'insp', { ro: readOnly }]" :inert="readOnly || undefined">
           <InspectorPage :page="currentPage" :zoom="vp.zoom" :screen-count="list.length" @rename="(n: string) => currentPage && renamePageUndoable(currentPage.id, n).catch(() => sayFail(tr('Couldn\'t rename the page')))" @settings="onPageSettings" @zoom="(z: number | 'fit') => (z === 'fit' ? canvas?.fit() : canvas?.zoomAt(z))" />
         </div>
         <div v-else class="none">
@@ -1381,7 +1416,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       </template>
     </aside>
 
-    <EditorToolbar v-model="tool" @rail="onRail" />
+    <EditorToolbar v-model="tool" :readonly="readOnly" @rail="onRail" />
+    <!-- 보기 전용 띠(PRD/16 E): 캔버스 위 가운데 -->
+    <div v-if="readOnly" class="sq ro-band" role="status">
+      <EditorIcon name="visibility_on" :size="16" />
+      <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
+    </div>
 
     <div class="toast-wrap" role="status" aria-live="polite">
       <!-- 오래 남는 알림(닫을 때까지): 인터넷 끊김 · 저장 실패 — 피그마 'This file has unsaved changes' 처럼 도구 막대 위 -->
@@ -1426,6 +1466,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" multiple @change="onImageFile" @cancel="tool === 'image' && (tool = 'move')">
     <AppCommandPalette />
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
+    <ShareModal v-model:open="shareOpen" :project-id="projectId" :project-name="project.data.value?.name ?? ''" />
     <KeyboardShortcuts v-if="shortcutsOpen" @close="shortcutsOpen = false" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
@@ -1451,10 +1492,15 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmPage = null) }, { label: tr('Delete page'), kind: 'destructed', onClick: doRemovePage }]"
       @close="confirmPage = null"
     />
+    <!-- 멤버가 아니거나 처음 초대받은 경우: 편집기 대신 안내(PRD/16 B) -->
+    <AccessGate :project-id="projectId" :project-name="project.data.value?.name" />
   </div>
 </template>
 
 <style scoped>
+.ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
+.insp.ro { opacity: .64; }
+.ro-note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-06) var(--ref-spacing-08) 0; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px; }
 .editor { height: calc(100vh - var(--iris-tabs-h, 0px)); position: relative; overflow: clip; background: var(--iris-canvas); font-size: 12px; line-height: 18px; }
 /* 캔버스 나타나기: 보던 자리를 놓은 뒤 .28s 로 옅게 → 또렷이. 페이지를 바꿀 땐 바로 감췄다가 다시 나타나요 */
 .editor :deep(.canvas) { transition: opacity .28s cubic-bezier(.2, .7, .2, 1); }

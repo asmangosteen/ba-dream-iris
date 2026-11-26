@@ -4,6 +4,8 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 /** 아래 도구 막대. 피그마처럼 묶음 버튼(프레임 · 섹션 / 도형 / 그리기)을 누르면 마지막 도구, ▾ 로 펼쳐서 고르기 */
 export type Tool = 'move' | 'hand' | 'scale' | 'pen' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
 const tool = defineModel<Tool>({ default: 'move' })
+/** 보기 전용(디자인 편집 권한 없음): 이동 · 손만, 편집 도구 자리에 잠긴 Edit(PRD/16 E) */
+const props = defineProps<{ readonly?: boolean }>()
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
 interface Item { key: Tool; label: string; key2?: string; icon: string }
@@ -86,7 +88,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
 
 <template>
   <div ref="root" role="toolbar" :aria-label="tr('Tools')" aria-orientation="horizontal" class="sq float s bar">
-    <div v-for="g in GROUPS" :key="g.id" class="grp-wrap">
+    <div v-for="g in (props.readonly ? GROUPS.slice(0, 1) : GROUPS)" :key="g.id" class="grp-wrap">
       <button
         :aria-label="tip(shown(g))"
         :data-tip="tr(shown(g).label)"
@@ -112,15 +114,21 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
         </button>
       </div>
     </div>
-    <span class="div" aria-hidden="true" />
-    <button type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
-    <button type="button" :aria-label="tr('Link requirement')" :data-tip="tr('Link requirement')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
-    <button type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
+    <template v-if="props.readonly">
+      <span class="div" aria-hidden="true" />
+      <span class="locked" tabindex="0" :aria-label="tr('Editing is locked. Only people who can edit design can edit')" :data-tip="tr('Only people who can edit design can do this')" data-tip-at="top"><EditorIcon name="lock" :size="16" />{{ tr('Edit') }}</span>
+    </template>
+    <span v-if="!props.readonly" class="div" aria-hidden="true" />
+    <button v-if="!props.readonly" type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
+    <button v-if="!props.readonly" type="button" :aria-label="tr('Link requirement')" :data-tip="tr('Link requirement')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
+    <button v-if="!props.readonly" type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
     <button type="button" :aria-label="tr('Comments (coming soon)')" aria-disabled="true" :data-tip="tr('Comments')" :data-tip-key="tr('Soon')" data-tip-at="top" class="rail-btn soon" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /></button>
   </div>
 </template>
 
 <style scoped>
+.locked { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 32px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-500); cursor: not-allowed; }
+.locked:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 /* 도구 막대는 늘 맨 앞(z 8): 캔버스 · 좌우 패널(4 · 3) 위, 팝오버 · 메뉴 · 변수 화면(20~) 아래 */
 /* 도구 막대: 바닥에서 16 띄움 · 높이 44 · 모서리 14(= 도구 8 + 안쪽 6, 안팎 곡선이 나란해요) · 안쪽 6(도구 32 둘레가 위아래 · 좌우 모두 6) · 묶음 사이 6 · 도구 32 + ▾ 16(붙어 있음 1px) · 칸막이는 위아래 끝까지 */
 .bar { position: absolute; bottom: var(--ref-spacing-10); left: 50%; transform: translateX(-50%); height: 44px; box-sizing: border-box; border-radius: 14px; padding: 0 var(--ref-spacing-05); display: flex; align-items: center; gap: var(--ref-spacing-05); z-index: 8; }

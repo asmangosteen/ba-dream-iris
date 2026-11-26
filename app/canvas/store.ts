@@ -31,7 +31,11 @@ export function createLayerStore(opts: {
   onUnsaved?: (screenId: string, doc: LayerDoc, error: unknown) => void
   /** 저장에 성공한 화면(보관해 둔 내용을 지워요) */
   onSaved?: (screenId: string) => void
+  /** 보기 전용인데 고치려 했을 때(바뀐 것은 되돌려요) */
+  onBlocked?: () => void
 }) {
+  /** 보기 전용(디자인 편집 권한 없음): 고친 것은 기록 · 저장하지 않고 바로 되돌려요 — 진짜로 막는 건 DB 규칙 */
+  const readonly = ref(false)
   const docs = reactive<Record<string, LayerDoc>>({})
   const screenId = ref<string | null>(null) // 고른 화면
   const layerIds = ref<string[]>([]) // 고른 레이어(같은 화면 안)
@@ -76,6 +80,7 @@ export function createLayerStore(opts: {
   /** 화면을 떠난 편집기: 마지막 저장만 하고 더 다시 시도하지 않아요(새로 연 편집기가 보관본으로 복구해요 — 옛 내용이 덮어쓰지 않게) */
   let disposed = false
   function scheduleSave(sid: string) {
+    if (readonly.value) return
     pending.add(sid)
     clearTimeout(timers.get(sid))
     timers.set(sid, setTimeout(() => flush(sid), 600))
@@ -132,6 +137,10 @@ export function createLayerStore(opts: {
     }
   }
   function record(sid: string, before: string, selBefore?: string[]) {
+    if (readonly.value) {
+      if (snap(sid) !== before) { docs[sid] = JSON.parse(before); opts.onBlocked?.() }
+      return
+    }
     detachEdited(sid, before)
     const after = snap(sid)
     if (after === before) return
@@ -149,7 +158,7 @@ export function createLayerStore(opts: {
     canRedo.value = false
   }
   /** 레이어 밖의 변경(화면 옮기기 · 만들기 · 속성)도 실행취소 기록에 넣습니다 */
-  const pushAction = (screenId: string | null, undo: () => unknown, redo: () => unknown) => push({ kind: 'action', screenId, undo, redo })
+  const pushAction = (screenId: string | null, undo: () => unknown, redo: () => unknown) => { if (!readonly.value) push({ kind: 'action', screenId, undo, redo }) }
   /** 바꾸기 전 모습을 받아 두는 시작점 (끌기처럼 여러 번 바뀌다가 끝에 한 번 기록할 때) */
   /** 시작할 때 고른 레이어(끌기 · 잡아 두기가 끝나 기록할 때 '바꾸기 전 고른 것'으로) */
   const begunSel = new Map<string, string[]>()
@@ -1276,7 +1285,7 @@ export function createLayerStore(opts: {
     pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, dispose, hasUnsaved, recoverDoc, pushAction,
-    hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
+    readonly, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,

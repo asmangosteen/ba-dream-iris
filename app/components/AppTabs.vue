@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import NotificationBell from '~/components/app/NotificationBell.vue'
 import { MAX_PINNED, NEW_TAB_ID, NEW_TAB_PATH, tabIdOf, useTabReload, useTabs } from '~/composables/useTabs'
 import { forgetEditorCache } from '~/composables/useEditor'
 
@@ -286,6 +287,7 @@ function onFocusIn(e: FocusEvent) {
     </div>
     <button type="button" class="sq add" :aria-label="tr('New file')" :data-tip="tr('New file')" @click="openNew"><EditorIcon name="plus" :size="16" /></button>
     <span class="rest" aria-hidden="true" @dblclick="openNew" />
+    <NotificationBell />
     <div v-if="note" class="sq note" role="status">{{ note }}</div>
   </nav>
 </template>
