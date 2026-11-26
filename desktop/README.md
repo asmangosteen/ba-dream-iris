@@ -7,8 +7,8 @@
 
 | 파일 | 하는 일 |
 |---|---|
-| `src/main.cjs` | 창 열기, 창 위치 · 크기 기억, 메뉴, 링크 처리(Iris 주소는 앱 안, 나머지는 기본 브라우저) |
-| `src/preload.cjs` | 웹에 `window.irisDesktop = { platform }` 를 알려 줌 (앱에서 열렸는지 구분할 때 사용) |
+| `src/main.cjs` | 창 열기, 창 위치 · 크기 기억, 메뉴, 링크 처리(Iris 주소는 앱 안, 나머지는 기본 브라우저), 권한(클립보드 · 알림은 Iris 주소에만) |
+| `src/preload.cjs` | 웹에 `window.irisDesktop` 를 알려 줌 — `platform`(앱에서 열렸는지 구분), `openExternal`(탭 우클릭 '브라우저에서 열기'), `onReloadTab`(⌥⌘R 지금 탭만 새로 고침) |
 | `src/offline.html` | 인터넷이 끊겼을 때 뜨는 "Can't reach Iris" 화면 |
 | `scripts/make-icons.cjs` | `public/favicon.svg` 로 앱 아이콘 PNG(`build/icon-mac.png`, `build/icon-win.png`)를 만듦 |
 
@@ -25,11 +25,27 @@ npm run dist:win     # 윈도우 설치 파일 → dist/Iris-버전-win-x64.exe
 
 버전을 올리려면 `package.json` 의 `version` 을 바꾸고 다시 빌드해요.
 
+## 새 설치 파일 올리기 (GitHub Releases)
+
+설치 파일은 100MB 가 넘어서 git 에 넣지 않고 Releases 에 올려요. 저장소 README 의 내려받기 링크가 Releases 를 가리켜요.
+
+```bash
+# 1. package.json 의 version 올리기 (예: 0.1.2) → 2. 빌드
+npm run dist
+# 3. Releases 에 올리기 (gh 로그인 필요)
+gh release create desktop-v0.1.2 dist/Iris-0.1.2-mac-universal.dmg dist/Iris-0.1.2-win-x64.exe \
+  --title "Iris 데스크탑 0.1.2" --notes "바뀐 점"
+```
+
+4. 저장소 `README.md` 의 "데스크탑 앱" 표에서 버전 숫자 두 곳(파일 이름 · `desktop-v…`)을 새 버전으로 바꿔요.
+
 ## 단축키
 
 - Cmd(Ctrl) + `0` · `+` · `-` 는 Iris 캔버스 확대 · 축소에 써서, 페이지 확대 메뉴는 넣지 않았어요.
 - Cmd + Z · C · V 같은 편집 키는 Iris 가 먼저 받아서 처리해요. 처리하지 않으면 입력칸 기본 동작(실행 취소 · 복사 · 붙여넣기)이 일어나요.
-- Cmd + R 새로고침, Cmd + Option + I 개발자 도구.
+- Cmd + R · Shift + Cmd + R 은 편집기의 이름 바꾸기 · 바꿔 붙여넣기예요(피그마와 같아요). 고른 게 없으면 Cmd + R 은 탭 새로 고침.
+- Option + Cmd + R: 지금 탭만 새로 고침(탭 막대는 그대로). Option + Shift + Cmd + R: 창 전체를 강제로 새로 고침.
+- Option + Cmd + I: 개발자 도구.
 
 ## 로그인
 
