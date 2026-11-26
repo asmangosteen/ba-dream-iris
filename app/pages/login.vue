@@ -18,7 +18,7 @@ const local = ref('')
 const code = ref('')
 const busy = ref(false)
 const resent = ref(false)
-const error = ref(route.query.blocked ? `Only company emails (@${domain}) can sign in` : route.query.expired ? 'Your session expired after 30 days. Please sign in again' : route.query.signedout ? 'You were signed out. Sign in again to keep working' : '')
+const error = ref(route.query.blocked ? tr('Only company emails (@{domain}) can sign in', { domain }) : route.query.expired ? tr('Your session expired after 30 days. Please sign in again') : route.query.signedout ? tr('You were signed out. Sign in again to keep working') : '')
 const email = computed(() => `${local.value.trim()}@${domain}`)
 // 도메인 글자: 입력칸 오른쪽에 늘 보이게(입력 글자는 그 앞에서 끝나요)
 const emailField = ref<HTMLElement | null>(null)
@@ -35,7 +35,7 @@ async function sendCode() {
   if (busy.value) return
   const v = local.value.trim()
   if (!v || v.includes('@')) {
-    error.value = v.includes('@') ? `Enter only the part before @. We'll add @${domain} for you` : 'Enter your email'
+    error.value = v.includes('@') ? tr("Enter only the part before @. We'll add @{domain} for you", { domain }) : tr('Enter your email')
     return
   }
   busy.value = true
@@ -43,7 +43,7 @@ async function sendCode() {
   const { error: e } = await supabase.auth.signInWithOtp({ email: email.value, options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/confirm` } })
   busy.value = false
   if (e) {
-    error.value = e.message.includes('회사 이메일') ? `Only company emails (@${domain}) can sign in` : e.message.includes('rate') || e.status === 429 ? 'Code just sent. You can request a new one in a minute' : 'Couldn\'t send the email. Check your address and try again'
+    error.value = e.message.includes('회사 이메일') ? tr('Only company emails (@{domain}) can sign in', { domain }) : e.message.includes('rate') || e.status === 429 ? tr('Code just sent. You can request a new one in a minute') : tr("Couldn't send the email. Check your address and try again")
     return
   }
   if (step.value === 'code') resent.value = true
@@ -53,13 +53,13 @@ async function sendCode() {
 
 async function verify() {
   if (busy.value) return
-  if (code.value.trim().length !== 6) { error.value = 'Enter the 6-digit code from your email'; return }
+  if (code.value.trim().length !== 6) { error.value = tr('Enter the 6-digit code from your email'); return }
   busy.value = true
   error.value = ''
   const { error: e } = await supabase.auth.verifyOtp({ email: email.value, token: code.value.trim(), type: 'email' })
   if (e) {
     busy.value = false
-    error.value = 'That code didn\'t match. Check the 6 digits in your email'
+    error.value = tr("That code didn't match. Check the 6 digits in your email")
     return
   }
   // 로그인 상태(useSupabaseUser)가 채워진 뒤 이동해야 미들웨어가 로그인 화면으로 되돌리지 않습니다
@@ -132,14 +132,16 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 <template>
   <div class="page" :class="theme">
     <!-- 랜딩으로 나가기: 랜딩의 Sign in 과 같은 크기 · 같은 높이, 왼쪽에 -->
-    <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" aria-label="Back to home" @click="navigateTo('/welcome')" />
-    <h1 class="bar-title">Sign in</h1>
+    <Button class="out" size="l" type="tertiary" contents="icon" icon-name="arrow_left" :aria-label="tr('Back to home')" @click="navigateTo('/welcome')" />
+    <h1 class="bar-title">{{ tr('Sign in') }}</h1>
     <section class="side">
 
       <form class="form" novalidate @submit.prevent="submit">
-        <NuxtLink to="/welcome" class="brand" aria-label="Back to home"><IrisLogo kind="horizontal" :height="64" :theme="theme" /></NuxtLink>
+        <NuxtLink to="/welcome" class="brand" :aria-label="tr('Back to home')"><IrisLogo kind="horizontal" :height="64" :theme="theme" /></NuxtLink>
         <!-- 코드 단계: 어디로 보냈는지만 알려요 -->
-        <p v-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
+        <!-- 한국어는 문장 순서가 달라서 따로(메일 주소가 앞에 와요) -->
+        <p v-if="step === 'code' && isKo()" class="sent tx-meta m0"><strong class="who">{{ email }}</strong> 주소로 보낸 6자리 코드를 입력하거나, 메일 속 링크를 눌러 주세요</p>
+        <p v-else-if="step === 'code'" class="sent tx-meta m0">Enter the 6-digit code we sent to <strong class="who">{{ email }}</strong>, or click the link in the email</p>
 
         <!-- 도메인은 디자인 시스템 단위 대신 직접 붙여요: 단위는 입력 중(포커스)에 감춰지는 규칙이라 -->
         <div v-if="step === 'email'" ref="emailField" class="email-field" :style="{ '--unit-w': unitW + 'px', '--box-h': boxH + 'px' }">
@@ -147,7 +149,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
           v-model:value="local"
           size="m"
           :show-label="false"
-          placeholder="Email"
+          :placeholder="tr('Email')"
           :show-left-icon="false"
           :show-right-icon="false"
           :show-button="false"
@@ -155,13 +157,13 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
           :show-supporting-text="!!error"
           :supporting-text="error"
           supporting-theme="destructed"
-          :input-props="{ id: 'email', name: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: false, autofocus: true, 'aria-label': 'Company email' }"
+          :input-props="{ id: 'email', name: 'email', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: false, autofocus: true, 'aria-label': tr('Company email') }"
         />
         <span ref="unitEl" class="email-unit" aria-hidden="true">@{{ domain }}</span>
         </div>
         <!-- 코드 6칸: 칸마다 숫자 하나. 붙여넣기 · 자동 채우기는 한 번에, ← → 로 칸 옮기기, 지우면 앞 칸으로 -->
         <div v-else class="otp-wrap">
-          <div class="otp" role="group" aria-label="Sign-in code">
+          <div class="otp" role="group" :aria-label="tr('Sign-in code')">
             <!-- 칸 모양(채우기 · 선)은 squircle 층(.sq)이 그려요: input 은 투명하게 안에 -->
             <span v-for="(d, i) in digits" :key="i" class="sq otp-cell" :class="{ bad: !!error, filled: !!d, on: focused === i }">
             <input
@@ -174,7 +176,7 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
               :maxlength="i === 0 ? 6 : 1"
               :autocomplete="i === 0 ? 'one-time-code' : 'off'"
               :name="i === 0 ? 'code' : undefined"
-              :aria-label="`Digit ${i + 1} of 6`"
+              :aria-label="tr('Digit {n} of 6', { n: i + 1 })"
               @input="onBox(i, $event)"
               @keydown="onBoxKey(i, $event)"
               @paste.prevent="onPaste(i, $event)"
@@ -183,14 +185,14 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
             >
             </span>
           </div>
-          <p v-if="error || resent" class="otp-msg tx-meta m0" :class="{ bad: !!error }" role="status">{{ error || 'We sent a new code. Use the code from the latest email' }}</p>
+          <p v-if="error || resent" class="otp-msg tx-meta m0" :class="{ bad: !!error }" role="status">{{ error || tr('We sent a new code. Use the code from the latest email') }}</p>
         </div>
 
-        <Button size="l" type="primary" :loading="busy" class="full" @click="submit">{{ step === 'email' ? 'Send sign-in code' : 'Sign in' }}</Button>
+        <Button size="l" type="primary" :loading="busy" class="full" @click="submit">{{ step === 'email' ? tr('Send sign-in code') : tr('Sign in') }}</Button>
 
         <div v-if="step === 'code'" class="links">
-          <TextButton size="s" color="gray" contents="icon-text" icon-name="chevron_left" @click="back">Use a different email</TextButton>
-          <TextButton size="s" color="blue" :disabled="busy" @click="sendCode">Resend code</TextButton>
+          <TextButton size="s" color="gray" contents="icon-text" icon-name="chevron_left" @click="back">{{ tr('Use a different email') }}</TextButton>
+          <TextButton size="s" color="blue" :disabled="busy" @click="sendCode">{{ tr('Resend code') }}</TextButton>
         </div>
       </form>
 

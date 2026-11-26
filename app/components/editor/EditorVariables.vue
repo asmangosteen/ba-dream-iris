@@ -11,6 +11,8 @@ const emit = defineEmits<{ close: [] }>()
 const { all } = useTokenCatalog()
 
 // 왼쪽 종류 목록(영어 원문 — 그릴 때 tr). 텍스트 스타일 · 색이 위
+/** 투명한 색 아래 체크무늬(색 고르기 · Fill 칩과 같아요) — 불투명한 색이면 가려져서 안 보여요 */
+const CHECK = 'repeating-conic-gradient(#d9d9d9 0% 25%, #fff 0% 50%) 0 0 / 6px 6px'
 const ORDER: TokenKind[] = ['color', 'textStyle', 'spacing', 'radius', 'borderWidth', 'opacity', 'shadow', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing']
 const visible = computed(() => all.value.filter((t) => !t.hidden))
 const kinds = computed(() => ORDER.map((k) => ({ k, n: visible.value.filter((t) => t.kind === k).length })).filter((x) => x.n))
@@ -75,7 +77,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
             <div class="vgrp"><span>{{ groupLabel(g.g) }}</span><span class="num">{{ g.items.length }}</span></div>
             <div v-for="t in g.items" :key="t.id" class="row">
               <span class="nm">
-                <span v-if="t.kind === 'color'" class="sqc sw" :style="{ background: t.color }" aria-hidden="true" />
+                <span v-if="t.kind === 'color'" class="sqc sw" :style="{ background: `linear-gradient(${t.color}, ${t.color}), ${CHECK}` }" aria-hidden="true" />
                 <span v-else-if="t.kind === 'textStyle'" class="ag" aria-hidden="true">Ag</span>
                 <EditorIcon v-else name="variable" :size="16" class="vi" />
                 <span class="ell">{{ t.name }}</span>
