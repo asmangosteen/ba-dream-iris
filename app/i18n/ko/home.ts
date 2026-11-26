@@ -65,4 +65,9 @@ export default {
   'Sign in again': '다시 로그인하기',
   'Iris 3D logo. Drag to rotate, scroll to resize': 'Iris 3D 로고. 끌어서 돌리고, 스크롤해서 크기를 바꿀 수 있어요',
   'Company website': '회사 홈페이지',
+  'Sign in': '로그인',
+  'Reset': '초기화',
+  'Light mode': '라이트 모드',
+  'Dark mode': '다크 모드',
+  'Color mode': '화면 모드',
 } satisfies Record<string, string>

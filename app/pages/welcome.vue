@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@ba-dream/design-system'
+import { LANG_LABEL } from '~/composables/useLang'
 
 /**
  * 랜딩: 로그인 전에 보는 첫 화면. 흰 바탕 가운데 브러시드 스틸 Iris 로고(3D) 하나.
  * - 끌어서 360도 돌리기, 위아래 스크롤로 커서 위치 기준 확대 · 축소
  * - 처음 모습에서 바뀌면 Reset 이 나타나고, 누르면 처음 자세 · 크기로
  * - 위: 워드마크 · Sign in(→ /login), 아래: Reset · 저작권 · 회사 링크
+ * - 왼쪽 아래: English · 한국어 토글(고른 언어는 로그인 뒤 모든 화면에도 그대로)
  * - 오른쪽 아래: 라이트 · 다크 토글. 다크 배경은 black-default(#03091A). 고른 모드는 로그인 · 안쪽 화면에도 그대로
  */
 // 랜딩 ↔ 로그인은 스르륵 바뀜 (main.css 의 iris-fade)
@@ -13,6 +15,7 @@ definePageMeta({ pageTransition: { name: 'iris-fade', mode: 'out-in' } })
 
 useHead({ title: 'Iris' })
 const { theme, setTheme } = usePublicTheme()
+const { lang, setLang } = useLang()
 
 // 바닥 그림자: 흰 바탕엔 검정, 다크(black-default) 바탕엔 밝은 색으로 — 라이트와 같은 느낌으로 보이게
 const SHADOW = { light: { shadowColor: 0x000000, shadow: 0.1 }, dark: { shadowColor: 0xFFFFFF, shadow: 0.18 } } as const
@@ -60,11 +63,11 @@ onBeforeUnmount(() => {
 
     <header class="top">
       <IrisLogo kind="horizontal" :height="20" :theme="theme" />
-      <Button size="l" type="tertiary" contents="text-icon" icon-name="arrow_right" @click="navigateTo('/login')">Sign in</Button>
+      <Button size="l" type="tertiary" contents="text-icon" icon-name="arrow_right" @click="navigateTo('/login')">{{ tr('Sign in') }}</Button>
     </header>
 
     <div class="bottom">
-      <Button class="reset" :class="{ on: changed }" :aria-hidden="!changed" :tabindex="changed ? 0 : -1" size="l" type="tertiary" contents="icon-text" icon-name="refresh" @click="iris?.reset()">Reset</Button>
+      <Button class="reset" :class="{ on: changed }" :aria-hidden="!changed" :tabindex="changed ? 0 : -1" size="l" type="tertiary" contents="icon-text" icon-name="refresh" @click="iris?.reset()">{{ tr('Reset') }}</Button>
       <p class="copy cap">© 2026 CYCLOID.CORP. All rights reserved.</p>
       <nav class="links cap" :aria-label="tr('Company website')">
         <a href="https://cycloid-corp.vercel.app/" target="_blank" rel="noopener">CYCLOID</a>
@@ -73,9 +76,14 @@ onBeforeUnmount(() => {
       </nav>
     </div>
 
+    <!-- 왼쪽 아래: 언어(언어 이름은 늘 그 언어로 — English · 한국어) -->
+    <div class="sq mode lang" role="radiogroup" :aria-label="tr('Language')">
+      <button v-for="l in (['en', 'ko'] as const)" :key="l" type="button" role="radio" :aria-checked="lang === l" :lang="l" :class="['sq', 'mode-item', 'lang-item', { on: lang === l }]" @click="setLang(l)">{{ LANG_LABEL[l] }}</button>
+    </div>
+
     <!-- 오른쪽 아래: 화면 모드 -->
-    <div class="sq mode" role="radiogroup" aria-label="Appearance">
-      <button v-for="t in (['light', 'dark'] as const)" :key="t" type="button" role="radio" :aria-checked="theme === t" :aria-label="t === 'light' ? 'Light mode' : 'Dark mode'" :title="t === 'light' ? 'Light' : 'Dark'" :class="['sq', 'mode-item', { on: theme === t }]" @click="setTheme(t)">
+    <div class="sq mode" role="radiogroup" :aria-label="tr('Color mode')">
+      <button v-for="t in (['light', 'dark'] as const)" :key="t" type="button" role="radio" :aria-checked="theme === t" :aria-label="t === 'light' ? tr('Light mode') : tr('Dark mode')" :title="t === 'light' ? tr('Light') : tr('Dark')" :class="['sq', 'mode-item', { on: theme === t }]" @click="setTheme(t)">
         <ThemeIcon :name="t" />
       </button>
     </div>
@@ -123,6 +131,9 @@ onBeforeUnmount(() => {
 .mode-item.on { --sq-fill: var(--sys-color-common-white-emphasis); color: var(--sys-color-neutral-800); filter: drop-shadow(0 1px 1px var(--ref-color-gray-900-10)); }
 .dark .mode-item.on { --sq-fill: var(--ref-color-gray-900-10); filter: none; }
 .mode-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+/* 언어 토글: 모드 토글과 같은 모양, 왼쪽 아래. 칸은 글자 폭만큼 */
+.mode.lang { right: auto; left: 40px; }
+.lang-item { width: auto; padding: 0 var(--ref-spacing-05); font-size: var(--typography-caption-1-size); line-height: var(--typography-caption-1-line-height); font-weight: 500; }
 
 @media (max-width: 760px) {
   .top { height: 60px; padding: 0 16px; }
@@ -130,6 +141,7 @@ onBeforeUnmount(() => {
   .bottom { bottom: 64px; }
   .copy { margin-top: 20px; }
   .mode { right: 16px; bottom: 16px; }
+  .mode.lang { right: auto; left: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .stage, .loading, .reset, .landing { transition: none; } }
 </style>
