@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
-import type { ImageCrop, LayerNode } from '~/canvas/schema'
+import { normAngle, type ImageCrop, type LayerNode } from '~/canvas/schema'
+import { rotCursor, type Corner } from '~/canvas/cursors'
 import { coverCrop, radiiOf, rectPath } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
 import { useLayerStore } from '~/canvas/store'
@@ -30,6 +31,14 @@ const R = computed(() => {
   return { x: c.x * W.value, y: c.y * H.value, w: c.w * W.value, h: c.h * H.value }
 })
 const url = computed(() => imageSrc(paint.value?.src))
+/** 이미지 돌린 각도(도, 이미지 가운데 기준) */
+const rot = computed(() => paint.value?.rotation ?? 0)
+/** 이미지 안 비율 자리(u, v: 0~1) → 레이어 안 좌표(돌린 것 포함) */
+function ipt(u: number, v: number, r = R.value, deg = rot.value) {
+  const t = (deg * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t)
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2, dx = (u - 0.5) * r.w, dy = (v - 0.5) * r.h
+  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }
+}
 
 // --- 좌표 ---
 const pt = (x: number, y: number) => { const m = props.mat; return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f } }
@@ -42,7 +51,16 @@ function toLocal(dx: number, dy: number) {
 const tf = computed(() => { const m = props.mat; return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})` })
 const zoomNow = computed(() => Math.hypot(props.mat.a, props.mat.b))
 const poly = (x: number, y: number, w: number, h: number) => [pt(x, y), pt(x + w, y), pt(x + w, y + h), pt(x, y + h)].map((p) => `${p.x},${p.y}`).join(' ')
-const imgPoly = computed(() => poly(R.value.x, R.value.y, R.value.w, R.value.h))
+const imgPoly = computed(() => [ipt(0, 0), ipt(1, 0), ipt(1, 1), ipt(0, 1)].map((q) => pt(q.x, q.y)).map((p) => `${p.x},${p.y}`).join(' '))
+/** 흐린 이미지 가림 판(mask) 범위: 돌린 이미지 · 창을 모두 덮게 */
+const maskBox = computed(() => {
+  const ps = [ipt(0, 0), ipt(1, 0), ipt(1, 1), ipt(0, 1), { x: 0, y: 0 }, { x: W.value, y: H.value }]
+  const x0 = Math.min(...ps.map((q) => q.x)) - 2, y0 = Math.min(...ps.map((q) => q.y)) - 2
+  return { x: x0, y: y0, w: Math.max(...ps.map((q) => q.x)) + 2 - x0, h: Math.max(...ps.map((q) => q.y)) + 2 - y0 }
+})
+const imgRot = computed(() => (rot.value ? `rotate(${rot.value} ${R.value.x + R.value.w / 2} ${R.value.y + R.value.h / 2})` : undefined))
+/** 레이어가 화면에서 돈 각도(커서 방향) */
+const nodeAngle = computed(() => (Math.atan2(props.mat.b, props.mat.a) * 180) / Math.PI)
 const winPoly = computed(() => poly(0, 0, W.value, H.value))
 /** 자르는 창 모양: 레이어 그대로(모서리 둥글기 + Corner smoothing) — 테두리 · 흐린 이미지의 구멍이 같은 모양 */
 const shapeD = computed(() => {
@@ -53,7 +71,15 @@ const shapeD = computed(() => {
 const uid = `crop-${Math.random().toString(36).slice(2, 8)}`
 const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['se', 1, 1], ['sw', 0, 1]] as const
 const EDGES = [['n', 0, 0, 1, 0], ['e', 1, 0, 1, 1], ['s', 0, 1, 1, 1], ['w', 0, 0, 0, 1]] as const
-const imgHandles = computed(() => CORNERS.map(([k, u, v]) => ({ k, ...pt(R.value.x + u * R.value.w, R.value.y + v * R.value.h) })))
+const imgHandles = computed(() => CORNERS.map(([k, u, v]) => { const q = ipt(u, v); return { k, ...pt(q.x, q.y) } }))
+/** 이미지 돌리기 자리: 이미지 모서리 바로 바깥(화면 14px, 대각선 바깥쪽) — 커서는 모서리마다 다른 돌리기 화살표 */
+const imgRotHandles = computed(() => {
+  const c = pt(R.value.x + R.value.w / 2, R.value.y + R.value.h / 2)
+  return imgHandles.value.map((h) => {
+    const dx = h.x - c.x, dy = h.y - c.y, l = Math.hypot(dx, dy) || 1
+    return { k: h.k as Corner, x: h.x + (dx / l) * 14, y: h.y + (dy / l) * 14 }
+  })
+})
 /** 창 크기 손잡이(프레임 선택과 같은 모양): 모서리 네모 + 가장자리는 보이지 않는 잡는 띠. 돌리거나 뒤집은 레이어는 빼요 */
 const canResize = computed(() => !props.node.rotation && !props.node.flipX && !props.node.flipY)
 const winHandles = computed(() => (canResize.value ? CORNERS.map(([k, u, v]) => ({ k, ...pt(u * W.value, v * H.value) })) : []))
@@ -98,18 +124,46 @@ function startMove(e: PointerEvent) {
     setCrop(toCrop({ ...r0, x, y }))
   })
 }
-/** 이미지 크기: 맞은편 모서리 고정, 비율 그대로 */
+/** 이미지 크기: 맞은편 모서리 고정, 비율 그대로(돌린 이미지는 이미지 방향 기준) */
 function startImgResize(e: PointerEvent, k: string) {
   const r0 = { ...R.value }
   const a = r0.w / r0.h
-  const ax = k.includes('w') ? r0.x + r0.w : r0.x, ay = k.includes('n') ? r0.y + r0.h : r0.y
+  const sx = k.includes('w') ? -1 : 1, sy = k.includes('n') ? -1 : 1
+  const t = (rot.value * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t)
+  const A = ipt((1 - sx) / 2 === 0 ? 0 : 1, (1 - sy) / 2 === 0 ? 0 : 1, r0)
+  const P0 = ipt(sx > 0 ? 1 : 0, sy > 0 ? 1 : 0, r0)
   drag(e, (d) => {
-    const px = (k.includes('w') ? r0.x : r0.x + r0.w) + d.x, py = (k.includes('n') ? r0.y : r0.y + r0.h) + d.y
-    const w = Math.max(8, Math.max(Math.abs(px - ax), Math.abs(py - ay) * a))
-    const h = w / a
-    setCrop(toCrop({ x: k.includes('w') ? ax - w : ax, y: k.includes('n') ? ay - h : ay, w, h }))
+    const px = P0.x + d.x - A.x, py = P0.y + d.y - A.y
+    // 이미지 방향 좌표로
+    const vx = (px * cos + py * sin) * sx, vy = (-px * sin + py * cos) * sy
+    const w = Math.max(8, Math.max(vx, vy * a)), h = w / a
+    const cx = A.x + ((sx * w) / 2) * cos - ((sy * h) / 2) * sin, cy = A.y + ((sx * w) / 2) * sin + ((sy * h) / 2) * cos
+    setCrop(toCrop({ x: cx - w / 2, y: cy - h / 2, w, h }))
   })
 }
+/** 이미지 돌리기: 이미지 가운데 기준, ⇧ 15° 씩 */
+const svgEl = ref<SVGSVGElement | null>(null)
+function startImgRotate(e: PointerEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  e.stopPropagation()
+  const box = svgEl.value?.getBoundingClientRect()
+  const c = pt(R.value.x + R.value.w / 2, R.value.y + R.value.h / 2)
+  const cx = (box?.left ?? 0) + c.x, cy = (box?.top ?? 0) + c.y
+  const a0 = Math.atan2(e.clientY - cy, e.clientX - cx), r0 = rot.value
+  const sign = props.mat.a * props.mat.d - props.mat.b * props.mat.c < 0 ? -1 : 1
+  rotating.value = true
+  const move = (ev: PointerEvent) => {
+    let deg = r0 + (sign * (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180) / Math.PI
+    deg = ev.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg * 10) / 10
+    const v = normAngle(deg)
+    patchImage(store, props.edit, (p) => ({ ...p, fit: 'crop', crop: p.crop ?? toCrop(R.value), rotation: v || undefined }))
+  }
+  const up = () => { rotating.value = false; window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true) }
+  window.addEventListener('pointermove', move, true)
+  window.addEventListener('pointerup', up, true)
+}
+const rotating = ref(false)
 /** 창 크기: 레이어 상자를 바꾸고 이미지는 화면 그 자리 그대로 */
 function startWinResize(e: PointerEvent, k: string) {
   const r0 = { ...R.value }
@@ -195,7 +249,7 @@ function setAspect(v: string | null) {
   setCrop(c, geom, corner)
 }
 /** 처음처럼: 창을 꼭 덮게 */
-function reset() { setCrop(coverCrop(ar.value, W.value / H.value)) }
+function reset() { patchImage(store, props.edit, (p) => ({ ...p, fit: 'crop', crop: coverCrop(ar.value, W.value / H.value), rotation: undefined })) }
 const apply = () => endCrop(store, true)
 const cancel = () => endCrop(store, false)
 
@@ -241,22 +295,24 @@ watch(() => [store.screenId.value, store.layerIds.value.join(','), paint.value?.
 
 <template>
   <div class="crop-root">
-    <svg class="crop-svg" width="100%" height="100%">
+    <svg ref="svgEl" class="crop-svg" width="100%" height="100%">
       <defs>
-        <!-- 흐린 이미지에서 창 자리는 구멍(창 모양 그대로) -->
-        <mask :id="uid" maskUnits="userSpaceOnUse" :x="Math.min(0, R.x) - 1" :y="Math.min(0, R.y) - 1" :width="Math.max(W, R.x + R.w) - Math.min(0, R.x) + 2" :height="Math.max(H, R.y + R.h) - Math.min(0, R.y) + 2">
-          <rect :x="R.x" :y="R.y" :width="R.w" :height="R.h" fill="#fff" />
+        <!-- 흐린 이미지에서 창 자리는 구멍(창 모양 그대로) — 돌린 이미지도 덮게 넉넉히 -->
+        <mask :id="uid" maskUnits="userSpaceOnUse" :x="maskBox.x" :y="maskBox.y" :width="maskBox.w" :height="maskBox.h">
+          <rect :x="maskBox.x" :y="maskBox.y" :width="maskBox.w" :height="maskBox.h" fill="#fff" />
           <path :d="shapeD" fill="#000" />
         </mask>
       </defs>
       <g :transform="tf">
-        <image v-if="url" :href="url" :x="R.x" :y="R.y" :width="R.w" :height="R.h" preserveAspectRatio="none" opacity="0.4" :mask="`url(#${uid})`" />
+        <g :mask="`url(#${uid})`"><image v-if="url" :href="url" :x="R.x" :y="R.y" :width="R.w" :height="R.h" preserveAspectRatio="none" opacity="0.4" :transform="imgRot" /></g>
       </g>
+      <!-- 이미지 돌리기: 이미지 모서리 바로 바깥(레이어와 같아요 — ⇧ 15° 씩) -->
+      <circle v-for="h in imgRotHandles" :key="'ir' + h.k" class="rot-hit crop-ui" :cx="h.x" :cy="h.y" r="9" :style="{ cursor: rotCursor(h.k, rot + nodeAngle) }" @pointerdown="startImgRotate" />
       <!-- 옮기기: 이미지 · 창 어디를 잡아도 -->
       <polygon class="hit move crop-ui" :points="imgPoly" @pointerdown="startMove" />
       <polygon class="hit move crop-ui" :points="winPoly" @pointerdown="startMove" />
       <g :transform="tf">
-        <rect class="img-line" :x="R.x" :y="R.y" :width="R.w" :height="R.h" vector-effect="non-scaling-stroke" />
+        <rect class="img-line" :x="R.x" :y="R.y" :width="R.w" :height="R.h" :transform="imgRot" vector-effect="non-scaling-stroke" />
         <path class="win-line" :d="shapeD" vector-effect="non-scaling-stroke" />
       </g>
       <!-- 창 가장자리: 보이지 않는 잡는 띠(프레임 선택과 같아요) -->
@@ -307,6 +363,7 @@ watch(() => [store.screenId.value, store.layerIds.value.join(','), paint.value?.
 /* 손잡이: 캔버스 선택 손잡이(.handle.live · .rh)와 같은 모양 */
 .hd { fill: #FFFFFF; stroke: var(--iris-select); stroke-width: 1; pointer-events: none; }
 .hd-hit { fill: transparent; pointer-events: all; }
+.rot-hit { fill: transparent; pointer-events: all; }
 .edge { stroke: transparent; stroke-width: 8; pointer-events: stroke; }
 /* 아래 막대: 도구 막대 위(토스트 자리), 도구 막대와 같은 떠 있는 상자 */
 .cbar { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); height: 44px; box-sizing: border-box; border-radius: 14px; padding: 0 var(--ref-spacing-05) 0 var(--ref-spacing-08); display: flex; align-items: center; gap: var(--ref-spacing-04); pointer-events: auto; z-index: 9; font-size: 12px; }

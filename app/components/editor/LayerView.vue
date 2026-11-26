@@ -11,7 +11,7 @@ import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -81,7 +81,7 @@ const style = computed(() => {
     mixBlendMode: s.blend && s.blend !== 'normal' ? s.blend : undefined,
   }
   const sq = smooth.value
-  if (boxy.value && v.type !== 'image' && !sq) Object.assign(css, backgroundCss(s, color, imageSrc))
+  if (boxy.value && v.type !== 'image' && !sq) Object.assign(css, backgroundCss(s, color, imageSrc, { w: v.w, h: v.h }))
   const e = fx.value!
   const shadow = sq ? [...strokes.value.outer] : [...strokes.value.outer, ...e.outer, ...e.inner]
   if (shadow.length) css.boxShadow = shadow.join(', ')
@@ -201,7 +201,26 @@ const smoothBg = computed(() => {
   const sq = smooth.value
   if (!v || !sq || v.type === 'image') return null
   const e = fx.value!
-  return { ...backgroundCss(v.style, color, imageSrc), clipPath: `path('${sq.path}')`, boxShadow: e.inner.length ? e.inner.join(', ') : undefined, backdropFilter: e.backdrop, WebkitBackdropFilter: e.backdrop }
+  return { ...backgroundCss(v.style, color, imageSrc, { w: v.w, h: v.h }), clipPath: `path('${sq.path}')`, boxShadow: e.inner.length ? e.inner.join(', ') : undefined, backdropFilter: e.backdrop, WebkitBackdropFilter: e.backdrop }
+})
+/**
+ * 돌린 Crop 이미지 칠(이미지 편집에서 돌린 것): 배경으로 못 돌려서 따로 그려요 — 레이어 모양(둥글기 · smoothing)대로 잘라서.
+ * 맨 위 칠 위치에 그려요(다른 배경 칠 위)
+ */
+const rotImgs = computed(() => {
+  const v = n.value
+  if (!v || !boxy.value || v.type === 'image') return null
+  const list = (v.style.fills ?? []).filter((p) => p.visible !== false).filter(rotatedImage)
+  if (!list.length) return null
+  const sq = smooth.value
+  return {
+    clip: sq ? `path('${sq.path}')` : undefined,
+    items: list.map((p) => {
+      const c = p.crop!
+      const url = imageSrc(p.src)
+      return { left: c.x * v.w + 'px', top: c.y * v.h + 'px', width: c.w * v.w + 'px', height: c.h * v.h + 'px', transform: `rotate(${p.rotation}deg)`, backgroundImage: url ? `url("${url}")` : undefined, opacity: p.opacity ?? 1 }
+    }),
+  }
 })
 /** 내용을 자르는 smoothing 프레임: 그림자는 레이어 자체 filter 가 그려요 */
 const clipsSmooth = computed(() => { const v = n.value; return !!v && !!smooth.value && clipsContent(v) })
@@ -524,6 +543,7 @@ function onKey(e: KeyboardEvent) {
 <template>
   <div v-if="n && !n.hidden" class="ly" :class="[n.type, { lk: n.locked }]" :data-layer="n.id" :style="ghosted ? { ...style, visibility: 'hidden' } : style">
     <i v-if="smoothBg" class="smw" :style="{ filter: (!clipsSmooth && smoothShadow) || undefined }"><i class="smb" :style="smoothBg" /></i>
+    <i v-if="rotImgs" class="rimg" :style="{ clipPath: rotImgs.clip }" aria-hidden="true"><i v-for="(st, k) in rotImgs.items" :key="k" :style="st" /></i>
     <span v-if="n.type === 'section'" class="sec-name" :data-sec="n.id" :style="{ '--z': zoom ?? 1 }">
       <!-- 섹션 이름 두 번 누르기: 그 자리에서 고치기(화면 이름표 · 레이어 목록과 같아요 — Enter 저장 · Esc 취소 · 바깥 누르면 저장) -->
       <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
@@ -618,6 +638,9 @@ function onKey(e: KeyboardEvent) {
 .stk { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 /* Corner smoothing 바탕 · 그림자 층: 내용 뒤에 */
 .smw { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+/* 돌린 Crop 이미지: 레이어 모양대로 잘라요(둥근 모서리는 border-radius, smoothing 은 clip-path) */
+.rimg { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
+.rimg > i { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
 .smb { position: absolute; inset: 0; }
 .dash { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 1; }
 .vfill { position: absolute; inset: 0; }

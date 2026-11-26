@@ -18,7 +18,8 @@ export function alpha(c: string, a = 1): string {
 }
 
 /** 칠 하나 → background 한 겹 */
-export function paintLayer(p: Paint, color: ColorFn, img: ImgFn): { image: string; size: string; position: string; repeat: string } | null {
+/** box: 칠하는 상자 크기(px) — 있으면 Crop 자리를 px 로 정확히(이미지 폭이 상자 폭과 같을 때도 — % 로는 위치를 못 나타내요) */
+export function paintLayer(p: Paint, color: ColorFn, img: ImgFn, box?: { w: number; h: number }): { image: string; size: string; position: string; repeat: string } | null {
   if (p.type === 'solid') {
     const c = alpha(color(p.color) ?? p.color, p.opacity)
     return { image: `linear-gradient(${c}, ${c})`, size: 'auto', position: '0 0', repeat: 'no-repeat' }
@@ -36,6 +37,7 @@ export function paintLayer(p: Paint, color: ColorFn, img: ImgFn): { image: strin
   // Crop: 레이어 상자 기준 이미지 자리(비율). background-position % 는 '남는 폭 × %' 라 x / (1 − w) 로 바꿔요
   if (fit === 'crop' && p.crop) {
     const { x, y, w, h } = p.crop
+    if (box) return { image, size: `${r4(w * box.w)}px ${r4(h * box.h)}px`, position: `${r4(x * box.w)}px ${r4(y * box.h)}px`, repeat: 'no-repeat' }
     const pos = (o: number, size: number) => (Math.abs(1 - size) < 1e-6 ? 0 : (o / (1 - size)) * 100)
     return { image, size: `${r4(w * 100)}% ${r4(h * 100)}%`, position: `${r4(pos(x, w))}% ${r4(pos(y, h))}%`, repeat: 'no-repeat' }
   }
@@ -60,10 +62,12 @@ export function topImagePaint(s: LayerStyle): { i: number; p: Extract<Paint, { t
 }
 
 /** 채우기: fill(바탕) + fills(위로 쌓기, 마지막이 맨 위) */
-export function backgroundCss(s: LayerStyle, color: ColorFn, img: ImgFn): Record<string, string> {
+/** 돌린 Crop 이미지 칠(배경으로 못 그려서 따로 그려요) */
+export const rotatedImage = (p: Paint): p is Extract<Paint, { type: 'image' }> => p.type === 'image' && p.fit === 'crop' && !!p.crop && !!p.rotation
+export function backgroundCss(s: LayerStyle, color: ColorFn, img: ImgFn, box?: { w: number; h: number }): Record<string, string> {
   const css: Record<string, string> = {}
   if (s.fill) css.backgroundColor = color(s.fill) ?? s.fill
-  const layers = (s.fills ?? []).filter(on).map((p) => paintLayer(p, color, img)).filter((x): x is NonNullable<typeof x> => !!x).reverse()
+  const layers = (s.fills ?? []).filter(on).filter((p) => !(box && rotatedImage(p))).map((p) => paintLayer(p, color, img, box)).filter((x): x is NonNullable<typeof x> => !!x).reverse()
   if (layers.length) {
     css.backgroundImage = layers.map((l) => l.image).join(', ')
     css.backgroundSize = layers.map((l) => l.size).join(', ')

@@ -21,12 +21,13 @@ export interface VPath { pts: VPoint[]; closed?: boolean }
 export type Paint =
   | { type: 'solid'; color: string; opacity?: number; visible?: boolean; token?: string }
   | { type: 'linear' | 'radial' | 'angular'; stops: GradStop[]; angle?: number; opacity?: number; visible?: boolean }
-  | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean; crop?: ImageCrop; iw?: number; ih?: number; scale?: number }
+  | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean; crop?: ImageCrop; iw?: number; ih?: number; scale?: number; rotation?: number }
 export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
 /**
  * 이미지 칠 자르기(fit 'crop', 피그마 Crop): 레이어 상자 기준 이미지 자리 — 왼쪽 · 위(x · y)와 폭 · 높이(w · h), 모두 레이어 폭 · 높이에 대한 비율.
  * 예) { x: -0.2, y: 0, w: 1.4, h: 1 } = 이미지가 레이어보다 1.4배 넓고 왼쪽으로 20% 나가 있어요(나간 부분은 잘려요).
  * iw · ih: 이미지 원래 크기(px) — 비율 · Tile 크기에 써요. scale: Tile 크기 배율(1 = 원래 크기)
+ * rotation: Crop 안에서 이미지 돌리기(도, 이미지 가운데 기준) — CSS 배경으로는 못 돌려서 LayerView 가 따로 그려요
  */
 export interface ImageCrop { x: number; y: number; w: number; h: number }
 

@@ -9,6 +9,7 @@ import { Button, Skeleton, TextButton } from '@ba-dream/design-system'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
+import KeyboardShortcuts from '~/components/editor/KeyboardShortcuts.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
 import { importSvg } from '~/canvas/vector'
@@ -993,6 +994,13 @@ async function share() {
 const zoomOpen = ref(false)
 const projMenu = ref(false)
 const settingsOpen = ref(false)
+/** 단축키 모음 창(메인 메뉴 · ⌃⇧? — 피그마와 같아요) */
+const shortcutsOpen = ref(false)
+function onShortcutsKey(e: KeyboardEvent) {
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'Slash') { e.preventDefault(); e.stopPropagation(); shortcutsOpen.value = !shortcutsOpen.value }
+}
+onMounted(() => window.addEventListener('keydown', onShortcutsKey, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onShortcutsKey, true))
 const ZOOMS = [0.25, 0.5, 1, 2]
 const { data: me } = useMe()
 const myName = computed(() => me.value?.name || me.value?.email || tr('Me'))
@@ -1100,6 +1108,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
             <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
             <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requirements board') }}</NuxtLink>
+            <button class="sq menu-item ks-mi" role="menuitem" @click="shortcutsOpen = true"><span>{{ tr('Keyboard shortcuts') }}</span><span class="mi-key">⌃⇧?</span></button>
             <div class="msep" role="separator" />
             <ThemeSwitch compact />
             <LangSwitch />
@@ -1314,6 +1323,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime" class="sr" tabindex="-1" aria-hidden="true" multiple @change="onImageFile" @cancel="tool === 'image' && (tool = 'move')">
     <AppCommandPalette />
     <ProjectModal v-model:open="settingsOpen" :project-id="projectId" @removed="navigateTo('/')" />
+    <KeyboardShortcuts v-if="shortcutsOpen" @close="shortcutsOpen = false" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
     <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
@@ -1353,6 +1363,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .vars-btn .muted { color: var(--sys-color-neutral-500); }
 .home-wrap { position: relative; flex: none; }
 .pmenu { left: 0; right: auto; width: 232px; }
+/* 메뉴 줄 오른쪽 끝 단축키(흐리게) */
+.pmenu .ks-mi { justify-content: space-between; }
+.pmenu .mi-key { color: var(--sys-color-neutral-500); font-size: 11px; }
 .home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* 눈금자를 켜면(⇧R) 피그마처럼 양쪽 패널이 눈금자 두께(18)만큼 안으로 — 왼쪽 패널은 위 · 왼쪽, 오른쪽 패널은 위만 */

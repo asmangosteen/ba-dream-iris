@@ -26,6 +26,7 @@ import { textShortcut } from '~/canvas/textKeys'
 import { download, fileNameOf, renderExport } from '~/canvas/exporter'
 import type { ExportSetting, Paint } from '~/canvas/schema'
 import ImageCropOverlay from '~/components/editor/ImageCropOverlay.vue'
+import { rotCursor } from '~/canvas/cursors'
 import { cropFromFit, startCrop, useImageEdit } from '~/composables/useImageEdit'
 
 /**
@@ -206,25 +207,6 @@ function onWheel(e: WheelEvent) {
 // 끌기
 // ---------------------------------------------------------------------------
 const CORNERS = ['nw', 'ne', 'sw', 'se'] as const
-/**
- * 돌리기 커서(피그마와 같아요): 모서리를 감싸는 굽은 화살표 — 왼쪽 위 모양을 기준으로 모서리마다 90° 씩, 돌린 상자면 그 각도만큼 더 돌려요
- */
-const ROT_BASE: Record<(typeof CORNERS)[number], number> = { nw: 0, ne: 90, se: 180, sw: 270 }
-const rotCursorCache = new Map<number, string>()
-function rotCursor(c: (typeof CORNERS)[number], angle = 0) {
-  const a = ((Math.round(ROT_BASE[c] + angle) % 360) + 360) % 360
-  let v = rotCursorCache.get(a)
-  if (!v) {
-    // 양쪽 화살표 굽은 선(피그마 돌리기 커서): 사분원(90°) 곡선 + 양 끝 채운 삼각 화살촉 — 흰 테두리 + 검은 선, 옅은 그림자
-    const arc = 'M7.5 17A10 10 0 0 1 17.5 7'
-    const heads = 'M17 3.2L21.6 7L17 10.8Z M3.7 16.5L7.5 21.1L11.3 16.5Z'
-    const g = `<path d='${arc}' stroke='white' stroke-width='4.5'/><path d='${heads}' fill='white' stroke='white' stroke-width='3'/><path d='${arc}' stroke='black' stroke-width='1.6'/><path d='${heads}' fill='black'/>`
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><defs><filter id='s' x='-20%' y='-20%' width='140%' height='140%'><feDropShadow dx='0' dy='0.6' stdDeviation='0.6' flood-opacity='0.35'/></filter></defs><g fill='none' stroke-linecap='round' stroke-linejoin='round' filter='url(#s)' transform='rotate(${a} 12 12)'>${g}</g></svg>`
-    v = `url("data:image/svg+xml,${encodeURIComponent(svg)}") 12 12, alias`
-    rotCursorCache.set(a, v)
-  }
-  return v
-}
 const EDGES = ['n', 's', 'e', 'w'] as const
 type Targets = { sibs: Rect[]; parents: Rect[] }
 /** 그리는 중 Space(피그마와 같아요): 누른 순간의 포인터 · 시작점 — 손을 뗄 때까지 그리던 것을 통째로 옮겨요 */
@@ -249,7 +231,7 @@ type Drag =
   | { kind: 'screen'; id: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; targets: Rect[]; moved: boolean; clickLayer?: string; dup?: boolean; canDup?: boolean }
   | { kind: 'draw'; wx: number; wy: number; moved: boolean; sp?: SpaceMove }
   | { kind: 'placeImage'; wx: number; wy: number; moved: boolean }
-  | { kind: 'layers'; xcarry?: { sid: string; id: string; x: number; y: number; inv: Mat }[]; xbefore?: [string, string][]; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean }
+  | { kind: 'layers'; xcarry?: { sid: string; id: string; x: number; y: number; inv: Mat }[]; xbefore?: [string, string][]; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean ; prevDup?: { ids: string[]; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; targets: Targets; carry: { id: string; x: number; y: number }[] } }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean; sp?: SpaceMove; c?: { x: number; y: number } }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
   | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string; img0?: { i: number; x: number; y: number; R: { x: number; y: number; w: number; h: number }; p: Paint } }
@@ -1018,13 +1000,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
   const layerEl = (e.target as HTMLElement).closest('[data-layer]') as HTMLElement | null
   // 피그마처럼 화면 바로 아래 것부터(⌘ 를 누르면 가장 안쪽)
   const lid = diveBoolean(screen, pickLayer(screen.id, layerEl?.dataset.layer, e.metaKey), e.clientX, e.clientY, e.metaKey)
-  // 캔버스에 바로 놓인 프레임의 빈 곳(안 고른 상태)을 끌면 그 안 상자 고르기, 누르기만 하면 그 프레임 고르기(맨 위 프레임과 같아요 — 피그마와 같아요)
-  const topF = isCanvas(screen) && lid && layerEl?.dataset.layer === lid ? store.node(screen.id, lid) : undefined
-  if (topF && topF.type === 'frame' && !isGroupNode(topF) && !topF.parentId && !e.shiftKey && !e.altKey && !(store.screenId.value === screen.id && store.layerIds.value.includes(lid!))) {
-    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base: [], moved: false, pick: true, within: lid }
-    marqueeOn.value = true
-    return
-  }
+  // 캔버스에 바로 놓인 프레임 · 도형: 고르지 않았어도 누르고 끌면 곧바로 골라서 그 방향으로 옮겨요(사용자 요청 — 상자 고르기는 캔버스 빈 곳에서)
   // 피그마처럼: 고른 화면 안을 끌면 화면째 옮기기(누르고 떼기만 하면 그 레이어를 골라요)
   const screenGrab = !!lid && !isCanvas(screen) && store.screenId.value === screen.id && !store.layerIds.value.length && !multi.value.length && !(e.shiftKey && !e.altKey)
   if (lid && isNative(screen) && !screenGrab) {
@@ -1116,13 +1092,7 @@ function start(e: PointerEvent, screen?: ScreenRow) {
     drag = { kind: 'screens', ids: [...multi.value], sx: e.clientX, sy: e.clientY, orig, b0: union(moving.map(rectOf)), targets: realScreens.value.filter((v) => !multi.value.includes(v.id)).map(rectOf), moved: false, dup: e.altKey }
     return
   }
-  // 고르지 않은 화면(맨 위 프레임)의 빈 곳을 끌면 상자 고르기, 누르기만 하면 그 화면 고르기(피그마와 같아요). 이미 고른 화면은 끌면 옮겨요
-  const screenSel = store.screenId.value === screen.id && !store.layerIds.value.length
-  if (!layerEl && isNative(screen) && !isCanvas(screen) && !e.altKey && !screenSel && !multi.value.includes(screen.id)) {
-    drag = { kind: 'marquee', sid: screen.id, wx: w.x, wy: w.y, base: [], moved: false, pick: true }
-    marqueeOn.value = true
-    return
-  }
+  // 고르지 않은 화면(맨 위 프레임)의 빈 곳 · 이름표: 누르면 곧바로 골라서, 끌면 그 방향으로 옮겨요(먼저 고를 필요 없이 — 사용자 요청). ⌥ 면 복제
   store.selectScreen(screen.id)
   const sid0 = screen.id
   drag = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined, dup: e.altKey && isNative(screen) && !isCanvas(screen), canDup: isNative(screen) && !isCanvas(screen) }
@@ -1526,6 +1496,8 @@ function move(e: PointerEvent) {
     drag.moved = true
     // 끄는 도중 ⌥: 원래 화면은 제자리로 돌리고 복제로 바꿔요(피그마와 같아요)
     if (e.altKey && !drag.dup && drag.canDup) { drag.dup = true; emit('move', drag.id, drag.ox, drag.oy, false) }
+    // ⌥ 를 떼면 복제 취소: 파란 미리보기를 지우고 원래 화면이 다시 따라와요(피그마와 같아요)
+    else if (!e.altKey && drag.dup) { drag.dup = false; draft.value = null }
     // Shift: 가로나 세로로만
     const lockS = e.shiftKey ? (Math.abs(dx) > Math.abs(dy) ? 'y' : 'x') : null
     let nx = drag.ox + (lockS === 'x' ? 0 : dx / z), ny = drag.oy + (lockS === 'y' ? 0 : dy / z)
@@ -1541,8 +1513,19 @@ function move(e: PointerEvent) {
     if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 3) return
     drag.moved = true
     // 끄는 도중 ⌥(⇧⌥ 포함): 원본은 제자리로 돌리고, 속성까지 그대로인 복제본을 끌어요(피그마와 같아요)
+    // 끄는 도중 ⌥ 를 떼면 복제 취소(피그마와 같아요): 복제본을 지우고(방금 기록한 복제를 되돌려요) 원본이 다시 따라와요
+    if (!e.altKey && drag.duped && drag.prevDup) {
+      const dg = drag, pv = drag.prevDup
+      store.undo()
+      dg.ids = pv.ids; dg.orig = pv.orig; dg.inv = pv.inv; dg.targets = pv.targets; dg.carry = pv.carry
+      keepMix(() => { store.layerIds.value = [...pv.ids] })
+      dg.duped = false
+      dg.prevDup = undefined
+      dg.carryDup = false
+    }
     if (e.altKey && !drag.duped && drag.ids.length) {
       const dg = drag
+      dg.prevDup = { ids: [...dg.ids], orig: { ...dg.orig }, inv: { ...dg.inv }, targets: dg.targets, carry: [...dg.carry] }
       const d0 = store.doc(dg.sid)
       for (const id of dg.ids) { const n = d0.nodes[id]; if (n) { n.x = dg.orig[id]!.x; n.y = dg.orig[id]!.y } }
       keepMix(() => { store.layerIds.value = [...dg.ids]; store.duplicateInPlace() })
@@ -1724,6 +1707,7 @@ function move(e: PointerEvent) {
     drag.moved = true
     // 끄는 도중 ⌥: 원래 화면들은 제자리로, 복제로 바꿔요
     if (e.altKey && !drag.dup) { drag.dup = true; for (const id of drag.ids) emit('move', id, drag.orig[id]!.x, drag.orig[id]!.y, false) }
+    else if (!e.altKey && drag.dup) { drag.dup = false; mixGhosts.value = [] }
     const lock = e.shiftKey ? (Math.abs(dx) > Math.abs(dy) ? 'y' : 'x') : null // Shift: 가로나 세로로만
     if (lock === 'y') dy = 0
     if (lock === 'x') dx = 0
@@ -1860,6 +1844,12 @@ function end(e: PointerEvent) {
   if (!drag) return
   const d = drag
   drag = null
+  // 레이어 끌기 한 번 = 실행취소 한 번: 옮기기 · 다른 프레임(캔버스)으로 넘기기 · 함께 옮긴 화면을 묶어요
+  // (따로 기록하면 ⌘Z 첫 번에 원래 프레임 밖 잘린 자리로 돌아가 사라진 것처럼 보였어요)
+  if (d.kind === 'layers' && d.moved) store.batch(() => endDrag(e, d))
+  else endDrag(e, d)
+}
+function endDrag(e: PointerEvent, d: NonNullable<typeof drag>) {
   panning.value = false
   guides.value = null
   rotating.value = false
@@ -2736,13 +2726,16 @@ function labelPos(s: ScreenRow) {
  */
 function frameTags(s: ScreenRow) {
   const rot = scrRot(s)
-  if (!rot) return null
+  return rot ? tagsFor({ cx: s.x + s.width / 2, cy: s.y + s.height / 2, w: s.width, h: s.height, angle: rot }) : null
+}
+/** 돌린 상자(화면 · 레이어 공통)의 이름표 · 크기 표시 자리: 각도를 ±45° 안으로 줄여 위 · 아래에 오는 변을 따라(거꾸로 서지 않게) */
+function tagsFor(g: { cx: number; cy: number; w: number; h: number; angle: number }) {
+  const rot = g.angle
   const k = Math.round(rot / 90), eff = rot - k * 90
   const odd = Math.abs(k) % 2 === 1
-  const W = odd ? s.height : s.width, H = odd ? s.width : s.height
+  const W = odd ? g.h : g.w, H = odd ? g.w : g.h
   const t = (eff * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t)
-  const cx = s.x + s.width / 2, cy = s.y + s.height / 2
-  const at = (u: number, v: number) => ({ x: (cx + u * cos - v * sin) * vp.value.zoom + vp.value.x, y: (cy + u * sin + v * cos) * vp.value.zoom + vp.value.y })
+  const at = (u: number, v: number) => ({ x: (g.cx + u * cos - v * sin) * vp.value.zoom + vp.value.x, y: (g.cy + u * sin + v * cos) * vp.value.zoom + vp.value.y })
   const tl = at(-W / 2, -H / 2), bc = at(0, H / 2)
   return {
     label: { left: tl.x + 'px', top: tl.y - 20 + 'px', transform: eff ? `rotate(${eff}deg)` : undefined, transformOrigin: '0 20px' },
@@ -3370,6 +3363,8 @@ const measure = computed<Guides | null>(() => {
 // ⌥ 를 누른 채 끄는 중이면 붙는 선 대신 간격 재기를 보여요
 const shown = computed(() => (dragHover.value && measure.value ? measure.value : guides.value ?? measure.value))
 const sx = (v: number) => v * vp.value.zoom + vp.value.x
+/** 1px 선을 화면 픽셀에 딱 맞게(자 가이드 선과 같은 굵기 · 진하기 — 반 픽셀에 걸쳐 두껍게 번지지 않게) */
+const crisp = (v: number) => { const d = import.meta.client ? window.devicePixelRatio || 1 : 1; return Math.round(d) % 2 === 0 ? Math.round(v * d) / d : (Math.floor(v * d) + 0.5) / d }
 const sy = (v: number) => v * vp.value.zoom + vp.value.y
 /** 간격 표시 양 끝 눈금 */
 function ticks(l: { x1: number; y1: number; x2: number; y2: number }) {
@@ -3738,14 +3733,14 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
             <span v-for="h in radHandles ?? []" :key="'rh' + h.c" class="rh" :style="{ left: h.x + 'px', top: h.y + 'px' }" :title="tr('Corner radius (⌥ one corner)')" @pointerdown.stop.prevent="startRadius($event, h.c)" />
           </template>
         </div>
-        <span class="sq size below" :class="{ comp: selComp }" :style="belowBox(single)">
+        <span class="sq size below" :class="{ comp: selComp }" :style="single.angle ? tagsFor(single).size : belowBox(single)">
           <template v-if="rotating">{{ fmt(single.rotation) }}°</template>
           <template v-else>{{ fmt(single.w) }}<span v-if="singleModes.w" class="mode">{{ singleModes.w }}</span> × {{ fmt(single.h) }}<span v-if="singleModes.h" class="mode">{{ singleModes.h }}</span></template>
         </span>
       </template>
       <svg v-if="shown" class="guides" width="100%" height="100%">
         <template v-for="(l, i) in shown.lines" :key="i">
-          <line :x1="sx(l.x1)" :y1="sy(l.y1)" :x2="sx(l.x2)" :y2="sy(l.y2)" :stroke-dasharray="l.dash ? '3 3' : undefined" />
+          <line :x1="l.x1 === l.x2 ? crisp(sx(l.x1)) : sx(l.x1)" :y1="l.y1 === l.y2 ? crisp(sy(l.y1)) : sy(l.y1)" :x2="l.x1 === l.x2 ? crisp(sx(l.x2)) : sx(l.x2)" :y2="l.y1 === l.y2 ? crisp(sy(l.y2)) : sy(l.y2)" :stroke-dasharray="l.dash ? '3 3' : undefined" />
           <template v-if="l.tick"><line v-for="(t, j) in ticks(l)" :key="j" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" /></template>
           <!-- 맞춰진 점마다 작은 ×(피그마와 같아요) -->
           <path v-if="l.marks?.length" class="gmark" :d="l.marks.map((m) => `M${sx(m.x) - 3} ${sy(m.y) - 3}l6 6M${sx(m.x) + 3} ${sy(m.y) - 3}l-6 6`).join('')" />
@@ -3931,7 +3926,8 @@ a.fig-tag:hover svg { transform: scale(1.15); }
 .rh::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
 .rlabel { position: absolute; left: auto; top: auto; margin: 0; transform: translateX(-50%); }
 .guides.draw polyline { fill: none; stroke: var(--iris-select); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.guides line { stroke: var(--iris-measure); stroke-width: 1; shape-rendering: crispEdges; }
+/* 스마트 가이드(자석) 선: 자 가이드를 잡았을 때의 빨간 선과 같은 1px — crispEdges 는 소수 자리에서 2px 로 번져 진해 보여서 빼고 자리를 픽셀에 맞춰요 */
+.guides line { stroke: var(--iris-measure); stroke-width: 1; }
 .guides .gmark { fill: none; stroke: var(--iris-measure); stroke-width: 1; }
 /* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
 .glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 2px; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; --sq-fill: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
