@@ -25,7 +25,8 @@ type Entry =
 
 export function createLayerStore(opts: {
   screens: Ref<ScreenRow[]>
-  save: (screenId: string, doc: LayerDoc) => Promise<void>
+  /** edited = 사람이 직접 고친 변경이 들었나(크기 재기 · 요구사항 짝 같은 자동 저장만이면 false — 충돌 때 묻지 않아요) */
+  save: (screenId: string, doc: LayerDoc, edited: boolean) => Promise<void>
   tokens: Ref<{ name: string; value: string }[]>
   /** 저장에 실패한 화면의 내용(이 브라우저에 보관 — 새로 고쳐도 잃지 않게) */
   onUnsaved?: (screenId: string, doc: LayerDoc, error: unknown) => void
@@ -74,6 +75,8 @@ export function createLayerStore(opts: {
   // 실패하면: 내용을 브라우저에 보관(onUnsaved)하고 2 · 5 · 10 · 30초 간격으로 다시 시도해요(연결이 돌아오면 바로 — flushAll)
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
   const pending = new Set<string>()
+  /** 사람이 직접 고친 화면(기록 · 복구로 저장 대기) */
+  const dirty = new Set<string>()
   const RETRY = [2000, 5000, 10000, 30000]
   let fails = 0
   let retryT: ReturnType<typeof setTimeout> | null = null
@@ -91,12 +94,15 @@ export function createLayerStore(opts: {
     clearTimeout(timers.get(sid))
     saveState.state = 'saving'
     const body = JSON.parse(snap(sid)) as LayerDoc
+    const edited = dirty.has(sid)
+    dirty.delete(sid)
     try {
-      await opts.save(sid, body)
+      await opts.save(sid, body, edited)
       opts.onSaved?.(sid)
       if (!pending.size) { fails = 0; saveState.state = 'saved'; saveState.error = undefined; saveState.retryAt = undefined }
     } catch (e) {
       pending.add(sid)
+      if (edited) dirty.add(sid)
       opts.onUnsaved?.(sid, body, e)
       const wait = RETRY[Math.min(fails, RETRY.length - 1)]!
       fails++
@@ -113,9 +119,31 @@ export function createLayerStore(opts: {
   function dispose() { const p = flushAll(); disposed = true; if (retryT) { clearTimeout(retryT); retryT = null } return p }
   /** 저장 안 된 화면이 있는지(저장 중 · 대기 · 실패) */
   const hasUnsaved = () => pending.size > 0 || saveState.state === 'saving'
+  /**
+   * 다른 사람이 저장한 레이어로 바꿔 끼우기(실시간 반영 · 저장 충돌에서 '그 사람 것'): 기록 · 저장 없이.
+   * 이 화면의 실행취소 기록은 비워요(되돌리면 그 사람 것을 지우게 되니까)
+   */
+  function loadRemote(sid: string, layers: unknown) {
+    docs[sid] = migrate(layers)
+    pending.delete(sid)
+    dirty.delete(sid)
+    clearTimeout(timers.get(sid))
+    held.delete(sid); heldDoc.delete(sid)
+    const keep = (e: Entry) => e.screenId !== sid
+    undoStack.splice(0, undoStack.length, ...undoStack.filter(keep))
+    redoStack.splice(0, redoStack.length, ...redoStack.filter(keep))
+    canUndo.value = undoStack.length > 0
+    canRedo.value = redoStack.length > 0
+    layerIds.value = layerIds.value.filter((id) => docs[sid]!.nodes[id] || screenId.value !== sid)
+    xsel.value = xsel.value.filter((x) => x.sid !== sid || docs[sid]!.nodes[x.id])
+    if (editing.value && !docs[sid]!.nodes[editing.value]) editing.value = null
+  }
+  /** 이 화면에 아직 저장 안 된 내 변경이 있나(저장 대기 · 끄는 중) */
+  const hasPending = (sid: string) => dirty.has(sid) || held.has(sid)
   /** 보관해 둔 내용으로 되돌리고 저장(복구) */
   function recoverDoc(sid: string, d: unknown) {
     docs[sid] = migrate(d)
+    dirty.add(sid)
     scheduleSave(sid)
   }
 
@@ -145,6 +173,7 @@ export function createLayerStore(opts: {
     const after = snap(sid)
     if (after === before) return
     push({ screenId: sid, before, after, selBefore: selBefore ?? (screenId.value === sid ? [...layerIds.value] : []) })
+    dirty.add(sid)
     scheduleSave(sid)
   }
   /** 묶음(batch) 중이면 기록을 모아 두었다가 끝에 실행취소 한 번으로 */
@@ -213,6 +242,7 @@ export function createLayerStore(opts: {
     docs[sid] = JSON.parse(json)
     layerIds.value = layerIds.value.filter((id) => docs[sid]!.nodes[id])
     xsel.value = xsel.value.filter((x) => x.sid !== sid || docs[sid]!.nodes[x.id])
+    dirty.add(sid)
     scheduleSave(sid)
   }
   /** 되돌린 문서에 있는 것만 다시 고르기 */
@@ -1285,7 +1315,7 @@ export function createLayerStore(opts: {
     pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, dispose, hasUnsaved, recoverDoc, pushAction,
-    readonly, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
+    readonly, loadRemote, hasPending, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     rotateBy, flip, align, distribute, space, boxes,

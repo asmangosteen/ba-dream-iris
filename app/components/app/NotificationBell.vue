@@ -32,6 +32,9 @@ function textOf(n: NotificationRow): string {
     case 'invite_rejected': return tr('Your invite for {email} to {project} was declined', { email, project: p })
     case 'role_changed': return n.payload?.role === 'owner' ? tr('You\'re now the owner of {project}', { project: p }) : tr('Your role in {project} is now {role}', { project: p, role: roleTx(n.payload?.role) })
     case 'removed': return tr('You were removed from {project}', { project: p })
+    case 'mention': return tr('{who} mentioned you in {project}', { who, project: p })
+    case 'reply': return tr('{who} replied to a comment in {project}', { who, project: p })
+    case 'comment_resolved': return tr('{who} resolved your comment #{no} in {project}', { who, no: String(n.payload?.no ?? ''), project: p })
     default: return tr('Something changed in {project}', { project: p })
   }
 }
@@ -42,7 +45,8 @@ function go(n: NotificationRow) {
   markRead([n.id])
   open.value = false
   if (!n.project_id || n.kind === 'removed') return
-  navigateTo({ path: `/p/${n.project_id}`, query: isAsk(n) ? { share: '1' } : undefined })
+  const isComment = n.target_type === 'comment' && n.target_id
+  navigateTo({ path: `/p/${n.project_id}`, query: isAsk(n) ? { share: '1' } : isComment ? { comment: n.target_id! } : undefined })
 }
 
 function toggle() {
@@ -88,6 +92,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
             <MemberAvatar :name="person(n.actor_id)?.name || String(n.payload?.email ?? '?')" :src="person(n.actor_id)?.avatar_url" :size="28" />
             <span class="body">
               <span class="txt">{{ textOf(n) }}</span>
+              <span v-if="n.target_type === 'comment' && n.payload?.excerpt" class="sq quote">{{ n.payload.excerpt }}</span>
               <span class="tx-meta">{{ relativeTime(n.created_at) }}<template v-if="isAsk(n) && !n.read_at"> · <span class="ask">{{ tr('Needs your approval') }}</span></template></span>
             </span>
             <i v-if="!n.read_at" class="dot" :aria-label="tr('Unread')" />
@@ -117,6 +122,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .txt { color: var(--sys-color-neutral-700); }
 .item.unread .txt { color: var(--sys-color-neutral-800); font-weight: 500; }
+.quote { padding: 2px var(--ref-spacing-04); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask { color: var(--sys-color-brand-primary-default); }
 .dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-12) var(--ref-spacing-10) var(--ref-spacing-14); text-align: center; }

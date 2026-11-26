@@ -5,7 +5,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 export type Tool = 'move' | 'hand' | 'scale' | 'pen' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
 const tool = defineModel<Tool>({ default: 'move' })
 /** 보기 전용(디자인 편집 권한 없음): 이동 · 손만, 편집 도구 자리에 잠긴 Edit(PRD/16 E) */
-const props = defineProps<{ readonly?: boolean }>()
+const props = defineProps<{ readonly?: boolean; commenting?: boolean; unread?: boolean }>()
 const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
 interface Item { key: Tool; label: string; key2?: string; icon: string }
@@ -116,17 +116,19 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
     </div>
     <template v-if="props.readonly">
       <span class="div" aria-hidden="true" />
-      <span class="locked" tabindex="0" :aria-label="tr('Editing is locked. Only people who can edit design can edit')" :data-tip="tr('Only people who can edit design can do this')" data-tip-at="top"><EditorIcon name="lock" :size="16" />{{ tr('Edit') }}</span>
+      <span class="sq locked" tabindex="0" :aria-label="tr('Editing is locked. Only people who can edit design can edit')" :data-tip="tr('Only people who can edit design can do this')" data-tip-at="top"><EditorIcon name="lock" :size="16" />{{ tr('Edit') }}</span>
     </template>
     <span v-if="!props.readonly" class="div" aria-hidden="true" />
     <button v-if="!props.readonly" type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
     <button v-if="!props.readonly" type="button" :aria-label="tr('Link requirement')" :data-tip="tr('Link requirement')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
     <button v-if="!props.readonly" type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
-    <button type="button" :aria-label="tr('Comments (coming soon)')" aria-disabled="true" :data-tip="tr('Comments')" :data-tip-key="tr('Soon')" data-tip-at="top" class="rail-btn soon" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /></button>
+    <button type="button" :aria-label="tr('Comment (C)')" :aria-pressed="!!props.commenting" :data-tip="tr('Comments')" data-tip-key="C" data-tip-at="top" :class="['rail-btn', { on: props.commenting }]" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /><i v-if="props.unread" class="cdot" aria-hidden="true" /></button>
   </div>
 </template>
 
 <style scoped>
+.rail-btn { position: relative; }
+.cdot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 1.5px var(--sys-color-common-white-emphasis); }
 .locked { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 32px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-500); cursor: not-allowed; }
 .locked:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 /* 도구 막대는 늘 맨 앞(z 8): 캔버스 · 좌우 패널(4 · 3) 위, 팝오버 · 메뉴 · 변수 화면(20~) 아래 */

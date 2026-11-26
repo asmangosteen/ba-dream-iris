@@ -5,7 +5,15 @@ export interface PageRow { id: string; name: string; sort_order: number; layers?
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId
 export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
-export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown }
+export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown; updated_at?: string; updated_by?: string | null }
+
+/**
+ * 저장 충돌(PRD/16 J-2): 내가 고치는 동안 다른 사람이 같은 화면(프레임)의 레이어를 먼저 저장했어요.
+ * 그 사람 것(layers · 누가 · 언제)을 담아 던지고, 편집기가 '그 사람 것 / 내 것' 을 묻는 창을 띄워요
+ */
+export class ScreenConflict extends Error {
+  constructor(public screenId: string, public remote: { layers: unknown; updated_by: string | null; updated_at: string }) { super('screen_conflict') }
+}
 
 import { moveOrder } from '~/canvas/order'
 import type { NuxtApp } from '#app'
@@ -54,6 +62,12 @@ export function useEditor(projectId: string) {
   }, { deep: true, getCachedData: fromCache(() => `pages-${projectId}`) })
   // 서버에서 고른 페이지가 브라우저로 그대로 넘어가도록 useState 로 둡니다
   const pageId = useState<string | null>(`page-${projectId}`, () => null)
+  /** 화면마다 마지막으로 안 판(updated_at)과 그때 레이어 — 저장할 때 그 판이 그대로인지 확인해요(다른 사람이 먼저 저장했으면 충돌) */
+  const known = new Map<string, { at: string; layers: string }>()
+  function remember(id: string, at: string | undefined, layers: unknown) { if (at) known.set(id, { at, layers: JSON.stringify(layers ?? null) }) }
+  /** 미리보기: ?conflict=1 이면 첫 레이어 저장에서 충돌을 흉내 내요(충돌 창 확인용) */
+  let fakeConflict = preview && import.meta.client && new URLSearchParams(location.search).get('conflict') === '1'
+  const fakeAfter = Date.now() + 4000 // 불러온 직후 자동 저장(크기 재기)은 건너뛰고 직접 고친 저장에서
   const screens = useAsyncData(`screens-${projectId}`, async () => {
     if (!pageId.value) {
       await pages
@@ -61,8 +75,9 @@ export function useEditor(projectId: string) {
     }
     if (!pageId.value) return [] as ScreenRow[]
     if (preview) return PREVIEW_SCREENS[pageId.value] ?? []
-    const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers').eq('page_id', pageId.value).order('sort_order')
+    const { data, error } = await supabase.from('screens').select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers, updated_at, updated_by').eq('page_id', pageId.value).order('sort_order')
     if (error) throw error
+    for (const r of (data ?? []) as ScreenRow[]) remember(r.id, r.updated_at, r.layers)
     return (data ?? []) as ScreenRow[]
   }, { watch: [pageId], deep: true, getCachedData: fromCache(() => `screens-${projectId}:${pageId.value}`) })
   if (import.meta.client) {
@@ -170,17 +185,40 @@ export function useEditor(projectId: string) {
       const { data, error } = await supabase
         .from('screens')
         .insert({ page_id: pageId.value, name: row.name, source: 'native', x: row.x, y: row.y, width: row.width, height: row.height, sort_order: list.length, updated_by: me() })
-        .select('id, name, source, x, y, width, height, status')
+        .select('id, name, source, x, y, width, height, status, updated_at')
         .single()
       if (error) throw error
       Object.assign(row, data)
+      remember(row.id, row.updated_at, null)
     } else (PREVIEW_SCREENS[pageId.value] ??= []).push(row)
     screens.data.value = preview ? [...(PREVIEW_SCREENS[pageId.value] ?? [])] : [...(screens.data.value ?? []), row] // 여러 개를 한꺼번에 더할 때도 맞게 최신 목록에
     return row
   }
 
   /** 화면 속성 저장 (위치 · 크기 · 이름 · 상태). 화면에는 먼저 반영하고, 저장이 실패하면 되돌립니다 */
-  async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status' | 'layers'>>) {
+  /**
+   * 레이어 저장: 내가 안 판 그대로일 때만. 다른 사람이 먼저 저장했으면 —
+   * 그 사람 레이어가 내가 알던 것과 같으면(위치 · 이름만 바뀜) 새 판으로 다시 저장, 다르면 ScreenConflict
+   * force = '내 것으로 저장'(판 확인 없이)
+   */
+  async function saveLayers(id: string, layers: unknown, force = false) {
+    const k = known.get(id)
+    let q = supabase.from('screens').update({ layers, updated_by: me() }).eq('id', id)
+    if (k && !force) q = q.eq('updated_at', k.at)
+    const { data, error } = await q.select('updated_at')
+    if (error) throw error
+    const row = (data ?? [])[0] as { updated_at: string } | undefined
+    if (row) { remember(id, row.updated_at, layers); return }
+    // 판이 바뀌었어요: 지금 서버에 있는 것을 보고 정해요
+    const { data: cur, error: e2 } = await supabase.from('screens').select('layers, updated_by, updated_at').eq('id', id).maybeSingle()
+    if (e2) throw e2
+    if (!cur) return // 그새 지워진 화면
+    const remote = cur as { layers: unknown; updated_by: string | null; updated_at: string }
+    if (k && JSON.stringify(remote.layers ?? null) === k.layers) { known.set(id, { at: remote.updated_at, layers: k.layers }); return saveLayers(id, layers) }
+    throw new ScreenConflict(id, remote)
+  }
+
+  async function updateScreen(id: string, patch: Partial<Pick<ScreenRow, 'x' | 'y' | 'width' | 'height' | 'name' | 'status' | 'layers'>>, opts: { force?: boolean } = {}) {
     // 미리보기에서도 오프라인이면 실제처럼 저장이 실패해요(연결 · 저장 오류 화면 확인용)
     if (preview && import.meta.client && !navigator.onLine) throw new TypeError('Failed to fetch')
     // 캔버스 위 레이어 → pages.layers
@@ -203,9 +241,20 @@ export function useEditor(projectId: string) {
     }
     const before = { ...s }
     Object.assign(s, patch)
-    if (preview) return
-    const { error } = await supabase.from('screens').update({ ...patch, updated_by: me() }).eq('id', id)
+    if (preview) {
+      if (fakeConflict && 'layers' in patch && Date.now() > fakeAfter) { fakeConflict = false; throw new ScreenConflict(id, { layers: before.layers, updated_by: 'preview-2', updated_at: new Date().toISOString() }) }
+      return
+    }
+    if ('layers' in patch && Object.keys(patch).length === 1) {
+      try { await saveLayers(id, patch.layers, opts.force) } catch (e) { if (!(e instanceof ScreenConflict)) Object.assign(s, before); throw e }
+      s.updated_at = known.get(id)?.at
+      return
+    }
+    const { data, error } = await supabase.from('screens').update({ ...patch, updated_by: me() }).eq('id', id).select('updated_at')
     if (error) { Object.assign(s, before); throw error }
+    // 위치 · 이름 등만 바꾼 저장도 새 판이에요(레이어는 그대로라 알던 레이어 유지)
+    const at = (data?.[0] as { updated_at?: string } | undefined)?.updated_at
+    if (at) known.set(id, { at, layers: 'layers' in patch ? JSON.stringify(patch.layers ?? null) : known.get(id)?.layers ?? JSON.stringify(s.layers ?? null) })
   }
 
   async function removeScreen(id: string) {
@@ -217,5 +266,43 @@ export function useEditor(projectId: string) {
     screens.data.value = (screens.data.value ?? []).filter((x) => x.id !== id)
   }
 
-  return { project, pages, pageId, screens, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen }
+  /**
+   * 실시간 반영(2단계): 다른 사람이 이 페이지 화면을 저장하면 바로 받아요.
+   * onLayers(id, layers) — 그 화면에 내 저장 대기가 없으면 편집기가 레이어를 바꿔 끼워요(있으면 저장할 때 충돌로 물어봐요)
+   */
+  function liveScreens(onLayers: (id: string, layers: unknown) => boolean) {
+    if (preview || !import.meta.client) return
+    let ch: ReturnType<typeof supabase.channel> | null = null
+    const off = () => { if (ch) { supabase.removeChannel(ch); ch = null } }
+    watch(pageId, (pid) => {
+      off()
+      if (!pid) return
+      ch = supabase.channel(`iris-screens-${pid}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'screens', filter: `page_id=eq.${pid}` }, (msg) => {
+          const row = (msg.new ?? {}) as ScreenRow & { page_id?: string }
+          if (msg.eventType === 'DELETE' || msg.eventType === 'INSERT') {
+            if (msg.eventType === 'INSERT' && (screens.data.value ?? []).some((x) => x.id === row.id)) return
+            screens.refresh()
+            return
+          }
+          if (!row.id || row.updated_by === me()) return
+          const k = known.get(row.id)
+          if (k && row.updated_at && row.updated_at <= k.at) return
+          const s = (screens.data.value ?? []).find((x) => x.id === row.id)
+          if (!s) return
+          const layersChanged = JSON.stringify(row.layers ?? null) !== (k?.layers ?? JSON.stringify(s.layers ?? null))
+          Object.assign(s, { name: row.name, x: row.x, y: row.y, width: row.width, height: row.height, status: row.status, thumbnail_path: row.thumbnail_path, updated_by: row.updated_by })
+          if (layersChanged && !onLayers(row.id, row.layers)) return // 내 저장 대기가 있어 그대로(저장할 때 충돌 창)
+          s.layers = row.layers
+          remember(row.id, row.updated_at, row.layers)
+        })
+        .subscribe()
+    }, { immediate: true })
+    onBeforeUnmount(off)
+  }
+
+  /** 충돌에서 '그 사람 것'을 골랐을 때: 그 판을 내가 아는 판으로 */
+  const rememberScreen = (id: string, at: string, layers: unknown) => { remember(id, at, layers); const s = (screens.data.value ?? []).find((x) => x.id === id); if (s) { s.layers = layers; s.updated_at = at } }
+
+  return { project, pages, pageId, screens, saveLayers, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen }
 }

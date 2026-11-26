@@ -10,6 +10,7 @@ import editor from './editor'
 import inspector from './inspector'
 import newtab from './newtab'
 import access from './access'
+import collab from './collab'
 
 /** 여러 영역이 같은 영어 열쇠에 다른 한국어를 넣었을 때 하나로 정한 값(맨 뒤라 늘 이겨요). 새로 겹치면 여기서 정해요 */
 const SETTLED: Record<string, string> = {
@@ -22,4 +23,4 @@ const SETTLED: Record<string, string> = {
   'Remove auto layout': '자동 레이아웃 해제',
 }
 
-export const KO: Record<string, string> = { ...common, ...home, ...workspace, ...docs, ...editor, ...inspector, ...newtab, ...access, ...SETTLED }
+export const KO: Record<string, string> = { ...common, ...home, ...workspace, ...docs, ...editor, ...inspector, ...newtab, ...access, ...collab, ...SETTLED }

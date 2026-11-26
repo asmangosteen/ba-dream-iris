@@ -175,7 +175,7 @@ export default {
   'Type tools': '텍스트 도구',
   'Link requirement': '요구사항 연결',
   'Comments (coming soon)': '댓글(준비 중)',
-  'Comments': '댓글',
+  'Comments': '코멘트',
   'Soon': '준비 중',
   // 레이어 우클릭 메뉴
   'Copy as CSS': 'CSS로 복사',

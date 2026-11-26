@@ -31,6 +31,13 @@ import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import ShareModal from '~/components/project/ShareModal.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
+import ConflictDialog from '~/components/editor/ConflictDialog.vue'
+import { ScreenConflict } from '~/composables/useEditor'
+import CanvasPresence from '~/components/editor/CanvasPresence.vue'
+import CommentLayer from '~/components/editor/CommentLayer.vue'
+import CommentPanel from '~/components/editor/CommentPanel.vue'
+import { useComments, type Thread, type CommentRow } from '~/composables/useComments'
+import PresenceStack from '~/components/editor/PresenceStack.vue'
 import { ROLE_NAME } from '~/composables/useProjectAccess'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/canvas/types'
@@ -40,7 +47,7 @@ import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/use
 const route = useRoute()
 const router = useRouter()
 const projectId = route.params.projectId as string
-const { project, pages, pageId, screens, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+const { project, pages, pageId, screens, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
 // 좌우 사이드바 접기(위로 접혀서 탭 줄만 남아요): 왼쪽 패널의 접기 버튼 하나로 좌우가 함께 접히고 펼쳐져요. 이 브라우저에 기억
 const collapsed = ref<{ left: boolean; right: boolean }>({ left: false, right: false })
 onMounted(() => { try { const v = JSON.parse(localStorage.getItem('iris-panels') ?? '{}'); const c = !!(v.left || v.right); collapsed.value = { left: c, right: c } } catch { /* 저장소를 못 쓰면 펼친 채로 */ } })
@@ -180,7 +187,15 @@ let backupFailed = false
 // 화면 안 레이어: 고르기 · 실행취소 · 자동저장
 const store = createLayerStore({
   screens: canvasList,
-  save: (sid, doc) => updateScreen(sid, { layers: doc }),
+  // 저장 충돌(다른 사람이 먼저 저장)은 실패가 아니라 묻기 — 충돌 창을 띄우고 저장 대기에서는 빼요
+  save: async (sid, doc, edited) => {
+    try { await updateScreen(sid, { layers: doc }) } catch (e) {
+      if (!(e instanceof ScreenConflict)) throw e
+      // 자동 저장(크기 재기 등)만 있었으면 묻지 않고 그 사람 것으로
+      if (!edited) { store.loadRemote(sid, e.remote.layers); rememberScreen(sid, e.remote.updated_at, e.remote.layers); return }
+      openConflict(e)
+    }
+  },
   tokens: computed(() => (tokens.data.value ?? []).map((t) => ({ name: t.name, value: t.value }))),
   onUnsaved: (sid, doc) => {
     if (backup.put(sid, doc)) { backupFailed = false; return }
@@ -195,6 +210,141 @@ provide(LAYER_STORE, store)
 const access = useProjectAccess(projectId)
 const readOnly = computed(() => access.data.status.value === 'success' && !access.can.value.editDesign && !access.gate.value)
 watchEffect(() => { store.readonly.value = readOnly.value })
+// 저장 충돌(PRD/16 J-2): 같은 화면을 다른 사람이 먼저 저장했어요 — 그 사람 것 / 내 것
+const members = useMembers()
+const conflict = ref<{ sid: string; remote: ScreenConflict['remote'] } | null>(null)
+const conflictBusy = ref(false)
+function openConflict(e: ScreenConflict) { conflict.value = { sid: e.screenId, remote: e.remote } }
+const conflictScreen = computed(() => (conflict.value ? list.value.find((x) => x.id === conflict.value!.sid) ?? null : null))
+const conflictBy = computed(() => (members.data.value ?? []).find((m) => m.id === conflict.value?.remote.updated_by) ?? null)
+async function keepMine() {
+  const c = conflict.value
+  if (!c) return
+  conflictBusy.value = true
+  try { await updateScreen(c.sid, { layers: JSON.parse(JSON.stringify(store.doc(c.sid))) }, { force: true }); conflict.value = null; say(tr('Saved your version')) } catch { sayFail(tr('Couldn\'t save. Try again')) }
+  conflictBusy.value = false
+}
+function useTheirs() {
+  const c = conflict.value
+  if (!c) return
+  store.loadRemote(c.sid, c.remote.layers)
+  rememberScreen(c.sid, c.remote.updated_at, c.remote.layers)
+  conflict.value = null
+  say(tr('Switched to their version'))
+}
+// 실시간 반영: 다른 사람이 저장한 화면을 바로 받아요(내 저장 대기가 있는 화면은 저장할 때 충돌 창으로)
+liveScreens((id, layers) => { if (store.hasPending(id)) return false; store.loadRemote(id, layers); return true })
+// 코멘트(2단계): C 로 켜고 끄기, 켜면 캔버스를 눌러 핀을 달아요. 오른쪽 패널은 코멘트 목록으로
+const comments = useComments(projectId)
+const commentMode = ref(false)
+const openThread = ref<string | null>(null)
+const draft = ref<{ screenId: string | null; x: number; y: number } | null>(null)
+const confirmThread = ref<CommentRow | null>(null)
+const mentionPeople = computed(() => access.members.value.map((m) => ({ id: m.member_id, name: m.member?.name || m.member?.email || '?', avatar: m.member?.avatar_url ?? null, role: ROLE_NAME[m.role] })))
+watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else { draft.value = null; openThread.value = null } })
+/** 코멘트 모드에서 캔버스를 누르면: 그 자리(위에 있는 화면 기준)에 새 코멘트 */
+function onCommentDown(e: PointerEvent) {
+  if (!commentMode.value || e.button !== 0) return
+  const el = canvasEl()
+  if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return
+  e.preventDefault(); e.stopPropagation()
+  const r = el.getBoundingClientRect()
+  const wx = (e.clientX - r.left - vp.value.x) / vp.value.zoom, wy = (e.clientY - r.top - vp.value.y) / vp.value.zoom
+  const s = [...list.value].reverse().find((v) => wx >= v.x && wx <= v.x + v.width && wy >= v.y && wy <= v.y + v.height)
+  draft.value = s ? { screenId: s.id, x: wx - s.x, y: wy - s.y } : { screenId: null, x: wx, y: wy }
+  openThread.value = null
+}
+onMounted(() => window.addEventListener('pointerdown', onCommentDown, true))
+onBeforeUnmount(() => window.removeEventListener('pointerdown', onCommentDown, true))
+function onCommentKey(e: KeyboardEvent) {
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+  if (e.code === 'KeyC' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); commentMode.value = !commentMode.value; return }
+  if (e.key === 'Escape' && commentMode.value) {
+    e.stopPropagation()
+    if (draft.value) draft.value = null
+    else if (openThread.value) openThread.value = null
+    else commentMode.value = false
+  }
+}
+onMounted(() => window.addEventListener('keydown', onCommentKey, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onCommentKey, true))
+async function createComment(body: string, mentions: string[]) {
+  const d = draft.value
+  if (!d) return
+  try { const row = await comments.create({ pageId: pageId.value, screenId: d.screenId, x: d.x, y: d.y }, body, mentions); draft.value = null; openThread.value = row.id }
+  catch { sayFail(tr('Couldn\'t post the comment. Try again')) }
+}
+async function replyComment(root: CommentRow, body: string, mentions: string[]) {
+  try { await comments.reply(root, body, mentions) } catch { sayFail(tr('Couldn\'t post the reply. Try again')) }
+}
+async function resolveComment(root: CommentRow, done: boolean) {
+  try { await comments.resolve(root, done); if (done) { openThread.value = null; say(tr('Resolved #{no}', { no: root.no ?? '' })) } } catch { sayFail(tr('Something went wrong. Try again')) }
+}
+async function removeThread() {
+  const r = confirmThread.value
+  confirmThread.value = null
+  if (!r) return
+  try { await comments.remove(r); openThread.value = null } catch { sayFail(tr('Couldn\'t delete. Try again')) }
+}
+/** 목록 · 알림에서 스레드로: 그 페이지로 가서 핀이 보이게 옮기고 열어요 */
+function goThread(t: Thread) {
+  if (t.root.page_id && t.root.page_id !== pageId.value) pageId.value = t.root.page_id
+  commentMode.value = true
+  draft.value = null
+  openThread.value = t.root.id
+  comments.markRead(t.root.id)
+  nextTick(() => {
+    const s = list.value.find((v) => v.id === t.root.screen_id)
+    const wx = (s?.x ?? 0) + (t.root.x ?? 0), wy = (s?.y ?? 0) + (t.root.y ?? 0)
+    const el = canvasEl()
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const z = vp.value.zoom
+    const px = vp.value.x + wx * z, py = vp.value.y + wy * z
+    if (px < 280 || px > r.width - 680 || py < 80 || py > r.height - 120) vp.value = { ...vp.value, x: r.width / 2 - 160 - wx * z, y: r.height / 2 - wy * z }
+  })
+}
+// 알림에서 왔을 때(?comment=스레드)
+watch([() => route.query.comment, () => comments.threads.value.length, () => list.value.length], ([id]) => {
+  if (typeof id !== 'string') return
+  const t = comments.threads.value.find((x) => x.root.id === id)
+  if (!t || (t.root.screen_id && !list.value.some((v) => v.id === t.root.screen_id) && t.root.page_id === pageId.value)) return
+  goThread(t)
+  router.replace({ query: { ...route.query, comment: undefined } })
+}, { immediate: true })
+// 함께 보는 중(PRD/16 J-1): 접속자 · 커서 · 따라가기
+const editingAt = ref(0)
+watch(() => store.saveState.state, (v) => { if (v === 'saving') editingAt.value = Date.now() })
+const room = useRoom(projectId, { pageId, screenId: store.screenId, editingAt })
+const following = ref<string | null>(null)
+function canvasEl() { return document.querySelector<HTMLElement>('main.canvas') }
+function onRoomMove(e: PointerEvent) {
+  const el = canvasEl()
+  if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return
+  const r = el.getBoundingClientRect()
+  const z = vp.value.zoom
+  room.sendCursor({ x: (e.clientX - r.left - vp.value.x) / z, y: (e.clientY - r.top - vp.value.y) / z, view: { cx: (r.width / 2 - vp.value.x) / z, cy: (r.height / 2 - vp.value.y) / z, zoom: z } })
+}
+onMounted(() => window.addEventListener('pointermove', onRoomMove, { passive: true }))
+onBeforeUnmount(() => window.removeEventListener('pointermove', onRoomMove))
+/** 따라가기: 그 사람 화면 가운데 · 배율을 그대로(다른 페이지면 그 페이지로). 캔버스를 직접 움직이면 멈춰요 */
+let followVp: Viewport | null = null
+watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
+  if (!c?.view) return
+  const p = room.peers.value.find((x) => x.key === following.value)
+  if (p?.pageId && p.pageId !== pageId.value) { pageId.value = p.pageId; return }
+  const el = canvasEl()
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  followVp = { x: r.width / 2 - c.view.cx * c.view.zoom, y: r.height / 2 - c.view.cy * c.view.zoom, zoom: c.view.zoom }
+  vp.value = followVp
+}, { deep: true })
+watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
+watch(following, (k) => { followVp = null; if (k) { const p = room.people.value.find((x) => x.key === k); if (p) say(tr('Following {name}', { name: p.name })) } })
+function stopFollowKey(e: KeyboardEvent) { if (e.key === 'Escape' && following.value) following.value = null }
+onMounted(() => window.addEventListener('keydown', stopFollowKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', stopFollowKey))
 /** 보기 전용에서 쓸 수 있는 도구: 이동 · 손 */
 watch([tool, readOnly], () => { if (readOnly.value && tool.value !== 'move' && tool.value !== 'hand') tool.value = 'move' })
 let blockedAt = 0
@@ -1118,7 +1268,7 @@ function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
   else if (k === 'link') {
     if (!current.value) return say(tr('Select a frame on the canvas first'))
     closeDoc(); tab.value = 'plan'; nextTick(() => plan.value?.openPicker())
-  } else say(tr('Comments are coming soon'))
+  } else commentMode.value = !commentMode.value
 }
 
 /** 공유 창(초대 · 승인 · 멤버 역할 · 링크 복사) */
@@ -1225,6 +1375,16 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @ui="onUiKey"
       @reload="tabReload.reload(projectId)"
     />
+ <CommentLayer
+      v-if="commentMode"
+      :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :my-id="comments.myId.value"
+      :can-moderate="access.can.value.manage" :draft="draft" :open-id="openThread"
+      @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
+      @create="createComment" @cancel-draft="draft = null"
+      @reply="replyComment" @resolve="resolveComment" @remove="(r) => (confirmThread = r)"
+    />
+    <div v-if="commentMode" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
+    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
       <span class="tx-meta ce-sub">{{ tr('Draw a frame with the Frame tool (F) or import one from Figma') }}</span>
@@ -1333,14 +1493,15 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <aside spellcheck="false" :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick }]">
       <!-- 맨 위: 나 · Share — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
       <div class="panel-top r line-b">
+        <PresenceStack :people="room.people.value" :following="following" :pages="pages.data.value ?? []" :screens="list" @follow="(k) => (following = k)" />
         <MemberAvatar :size="24" :name="myName" :src="me?.avatar_url" :title="myName" />
         <span class="pill-acts">
           <Button size="s" type="primary" @click="share">{{ tr('Share') }}</Button>
         </span>
       </div>
-      <p v-if="readOnly && tab === 'design'" class="sq ro-note"><EditorIcon name="lock" :size="16" />{{ tr('View only. Only people who can edit design can change these') }}</p>
-      <!-- 인스펙터(문서를 열어도 그대로) -->
-      <template v-if="true">
+      <p v-if="readOnly && tab === 'design' && !commentMode" class="sq ro-note"><EditorIcon name="lock" :size="16" />{{ tr('View only. Only people who can edit design can change these') }}</p>
+      <!-- 인스펙터(문서를 열어도 그대로) — 코멘트 모드면 코멘트 목록 -->
+      <template v-if="!commentMode">
         <div role="tablist" :aria-label="tr('Properties tabs')" class="seg tabs">
           <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; expandPanels()">{{ tr(t[1]) }}</button>
           <div class="zoom-wrap">
@@ -1414,11 +1575,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
+      <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false" />
     </aside>
 
-    <EditorToolbar v-model="tool" :readonly="readOnly" @rail="onRail" />
+    <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
     <!-- 보기 전용 띠(PRD/16 E): 캔버스 위 가운데 -->
-    <div v-if="readOnly" class="sq ro-band" role="status">
+    <div v-if="readOnly && !commentMode" class="sq ro-band" role="status">
       <EditorIcon name="visibility_on" :size="16" />
       <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
     </div>
@@ -1492,12 +1654,35 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmPage = null) }, { label: tr('Delete page'), kind: 'destructed', onClick: doRemovePage }]"
       @close="confirmPage = null"
     />
+    <ConflictDialog
+      v-if="conflict && conflictScreen"
+      :screen="conflictScreen"
+      :mine="store.doc(conflict.sid)"
+      :theirs="conflict.remote.layers"
+      :by-name="conflictBy?.name ?? tr('Someone')"
+      :by-avatar="conflictBy?.avatar_url"
+      :at="conflict.remote.updated_at"
+      :my-name="myName"
+      :my-avatar="me?.avatar_url"
+      :busy="conflictBusy"
+      @keep-mine="keepMine"
+      @use-theirs="useTheirs"
+    />
+    <AppConfirm
+      v-if="confirmThread"
+      :title="tr('Delete this thread?')"
+      :desc="tr('The comment and all its replies are deleted for everyone')"
+      :actions="[{ label: tr('Cancel'), onClick: () => (confirmThread = null) }, { label: tr('Delete thread'), kind: 'destructed', onClick: removeThread }]"
+      @close="confirmThread = null"
+    />
     <!-- 멤버가 아니거나 처음 초대받은 경우: 편집기 대신 안내(PRD/16 B) -->
     <AccessGate :project-id="projectId" :project-name="project.data.value?.name" />
   </div>
 </template>
 
 <style scoped>
+.cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
+.cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .insp.ro { opacity: .64; }
 .ro-note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-06) var(--ref-spacing-08) 0; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px; }

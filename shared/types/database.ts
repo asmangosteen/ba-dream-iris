@@ -2,6 +2,8 @@
 // 실제 Supabase 프로젝트를 연결하면 `npx supabase gen types typescript --project-id <id> > shared/types/database.ts` 로 바꿉니다.
 /** 프로젝트 역할(PRD/12): 방장 · 부방장 · 기획 편집 · 디자인 편집 · 검토자 · 보기 전용 */
 export type ProjectRole = 'owner' | 'deputy' | 'planner_editor' | 'designer_editor' | 'reviewer' | 'viewer'
+/** 코멘트(스레드 첫 글 = thread_id 없음, 핀 자리 x · y 는 화면 기준 — 화면 없으면 페이지 캔버스 기준) */
+export type CommentRow = { id: string; project_id: string; page_id: string | null; screen_id: string | null; thread_id: string | null; no: number | null; x: number | null; y: number | null; author_id: string; body: string; mentions: string[]; resolved_at: string | null; resolved_by: string | null; created_at: string; edited_at: string | null }
 type Row<T> = { Row: T; Insert: Partial<T>; Update: Partial<T>; Relationships: [] }
 
 export interface Database {
@@ -23,6 +25,9 @@ export interface Database {
       project_invites: Row<{ id: string; project_id: string; email: string; kind: 'invite' | 'join'; requested_by: string; status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled'; role: Exclude<ProjectRole, 'owner'> | null; decided_by: string | null; decided_at: string | null; seen_at: string | null; created_at: string; expires_at: string }>
       notifications: Row<{ id: string; member_id: string; project_id: string | null; kind: string; target_type: string | null; target_id: string | null; actor_id: string | null; payload: Record<string, unknown>; group_key: string | null; count: number; read_at: string | null; created_at: string }>
       activity_log: Row<{ id: string; project_id: string; actor_id: string | null; action: string; target_type: string | null; target_id: string | null; before: unknown; after: unknown; created_at: string }>
+      // 2단계(20261127000000_comments_realtime.sql): 코멘트 · 읽음
+      comments: Row<CommentRow>
+      comment_reads: Row<{ member_id: string; thread_id: string; seen_at: string }>
     }
     Views: Record<string, never>
     Functions: {
@@ -35,6 +40,7 @@ export interface Database {
       transfer_project_owner: { Args: { pid: string; mid: string }; Returns: undefined }
       mark_invites_seen: { Args: { pid: string }; Returns: undefined }
       expire_invites: { Args: Record<string, never>; Returns: number }
+      resolve_comment: { Args: { cid: string; done: boolean }; Returns: undefined }
       project_role: { Args: { pid: string }; Returns: string | null }
     }
     Enums: Record<string, never>
