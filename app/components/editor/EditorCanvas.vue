@@ -3,7 +3,7 @@ import type { ScreenRow } from '~/composables/useEditor'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import { DEFAULT_STYLE, descendants, isGroupNode, isContainer, normAngle, ratioLocked, frameCss, frameDashStroke, frameSmoothLayers, frameStroke, gridBands, type LayoutGrid, type LayerNode, type LayerStyle, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { ellipsePath, radiiOf, rectPath, simplify, vectorPath } from '~/canvas/paint'
+import { ellipsePath, radiiOf, rectPath, simplify, topImagePaint, vectorPath } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
@@ -24,7 +24,9 @@ import { scaledStyle } from '~/canvas/scale'
 import { useImageSrc } from '~/canvas/images'
 import { textShortcut } from '~/canvas/textKeys'
 import { download, fileNameOf, renderExport } from '~/canvas/exporter'
-import type { ExportSetting } from '~/canvas/schema'
+import type { ExportSetting, Paint } from '~/canvas/schema'
+import ImageCropOverlay from '~/components/editor/ImageCropOverlay.vue'
+import { cropFromFit, startCrop, useImageEdit } from '~/composables/useImageEdit'
 
 /**
  * 무한 캔버스 + 화면 안 레이어 편집.
@@ -231,7 +233,7 @@ type Drag =
   | { kind: 'layers'; xcarry?: { sid: string; id: string; x: number; y: number; inv: Mat }[]; xbefore?: [string, string][]; sid: string; ids: string[]; sx: number; sy: number; orig: Record<string, { x: number; y: number }>; inv: Record<string, Mat>; b0: Rect | null; targets: Targets; before: string; moved: boolean; carry: { id: string; x: number; y: number }[]; clickLayer?: string; out?: boolean; parent0?: string | null; duped?: boolean; mixIds?: string[]; carryDup?: boolean }
   | { kind: 'drawLine'; sid: string; parentId: string | null; px: number; py: number; lx: number; ly: number; ex: number; ey: number; arrow: boolean; moved: boolean; sp?: SpaceMove; c?: { x: number; y: number } }
   | { kind: 'pencil'; sid: string; parentId: string | null; px: number; py: number; pts: [number, number][]; moved: boolean }
-  | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }
+  | { kind: 'resize'; sid: string; id: string; handle: Handle; sx: number; sy: number; g: { cx: number; cy: number; w: number; h: number; angle: number }; pinv: Mat; ratio: boolean; targets: Targets; before: string; moved: boolean; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string; img0?: { i: number; x: number; y: number; R: { x: number; y: number; w: number; h: number }; p: Paint } }
   | { kind: 'pen'; moved: boolean }
   | { kind: 'vpt'; sid: string; id: string; pi: number; qi: number; part: 'a' | 'i' | 'o'; sx: number; sy: number; abs0: ReturnType<typeof denorm>; inv: Mat; x0: number; y0: number; before: string; moved: boolean; virtual?: { cx: number; cy: number; r: number; qi: number }[]; group?: [number, number][]; collapse?: VKey }
   | { kind: 'resizeMany'; sid: string; handle: Handle; sx: number; sy: number; u0: Rect; items: { id: string; b: Rect; p: { x: number; y: number }; w0: number; h0: number; rot: number; kids0?: Record<string, { x: number; y: number; w: number; h: number }>; sub0?: string }[]; targets: Targets; before: string; moved: boolean }
@@ -1243,7 +1245,10 @@ function startResize(e: PointerEvent, handle: Handle) {
   const kids = isContainer(n) && !n.style.layout ? (n.children ?? []).map((c) => d0.nodes[c]!).filter(Boolean) : []
   const tg = snapTargets(s, [id])
   if (isContainer(n) && n.children?.length) tg.sibs.push(...innerTargets(s, n.children.filter((c) => d0.nodes[c] && !d0.nodes[c]!.hidden && !d0.nodes[c]!.absolute), n.style.layout?.padding))
-  drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n) || tool.value === 'scale', targets: tg, before: store.begin(s.id), moved: false, kids0: kids.length ? boxes0(kids) : undefined, sub0: tool.value === 'scale' ? JSON.stringify(descendants(d0, id).map((k) => d0.nodes[k])) : undefined }
+  // 이미지 칠 사각형: ⌘ 를 누른 채 끌면 자르기(이미지는 그 자리 그대로) — 시작 때 이미지 자리를 받아 둬요
+  const top = n.type === 'rect' && !n.rotation && !n.flipX && !n.flipY ? topImagePaint(n.style) : null
+  const img0 = top ? { i: top.i, x: n.x, y: n.y, R: (() => { const c = cropFromFit(top.p, n.w, n.h); return { x: c.x * n.w, y: c.y * n.h, w: c.w * n.w, h: c.h * n.h } })(), p: JSON.parse(JSON.stringify(top.p)) as Paint } : undefined
+  drag = { kind: 'resize', sid: s.id, id, handle, sx: e.clientX, sy: e.clientY, g: { cx: g.cx, cy: g.cy, w: g.w, h: g.h, angle: g.angle }, pinv: invert(parentWorld(s, id)), ratio: ratioLocked(n) || tool.value === 'scale', targets: tg, before: store.begin(s.id), moved: false, kids0: kids.length ? boxes0(kids) : undefined, sub0: tool.value === 'scale' ? JSON.stringify(descendants(d0, id).map((k) => d0.nodes[k])) : undefined, img0 }
 }
 /** 여러 개 고른 상자의 변 · 모서리: 모두 같은 비율로(피그마와 같아요) */
 function startResizeMany(e: PointerEvent, handle: Handle) {
@@ -1532,13 +1537,22 @@ function move(e: PointerEvent) {
     const dx = (e.clientX - drag.sx) / z, dy = (e.clientY - drag.sy) / z
     if (!drag.moved && Math.abs(dx * z) + Math.abs(dy * z) < 1) return
     drag.moved = true
+    // 이미지 자르기(⌘ + 이미지 칠 사각형): 끈 변만 잘리거나 넓어지고 이미지는 그대로 — 비율 잠금도 풀려요
+    const cropping = !!drag.img0 && e.metaKey
     // 비율이 잠겨 있어도 ⌃ 를 누르는 동안은 풀려요(피그마와 같아요)
-    const r = resizeBox(drag.g, drag.handle, dx, dy, e, drag.ratio && !e.ctrlKey, [...drag.targets.sibs, ...drag.targets.parents])
+    const r = resizeBox(drag.g, drag.handle, dx, dy, e, drag.ratio && !e.ctrlKey && !cropping, [...drag.targets.sibs, ...drag.targets.parents])
     guides.value = r.guide
     const c = apply(drag.pinv, r.cx, r.cy)
     const n = store.node(drag.sid, drag.id)
     if (n) {
       Object.assign(n, { x: store.snapPx(c.x - r.w / 2), y: store.snapPx(c.y - r.h / 2), w: r.w, h: r.h })
+      // 이미지 칠: ⌘ 면 Crop 으로 바꾸고 이미지 자리를 그대로(넓힌 쪽은 빈 영역), ⌘ 를 떼면 원래 칠로
+      if (drag.img0 && n.style.fills?.[drag.img0.i]) {
+        const o = drag.img0
+        n.style.fills[o.i] = cropping && o.p.type === 'image'
+          ? { ...o.p, fit: 'crop', crop: { x: (o.x + o.R.x - n.x) / n.w, y: (o.y + o.R.y - n.y) / n.h, w: o.R.w / n.w, h: o.R.h / n.h } }
+          : o.p
+      }
       if (drag.sub0) scaleSubtree(drag.sid, drag.sub0, r.w / drag.g.w, n.x, n.y) // 스케일 도구(K): 안쪽까지 같은 비율로
       else {
         if (n.type === 'text') {
@@ -2039,7 +2053,10 @@ function onDbl(target: HTMLElement, screen: ScreenRow, ev?: MouseEvent) {
   // 도형: 이미 골라 둔 것이거나 맨 위 단계에서 바로 잡히는 것이면 편집, 막 안으로 들어가 골라진 것이면 고르기만
   const direct = before.includes(lid) || pickLayer(screen.id, deepest, false, []) === lid
   if (!direct) { store.selectLayer(screen.id, lid); return }
-  if (tool.value === 'move' || tool.value === 'scale') enterVectorEdit(screen.id, lid)
+  if (tool.value !== 'move' && tool.value !== 'scale') return
+  // 이미지 칠이 있는 사각형: 이미지 자르기 편집 + 칠 창(피그마와 같아요 — 두 번 누르면 이미지 편집)
+  if (n.type === 'rect' && !n.locked && topImagePaint(n.style)) { store.selectLayer(screen.id, lid); void startCrop(store, frameImg, screen.id, lid, { open: true }); return }
+  enterVectorEdit(screen.id, lid)
 }
 
 // ---------------------------------------------------------------------------
@@ -2319,6 +2336,8 @@ function onKeyDown(e: KeyboardEvent) {
   if (cmdKey && !e.altKey && ['KeyS', 'KeyP', 'KeyR'].includes(e.code)) e.preventDefault()
   if (cmdKey && e.altKey && e.code === 'KeyB') e.preventDefault()
   if (typing(e)) return
+  // 이미지 자르기 중: Enter · Esc 는 자르기 화면이 받아요(점 편집 · 선택 풀기로 새지 않게)
+  if (imgEdit.value && (e.key === 'Enter' || e.key === 'Escape')) return
   // 다른 곳(색 고르기 · 메뉴 등)이 이미 처리한 키, 변수 화면처럼 캔버스를 덮는 창이 열려 있을 때는 캔버스 단축키를 쓰지 않아요
   if (handled || document.querySelector('.vars[role="dialog"]')) return
   if (e.key === 'Meta' && !metaHeld.value) { metaHeld.value = true; updateCmd() }
@@ -3395,6 +3414,18 @@ function insertInstance(component: string, at?: { x: number; y: number }) {
 }
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */
 const frameImg = useImageSrc()
+/** 이미지 자르기 화면: 자르는 레이어 자리(레이어 안 좌표 → 캔버스 화면 좌표) */
+const imgEdit = useImageEdit()
+const cropView = computed(() => {
+  void tick.value
+  void vp.value
+  const e = imgEdit.value
+  const s = e ? props.screens.find((v) => v.id === e.sid) : undefined
+  const n = e && s ? store.node(e.sid, e.id) : undefined
+  if (!e || !s || !n) return null
+  const m = worldMat(s, e.id), z = vp.value.zoom
+  return { e, n, mat: { a: m.a * z, b: m.b * z, c: m.c * z, d: m.d * z, e: m.e * z + vp.value.x, f: m.f * z + vp.value.y } }
+})
 /** 화면 바로 아래 마스크(하나만 골라 Use as mask): 그 위 레이어들을 마스크 모양으로 가려요(LayerView 의 프레임 안 마스크와 같아요) */
 function rootMask(sid: string) {
   const d = store.doc(sid)
@@ -3594,7 +3625,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <span class="sq size">{{ fmt(selWorld.w) }} × {{ fmt(selWorld.h) }}</span>
       </div>
       <!-- 점 편집 중에는 상자 · 손잡이 · 크기 표시를 숨겨요(피그마와 같아요) -->
-      <template v-if="single && !vhandles">
+      <ImageCropOverlay v-if="cropView" :edit="cropView.e" :node="cropView.n" :mat="cropView.mat" />
+      <template v-if="single && !vhandles && !cropView">
         <div class="sel none" :class="{ comp: selComp }" :style="rbox(single)">
           <template v-if="!single.locked">
             <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" @pointerdown.stop.prevent="startRotate($event)" />

@@ -28,7 +28,7 @@ import { clipsContent, isContainer, isGroupNode, isVector } from '~/canvas/schem
 import { useContextMenu } from '~/composables/useContextMenu'
 import { denorm, shapeVnet } from '~/canvas/vector'
 import { vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
-import { radiiOf } from '~/canvas/paint'
+import { radiiOf, topImagePaint } from '~/canvas/paint'
 import { canFlatten } from '~/canvas/boolean'
 import { RUN_KEYS, rangeValues, type RangeValues, type RunStyle } from '~/canvas/textRuns'
 import { useTextRange } from '~/composables/useTextRange'
@@ -440,6 +440,8 @@ const headTitle = computed(() => {
   const o = one.value
   if (!o) return tr('{n} selected', { n: nodes.value.length + store.xsel.value.length })
   if (o.type === 'boolean') return tr(BOOL_NAME[o.op ?? 'union'] ?? 'Union')
+  // 이미지 칠이 있는 사각형은 'Image'(피그마와 같아요)
+  if (o.type === 'rect' && topImagePaint(o.style)) return tr('Image')
   return isGroupLike(o) ? tr('Group') : tr(TYPE_LABEL[o.type])
 })
 const maskOn = computed(() => nodes.value.length > 0 && nodes.value.every((n) => n.isMask))

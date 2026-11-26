@@ -10,6 +10,7 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
 import PaintPopover from '~/components/editor/PaintPopover.vue'
 import { useTextRange } from '~/composables/useTextRange'
 import { rangeValues } from '~/canvas/textRuns'
+import { startCrop, useImageEdit } from '~/composables/useImageEdit'
 
 /**
  * Fill · Stroke 칠 목록(피그마와 같아요: 위에 있는 칠이 위에 그려져요).
@@ -195,6 +196,13 @@ const libTab = ref(false)
 watch(() => props.ids.join() + props.sid, () => (open.value = null))
 watch(open, (v, old) => { if (v === null || (old !== null && v !== old)) libTab.value = false })
 const openAt = (i: number) => { libTab.value = false; open.value = open.value === i ? null : i }
+// 이미지 자르기(캔버스에서 두 번 누르기)로 들어오면 그 이미지 칠 창을 열어요(피그마와 같아요)
+const imgEdit = useImageEdit()
+watch(imgEdit, (e) => {
+  if (!e?.open || props.kind !== 'fill' || props.frame || e.sid !== props.sid || props.ids.length !== 1 || props.ids[0] !== e.id) return
+  imgEdit.value = { ...e, open: false }
+  nextTick(() => { libTab.value = false; open.value = e.i })
+}, { immediate: true })
 /** 스타일 · 변수 적용(피그마 Fill 머리의 ⁘): 칠이 없으면 하나 만들고, 바탕 칠(없으면 맨 위 칠)의 창을 Libraries 탭으로 */
 function openLibraries() {
   if (!baseVal.value && !extras.value.length) add()
@@ -219,12 +227,24 @@ const popPaint = computed<Paint | null>(() => {
 })
 function onPopUpdate(p: Paint) {
   if (open.value === null) return
+  // 이미지 맞춤을 Crop 으로: 캔버스 자르기 편집으로 들어가요(레이어 하나일 때 — 피그마와 같아요)
+  const cur = open.value >= 0 ? extras.value[open.value] : undefined
+  if (p.type === 'image' && p.fit === 'crop' && cur?.type === 'image' && cur.fit !== 'crop' && !props.frame && props.ids.length === 1) {
+    void startCrop(store, imageSrc, props.sid, props.ids[0]!, { i: open.value })
+    return
+  }
   if (open.value < 0) { if (p.type === 'solid') setBase(withAlpha(p.color, p.opacity ?? 1)); return }
   setPaint(open.value, p)
 }
+/** 종류를 바꿨다 돌아와도 그 칠의 이미지는 남아요(피그마와 같아요): 레이어 · 칠 자리마다 마지막 이미지 칠을 기억 */
+const lastImage = new Map<string, Paint>()
+const memKey = (i: number) => `${props.frame ? frameIds.value.join(',') : props.sid + ':' + props.ids.join(',')}:${props.kind}:${i}`
 function setType(i: number, t: Paint['type']) {
   const cur = extras.value[i]
   if (!cur || cur.type === t) return
+  if (cur.type === 'image' && cur.src) lastImage.set(memKey(i), cur)
+  const mem = t === 'image' ? lastImage.get(memKey(i)) : undefined
+  if (mem) { setPaint(i, { ...mem, visible: cur.visible }); return }
   const c = cur.type === 'solid' ? withAlpha(cur.color, cur.opacity ?? 1) : cur.type === 'image' ? '#D9D9D9' : cur.stops[0]?.color ?? '#D9D9D9'
   const grad = cur.type === 'linear' || cur.type === 'radial' || cur.type === 'angular'
   const next: Paint = t === 'solid'

@@ -491,4 +491,19 @@ export default {
   // 원 호(Arc)
   'Start': '시작',
   'Sweep': '범위',
+  // 이미지 칠 · 자르기(피그마 Crop)
+  'Tile size': '타일 크기',
+  'Crop image': '이미지 자르기',
+  'Image zoom': '이미지 확대',
+  'Aspect ratio': '비율',
+  'Reset crop': '처음처럼 덮기',
+  'Apply crop': '자르기 적용',
+  'Square (1:1)': '정사각형 (1:1)',
+  'Circle (1:1)': '원 (1:1)',
+  'Landscape 4:3': '가로 4:3',
+  'Landscape 16:9': '가로 16:9',
+  'Landscape 3:2': '가로 3:2',
+  'Portrait 3:4': '세로 3:4',
+  'Portrait 9:16': '세로 9:16',
+  'Portrait 2:3': '세로 2:3',
 } satisfies Record<string, string>

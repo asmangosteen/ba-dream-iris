@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { fmtNum } from '~/canvas/num'
 import { matchReqLayers } from '~/canvas/reqMatch'
+import { topImagePaint } from '~/canvas/paint'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
@@ -770,7 +771,15 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
   if (!s) return
   try {
     const img = await uploadImage(file, s.id.replace(':', '-'), { supabase, preview })
-    if (replaceId && !at) { const target = store.screenId.value ?? s.id; const id = replaceId; replaceId = null; store.update(target, [id], { src: img.src }); return }
+    if (replaceId && !at) {
+      const target = store.screenId.value ?? s.id; const id = replaceId; replaceId = null
+      // 사각형 + 이미지 칠: 맨 위 이미지 칠의 그림만 바꿔요(맞춤 · 자르기는 그대로). 동영상 레이어는 src
+      const n = store.node(target, id)
+      const top = n && !img.video ? topImagePaint(n.style) : null
+      if (n && top) store.update(target, [id], (nn) => ({ style: { ...nn.style, fills: (nn.style.fills ?? []).map((p, k) => (k === top.i ? { ...top.p, src: img.src, iw: img.w, ih: img.h } : p)) } }))
+      else store.update(target, [id], { src: img.src })
+      return
+    }
     const onCanvas = isPageCanvas(s.id)
     // 원래 픽셀 크기 그대로(피그마와 같아요). 프레임보다 크면 프레임이 잘라 보여요
     const parentId = place?.sid === s.id ? place.parentId : null
@@ -783,7 +792,10 @@ async function insertImage(file: File, at?: { x: number; y: number }, place?: { 
     else { cx = Math.round(s.width / 2); cy = Math.round(s.height / 2) }
     const p0 = parentId ? store.absPos(s.id, parentId) : { x: 0, y: 0 }
     const name = file.name.replace(/\.[^.]+$/, '').slice(0, 40) || (img.video ? 'Video' : 'Image')
-    store.add(s.id, parentId, { type: 'image', name, src: img.src, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true })
+    const box = { name, x: cx - p0.x - Math.round(w / 2), y: cy - p0.y - Math.round(h / 2), w, h, lockRatio: true }
+    // 이미지는 사각형 + 이미지 칠(피그마와 같아요 — Fill 패널에서 이미지 · 맞춤을 고쳐요). 동영상은 영상 레이어
+    if (img.video) store.add(s.id, parentId, { type: 'image', src: img.src, ...box })
+    else store.add(s.id, parentId, { type: 'rect', ...box, style: { fill: undefined, fills: [{ type: 'image', src: img.src, iw: img.w, ih: img.h }] } })
     tab.value = 'design'
   } catch (e) {
     if (e instanceof MediaTooLargeError) return tooLarge()

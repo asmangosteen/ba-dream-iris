@@ -32,7 +32,31 @@ export function paintLayer(p: Paint, color: ColorFn, img: ImgFn): { image: strin
   const url = img(p.src)
   if (!url) return null
   const fit = p.fit ?? 'fill'
-  return { image: `url("${url}")`, size: fit === 'fit' ? 'contain' : fit === 'tile' ? 'auto' : 'cover', position: 'center', repeat: fit === 'tile' ? 'repeat' : 'no-repeat' }
+  const image = `url("${url}")`
+  // Crop: 레이어 상자 기준 이미지 자리(비율). background-position % 는 '남는 폭 × %' 라 x / (1 − w) 로 바꿔요
+  if (fit === 'crop' && p.crop) {
+    const { x, y, w, h } = p.crop
+    const pos = (o: number, size: number) => (Math.abs(1 - size) < 1e-6 ? 0 : (o / (1 - size)) * 100)
+    return { image, size: `${r4(w * 100)}% ${r4(h * 100)}%`, position: `${r4(pos(x, w))}% ${r4(pos(y, h))}%`, repeat: 'no-repeat' }
+  }
+  // Tile: 원래 크기 × 배율(피그마 Tile %), 왼쪽 위부터
+  if (fit === 'tile') return { image, size: p.iw && p.ih ? `${r4(p.iw * (p.scale ?? 1))}px ${r4(p.ih * (p.scale ?? 1))}px` : 'auto', position: '0 0', repeat: 'repeat' }
+  return { image, size: fit === 'fit' ? 'contain' : 'cover', position: 'center', repeat: 'no-repeat' }
+}
+const r4 = (v: number) => Math.round(v * 10000) / 10000
+
+/** 이미지 칠의 '덮기(Fill)' 자리 = 자르기 시작점(이미지 원래 비율 ar = 폭 / 높이, 레이어 비율 nr) */
+export function coverCrop(ar: number, nr: number): { x: number; y: number; w: number; h: number } {
+  if (!(ar > 0) || !(nr > 0)) return { x: 0, y: 0, w: 1, h: 1 }
+  if (ar > nr) { const w = ar / nr; return { x: (1 - w) / 2, y: 0, w, h: 1 } }
+  const h = nr / ar
+  return { x: 0, y: (1 - h) / 2, w: 1, h }
+}
+/** 맨 위(보이는) 이미지 칠 — 이미지 편집 · 레이어 아이콘 · 바꾸기에 써요 */
+export function topImagePaint(s: LayerStyle): { i: number; p: Extract<Paint, { type: 'image' }> } | null {
+  const l = s.fills ?? []
+  for (let i = l.length - 1; i >= 0; i--) { const p = l[i]!; if (p.type === 'image' && p.visible !== false) return { i, p } }
+  return null
 }
 
 /** 채우기: fill(바탕) + fills(위로 쌓기, 마지막이 맨 위) */

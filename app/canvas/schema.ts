@@ -6,7 +6,7 @@ import { backgroundCss, effectCss, radiiOf, rectPath, STAR_INNER, strokeColors, 
 import { squirclePath } from './squircle'
 import type { TextSpan } from './textRuns'
 
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 export type LayerType = 'frame' | 'rect' | 'text' | 'image' | 'ellipse' | 'line' | 'polygon' | 'star' | 'path' | 'section' | 'vector' | 'instance' | 'boolean'
 
@@ -21,8 +21,14 @@ export interface VPath { pts: VPoint[]; closed?: boolean }
 export type Paint =
   | { type: 'solid'; color: string; opacity?: number; visible?: boolean; token?: string }
   | { type: 'linear' | 'radial' | 'angular'; stops: GradStop[]; angle?: number; opacity?: number; visible?: boolean }
-  | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean }
+  | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean; crop?: ImageCrop; iw?: number; ih?: number; scale?: number }
 export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
+/**
+ * 이미지 칠 자르기(fit 'crop', 피그마 Crop): 레이어 상자 기준 이미지 자리 — 왼쪽 · 위(x · y)와 폭 · 높이(w · h), 모두 레이어 폭 · 높이에 대한 비율.
+ * 예) { x: -0.2, y: 0, w: 1.4, h: 1 } = 이미지가 레이어보다 1.4배 넓고 왼쪽으로 20% 나가 있어요(나간 부분은 잘려요).
+ * iw · ih: 이미지 원래 크기(px) — 비율 · Tile 크기에 써요. scale: Tile 크기 배율(1 = 원래 크기)
+ */
+export interface ImageCrop { x: number; y: number; w: number; h: number }
 
 /** 효과 (v5): 그림자 · 안쪽 그림자 · 레이어 흐림 · 배경 흐림 */
 export type Effect =
@@ -275,6 +281,7 @@ export function migrate(raw: unknown): LayerDoc {
   // v3 → v4: 화면 모양(frame) 이 더해졌어요. 비어 있어도 되는 값이라 그대로 읽습니다
   // v6 → v7: 벡터(vnet) · 디자인 시스템 인스턴스(component · props) · 마스크(isMask)가 더해졌어요. 비어 있어도 되는 값입니다
   // v5 → v6: 오토 레이아웃 · 크기 방식(Hug · Fill) · 제약 · 레이아웃 그리드가 더해졌어요. 비어 있어도 되는 값입니다
+  // v7 → v8: 이미지는 레이어 종류가 아니라 칠이에요(피그마와 같아요) — 이미지 레이어(type 'image')는 사각형 + 이미지 칠로 바꿔요. 동영상은 그대로
   // v4 → v5: 원 · 선 · 다각형 · 별 · 연필 · 섹션, 여러 칠 · 그라디언트 · 효과 · 선 위치 · 점선 · 혼합 모드 · 텍스트 고급이 더해졌어요. 모두 비어 있어도 되는 값입니다
   const doc: LayerDoc = { rootIds: [...d.rootIds], nodes: {}, schemaVersion: SCHEMA_VERSION }
   if (d.frame && typeof d.frame === 'object' && !Array.isArray(d.frame)) doc.frame = { ...d.frame }
@@ -289,10 +296,28 @@ export function migrate(raw: unknown): LayerDoc {
     for (const k of ['fills', 'strokes', 'effects'] as const) if (node.style[k] !== undefined && !Array.isArray(node.style[k])) delete node.style[k]
     if (node.pts && !(Array.isArray(node.pts) && node.pts.every((v) => typeof v === 'number'))) delete node.pts
     if (isContainer(node) && !Array.isArray(node.children)) node.children = []
+    if (node.type === 'image' && node.src && !node.src.endsWith('#video')) imageToRect(node)
     doc.nodes[id] = node
   }
   doc.rootIds = doc.rootIds.filter((id) => doc.nodes[id])
   return doc
+}
+
+/**
+ * 옛 이미지 레이어 → 사각형 + 이미지 칠(v8). 맞춤(Fill · Fit · Tile)은 그대로, 옛 자르기(확대 · 위치)는 원래 크기를 몰라 Fill 로.
+ * 비율 고정은 이미지 레이어 기본(켜짐) 그대로 남겨요
+ */
+function imageToRect(n: LayerNode) {
+  const st = n.style
+  const fit = st.fit === 'crop' ? undefined : st.fit
+  const paint: Paint = { type: 'image', src: n.src!, ...(fit && fit !== 'fill' ? { fit } : {}) }
+  n.type = 'rect'
+  n.lockRatio = n.lockRatio ?? true
+  delete n.src
+  delete st.fit
+  delete st.crop
+  delete st.fill
+  st.fills = [...(st.fills ?? []), paint]
 }
 
 export const newId = () => 'n' + Math.random().toString(36).slice(2, 9)

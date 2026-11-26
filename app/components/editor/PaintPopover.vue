@@ -253,18 +253,27 @@ const fileEl = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const dropping = ref(false)
 const hasImg = computed(() => props.paint.type === 'image' && !!props.paint.src)
+/** 미리보기: 맞춤과 상관없이 이미지 전체를 칸 안에(피그마와 같아요) */
 const imgCss = computed(() => {
   if (props.paint.type !== 'image') return {}
-  const l = paintLayer({ ...props.paint, opacity: undefined }, store.color, imageSrc)
-  return l ? { backgroundImage: l.image, backgroundSize: l.size === 'auto' ? (props.paint.fit === 'tile' ? '48px' : '100% 100%') : l.size, backgroundPosition: l.position, backgroundRepeat: l.repeat } : {}
+  const l = paintLayer({ ...props.paint, fit: 'fit', opacity: undefined }, store.color, imageSrc)
+  return l ? { backgroundImage: l.image, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : {}
 })
+/** Tile 크기(피그마 Tile 옆 %): 원래 크기 대비 */
+const tilePct = computed(() => (props.paint.type === 'image' ? Math.round((props.paint.scale ?? 1) * 100) : 100))
+function setTile(e: Event) {
+  const v = Number((e.target as HTMLInputElement).value.replace('%', ''))
+  if (props.paint.type !== 'image' || !Number.isFinite(v) || v <= 0) return
+  emit('update', { ...props.paint, scale: Math.min(1000, v) / 100 === 1 ? undefined : Math.min(1000, v) / 100 })
+}
 async function useFile(f?: File | null) {
   if (!f || props.paint.type !== 'image') return
   if (!f.type.startsWith('image/')) return
   uploading.value = true
   try {
     const img = await uploadImage(f, (props.sid ?? 'fills').replace(':', '-'), { supabase, preview })
-    if (props.paint.type === 'image') emit('update', { ...props.paint, src: img.src })
+    // 그림을 바꾸면 원래 크기도 새로, 자르기는 새 그림 비율로 다시 덮게
+    if (props.paint.type === 'image') { const { crop: _c, ...rest } = props.paint; emit('update', { ...rest, src: img.src, iw: img.w, ih: img.h }) }
   } finally { uploading.value = false }
 }
 function onFile(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; input.value = ''; useFile(f) }
@@ -452,6 +461,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
             <template v-else-if="paint.type === 'image'">
               <div class="img-tools">
                 <EditorSelect class="img-fit" :model-value="(paint as { fit?: string }).fit ?? 'fill'" :options="FITS" ariaLabel="Image fit" @update:model-value="(v) => emit('update', { ...paint, fit: v } as Paint)" />
+                <label v-if="(paint as { fit?: string }).fit === 'tile'" class="sq fld img-tile"><input :key="'t' + tilePct" :value="tilePct + '%'" inputmode="numeric" :aria-label="tr('Tile size')" @change="setTile" @keydown="blur" @focus="sel"></label>
               </div>
               <div
                 class="sq sq-clip img-box"
@@ -575,7 +585,10 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 .swatch:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
 /* 이미지: [맞춤 ▾] · 정사각 미리보기(체크) + 가운데 올리기 버튼 */
 .img-tools { display: flex; align-items: center; }
+.img-tools { gap: var(--ref-spacing-04); }
 .img-fit { width: 92px; flex: none; }
+.img-tile { width: 64px; flex: none; }
+.img-tile input { width: 100%; }
 .img-box { position: relative; aspect-ratio: 1; border-radius: var(--ref-radius-03); overflow: hidden; background: repeating-conic-gradient(#ececec 0% 25%, #f8f8f8 0% 50%) 0 0 / 16px 16px; --sq-line: rgb(0 0 0 / 10%); --sq-line-w: 0.5px; display: grid; place-items: center; }
 .img-box.drop { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
 .img-prev { position: absolute; inset: 0; }

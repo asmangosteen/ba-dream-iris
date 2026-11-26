@@ -3,7 +3,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import { descendants, isContainer, isGroupNode, type LayerNode } from '~/canvas/schema'
 import { LAYER_ICON } from '~/canvas/icons'
-import { radiiOf, rectPath, vectorPath } from '~/canvas/paint'
+import { radiiOf, rectPath, topImagePaint, vectorPath } from '~/canvas/paint'
 import { booleanPath } from '~/canvas/boolean'
 import { layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq, useToastReq } from '~/composables/useLayerMenu'
 import RenameLayers from '~/components/editor/RenameLayers.vue'
@@ -409,6 +409,8 @@ function shapeIcon(n: LayerNode, sid: string): { d: string; vb: string } | null 
   return { d, vb: `${(n.w - box) / 2} ${(n.h - box) / 2} ${box} ${box}` }
 }
 /** 줄마다 한 번만 계산(모양 · 크기 · 둥글기가 바뀌면 바로 따라 바뀌어요) */
+/** 이미지 칠이 보이는 사각형(피그마: 이미지 아이콘) */
+const imageRect = (n: LayerNode) => n.type === 'rect' && !!topImagePaint(n.style)
 const shapeIcons = computed(() => {
   const m = new Map<string, { d: string; vb: string } | null>()
   for (const it of items.value) if (it.kind === 'layer') m.set(it.r.sid + ':' + it.r.n.id, shapeIcon(it.r.n, it.r.sid))
@@ -547,6 +549,8 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         <span class="icw">
         <!-- 마스크(피그마와 같아요): 마스크 레이어는 마스크 아이콘, 그 위 가려지는 레이어는 아래로 ↓ 표시 -->
         <EditorIcon v-if="r.n.isMask" name="mask_layer" :size="16" class="ic" />
+        <!-- 이미지 칠이 있는 사각형: 이미지 아이콘(피그마와 같아요) — 칠을 색으로 바꾸면 다시 사각형 -->
+        <EditorIcon v-else-if="imageRect(r.n)" name="image" :size="16" class="ic" />
         <!-- 도형 · 펜 · 불리언: 지금 그 모양 그대로(비율 · 둥글기 · 점을 고치면 바로 따라 바뀌어요) -->
         <svg v-else-if="shapeIcons.get(r.sid + ':' + r.n.id)" width="16" height="16" :viewBox="shapeIcons.get(r.sid + ':' + r.n.id)!.vb" aria-hidden="true" class="ic"><path :d="shapeIcons.get(r.sid + ':' + r.n.id)!.d" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
         <!-- 오토 레이아웃 프레임: 방향별 아이콘(세로 · 가로 · 줄바꿈) — 피그마와 같아요 -->
