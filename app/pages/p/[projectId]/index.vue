@@ -383,7 +383,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onCommentKey, true))
 async function createComment(body: string, mentions: string[], attachments: string[]) {
   const d = draft.value
   if (!d) return
-  try { const row = await comments.create({ pageId: pageId.value, screenId: d.screenId, layerId: d.layerId, x: d.x, y: d.y, area: d.area }, body, mentions, attachments); draft.value = null; openThread.value = row.id }
+  try {
+    const row = await comments.create({ pageId: pageId.value, screenId: d.screenId, layerId: d.layerId, x: d.x, y: d.y, area: d.area }, body, mentions, attachments)
+    draft.value = null; openThread.value = row.id
+    // DB 업데이트 전이라 영역 없이 점 코멘트로 남겼어요
+    if (d.area && comments.dbBehind.value) say(tr('Posted as a pin — area comments need a database update'))
+  }
   catch { sayFail(tr('Couldn\'t post the comment. Try again')) }
 }
 async function replyComment(root: CommentRow, body: string, mentions: string[], attachments: string[]) {

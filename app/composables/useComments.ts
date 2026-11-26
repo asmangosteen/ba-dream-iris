@@ -97,6 +97,8 @@ export function useComments(projectId: string) {
   }
 
   /** 새 스레드(핀) */
+  /** DB 가 코멘트 새 칸(영역 · 레이어)보다 뒤처져 있어 영역 없이 남겼을 때 true */
+  const dbBehind = ref(false)
   async function create(at: CommentAt, body: string, mentions: string[], attachments: string[] = []) {
     if (preview) {
       const no = Math.max(0, ...(list.data.value ?? []).map((c) => c.no ?? 0)) + 1
@@ -105,7 +107,13 @@ export function useComments(projectId: string) {
       return row
     }
     // 이미지가 있을 때만 attachments 를 보내요(마이그레이션 전 DB 에서도 글만 쓰기는 되게)
-    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, page_id: at.pageId, screen_id: at.screenId, x: at.x, y: at.y, body, mentions, ...(attachments.length ? { attachments } : {}), ...(at.layerId ? { layer_id: at.layerId } : {}), ...(at.area ? { area: at.area } : {}) }).select('*').single()
+    const base = { project_id: projectId, page_id: at.pageId, screen_id: at.screenId, x: at.x, y: at.y, body, mentions, ...(attachments.length ? { attachments } : {}) }
+    let { data, error } = await supabase.from('comments').insert({ ...base, ...(at.layerId ? { layer_id: at.layerId } : {}), ...(at.area ? { area: at.area } : {}) }).select('*').single()
+    // DB 에 영역 · 붙는 레이어 칸이 아직 없으면(마이그레이션 20261128000000 전): 그 둘을 빼고 점 코멘트로라도 남겨요 — 화면에는 알림
+    if (error?.code === '42703' && (at.area || at.layerId)) {
+      ({ data, error } = await supabase.from('comments').insert(base).select('*').single())
+      if (!error) dbBehind.value = true
+    }
     if (error) throw error
     put(data as CommentRow)
     return data as CommentRow
@@ -180,7 +188,7 @@ export function useComments(projectId: string) {
     supabase.from('comment_reads').upsert({ member_id: myId.value, thread_id: threadId, seen_at: at }).then(() => undefined, () => undefined)
   }
 
-  return { list, threads, myId, create, reply, resolve, remove, edit, movePin, markRead, markUnread, react }
+  return { list, threads, myId, create, reply, resolve, remove, edit, movePin, markRead, markUnread, react, dbBehind }
 }
 
 /** 글 속 @이름 → 멤버 id(글에 아직 남아 있는 것만) */
