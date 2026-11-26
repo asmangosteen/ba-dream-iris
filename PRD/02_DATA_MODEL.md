@@ -304,6 +304,169 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 
 ---
 
+## 2026-11-26 추가 — 기획서 양식 · 피그마 연동 · 역할 · 검수
+
+> 근거 문서: [11 기획서 양식](./11_PLANNING_DOC_FORMAT.md) · [12 역할](./12_ROLES_PERMISSIONS.md) · [13 피그마 연동](./13_FIGMA_LINK.md) · [14 검수 흐름](./14_REVIEW_FLOW.md) · [15 양식 변환](./15_DOC_CONVERT.md). 적용 시점은 [03_PHASES.md](./03_PHASES.md) 'Phase 2 추가'.
+> 화면 이름 '요구사항'을 '정책'으로 바꿀지는 미정이라, 테이블 이름은 지금(`requirements`)을 그대로 쓴다.
+
+### 바뀐 구조
+
+```
+[Project]
+  ├─1:N─> [ProjectMember 프로젝트 역할]   ├─1:N─> [ProjectInvite 초대 요청]
+  ├─1:N─> [ProjectIdAlias 옛 약자 대응]
+  ├─1:N─> [Document] ─1:N─> [DocumentVersion 버전] ─1:N─> [RequirementVersion 정책 문장 버전]
+  │            ├─1:N─> [Requirement 정책]
+  │            └─1:N─> [ScreenSlot 화면 칸 = 화면 표 한 행]
+  │                          └─1:N─> [Screen 디자인(피그마 · 자체)] ─N:M─> [ScreenRequirement]
+  ├─1:N─> [ActivityLog 기록]
+  └─1:N─> [ConvertJob 양식 변환]
+[Member] ─1:N─> [Notification 알림]
+```
+
+### Document — 더하는 필드
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| abbr | 문서 약자(ID 겹칠 때 앞에 붙임) | 몰 | X |
+| status | 문서 상태 | draft / review / confirmed | O |
+| current_version_id | 지금 보여 주는 버전 | dv_03 | X |
+| check_result | 양식 검사 결과(필수 빠짐 · 경고 목록과 위치) | JSON | X |
+
+### DocumentVersion (문서 버전) — 새 테이블
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| id | 고유 식별자 | dv_03 | O |
+| document_id | 문서 | doc_01 | O |
+| version_label | 버전 표기 | v1.1 | O |
+| status | 버전 상태 | draft / review / confirmed | O |
+| content | 그 버전의 본문(`content_blocks` · `file_path` · `rendered_html` · `plain_text` 묶음) | JSON | O |
+| origin | 어떻게 생겼나 | upload / edit / ai_convert | O |
+| based_on_version_id | 어느 버전에서 나왔나 | dv_02 | X |
+| change_summary | 직전 확정 버전과의 비교 결과(추가 · 수정 · 삭제 ID 목록) | JSON | X |
+| confirmed_by / confirmed_at | 확정한 사람 · 시각 | | X |
+| created_by / created_at | | | O |
+
+### Requirement (정책) — 더하는 · 바뀌는 필드
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| code | 문서 안 ID 그대로. 직접 지정한 문장은 임시 번호 | `P-ORD-05` / `#12` | O |
+| area | 영역 약자 | ORD | X |
+| marks | 표기 | `["default","pending","dev_check","legal"]` | X |
+| has_screen | 화면이 있는 정책인지(없으면 반영률에서 뺌) | false | O |
+| removed_at | 문서에서 빠진 시각(지우지 않고 표시) | | X |
+| origin | 어떻게 생겼나 | auto_pattern / manual / ai | O |
+
+- `REQ-nnn` 자동 부여는 없앤다. `title`은 정책 표의 '정책' 칸, `body`는 '세부 규칙' 칸이다.
+
+### RequirementVersion (정책 문장 버전) — 새 테이블
+버전마다 정책 문장을 남겨 바뀐 것을 찾고 전 · 후를 보여 준다.
+
+| 필드 | 설명 | 필수 |
+|---|---|---|
+| requirement_id | 정책 | O |
+| document_version_id | 버전 | O |
+| title / body / marks | 그 버전의 문장 · 표기 | O |
+| body_hash | 띄어쓰기 · 문장부호를 뺀 비교용 값 | O |
+
+### ScreenSlot (화면 칸) — 새 테이블
+기획서 화면 표의 한 행. 디자인(Screen)이 여기에 붙는다.
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| id | 고유 식별자 | slot_05 | O |
+| project_id / document_id | 소속 | | O |
+| code | 화면 ID | C-05 | O |
+| name | 화면 이름 | 상품 상세 | O |
+| spec | '보여 줄 것' 원문 | | X |
+| states | '상태' 열에서 읽은 상태 이름 | `["로딩","일시품절","오류"]` | X |
+| policy_codes | '정책' 열(없으면 문장 속 `(P-…)`)에서 읽은 ID | `["P-PRD-05","P-PRD-13"]` | X |
+| assignee_member_id | 담당 디자이너 | | X |
+| removed_at | 기획서에서 빠진 시각 | | X |
+
+### Screen — 더하는 필드
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| slot_id | 붙은 화면 칸(없으면 '연결 안 된 화면') | slot_05 | X |
+| slot_state | 상태 변형 이름(기본 디자인은 비움) | 일시품절 | X |
+| is_primary | 같은 ID 시안 중 대표 | true | O |
+| design_hash | 썸네일 · 레이어 요약 비교값(바뀜 감지) | | X |
+| thumbnail_history | 직전 썸네일(최근 5개) | `[{path, at}]` | X |
+| figma_missing_at | 피그마에서 프레임이 지워진 걸 안 시각 | | X |
+
+- `status`(draft / review / approved)는 그대로 쓰고 뜻을 '작업 중 / 검토 요청 / 승인'으로 맞춘다.
+
+### ScreenRequirement — 바뀌는 필드
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| status | 반영 상태에 둘을 더함 | unchecked / reflected / partial / missing / na / needs_review | O |
+| prev_status | '재검토 필요' 전 상태(되돌려 보기용) | reflected | X |
+| origin | 어떻게 연결됐나 | doc_table / figma_desc / manual / ai | O |
+
+### ProjectMember · ProjectInvite — 새 테이블
+[12_ROLES_PERMISSIONS.md](./12_ROLES_PERMISSIONS.md) 6장 초안을 그대로 옮긴다.
+
+| 테이블 | 필드 |
+|---|---|
+| ProjectMember | project_id, member_id, role(`owner` / `deputy` / `planner_editor` / `designer_editor` / `reviewer` / `viewer`), added_by, created_at |
+| ProjectInvite | id, project_id, email, requested_by, status(`pending` / `approved` / `rejected` / `expired`), role(승인 때 정함), decided_by, created_at, expires_at(+7일) |
+
+- DB 보안 규칙: 지금의 `is_member()`에 더해 `project_role(project_id)`를 두고, 테이블마다 쓰기 규칙을 역할로 거른다.
+- 이 테이블이 생길 때 기존 프로젝트는 만든 사람(`created_by`)을 방장으로, 나머지 회사 멤버를 기획 편집 · 디자인 편집(직무 기준)으로 넣는다〔기본값〕.
+
+### ProjectIdAlias (옛 약자 대응) — 새 테이블
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| project_id | 프로젝트 | | O |
+| from_prefix → to_prefix | 옛 약자 → 새 약자 | `M` → `C`, `MA` → `A`, `MN` → `N` | O |
+
+### ActivityLog (기록) — 새 테이블
+지우거나 고칠 수 없다. 1년 보관〔기본값〕.
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| id · project_id · actor_id · created_at | | | O |
+| action | 한 일 | status_change / review_request / approve / reject / doc_confirm / convert_confirm / role_change / invite_decide / slot_link | O |
+| target_type / target_id | 대상 | screen_requirement / scr_02 | O |
+| before / after | 바뀌기 전 · 후 | JSON | X |
+
+### Notification (알림) — 새 테이블
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| id · member_id · project_id · created_at | | | O |
+| kind | 종류([14](./14_REVIEW_FLOW.md) 5장 표) | needs_review / invite_request / approved … | O |
+| target_type / target_id | 누르면 갈 곳 | | O |
+| group_key | 짧은 시간 같은 일 묶기 | needs_review:dv_03 | X |
+| count | 묶인 개수 | 30 | O |
+| read_at | 읽은 시각 | | X |
+
+### ConvertJob (양식 변환) — 새 테이블
+
+| 필드 | 설명 | 예시 | 필수 |
+|---|---|---|---|
+| id · document_id · created_by · created_at | | | O |
+| source_version_id | 바꿀 원본 버전 | dv_01 | O |
+| status | 진행 상태 | queued / running / done / failed | O |
+| sections_total / sections_done | 장 단위 진행률 | 13 / 5 | O |
+| result_version_id | 만들어진 변환본(초안) | dv_02 | X |
+| error | 실패 사유 | | X |
+
+### 더하는 조회
+
+| 조회 | 쓰는 곳 |
+|---|---|
+| 프로젝트 → 디자인 없는 화면 칸 · 상태 디자인 없음 · 기획서에 없는 화면 | 프로젝트 홈, 정책 보드 '빠진 것' |
+| 문서 버전 → 바뀐 정책 → 연결 화면 | 새 버전 확정 때 '재검토 필요' 붙이기 |
+| 멤버 → 담당 화면의 '재검토 필요' 개수 | 알림, '내 화면' 필터 |
+
+---
+
 ## 관계 요약
 - 워크스페이스 1개 → 멤버·프로젝트·컴포넌트·토큰 여러 개
 - 프로젝트 1개 → 문서 여러 개, 페이지 여러 개
@@ -340,6 +503,8 @@ id로 찾아가는 평평한 목록이다. 부모·자식 관계는 `parentId`�
 
 ## [NEEDS CLARIFICATION]
 
-- [ ] 요구사항 번호가 문서마다 겹칠 때 (`REQ-001`이 두 문서에 있을 때) 표시 규칙. 기본값: 프로젝트 안에서 `문서약어-REQ-001`
-- [ ] 문서가 새 버전으로 바뀌었을 때 기존 요구사항 연결을 유지할지. 기본값: 같은 `code`면 연결을 유지하고 "원문 변경됨" 배지 표시
-- [ ] 화면 상태(draft/review/approved)를 누가 바꿀 수 있는지. 기본값: 모든 멤버
+- [x] 번호가 문서마다 겹칠 때 표시 규칙 → 문서 약자와 함께 표시(예: `몰 C-05`). [11_PLANNING_DOC_FORMAT.md](./11_PLANNING_DOC_FORMAT.md) 3-3
+- [x] 문서가 새 버전으로 바뀌었을 때 → 같은 ID면 연결을 유지하고, ID 기준으로 변경 요약을 만들며 바뀐 정책에 연결된 화면은 '재검토 필요'. 11_PLANNING_DOC_FORMAT 5장
+- [x] 화면 승인을 누가 하는지 → 방장 · 부방장 · 기획 편집(문서 확정) 등 역할별. [12_ROLES_PERMISSIONS.md](./12_ROLES_PERMISSIONS.md)
+- [x] 프로젝트 역할 · 초대 테이블(ProjectMember · ProjectInvite)을 이 문서 본문에 옮길 시점 → 2026-11-26 '2026-11-26 추가'로 옮겼다
+- [ ] 기존 프로젝트에 역할을 처음 넣을 때 기본값(만든 사람 = 방장, 나머지 = 직무 기준 편집)이 맞는지
