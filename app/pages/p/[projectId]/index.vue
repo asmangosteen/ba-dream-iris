@@ -374,7 +374,7 @@ watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
   vp.value = followVp
 }, { deep: true })
 watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
-watch(following, (k) => { followVp = null; if (k) { const p = room.people.value.find((x) => x.key === k); if (p) say(tr('Following {name}', { name: p.name })) } })
+watch(following, () => { followVp = null })
 /** 따라가는 사람(편집기 테두리를 그 사람 색으로) */
 const followPeer = computed(() => (following.value ? room.peers.value.find((p) => p.key === following.value) ?? null : null))
 watch(followPeer, (p) => { if (following.value && !p) following.value = null }) // 그 사람이 나가면 멈춤
@@ -1421,6 +1421,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     />
     <div v-if="commentMode" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
     <div v-if="followPeer" class="follow-ring" :style="{ '--c': followPeer.color }" aria-hidden="true" />
+    <!-- 따라가는 중: 위 가운데에 계속(그만두면 바로 사라져요) -->
+    <div v-if="followPeer" class="sq follow-band" role="status" :style="{ '--c': followPeer.color }">
+      <MemberAvatar :name="followPeer.name" :src="followPeer.avatar" :size="20" />
+      <span>{{ tr('Following {name}', { name: followPeer.name }) }}</span>
+      <button type="button" class="sq fb-stop" @click="following = null">{{ tr('Stop') }}</button>
+    </div>
     <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
@@ -1617,7 +1623,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
     <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
     <!-- 보기 전용 띠(PRD/16 E): 캔버스 위 가운데 -->
-    <div v-if="readOnly && !commentMode" class="sq ro-band" role="status">
+    <div v-if="readOnly && !commentMode && !followPeer" class="sq ro-band" role="status">
       <EditorIcon name="visibility_on" :size="16" />
       <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
     </div>
@@ -1721,6 +1727,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
 /* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
 .follow-ring { position: fixed; top: var(--iris-tabs-h, 44px); left: 0; right: 0; bottom: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
+.follow-band { position: fixed; top: calc(var(--iris-tabs-h, 44px) + 12px); left: 50%; transform: translateX(-50%); z-index: 41; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-03, 3px) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-05); --sq-fill: var(--c); color: #FFFFFF; font-size: 12px; font-weight: 500; white-space: nowrap; filter: drop-shadow(0 2px 6px rgb(3 9 26 / 18%)); }
+.fb-stop { height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); --sq-fill: rgb(255 255 255 / 18%); color: #FFFFFF; font-size: 12px; font-weight: 500; }
+.fb-stop:hover { --sq-fill: rgb(255 255 255 / 28%); }
+.fb-stop:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 1px; }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
