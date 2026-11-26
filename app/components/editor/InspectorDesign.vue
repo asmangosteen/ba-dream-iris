@@ -2,7 +2,7 @@
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { ScreenRow } from '~/composables/useEditor'
 import type { LayerStyle } from '~/canvas/schema'
-import type { CatalogToken } from '~/canvas/tokens'
+import { useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
 import { useLayerStore } from '~/canvas/store'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import InspectorGrids from '~/components/editor/InspectorGrids.vue'
@@ -40,6 +40,7 @@ function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
   if (!input.value.trim() || !Number.isFinite(v) || ((key === 'width' || key === 'height') && v < 1)) { input.value = same(key) === null ? '' : String(same(key)); return }
   const r = Math.round(v * 100) / 100 // 소수도 그대로(둘째 자리까지)
+  if (vb(VKEY[key])) unbindPos(key)
   if (r === same(key)) return
   // 비율 잠금: W 를 바꾸면 H 도 같은 비율로(피그마와 같아요)
   if (ratioOn.value && (key === 'width' || key === 'height') && !isMulti.value) {
@@ -49,6 +50,28 @@ function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
   }
   emit('update', { [key]: r })
 }
+/**
+ * 크기(W · H) 변수(간격 토큰). 위치(X · Y)는 토큰을 쓰지 않아요. 고르면 값을 넣고 연결(frame.vars 의 x · y · w · h), 숫자를 치면 연결이 풀려요.
+ * 화면은 끌어서도 옮겨지니, 지금 값이 변수 값과 같을 때만 연결로 보여요
+ */
+const VKEY = { x: 'x', y: 'y', width: 'w', height: 'h' } as const // X · Y 는 변수 버튼 없음(위치엔 토큰을 쓰지 않아요 — 사용자 요청), 남은 연결만 풀어요
+type PosKey = keyof typeof VKEY
+function vbPos(key: PosKey) {
+  const id = vb(VKEY[key])
+  if (!id) return null
+  const t = catalog.find(id)
+  return t?.num !== undefined && t.num === same(key) ? id : null
+}
+function pickPos(key: PosKey, t: CatalogToken) {
+  const v = t.num
+  if (v === undefined) return
+  if (ratioOn.value && (key === 'width' || key === 'height') && !isMulti.value) {
+    const sc = props.screen, k = v / (sc[key] || 1)
+    emit('update', key === 'width' ? { width: v, height: Math.max(1, Math.round(sc.height * k * 100) / 100) } : { height: v, width: Math.max(1, Math.round(sc.width * k * 100) / 100) })
+  } else emit('update', { [key]: v })
+  store.batch(() => { for (const id of ids.value) store.frameStyle(id, {}, { [VKEY[key]]: t.id }) })
+}
+function unbindPos(key: PosKey) { store.batch(() => { for (const id of ids.value) store.frameStyle(id, {}, { [VKEY[key]]: null }) }) }
 /** 화면 비율 잠금(피그마 Lock aspect ratio) */
 const ratioOn = computed(() => !!(store.doc(props.screen.id).frame ?? {}).lockRatio)
 /** 화살표 키로 1씩(Shift 는 10씩) 바꾸기 */
@@ -69,6 +92,7 @@ function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
 }
 // --- 화면 모양: 레이어와 같은 방식(토큰 연결 포함). 기본은 흰 바탕 · 선 없음 · 모서리 0 ---
 const store = useLayerStore()
+const catalog = useTokenCatalog()
 const native = computed(() => all.value.every((s) => s.source === 'native'))
 const look = computed<LayerStyle>(() => store.doc(props.screen.id).frame ?? {})
 const fstyle = (patch: Partial<LayerStyle>, vars?: Record<string, string | null>) => store.batch(() => { for (const id of ids.value) store.frameStyle(id, patch, vars) })
@@ -252,7 +276,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
     <section class="s">
       <div class="sec-h h24"><span>{{ tr('Position') }}</span></div>
       <template v-if="isMulti">
-        <div class="ig-l"><span>{{ tr('Alignment') }}</span></div>
+        <!-- 'Alignment' 이름표는 ArrangeControls 안에 있어요(두 번 나오지 않게) -->
         <ArrangeControls :count="all.length" :gap="gap" :axis="axis" @op="emit('arrange', $event)" />
         <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       </template>
@@ -267,8 +291,8 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <div class="sec-h h24"><span>{{ tr('Layout') }}</span></div>
       <div class="ig-l"><span>{{ tr('Dimensions') }}</span></div>
       <div class="ig">
-        <label class="sq fld"><span>W</span><input :key="'w' + same('width')" :value="same('width') ?? ''" :placeholder="same('width') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
-        <label class="sq fld"><span>H</span><input :key="'h' + same('height')" :value="same('height') ?? ''" :placeholder="same('height') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label>
+        <label class="sq fld"><span>W</span><input v-if="!vbPos('width')" :key="'w' + same('width')" :value="same('width') ?? ''" :placeholder="same('width') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Width')" @change="num('width', $event)" @keydown="step('width', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"><TokenPicker :kinds="['spacing']" :bound="vbPos('width')" reveal label="Frame width" @pick="(t) => pickPos('width', t)" @unbind="unbindPos('width')" @step="(d) => emit('step', 'width', d)" /></label>
+        <label class="sq fld"><span>H</span><input v-if="!vbPos('height')" :key="'h' + same('height')" :value="same('height') ?? ''" :placeholder="same('height') === null ? tr('Mixed') : ''" inputmode="numeric" :aria-label="tr('Height')" @change="num('height', $event)" @keydown="step('height', $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"><TokenPicker :kinds="['spacing']" :bound="vbPos('height')" reveal label="Frame height" @pick="(t) => pickPos('height', t)" @unbind="unbindPos('height')" @step="(d) => emit('step', 'height', d)" /></label>
         <button v-if="!isMulti" :class="['ib', 's24', 'tog', { on: ratioOn }]" :aria-pressed="ratioOn" :aria-label="ratioOn ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" :title="ratioOn ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" @click="store.frameStyle(screen.id, { lockRatio: ratioOn ? undefined : true })">
           <EditorIcon :name="ratioOn ? 'ratio_locked' : 'ratio_unlocked'" />
         </button>
@@ -357,7 +381,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
 .ig4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 56px !important; }
 .ig4-acts { display: flex; align-items: center; }
 .ig4 > :deep(.esel) > .dd { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--sys-color-brand-primary-default); }
+.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--iris-open-line); }
 /* 자르기 Mixed: 상자 안 가로줄(피그마와 같아요) */
 .cb.mix > i::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' stroke='%23202837' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-position: center; background-size: 12px; background-repeat: no-repeat; }
 </style>

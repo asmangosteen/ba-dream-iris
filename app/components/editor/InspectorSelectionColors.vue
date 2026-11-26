@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { LayerStyle, Paint } from '~/canvas/schema'
 import { descendants } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
@@ -34,6 +35,8 @@ type Hit = { key: string; color: string; token?: string }
 function colorsOf(s: LayerStyle, out: Hit[]) {
   const vars = s.vars as Record<string, string> | undefined
   const push = (color: string | undefined, token?: string) => {
+    // 예전 방식 'token:<이름>' 값도 변수로(칠 칸과 같아요 — db:<이름>)
+    if (!token && color?.startsWith('token:')) token = 'db:' + color.slice(6)
     const k = keyOf(color, token)
     if (k && color) out.push({ key: k, color: store.color(color) ?? color, token })
   }
@@ -140,6 +143,18 @@ function onAlpha(i: number, e: Event) {
 const bind = (i: number, t: CatalogToken) => { const r = visible.value[i]; if (r && t.color) apply(r.key, t.color, t.id) }
 /** 토큰 풀기: 색 값은 그대로 */
 const unbind = (i: number) => { const r = visible.value[i]; if (r) apply(r.key, r.color, null) }
+/** 이 색을 쓰는 레이어 고르기(피그마 Select matching layers) — 첫 화면(문서)에서, 없으면 다음 화면에서 */
+function selectUsing(i: number) {
+  const r = visible.value[i]
+  if (!r) return
+  for (const sc of scopes.value) {
+    const d = store.doc(sc.sid)
+    const hit = sc.layerIds.filter((id) => { const n = d.nodes[id]; if (!n || n.hidden) return false; const out: Hit[] = []; colorsOf(n.style, out); return out.some((h) => h.key === r.key) })
+    if (!hit.length) continue
+    hit.forEach((id, k) => store.selectLayer(sc.sid, id, k > 0))
+    return
+  }
+}
 const sids = computed(() => props.targets.map((t) => t.sid))
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
@@ -162,6 +177,13 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
             <span class="op"><input :key="'a' + r.key" class="pct" :value="Math.round(alphaOf(r.color) * 100)" inputmode="numeric" :aria-label="tr('Selection color opacity')" @change="onAlpha(i, $event)" @keydown="blur" @focus="sel"><i class="unit">%</i></span>
           </template>
         </div>
+        <!-- 줄에 올리면(피그마와 같아요): [변수 떼기(변수일 때만 — 아니면 빈 자리)] [이 색을 쓰는 레이어 고르기]. 칸 · 아이콘 자리는 Fill 줄과 같아요(28 · 28, 칸 뒤 간격) -->
+        <button v-if="r.token" type="button" class="ib s24 act-b" :aria-label="tr('Detach variable')" :data-tip="tr('Detach variable')" @click="unbind(i)"><EditorIcon name="unlink" :size="16" /></button>
+        <span v-else aria-hidden="true" />
+        <!-- 이 색을 쓰는 레이어 고르기: 과녁(피그마 Selection colors 의 ◎ 와 비슷하게) -->
+        <button type="button" class="ib s24 act-b" :aria-label="tr('Select matching layers')" :data-tip="tr('Select matching layers')" @click="selectUsing(i)">
+          <svg class="tgt" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.75" fill="none" stroke="currentColor" stroke-width="1.25" /><circle cx="8" cy="8" r="2.25" fill="currentColor" /></svg>
+        </button>
       </div>
       <button v-if="rows.length > LIMIT" type="button" class="more" @click="all = !all">{{ all ? tr('Show fewer') : tr('See all {n} colors', { n: rows.length }) }}</button>
     </template>
@@ -171,8 +193,14 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .h24 { height: 28px; padding: 0; }
-/* Fill 행과 같은 칸, 오른쪽 아이콘 자리(24 + 24 + 8)만큼 비워 같은 폭으로 */
-.srow { display: grid; grid-template-columns: minmax(0, 1fr) 56px; align-items: center; min-width: 0; }
+/* Fill 줄과 같은 틀: [칸 | 28 | 28], 칸 뒤 간격도 같아요(InspectorPaints .prow) — 칸 폭 · 아이콘 자리가 위아래로 맞아요 */
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
+.srow > .fld { margin-right: var(--ref-spacing-06); }
+/* 줄 오른쪽 버튼(변수 떼기 · 이 색 레이어 고르기): 줄에 올렸을 때만 */
+.act-b { opacity: 0; }
+.srow:hover .act-b, .act-b:focus-visible { opacity: 1; }
+.s24 { width: 28px; height: 28px; }
+.tgt { display: block; }
 .pf { gap: var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); min-width: 0; }
 .pf.bound { padding-right: var(--ref-spacing-06); }
 .pf:has(input:focus) { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }

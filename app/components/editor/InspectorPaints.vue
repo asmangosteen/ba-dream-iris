@@ -79,7 +79,8 @@ function add() {
 function remove(i: number) {
   if (open.value === i) open.value = null
   if (i < 0) {
-    if (props.kind === 'text' && !extras.value.length) return
+    // 글자 칠을 다 빼면 칠 없음(color '' — 글자가 안 보여요, 피그마와 같아요). + 로 다시 넣어요
+    if (props.kind === 'text') { patchAll(() => ({ color: '' })); return }
     if (props.frame && base.value === 'fill') patchAll(() => ({ fill: '' }), { fill: null })
     else patchAll((s) => ({ [base.value]: undefined, ...(props.kind === 'stroke' && !(s.strokes ?? []).length ? { strokeWidth: undefined } : {}) }))
   } else setExtras((l) => l.filter((_, k) => k !== i))
@@ -283,7 +284,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
           <TokenPicker v-else :kinds="['color']" :bound="bound" :label="`${title} color`" @pick="pick" @unbind="unbind" />
         </div>
         <button class="ib s24" :aria-label="tr(`Hide ${title.toLowerCase()}`)" :data-tip="tr('Hide')" @click="toggle(-1)"><EditorIcon name="eye" :size="16" /></button>
-        <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" :disabled="kind === 'text' && !extras.length" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
+        <button class="ib s24" :aria-label="tr(`Remove ${title.toLowerCase()}`)" :data-tip="tr('Remove')" @click="remove(-1)"><EditorIcon name="minus" :size="16" /></button>
       </div>
       <!-- 덧붙인 칠 -->
       <div v-else-if="extras[i]" class="prow" data-drag-row :class="{ off: extras[i]!.visible === false, dragging: drag?.from === vi }">

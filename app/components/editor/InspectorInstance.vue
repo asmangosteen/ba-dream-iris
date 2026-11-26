@@ -296,7 +296,7 @@ function onChangeCap(e: Event) { if ((e.target as HTMLElement).dataset?.esc) e.s
 .icon-fld .ph { color: var(--sys-color-neutral-500); }
 .icon-fld .ell { flex: 1; }
 .icon-fld .chev-i { flex: none; color: var(--sys-color-neutral-500); }
-.icon-fld.open { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+.icon-fld.open { --sq-line: var(--iris-open-line); --sq-line-w: 1px; }
 .lbl { font-size: 12px; color: var(--sys-color-neutral-600); }
 .row.mod .lbl { color: var(--sys-color-neutral-800); font-weight: 500; }
 .fld input::placeholder { color: var(--sys-color-neutral-500); }

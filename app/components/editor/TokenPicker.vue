@@ -346,7 +346,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 .tchip-w { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .tchip { flex: 0 1 auto; min-width: 0; height: 20px; display: flex; align-items: center; padding: 0 var(--ref-spacing-05); margin-left: calc(-1 * var(--ref-spacing-02)); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--sys-color-neutral-400); --sq-line-w: 0.5px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
 .tchip:hover { --sq-line: var(--sys-color-neutral-500); }
-.tchip.open { --sq-line: var(--sys-color-brand-primary-default); }
+.tchip.open { --sq-line: var(--iris-open-line); }
 .tchip.mixed { color: var(--sys-color-neutral-600); }
 .short .tchip { padding: 0 var(--ref-spacing-04); margin-left: 0; }
 .tchip:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
@@ -366,7 +366,6 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 /* 드롭다운(텍스트 스타일)에 연결된 값: 다른 칸과 같은 흰 칩 — 칩 자체는 버튼이 아니라 드롭다운 전체가 눌려요 */
 .dd-chip { flex: 0 1 auto; }
 .dd:hover .dd-chip { --sq-line: var(--ref-color-gray-900-20); }
-.dd.open .dd-chip { --sq-line: var(--sys-color-brand-primary-default); }
 .dd-v { flex: none; color: var(--sys-color-neutral-500); }
 .ph { color: var(--sys-color-neutral-600); }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
@@ -408,7 +407,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 /* 글자 스타일이 걸린 칸(피그마): 흰 칸 · 0.5px 선 · 28h, [Ag(스타일 굵기) 이름 · 값]. 열면 파란 바탕 · 파란 선 · 파란 글자 */
 .tsf { width: 100%; min-width: 0; height: 28px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); box-sizing: border-box; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); text-align: left; }
 .tsf:hover { --sq-line: var(--sys-color-neutral-400); }
-.tsf.open { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); color: var(--sys-color-brand-primary-default); }
+.tsf.open { --sq-line: var(--iris-open-line); }
 .tsf:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .tsf-ag { flex: none; font-size: 14px; line-height: 18px; }
 .tsf-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

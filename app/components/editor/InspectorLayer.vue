@@ -489,6 +489,10 @@ function onSizing(axis: 'w' | 'h', v: string) {
   if (v === VAR_OPT) { nextTick(() => sizeVar[axis]?.show()); return }
   setSizing(axis, v as Sizing)
 }
+/** Hug · Fill 이면 칸은 숫자 대신 'Hug ▾ · Fill ▾' 흰 드롭다운(피그마 UI3와 같아요) — 숫자로 바꾸려면 ▾ 에서 Fixed */
+const autoSize = (axis: 'w' | 'h') => { const v = sizingNow(axis); return v === 'hug' || v === 'fill' }
+/** 오토 레이아웃 안(자리를 레이아웃이 정해요): X · Y · 회전 칸은 흰 테두리 칸 + 옅은 값(피그마와 같아요) */
+const flowOwned = computed(() => inFlow.value && same((n) => !!n.absolute) === false)
 const sizingNow = (axis: 'w' | 'h') => same((n) => (axis === 'w' ? n.sizeH ?? (n.type === 'text' && n.style.autoWidth ? 'hug' : 'fixed') : n.sizeV ?? (n.type === 'text' ? 'hug' : 'fixed')))
 function setSizing(axis: 'w' | 'h', v: Sizing) {
   // 피그마처럼: 그 방향이 Hug 인 부모 안에서 Fill 을 고르면 부모를 그 방향 Fixed 로 바꿔요(Hug 부모는 채울 크기가 없어요). 실행취소 한 번
@@ -742,8 +746,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <ArrangeControls :count="nodes.length" :gap="gap" :axis="axis" @op="onArrange" />
       <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       <div class="ig">
-        <label class="sq fld"><span>X</span><input v-if="!vb('x')" :value="showG(same((n) => n.x))" :placeholder="same((n) => n.x) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('x')" reveal label="X" @pick="(t) => pickNum('x', t)" @unbind="unbind('x')" @step="(d) => stepNum('x', d)" /></label>
-        <label class="sq fld"><span>Y</span><input v-if="!vb('y')" :value="showG(same((n) => n.y))" :placeholder="same((n) => n.y) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"><TokenPicker :kinds="['spacing']" :bound="vb('y')" reveal label="Y" @pick="(t) => pickNum('y', t)" @unbind="unbind('y')" @step="(d) => stepNum('y', d)" /></label>
+        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>X</span><input :value="showG(same((n) => n.x))" :placeholder="same((n) => n.x) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"></label>
+        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>Y</span><input :value="showG(same((n) => n.y))" :placeholder="same((n) => n.y) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"></label>
         <button v-if="showConstraints" :class="['ib', 's24', 'tog', { on: consShown }]" :aria-pressed="consShown" :aria-label="consShown ? tr('Hide constraints') : tr('Show constraints')" :title="consShown ? tr('Hide constraints') : tr('Show constraints')" @click="setConsShown(!consShown)"><EditorIcon name="constraints" /></button>
         <span v-else />
       </div>
@@ -769,7 +773,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       </template>
       <div class="ig-l"><span>{{ tr('Rotation') }}</span></div>
       <div class="ig">
-        <label class="sq fld u" :title="tr('Rotation')"><EditorIcon name="rotation" /><input :value="showG(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span v-if="same((n) => n.rotation ?? 0) !== 'Mixed'" class="unit">°</span></label>
+        <label :class="['sq', 'fld', 'u', { lo: flowOwned }]" :title="tr('Rotation')"><EditorIcon name="rotation" /><input :value="showG(same((n) => n.rotation ?? 0))" :placeholder="same((n) => n.rotation ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="setRotation" @keydown="blurOnEnter($event); step($event, (d) => store.rotateBy(sid, ids, d))"><span v-if="same((n) => n.rotation ?? 0) !== 'Mixed'" class="unit">°</span></label>
         <div class="grp" role="group" :aria-label="tr('Rotate and flip')">
           <button class="ib" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="store.rotateBy(sid, ids, 90)"><EditorIcon name="rotate_90" class="keep" /></button>
           <button class="ib" :aria-label="tr('Flip horizontal') + ' (⇧H)'" :data-tip="tr('Flip horizontal') + ' ⇧H'" @click="store.flip(sid, ids, 'x')"><EditorIcon name="flip_horizontal" class="keep" /></button>
@@ -786,7 +790,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <div class="ig-l"><span>{{ sizingNow('w') === 'fixed' && sizingNow('h') === 'fixed' ? tr('Dimensions') : tr('Resizing') }}</span></div>
         <div class="ig">
           <!-- 피그마처럼 W/H 칸 안에는 숫자 + Hug · Fill ▾ 만: 변수 연결은 ▾ 메뉴의 'Apply variable…' 로(칸에 버튼이 더 나오면 숫자가 잘려요) -->
-          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1 }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="Mixed" @update:model-value="(v) => onSizing(k, v)" /></label>
+          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1, auto: autoSize(k) }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k) && !autoSize(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="Mixed" @update:model-value="(v) => onSizing(k, v)" /></label>
           <button :class="['ib', 's24', 'tog', { on: locked }]" :aria-pressed="locked" :aria-label="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" :title="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" @click="toggleRatio">
             <EditorIcon :name="locked ? 'ratio_locked' : 'ratio_unlocked'" />
           </button>
@@ -1005,6 +1009,16 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 /* 단위(° % px)는 숫자 바로 뒤에 붙고, 남는 자리는 단위 뒤로(피그마: "0°" · "100%") */
 .li .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }
 .fld.u > .unit { flex: 1 1 0; min-width: 0; margin-left: calc(var(--ref-spacing-03) * -1); color: var(--sys-color-neutral-500); }
+/* Hug · Fill: 칸 전체가 흰 드롭다운('W  Fill ▾') — 피그마 UI3와 같아요 */
+.fld.sz.auto { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.fld.sz.auto:hover { --sq-line: var(--ref-color-gray-900-20); }
+.fld.sz.auto :deep(.esel) { flex: 1; min-width: 0; }
+.fld.sz.auto :deep(.inl) { width: 100%; justify-content: space-between; padding: 0; color: var(--sys-color-neutral-800); }
+.fld.sz.auto :deep(.inl:hover), .fld.sz.auto :deep(.inl.open) { --sq-fill: transparent; }
+.fld.sz.auto :deep(.inl .cv) { display: block; color: var(--sys-color-neutral-500); }
+/* 오토 레이아웃 안 X · Y · 회전: 흰 테두리 칸 + 옅은 값(자리는 레이아웃이 정해요) */
+.fld.lo { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.fld.lo > input, .fld.lo > .unit { color: var(--sys-color-neutral-400); }
 /* W/H: 칸 안 변수 버튼은 숨겨요 — 변수는 Hug · Fill ▾ 메뉴의 'Apply variable…' 로 열어요(숫자가 잘리지 않게) */
 .fld.sz > :deep(.vb) { display: none; }
 /* 크기 방식이 여럿이면(오토 레이아웃 안 · 오토 레이아웃 프레임 · 글자) ▾ 를 늘 보여 줘요 — 옅게, 칸에 올리면 진하게 */
@@ -1073,5 +1087,5 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .ig4-acts { display: flex; align-items: center; }
 /* Position ▾: Constraints 드롭다운처럼 흰 바탕 + 테두리(피그마와 같아요) */
 .ig4 > :deep(.esel) > .dd { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--sys-color-brand-primary-default); }
+.ig4 > :deep(.esel) > .dd.open { --sq-line: var(--iris-open-line); }
 </style>

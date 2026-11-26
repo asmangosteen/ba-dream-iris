@@ -117,7 +117,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
           <input :key="e.scale + e.format" :value="isVectorFormat(e.format) ? '1x' : e.scale" :disabled="isVectorFormat(e.format)" :aria-label="tr('Export scale')" @change="typedScale(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()">
           <EditorSelect v-if="!isVectorFormat(e.format)" variant="inline" :model-value="e.scale" :options="SCALE_OPTS" aria-label="Export scale presets" @update:model-value="(v) => setAt(i, { scale: v })" />
         </label>
-        <EditorSelect :model-value="e.format" :options="FORMAT_OPTS" aria-label="Export format" @update:model-value="(v) => setAt(i, { format: v as ExportSetting['format'] })" />
+        <EditorSelect class="esel-w" :model-value="e.format" :options="FORMAT_OPTS" aria-label="Export format" @update:model-value="(v) => setAt(i, { format: v as ExportSetting['format'] })" />
         <button :class="['ib', 's24', { on: menu === i }]" :aria-label="tr('Export settings')" :title="tr('Export settings')" @click="menu = menu === i ? null : i">
           <EditorIcon name="menu_meatball" />
         </button>
