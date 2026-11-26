@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { IRIS_ICONS } from './irisIcons'
 /** 편집기 아이콘 — 편집기 화면(툴바 · 패널 · 메뉴)에서 쓰는 아이콘.
-    새 세트(PRD/08_EDITOR_ICONS.md · PRD/icons): 24 그리드 면 아이콘(선 2px 를 면으로), currentColor. irisIcons.ts 에 있는 이름이면 그걸 그려요.
+    새 세트(PRD/08_EDITOR_ICONS.md · PRD/icons): 24 그리드 면 아이콘(쓰임별 굵기: 선 1.5 → 16px 에서 1px · 정렬 물체 막대 3), currentColor. irisIcons.ts 에 있는 이름이면 그걸 그려요.
     아래 P 는 예전 16 그리드 선 아이콘 — 새 세트에 없는 이름만 이걸로 그려요.
     크기: 20 툴바 도구 · 16 패널 아이콘 버튼 · 칸 앞 · 레이어 행 · 메뉴 · 12 ▾ ▸ ✓ 같은 보조 표시 */
 const props = withDefaults(defineProps<{ name: string; size?: number }>(), { size: 16 })

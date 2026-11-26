@@ -18,7 +18,7 @@ const names = Object.keys(icons).sort()
 for (const n of names) for (const s of SIZES)
   fs.writeFileSync(path.join(out, String(s), n + '.svg'), `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none">${icons[n]}</svg>\n`)
 // 서비스용 사전
-const ts = `// 자동 생성 — PRD/icons 와 같은 아이콘(24 그리드, 면으로 그린 선 2px, currentColor). 손으로 고치지 말고 피그마에서 고친 뒤 다시 뽑아요.\n// 피그마: 바드림 Design System · Iconography · "Iris Editor Icons"\nexport const IRIS_ICONS: Record<string, string> = {\n${names.map((n) => `  ${n}: '${icons[n].replace(/'/g, "\\'")}',`).join('\n')}\n}\n`
+const ts = `// 자동 생성 — PRD/icons 와 같은 아이콘(24 그리드 면 아이콘 · 쓰임별 굵기: 선 1.5(16px 에서 1px) · 물체 막대 3, currentColor). 손으로 고치지 말고 피그마에서 고친 뒤 다시 뽑아요.\n// 피그마: 바드림 Design System · Iconography · "Iris Editor Icons · 쓰임별 굵기"\nexport const IRIS_ICONS: Record<string, string> = {\n${names.map((n) => `  ${n}: '${icons[n].replace(/'/g, "\\'")}',`).join('\n')}\n}\n`
 fs.writeFileSync(path.join(repo, 'app/components/editor/irisIcons.ts'), ts)
 // 문서 표
 const byGroup = {}
