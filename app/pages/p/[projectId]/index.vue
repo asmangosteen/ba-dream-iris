@@ -1310,6 +1310,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .save { margin-left: auto; flex: none; padding-right: var(--ref-spacing-04); }
 /* 사이드바 맨 위 줄(파일 줄 · 나 · Docs · Share): 높이 40, 아래 구분선 1px 로 탭 줄과 나눠요 — 예전 위에 따로 떠 있던 알약 둘을 합쳤어요 */
 .panel-top { flex: none; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); position: relative; z-index: 2; }
+/* 메뉴는 늘 맨 위: 메인 메뉴 · 확대 메뉴가 열리면 이 줄을 패널 안 다른 것(Pages | Layers 크기 조절 선 · 끌기 선)보다 위로 */
+.panel-top:has(.menu) { z-index: 10; }
 .panel-top.r { padding: 0 var(--ref-spacing-06); }
 /* 왼쪽 패널 본문: 메인 메뉴(검은 메뉴)가 접힌 패널 밖으로도 보이게 패널은 넘침을 보이고, 본문만 잘라요 */
 /* clip: hidden 과 달리 코드로도 스크롤되지 않아요 — 접힌 채 레이어를 고르면 scrollIntoView 가 이 칸을 밀어 올려 탭 줄 대신 페이지 · 레이어가 보이던 문제 */
