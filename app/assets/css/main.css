@@ -187,6 +187,9 @@ button:active{cursor:grabbing}
 .seg>.seg-item{--sq-line-w:1px}
 .seg-item:focus-visible,.nav-item:focus-visible,.menu-item:focus-visible,.ib:focus-visible,.rail-btn:focus-visible,.more:focus-visible,.act:focus-visible,.dd:focus-visible,.hov:focus-visible{outline:2px solid var(--sys-color-brand-primary-default);outline-offset:1px}
 .menu-item:focus-visible{outline-offset:-2px}
+/* 포커스 링은 Tab 으로 옮길 때만(plugins/focusring.client.ts) — 마우스로 누른 뒤엔 링을 그리지 않아요(입력칸 선택선 · 메뉴 고른 줄은 그대로) */
+html:not(.kbd-nav) :focus-visible{outline:none!important}
+html:not(.kbd-nav) :is(.cs-track,.bar):focus-visible{box-shadow:none!important}
 .ib:disabled,.act:disabled,.menu-item:disabled{opacity:.45;cursor:default}
 @media (prefers-reduced-motion: reduce){*{transition-duration:0s!important}}
 /* 편집기: 피그마 UI3 처럼 호버 · 눌림 · 선택 색은 바로 바뀌어요(0s). 접기 · 토글 손잡이 · 화살표 회전 같은 움직임은 그대로 */

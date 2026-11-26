@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import ScreenThumb from '~/components/editor/ScreenThumb.vue'
+/** 웹 · 데스크톱 화면이면 넓은 표지(폭 768 이상 — 태블릿 · 데스크톱 프레임) */
+const isWide = (s: { width: number }) => s.width >= 768
 import { KIND_INFO, type ProjectKind } from '~/composables/useProjectActions'
 import { useTabs } from '~/composables/useTabs'
 
@@ -86,7 +88,7 @@ function onSearchKey(e: KeyboardEvent) {
       <ul v-else class="list">
         <li v-for="p in recents" :key="p.id">
           <a :href="`/p/${p.id}`" class="sq row" @click="onOpen($event, p.id)">
-            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" class="sq cover"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span><span v-else-if="coverStatus === 'success'" class="sq ghost" /></span>
+            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" :class="['sq', 'cover', { wide: isWide(covers[p.id]!) }]"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" :fit="isWide(covers[p.id]!) ? 'top' : 'width'" /></span></span><span v-else-if="coverStatus === 'success'" class="sq ghost" /></span>
             <span class="col">
               <span class="name">{{ p.name }}</span>
               <span class="tx-meta">{{ relativeTime(p.updated_at) }}</span>
@@ -130,6 +132,8 @@ a.row:focus-visible { outline: 0; --sq-line: var(--sys-color-brand-primary-defau
 /* 썸네일로 정한 프레임: 칸(3:2)을 꽉 채워 확대(가운데 기준) — 홈 카드와 같아요 */
 .full { position: absolute; inset: 0; }
 .cover { position: absolute; inset: 6px calc(22% - 1px) -10px; border-radius: 5px; --sq-line: var(--iris-line); --sq-line-w: 1px; }
+/* 웹 · 데스크톱 화면(폭 768 이상): 휴대폰 모양 좁은 칸 대신 썸네일 폭에 맞는 넓은 칸, 위쪽부터 꽉 채워요(납작한 화면도 아래가 비지 않게) */
+.cover.wide { inset: 6px 6px -10px; }
 .sq-clip-inner { position: absolute; inset: 1px; overflow: hidden; border-radius: 4px; }
 .ghost { position: absolute; left: 50%; top: 10px; width: 26px; height: 44px; margin-left: -13px; border-radius: var(--ref-radius-02); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; --sq-fill: var(--sys-color-common-white-default); }
 .col { min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-01); }

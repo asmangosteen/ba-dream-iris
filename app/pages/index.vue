@@ -2,6 +2,8 @@
 import { Button, EmptyState, Icon, Skeleton } from '@ba-dream/design-system'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import ScreenThumb from '~/components/editor/ScreenThumb.vue'
+/** 웹 · 데스크톱 화면이면 넓은 표지(폭 768 이상 — 태블릿 · 데스크톱 프레임) */
+const isWide = (s: { width: number }) => s.width >= 768
 
 const { data: projects, status, error, refresh } = useProjects()
 const { data: progress } = useProjectProgress()
@@ -57,7 +59,7 @@ function createProject() { newOpen.value = true }
         />
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
-            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" class="sq cover"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
+            <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" :class="['sq', 'cover', { wide: isWide(covers[p.id]!) }]"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" :fit="isWide(covers[p.id]!) ? 'top' : 'width'" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
             <button class="ib more" :aria-label="tr('{name} settings', { name: p.name })" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
@@ -85,6 +87,8 @@ function createProject() { newOpen.value = true }
 .thumb { aspect-ratio: 3 / 2; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 /* 화면 표지: 바깥 1px 선(.cover) 안에 squircle 로 자른 그림. 아래 두 모서리는 썸네일(.sq-clip) 밖으로 내려 감춤 */
 .cover { position: absolute; inset: 11px calc(24% - 1px) -14px; border-radius: 7px; --sq-line: var(--iris-line); --sq-line-w: 1px; }
+/* 웹 · 데스크톱 화면(폭 768 이상): 휴대폰 모양 좁은 칸 대신 썸네일 폭에 맞는 넓은 칸, 위쪽부터 꽉 채워요(납작한 화면도 아래가 비지 않게) */
+.cover.wide { inset: 11px 11px -14px; }
 .sq-clip-inner { position: absolute; inset: 1px; overflow: hidden; border-radius: 6px; }
 /* 썸네일로 정한 프레임: 칸을 꽉 채워 확대(가운데 기준, 넘치는 곳은 잘림) — 테두리 선(.thumb ::after)은 그 위에 */
 .full { position: absolute; inset: 0; }
