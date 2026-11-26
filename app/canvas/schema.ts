@@ -4,6 +4,7 @@
  */
 import { backgroundCss, effectCss, radiiOf, rectPath, STAR_INNER, strokeColors, strokeShadows } from './paint'
 import { squirclePath } from './squircle'
+import type { TextSpan } from './textRuns'
 
 export const SCHEMA_VERSION = 7
 
@@ -212,6 +213,8 @@ export interface LayerNode {
   /** 그룹(⌘G): true 면 그룹, false 면 프레임(오토 레이아웃을 풀어 프레임이 된 것). 비어 있으면 모양으로 짐작(채우기 · 자르기 · 오토 레이아웃 없는 프레임) */
   group?: boolean
   text?: string
+  /** 글자 구간 서식(글자마다 다른 색 · 굵기 · 크기 …) — style 이 바탕, 구간이 덮어써요(app/canvas/textRuns.ts) */
+  spans?: TextSpan[]
   /** 선 · 연필: 상자 안 점 [x0, y0, x1, y1, …], 0~1 비율 (v5) */
   pts?: number[]
   /** 연필: 닫힌 모양 */

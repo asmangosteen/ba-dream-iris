@@ -8,6 +8,8 @@ import { paintLayer } from '~/canvas/paint'
 import { alphaOf, hexOf, normHex, withAlpha } from '~/canvas/color'
 import TokenPicker from '~/components/editor/TokenPicker.vue'
 import PaintPopover from '~/components/editor/PaintPopover.vue'
+import { useTextRange } from '~/composables/useTextRange'
+import { rangeValues } from '~/canvas/textRuns'
 
 /**
  * Fill · Stroke 칠 목록(피그마와 같아요: 위에 있는 칠이 위에 그려져요).
@@ -30,14 +32,20 @@ function frameAll(patch: Partial<LayerStyle> | ((s: LayerStyle) => Partial<Layer
   store.batch(() => { for (const id of frameIds.value) store.frameStyle(id, typeof patch === 'function' ? patch(store.doc(id).frame ?? {}) : patch, vars) })
 }
 const firstStyle = computed<LayerStyle | undefined>(() => styles.value[0])
+/** 글자를 고치는 중 글자를 골랐으면 글자 색은 그 글자에만(피그마와 같아요) */
+const textRange = useTextRange()
+const rng = computed(() => { const r = textRange.value; return props.kind === 'text' && !props.frame && r && r.sid === props.sid && props.ids.length === 1 && props.ids[0] === r.id ? r : null })
 const baseVal = computed(() => {
+  if (rng.value) return rng.value.values.color === 'Mixed' ? undefined : (rng.value.values.color as string | undefined)
   const s = firstStyle.value
   if (!s) return undefined
   if (props.frame && base.value === 'fill') return s.fill === '' ? undefined : s.fill ?? '#FFFFFF'
   return s[base.value]
 })
 const extras = computed<Paint[]>(() => firstStyle.value?.[extraKey.value] ?? [])
-const mixed = computed(() => styles.value.some((s) => JSON.stringify([s[base.value], s[extraKey.value]]) !== JSON.stringify([firstStyle.value?.[base.value], firstStyle.value?.[extraKey.value]])))
+/** 글자마다 색이 다른 글자 레이어(구간 덮어쓰기) — 레이어 전체로 보면 Mixed */
+const runsMixed = computed(() => props.kind === 'text' && !rng.value && nodes.value.some((n) => n.spans?.some((sp) => sp.style.color !== undefined) && rangeValues(n.style, n.spans, (n.text ?? '').length, 0, (n.text ?? '').length).color === 'Mixed'))
+const mixed = computed(() => (rng.value ? rng.value.values.color === 'Mixed' : runsMixed.value) || styles.value.some((s) => JSON.stringify([s[base.value], s[extraKey.value]]) !== JSON.stringify([firstStyle.value?.[base.value], firstStyle.value?.[extraKey.value]])))
 /** 줄: 위(맨 위 칠)부터. -1 은 바탕 칠 */
 const rows = computed(() => (mixed.value ? [] : [...extras.value.map((_, i) => i).reverse(), ...(baseVal.value ? [-1] : [])]))
 const types = computed<Paint['type'][]>(() => (props.kind === 'stroke' ? ['solid'] : ['solid', 'linear', 'radial', 'angular', 'image']))
@@ -45,11 +53,14 @@ const TYPE_NAME: Record<Paint['type'], string> = { solid: 'Solid', linear: 'Line
 
 function patchAll(fn: (s: LayerStyle) => Partial<LayerStyle>, vars?: Record<string, string | null>) {
   if (props.frame) frameAll(fn, vars)
+  // 글자 레이어: 레이어 서식으로(store.style) — 바꾼 키의 글자 구간 덮어쓰기도 지워져요(같은 값을 넣어도 글자 전체가 그 색으로)
+  else if (props.kind === 'text') store.batch(() => { for (const n of nodes.value) store.style(props.sid, [n.id], fn(n.style)) })
   else store.update(props.sid, props.ids, (n) => ({ style: { ...n.style, ...fn(n.style) } }))
 }
 const setExtras = (fn: (list: Paint[]) => Paint[]) => patchAll((s) => { const l = fn([...(s[extraKey.value] ?? [])]); return { [extraKey.value]: l.length ? l : undefined } })
 
 function add() {
+  if (rng.value) { rng.value.apply({ color: '#000000' }); return }
   // 여러 값(Mixed): 모두 같은 칠 하나로 바꿔요(피그마와 같아요)
   if (mixed.value) {
     const v = props.kind === 'stroke' ? '#000000' : props.kind === 'text' ? '#000000' : props.frame ? '#FFFFFF' : '#D9D9D9'
@@ -129,7 +140,10 @@ function applyList(list: Paint[]) {
 }
 
 // --- 색 ---
-function setBase(v: string) { patchAll(() => ({ [base.value]: v })) }
+function setBase(v: string) {
+  if (rng.value) { rng.value.apply({ color: v }); return }
+  patchAll(() => ({ [base.value]: v }))
+}
 function onBaseHex(e: Event) {
   const input = e.target as HTMLInputElement
   const v = normHex(input.value)
@@ -152,12 +166,14 @@ function onExtraAlpha(i: number, e: Event) {
 }
 // 토큰(바탕 칠만)
 const bound = computed(() => {
+  if (rng.value) return null
   const v = (firstStyle.value?.vars as Record<string, string> | undefined)?.[base.value as BindKey]
   if (v) return v
   const c = baseVal.value
   return c?.startsWith('token:') ? 'db:' + c.slice(6) : null
 })
 function pick(t: CatalogToken) {
+  if (rng.value) { if (t.color) rng.value.apply({ color: t.color }); return }
   if (props.frame) frameAll({ [base.value]: t.color }, { [base.value]: t.id })
   else store.bind(props.sid, props.ids, base.value, t.id, () => ({ style: { [base.value]: t.color } }))
 }

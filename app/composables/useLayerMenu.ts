@@ -1,3 +1,4 @@
+import { runCss } from '~/canvas/textRuns'
 import { isContainer, type LayerDoc, type LayerNode } from '~/canvas/schema'
 import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
 import { nodePathIn } from '~/canvas/vector'
@@ -44,7 +45,15 @@ export function cssOf(n: LayerNode, color: (v?: string) => string | undefined): 
   if (s.opacity !== undefined && s.opacity < 1) css.opacity = String(s.opacity)
   if (s.blend && s.blend !== 'normal') css['mix-blend-mode'] = s.blend
   if (n.type === 'text') Object.assign(css, { color: color(s.color) ?? '', 'font-family': 'Pretendard', 'font-size': `${s.fontSize ?? 16}px`, 'font-weight': String(s.fontWeight ?? 400), 'line-height': s.lineHeight ? (s.lineHeightUnit === 'percent' ? `${s.lineHeight}%` : `${s.lineHeight}px`) : 'normal', ...(s.letterSpacing ? { 'letter-spacing': `${s.letterSpacing}px` } : {}), 'text-align': s.align ?? 'left' })
-  return `/* ${n.name} */\n` + Object.entries(css).filter(([, v]) => v).map(([k, v]) => `${k}: ${v};`).join('\n')
+  const head = `/* ${n.name} */\n` + Object.entries(css).filter(([, v]) => v).map(([k, v]) => `${k}: ${v};`).join('\n')
+  // 글자마다 다른 서식: 구간마다 덮어쓴 값만 이어서(피그마 Dev Mode 처럼 — 어느 글자인지 주석으로)
+  if (n.type !== 'text' || !n.spans?.length) return head
+  const runs = n.spans.map((sp) => {
+    const t = (n.text ?? '').slice(sp.s, sp.e).replace(/\s+/g, ' ')
+    const body = runCss(s, sp.style, color).split(';').filter((d) => d && !d.startsWith('-webkit-text-fill-color')).map((d) => d.replace(':', ': ') + ';').join('\n')
+    return `/* "${t.length > 24 ? t.slice(0, 24) + '…' : t}" (${sp.s}–${sp.e}) */\n${body}`
+  })
+  return [head, ...runs].join('\n\n')
 }
 /** 레이어들 → SVG(피그마 'Copy as SVG'). 텍스트 · 이미지 · 인스턴스는 빼요 */
 export function svgOf(doc: LayerDoc, ns: LayerNode[], color: (v?: string) => string | undefined): string | null {

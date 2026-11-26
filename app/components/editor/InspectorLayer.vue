@@ -30,6 +30,8 @@ import { denorm, shapeVnet } from '~/canvas/vector'
 import { vselPoints, type VEdit, type VKey } from '~/canvas/vsel'
 import { radiiOf } from '~/canvas/paint'
 import { canFlatten } from '~/canvas/boolean'
+import { RUN_KEYS, rangeValues, type RangeValues, type RunStyle } from '~/canvas/textRuns'
+import { useTextRange } from '~/composables/useTextRange'
 
 /**
  * 오른쪽 패널 · 디자인 탭(레이어를 골랐을 때): 위치 · 크기(비율 고정) · 회전 · 뒤집기 · 정렬 · 균등 분배 · 모양(모서리 따로) · 채우기 · 선 · 텍스트 · 순서
@@ -146,7 +148,26 @@ function setCorner(e: Event, i?: number) {
 const corner = (i: number) => same((n) => n.style.radii?.[i] ?? n.style.radius ?? 0)
 const allCorners = computed(() => same((n) => (n.style.radii ? (n.style.radii.every((r) => r === n.style.radii![0]) ? n.style.radii[0] : 'Mixed') : n.style.radius ?? 0)))
 const CORNER_LABEL = ['Top left', 'Top right', 'Bottom right', 'Bottom left']
-function setStyle(key: keyof LayerStyle, value: LayerStyle[keyof LayerStyle]) { store.style(sid.value, ids.value, { [key]: value }) }
+/**
+ * 글자를 고치는 중 글자를 골랐으면(피그마처럼): 글자 서식(색 · 굵기 · 크기 · 줄 높이 · 자간 · 꾸밈)은 그 글자에만, 칸 값도 그 글자 것
+ */
+const textRange = useTextRange()
+const rng = computed(() => { const r = textRange.value; return r && r.sid === sid.value && ids.value.length === 1 && ids.value[0] === r.id ? r : null })
+const isRunKey = (k: string) => (RUN_KEYS as readonly string[]).includes(k)
+/** 칸 값: 고른 글자가 있으면 그 글자 값, 없으면 레이어 값 */
+function tsame(key: keyof RangeValues, fn: (n: LayerNode) => unknown): unknown {
+  if (rng.value) return rng.value.values[key]
+  // 글자마다 다른 서식이 있는 글자 레이어는 글자 전체 값(다르면 Mixed — 피그마와 같아요)
+  if (nodes.value.some((n) => n.type === 'text' && n.spans?.length)) {
+    const vs = nodes.value.map((n) => (n.type === 'text' ? rangeValues(n.style, n.spans, (n.text ?? '').length, 0, (n.text ?? '').length)[key] : fn(n)))
+    return vs.every((v) => JSON.stringify(v) === JSON.stringify(vs[0])) ? vs[0] : 'Mixed'
+  }
+  return same(fn)
+}
+function setStyle(key: keyof LayerStyle, value: LayerStyle[keyof LayerStyle]) {
+  if (rng.value && isRunKey(key)) { rng.value.apply({ [key]: value } as RunStyle); return }
+  store.style(sid.value, ids.value, { [key]: value })
+}
 function setStyleNum(key: 'radius' | 'strokeWidth' | 'fontSize' | 'lineHeight' | 'letterSpacing', e: Event, min = 0) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value)
@@ -163,8 +184,10 @@ function setLineHeight(e: Event) {
   const raw = input.value.trim()
   const pct = raw.endsWith('%')
   const v = Number(raw.replace(/[%px\s]/gi, ''))
-  if (!raw || !Number.isFinite(v)) { input.value = show(same(lhText)); return }
-  store.style(sid.value, ids.value, { lineHeight: Math.max(1, Math.round(v * 100) / 100), lineHeightUnit: pct ? 'percent' : undefined })
+  if (!raw || !Number.isFinite(v)) { input.value = show(tsame('lineHeight', lhText)); return }
+  const patch = { lineHeight: Math.max(1, Math.round(v * 100) / 100), lineHeightUnit: pct ? ('percent' as const) : undefined }
+  if (rng.value) rng.value.apply(patch)
+  else store.style(sid.value, ids.value, patch)
 }
 function setOpacity(e: Event) {
   const input = e.target as HTMLInputElement
@@ -265,10 +288,16 @@ const typoVar: Record<'fontWeight' | 'fontSize', { show: () => void } | null> = 
 function setTypoRef(k: 'fontWeight' | 'fontSize', c: unknown) { typoVar[k] = c && typeof (c as { show?: unknown }).show === 'function' ? (c as { show: () => void }) : null }
 const weightOptions = computed(() => [...weights.value.map((w) => ({ value: String(w), label: WEIGHT_LABEL(w), raw: true })), { value: VAR_OPT, label: 'Apply variable…', sep: true }])
 function onWeight(v: string) { if (v === VAR_OPT) nextTick(() => typoVar.fontWeight?.show()); else setStyle('fontWeight', Number(v)) }
-/** 크기 ▾: 자주 쓰는 크기(피그마 글자 크기 목록) */
-const SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 64]
-const sizeNow = computed(() => { const v = same((n) => n.style.fontSize ?? 16); return v === 'Mixed' ? null : String(v) })
-const sizeOptionsT = computed(() => [...SIZES.map((z) => ({ value: String(z), label: String(z), short: '' })), { value: VAR_OPT, label: vb('fontSize') ? 'Change variable…' : 'Apply variable…', short: '', sep: true }])
+/** 크기 ▾: 디자인 시스템 글자 크기(변수 · 토큰 값) — 굵기 목록과 같아요. 지금 값도 함께. 토큰이 없으면 피그마 기본 크기 */
+const FALLBACK_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 64]
+const SIZES = computed(() => {
+  const list = catalog.list(['fontSize']).map((t) => t.num!).filter((v) => Number.isFinite(v))
+  const base = list.length ? list : FALLBACK_SIZES
+  const cur = tsame('fontSize', (n) => n.style.fontSize ?? 16)
+  return [...new Set([...base, ...(typeof cur === 'number' ? [cur] : [])])].sort((a, b) => a - b)
+})
+const sizeNow = computed(() => { const v = tsame('fontSize', (n) => n.style.fontSize ?? 16); return v === 'Mixed' ? null : String(v) })
+const sizeOptionsT = computed(() => [...SIZES.value.map((z) => ({ value: String(z), label: String(z), short: '' })), { value: VAR_OPT, label: vb('fontSize') ? 'Change variable…' : 'Apply variable…', short: '', sep: true }])
 function onSize(v: string) { if (v === VAR_OPT) nextTick(() => typoVar.fontSize?.show()); else setStyle('fontSize', Number(v)) }
 function pickTextStyle(t: CatalogToken) {
   const x = t.text!
@@ -288,6 +317,14 @@ function stepNum(key: 'x' | 'y' | 'w' | 'h', d: number) {
   store.update(sid.value, key === 'x' || key === 'y' ? store.topIds(sid.value, ids.value) : ids.value, (n) => (key === 'w' || key === 'h' ? sized(n, key, n[key] + d) : { [key]: n[key] + d }))
 }
 function stepStyle(key: 'radius' | 'strokeWidth' | 'fontSize' | 'lineHeight' | 'letterSpacing', d: number, min = 0) {
+  // 고른 글자: 그 글자 값에서(서로 다르면 그대로) — 줄 높이는 단위 그대로
+  if (rng.value && (key === 'fontSize' || key === 'letterSpacing' || key === 'lineHeight')) {
+    const cur = rng.value.values[key]
+    if (cur === 'Mixed' || cur === '') return
+    if (key === 'lineHeight') { const t = String(cur); const pct = t.endsWith('%'); rng.value.apply({ lineHeight: Math.max(min, Math.round((Number(t.replace('%', '')) + d) * 100) / 100), lineHeightUnit: pct ? 'percent' : undefined }); return }
+    rng.value.apply({ [key]: Math.max(min, Math.round((Number(cur) + d) * 100) / 100) } as RunStyle)
+    return
+  }
   store.update(sid.value, ids.value, (n) => ({ style: { ...n.style, [key]: Math.max(min, Math.round(((n.style[key] ?? 0) + d) * 100) / 100) } }))
 }
 function stepCorner(i: number, d: number) {
@@ -302,7 +339,7 @@ const weights = computed(() => {
   const cur = nodes.value.map((n) => n.style.fontWeight ?? 400)
   return [...new Set([...base, ...cur])].sort((a, b) => a - b)
 })
-const weightNow = computed(() => same((n) => n.style.fontWeight ?? 400))
+const weightNow = computed(() => tsame('fontWeight', (n) => n.style.fontWeight ?? 400))
 // --- v7: 불리언 · 마스크 ---
 /** 선택 머리의 순서 버튼(16 그리드): 맨 앞 · 앞 · 뒤 · 맨 뒤 */
 // 불리언 아이콘: 아이콘 세트(boolean_*) 이름
@@ -842,13 +879,13 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
             <EditorSelect :model-value="weightNow === 'Mixed' ? null : String(weightNow)" :options="weightOptions" aria-label="Font weight" placeholder="Mixed" @update:model-value="onWeight" />
             <TokenPicker :ref="(c) => setTypoRef('fontWeight', c)" :kinds="['fontWeight']" label="Font weight" @pick="(t) => pickNum('fontWeight', t)" />
           </div>
-          <label class="sq fld sz multi" :title="tr('Font size')"><input v-if="!vb('fontSize')" :value="show(same((n) => n.style.fontSize ?? 16))" :placeholder="same((n) => n.style.fontSize ?? 16) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Font size')" @change="setStyleNum('fontSize', $event, 1)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('fontSize', d, 1))"><TokenPicker :ref="(c) => setTypoRef('fontSize', c)" :kinds="['fontSize']" :bound="vb('fontSize')" label="Font size" @pick="(t) => pickNum('fontSize', t)" @unbind="unbind('fontSize')" @step="(d) => stepStyle('fontSize', d, 1)" /><EditorSelect variant="inline" :model-value="sizeNow" :options="sizeOptionsT" aria-label="Font size" @update:model-value="onSize" /></label>
+          <label class="sq fld sz multi" :title="tr('Font size')"><input v-if="!vb('fontSize')" :value="show(tsame('fontSize', (n) => n.style.fontSize ?? 16))" :placeholder="tsame('fontSize', (n) => n.style.fontSize ?? 16) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Font size')" @change="setStyleNum('fontSize', $event, 1)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('fontSize', d, 1))"><TokenPicker :ref="(c) => setTypoRef('fontSize', c)" :kinds="['fontSize']" :bound="vb('fontSize')" label="Font size" @pick="(t) => pickNum('fontSize', t)" @unbind="unbind('fontSize')" @step="(d) => stepStyle('fontSize', d, 1)" /><EditorSelect variant="inline" :model-value="sizeNow" :options="sizeOptionsT" aria-label="Font size" @update:model-value="onSize" /></label>
           <span />
         </div>
         <div class="ig-l"><span>{{ tr('Line height') }}</span><span>{{ tr('Letter spacing') }}</span></div>
         <div class="ig">
-        <label class="sq fld" :title="tr('Line height')"><EditorIcon name="line_height" /><input v-if="!vb('lineHeight')" :key="'lh' + show(same(lhText))" :value="show(same(lhText))" :placeholder="same(lhText) === 'Mixed' ? tr('Mixed') : tr('Auto')" :aria-label="tr('Line height')" @change="setLineHeight" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
-        <label class="sq fld u" :title="tr('Letter spacing')"><EditorIcon name="letter_spacing" /><template v-if="!vb('letterSpacing')"><input :value="show(same((n) => n.style.letterSpacing ?? 0))" :placeholder="same((n) => n.style.letterSpacing ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Letter spacing')" @change="setStyleNum('letterSpacing', $event, -100)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('letterSpacing', d / 10, -100))"><span v-if="same((n) => n.style.letterSpacing ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['letterSpacing']" :bound="vb('letterSpacing')" reveal label="Letter spacing" @pick="(t) => pickNum('letterSpacing', t)" @unbind="unbind('letterSpacing')" @step="(d) => stepStyle('letterSpacing', d / 10, -100)" /></label>
+        <label class="sq fld" :title="tr('Line height')"><EditorIcon name="line_height" /><input v-if="!vb('lineHeight')" :key="'lh' + show(tsame('lineHeight', lhText))" :value="show(tsame('lineHeight', lhText))" :placeholder="tsame('lineHeight', lhText) === 'Mixed' ? tr('Mixed') : tr('Auto')" :aria-label="tr('Line height')" @change="setLineHeight" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('lineHeight', d, 1))"><TokenPicker :kinds="['lineHeight']" :bound="vb('lineHeight')" reveal label="Line height" @pick="(t) => pickNum('lineHeight', t)" @unbind="unbind('lineHeight')" @step="(d) => stepStyle('lineHeight', d, 1)" /></label>
+        <label class="sq fld u" :title="tr('Letter spacing')"><EditorIcon name="letter_spacing" /><template v-if="!vb('letterSpacing')"><input :value="show(tsame('letterSpacing', (n) => n.style.letterSpacing ?? 0))" :placeholder="tsame('letterSpacing', (n) => n.style.letterSpacing ?? 0) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Letter spacing')" @change="setStyleNum('letterSpacing', $event, -100)" @keydown="blurOnEnter($event); step($event, (d) => stepStyle('letterSpacing', d / 10, -100))"><span v-if="tsame('letterSpacing', (n) => n.style.letterSpacing ?? 0) !== 'Mixed'" class="unit">px</span></template><TokenPicker :kinds="['letterSpacing']" :bound="vb('letterSpacing')" reveal label="Letter spacing" @pick="(t) => pickNum('letterSpacing', t)" @unbind="unbind('letterSpacing')" @step="(d) => stepStyle('letterSpacing', d / 10, -100)" /></label>
           <span />
         </div>
       </template>

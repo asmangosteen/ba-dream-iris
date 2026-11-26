@@ -258,6 +258,7 @@ function exportCsv() {
               <span class="ellipsis">{{ project?.name ?? tr('Choose a project') }}</span><EditorIcon name="chevron_down" :size="12" />
             </button>
             <div v-if="pickOpen" class="sq menu pick-menu" role="menu" @click="pickOpen = false">
+              <div class="menu-sc">
               <template v-if="activeProjects.length">
                 <span class="menu-lbl">{{ tr('Active') }}</span>
                 <NuxtLink v-for="p in activeProjects" :key="p.id" :to="{ query: { p: p.id } }" role="menuitemradio" :aria-checked="p.id === projectId" :class="['sq', 'menu-item', { on: p.id === projectId }]"><span class="ellipsis">{{ p.name }}</span></NuxtLink>
@@ -267,6 +268,7 @@ function exportCsv() {
                 <span class="menu-lbl">{{ tr('Completed') }}</span>
                 <NuxtLink v-for="p in doneProjects" :key="p.id" :to="{ query: { p: p.id } }" role="menuitemradio" :aria-checked="p.id === projectId" :class="['sq', 'menu-item', { on: p.id === projectId }]"><span class="ellipsis">{{ p.name }}</span></NuxtLink>
               </template>
+              </div>
             </div>
           </div>
         </div>
@@ -398,10 +400,12 @@ function exportCsv() {
           <div ref="addRef" class="add">
             <button type="button" class="ib s" :aria-label="tr('Link a screen')" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><Icon name="plus" :size="14" /></button>
             <div v-if="addOpen" class="sq menu" role="menu">
+              <div class="menu-sc">
               <p v-if="!linkable.length" class="tx-meta menu-empty">{{ tr('No more screens to link') }}</p>
               <button v-for="s in linkable" :key="s.id" type="button" role="menuitem" class="sq menu-item" :title="s.name" @click="link(s.id)">
                 <span class="ellipsis">{{ s.name }}</span><span class="tx-meta menu-page">{{ s.page }}</span>
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -449,7 +453,8 @@ function exportCsv() {
 .pick-btn { display: flex; align-items: center; gap: var(--ref-spacing-03); max-width: 320px; height: 28px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-03); font-size: 13px; line-height: 20px; color: var(--sys-color-neutral-600); }
 .pick-btn:hover, .pick-btn[aria-expanded='true'] { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 .pick-btn :deep(.eic) { flex: none; color: var(--sys-color-neutral-500); }
-.pick-menu { left: 0; right: auto; top: calc(100% + 4px); width: 240px; max-height: 360px; overflow: auto; }
+.pick-menu { left: 0; right: auto; top: calc(100% + 4px); width: 240px; }
+.pick-menu .menu-sc { max-height: 344px; }
 /* 고른 프로젝트는 왼쪽 ✓ 칸(편집기 고르는 목록과 같아요) */
 .pick-menu .menu-item { padding-left: 26px; background-repeat: no-repeat; background-position: 8px center; background-size: 12px; }
 .menu-lbl { padding-left: 26px !important; }
@@ -508,7 +513,8 @@ function exportCsv() {
 .src { align-self: flex-start; }
 .no-link { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); }
 .add { position: relative; }
-.add .menu { left: auto; right: 0; width: 220px; max-height: 240px; overflow: auto; }
+.add .menu { left: auto; right: 0; width: 220px; }
+.add .menu .menu-sc { max-height: 224px; }
 .menu-item { justify-content: space-between; flex: none; }
 .menu-page { flex: none; }
 .menu-empty { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); }

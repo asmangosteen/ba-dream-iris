@@ -2,6 +2,8 @@
 import { clipsContent, isContainer, isVector, lineHeightCss, type ArrowHead, type LayerDoc } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { textShortcut } from '~/canvas/textKeys'
+import { applySpans, offsetOf, rangeOf, rangeValues, readEditable, runsHtml, type RunStyle } from '~/canvas/textRuns'
+import { useTextRange } from '~/composables/useTextRange'
 import { isVideoSrc, useImageSrc } from '~/canvas/images'
 import { GHOST_KEY, ZOOM_KEY } from '~/canvas/ghost'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
@@ -131,6 +133,18 @@ const textFill = computed(() => {
 })
 // 텍스트: 글머리 · 번호 목록 · 문단 간격은 고치지 않을 때만 줄 단위로 그려요
 const lines = computed(() => (n.value?.text ?? '').split('\n'))
+/** 글자 HTML(글자 구간 서식이 있으면 구간마다 span) — 고치는 칸 · 그냥 보이는 글자 모두 */
+const textHtml = computed(() => { const v = n.value; return v ? runsHtml(v.text ?? '', v.spans, v.style, color) : '' })
+/** 줄 단위(목록 · 문단 간격)로 그릴 때 i 번째 줄 HTML */
+const lineHtml = (i: number) => {
+  const v = n.value
+  if (!v) return ''
+  const ls = lines.value
+  let from = 0
+  for (let k = 0; k < i; k++) from += ls[k]!.length + 1
+  const html = runsHtml(v.text ?? '', v.spans, v.style, color, from, from + ls[i]!.length)
+  return html || '&nbsp;'
+}
 const blockText = computed(() => !editingThis.value && !!n.value && (!!n.value.style.list || !!n.value.style.paraSpacing))
 
 // 이미지: 채우는 방식 · 자르기
@@ -255,7 +269,7 @@ function peerList() {
   for (const x of store.xsel.value) add(x.sid, x.id)
   return out
 }
-const typed = (el: HTMLElement) => el.innerText.replace(/\n$/, '')
+const typed = (el: HTMLElement) => readEditable(el).text
 watch(editingThis, async (on) => {
   if (!on) return
   peers = peerList()
@@ -330,24 +344,148 @@ function textSize(el: HTMLElement) {
   const cs = getComputedStyle(el)
   return { w: parseFloat(cs.width) || el.offsetWidth, h: parseFloat(cs.height) || el.offsetHeight }
 }
+// ---------------------------------------------------------------------------
+// 고른 글자 구간(피그마처럼 글자마다 서식): 오른쪽 패널이 그 구간에만 적용해요
+// ---------------------------------------------------------------------------
+const textRange = useTextRange()
+/** 패널 · 팝오버 · 메뉴: 거기를 눌러도 편집은 이어지고 고른 글자는 하이라이트로 남아요 */
+const KEEP = 'aside, [role="dialog"], .paint-pop, .tp, .menu, .ctx, .esel-m'
+let parked = false
+let downKeep = false
+const HL = 'iris-text-sel'
+type HL = { set: (k: string, v: unknown) => void; delete: (k: string) => void }
+const highlights = () => (globalThis as unknown as { CSS?: { highlights?: HL } }).CSS?.highlights
+const HighlightCtor = () => (globalThis as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight
+function showHighlight(a: number, b: number) {
+  const el = textEl.value
+  const H = HighlightCtor()
+  if (!el || !H || b <= a) return
+  try { highlights()?.set(HL, new H(rangeOf(el, a, b))) } catch { /* 못 그려도 동작은 그대로 */ }
+}
+const hideHighlight = () => { try { highlights()?.delete(HL) } catch { /* 그대로 */ } }
+/** 지금 칸 안 글자 · 구간 + 고른 구간으로 패널 상태를 채워요 */
+function publish(a: number, b: number) {
+  const el = textEl.value
+  const v = n.value
+  if (!el || !v) return
+  const cur = readEditable(el)
+  textRange.value = { sid: props.screenId, id: props.id, start: a, end: b, values: rangeValues(v.style, cur.spans, cur.text.length, a, b), apply: applyRange }
+}
+function onSelChange() {
+  const el = textEl.value
+  const sel = window.getSelection()
+  if (!el || !sel || !sel.rangeCount || parked) return
+  const r = sel.getRangeAt(0)
+  // 칸 밖으로 옮겨 간 선택(패널 누르기 등)은 무시 — 고른 구간을 그대로 둬요
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return
+  const a = offsetOf(el, r.startContainer, r.startOffset), b = offsetOf(el, r.endContainer, r.endOffset)
+  if (b > a) publish(a, b)
+  else textRange.value = null
+}
+/** 패널에서 고친 값을 고른 글자에만: 칸의 지금 글자 · 구간을 기록하고(실행 취소 한 번), 다시 그린 뒤 고른 자리를 되살려요 */
+function applyRange(patch: RunStyle) {
+  const el = textEl.value
+  const r = textRange.value
+  if (!el || !r || !n.value) return
+  const cur = readEditable(el)
+  const keep = { a: r.start, b: r.end }
+  if (keep.a <= 0 && keep.b >= cur.text.length) {
+    // 글자 전부를 골랐으면 레이어 서식 자체를 바꿔요(그 키의 구간 덮어쓰기는 지워져요)
+    const base: Record<string, unknown> = { ...patch }
+    if ('lineHeight' in patch && !('lineHeightUnit' in patch)) base.lineHeightUnit = undefined
+    if (base.decoration === 'none') base.decoration = undefined
+    store.batch(() => {
+      store.update(props.screenId, [props.id], { text: cur.text, spans: cur.spans.length ? cur.spans : undefined })
+      store.style(props.screenId, [props.id], base as Partial<typeof n.value.style>)
+    })
+  } else {
+    const spans = applySpans(cur.text.length, cur.spans, keep.a, keep.b, patch)
+    store.update(props.screenId, [props.id], { text: cur.text, spans: spans.length ? spans : undefined })
+  }
+  nextTick(() => {
+    const e2 = textEl.value
+    if (!e2) return
+    // 글자 크기가 바뀌었을 수 있어요 — 상자 크기 다시 맞추기(기록 없이)
+    onInput()
+    if (parked) showHighlight(keep.a, keep.b)
+    else {
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(rangeOf(e2, keep.a, keep.b))
+    }
+    publish(keep.a, keep.b)
+  })
+}
+function onDocDown(e: PointerEvent) {
+  const t = e.target as HTMLElement | null
+  downKeep = !!t?.closest?.(KEEP)
+  if (!parked) return
+  if (textEl.value?.contains(t)) { parked = false; hideHighlight(); return }
+  if (downKeep) return
+  // 캔버스 다른 곳: 편집 끝
+  parked = false
+  hideHighlight()
+  finish()
+}
+function onBlur() {
+  // 패널 · 팝오버를 눌러서 빠져나간 것이고 고른 글자가 있으면: 편집은 그대로(고른 글자는 하이라이트로)
+  if (downKeep && textRange.value && textRange.value.id === props.id) {
+    parked = true
+    showHighlight(textRange.value.start, textRange.value.end)
+    return
+  }
+  finish()
+}
+function onParkedKey(e: KeyboardEvent) {
+  if (!parked || e.key !== 'Escape') return
+  const t = e.target as HTMLElement | null
+  if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
+  parked = false
+  hideHighlight()
+  finish()
+}
+function endRange() {
+  if (textRange.value?.id === props.id) textRange.value = null
+  parked = false
+  hideHighlight()
+}
+watch(editingThis, (on) => {
+  if (on) {
+    document.addEventListener('selectionchange', onSelChange)
+    document.addEventListener('pointerdown', onDocDown, true)
+    window.addEventListener('keydown', onParkedKey, true)
+  } else {
+    document.removeEventListener('selectionchange', onSelChange)
+    document.removeEventListener('pointerdown', onDocDown, true)
+    window.removeEventListener('keydown', onParkedKey, true)
+    endRange()
+  }
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', onSelChange)
+  document.removeEventListener('pointerdown', onDocDown, true)
+  window.removeEventListener('keydown', onParkedKey, true)
+  endRange()
+})
 function finish() {
   const el = textEl.value
   if (!el || !n.value) return
   // 치는 동안 맞춘 크기는 되돌려 두고, 아래 update 한 번으로 기록해요(실행 취소하면 처음 크기로)
   if (orig) { n.value.w = orig.w; n.value.h = orig.h; orig = null }
-  const text = typed(el)
+  const { text, spans } = readEditable(el)
+  endRange()
   store.editing.value = null
   // 함께 고른 글자: 원래 글자로 돌려 둔 뒤 아래에서 한 번에 기록
   const ps = peers
   peers = []
   for (const p of ps) { const pn = store.doc(p.sid).nodes[p.id]; if (pn) pn.text = p.text }
   if (!text.trim()) { store.remove(props.screenId, [props.id]); return }
-  const patch: Record<string, unknown> = { text }
+  const patch: Record<string, unknown> = { text, spans: spans.length ? spans : undefined }
   const r2 = (v: number) => Math.round(v * 100) / 100
   const sz = textSize(el)
   if (n.value.style.autoWidth) { patch.w = r2(sz.w); patch.h = r2(sz.h) }
   else if (n.value.sizeV !== 'fixed') patch.h = r2(sz.h)
-  const self = () => { if (text !== n.value?.text || patch.w !== n.value?.w || patch.h !== n.value?.h) store.update(props.screenId, [props.id], patch) }
+  const self = () => { if (text !== n.value?.text || JSON.stringify(patch.spans ?? []) !== JSON.stringify(n.value?.spans ?? []) || patch.w !== n.value?.w || patch.h !== n.value?.h) store.update(props.screenId, [props.id], patch) }
   const others = ps.filter((p) => p.text !== text)
   if (!others.length) { self(); return }
   store.batch(() => {
@@ -366,6 +504,14 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' || (e.key === 'Enter' && mod)) { e.preventDefault(); (e.target as HTMLElement).blur() }
   // Tab: 편집에서 빠져나가지 않고 탭 글자(피그마와 같아요)
   else if (e.key === 'Tab' && !mod && !e.altKey) { e.preventDefault(); document.execCommand('insertText', false, '\t') }
+  // 글자를 골랐으면 ⌘B · ⌘U · ⇧⌘X 는 고른 글자에만(피그마와 같아요)
+  else if (mod && !e.altKey && textRange.value?.id === props.id && ((!e.shiftKey && (e.code === 'KeyB' || e.code === 'KeyU')) || (e.shiftKey && e.code === 'KeyX'))) {
+    e.preventDefault()
+    const v = textRange.value.values
+    if (e.code === 'KeyB') applyRange({ fontWeight: v.fontWeight !== 'Mixed' && Number(v.fontWeight) >= 600 ? 400 : 700 })
+    else if (e.code === 'KeyU') applyRange({ decoration: v.decoration === 'underline' ? ('none' as never) : 'underline' })
+    else applyRange({ decoration: v.decoration === 'strike' ? 'none' as never : 'strike' })
+  }
   // 글자 단축키(⌘B · ⌘U · 정렬 · 크기 · 목록 등): 브라우저 서식 대신 레이어에
   else if (textShortcut(e, store, props.screenId, [props.id])) e.preventDefault()
   // 브라우저 서식(⌘I 등)은 저장되지 않아서 막아요
@@ -398,9 +544,9 @@ function onKey(e: KeyboardEvent) {
     <img v-else-if="n.type === 'image'" :src="imageSrc(n.src)" alt="" draggable="false" :style="imgStyle">
     <template v-else-if="n.type === 'text'">
       <component :is="n.style.list === 'number' ? 'ol' : 'ul'" v-if="blockText && n.style.list" class="txt list" :style="textFill">
-        <li v-for="(l, i) in lines" :key="i" :style="{ marginBottom: n.style.paraSpacing ? n.style.paraSpacing + 'px' : undefined }">{{ l || '&nbsp;' }}</li>
+        <li v-for="(l, i) in lines" :key="i" :style="{ marginBottom: n.style.paraSpacing ? n.style.paraSpacing + 'px' : undefined }" v-html="lineHtml(i)" />
       </component>
-      <span v-else-if="blockText" ref="blockEl" class="txt" :style="textFill"><span v-for="(l, i) in lines" :key="i" class="para" :style="{ marginBottom: i < lines.length - 1 ? n.style.paraSpacing + 'px' : undefined }">{{ l || '&nbsp;' }}</span></span>
+      <span v-else-if="blockText" ref="blockEl" class="txt" :style="textFill"><span v-for="(l, i) in lines" :key="i" class="para" :style="{ marginBottom: i < lines.length - 1 ? n.style.paraSpacing + 'px' : undefined }" v-html="lineHtml(i)" /></span>
       <span
         v-else
         ref="textEl"
@@ -408,12 +554,13 @@ function onKey(e: KeyboardEvent) {
         :style="editingThis ? undefined : textFill"
         :contenteditable="editingThis ? 'true' : 'false'"
         spellcheck="false"
-        @blur="editingThis && finish()"
+        @blur="editingThis && onBlur()"
         @keydown="editingThis && onKey($event)"
         @input="editingThis && onInput()"
         @paste="editingThis && onPaste($event)"
         @pointerdown="editingThis && $event.stopPropagation()"
-      >{{ n.text }}</span>
+        v-html="textHtml"
+      />
     </template>
     <template v-else-if="vec">
       <div v-if="vec.fill" class="vfill" :style="vec.fill" />

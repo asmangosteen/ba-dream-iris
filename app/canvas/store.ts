@@ -3,6 +3,7 @@ import { relayout as layoutDoc, constrain, boxes0 } from './layout'
 import { guessAxis, currentGap, rowsOf } from './geom'
 import { shapeVnet } from './vector'
 import { radiiOf } from './paint'
+import { stripChanged, stripRuns } from './textRuns'
 import { booleanLoops, flattenLoops, flattenable, loopsVnet } from './boolean'
 import { scaledStyle } from './scale'
 import { newSmoothing } from './prefs'
@@ -386,12 +387,16 @@ export function createLayerStore(opts: {
     mutate(sid, (d) => {
       for (const id of ids) {
         const n = d.nodes[id]
-        if (n) Object.assign(n, typeof patch === 'function' ? patch(n) : patch)
+        if (!n) continue
+        const before = n.style
+        Object.assign(n, typeof patch === 'function' ? patch(n) : patch)
+        // 글자 레이어 전체 서식을 바꾸면 그 키의 글자 구간 덮어쓰기는 지워요(피그마와 같아요)
+        if (n.style !== before) stripChanged(n, before)
       }
     })
   }
   function style(sid: string, ids: string[], s: Partial<LayerStyle>) {
-    withX(sid, ids, (s2, ids2) => mutate(s2, (d) => { for (const id of ids2) { const n = d.nodes[id]; if (n) n.style = { ...n.style, ...s } } }))
+    withX(sid, ids, (s2, ids2) => mutate(s2, (d) => { for (const id of ids2) { const n = d.nodes[id]; if (n) { n.style = { ...n.style, ...s }; stripRuns(n, Object.keys(s)) } } }))
   }
   /**
    * 변수(토큰) 연결 · 풀기. patch 로 실제 값도 함께 써 넣습니다(연결해도 그리기 · 내보내기는 그 값을 씀).
@@ -413,6 +418,7 @@ export function createLayerStore(opts: {
         }
         n.style = { ...n.style, ...p?.style, vars: Object.keys(vars).length ? vars : undefined }
         if (!n.style.vars) delete n.style.vars
+        if (p?.style) stripRuns(n, Object.keys(p.style))
       }
     }))
   }
@@ -1006,7 +1012,7 @@ export function createLayerStore(opts: {
       const id = newId()
       const sib = siblings(d, parentId)
       const at = Math.max(...same.map((k) => sib.indexOf(k)))
-      d.nodes[id] = { ...(kind === 'group' ? { group: true } : {}), id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? nextLabel('Group', d) : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { fill: '#FFFFFF', clip: true } }
+      d.nodes[id] = { ...(kind === 'group' ? { group: true } : {}), id, type: kind === 'section' ? 'section' : 'frame', name: kind === 'group' ? nextLabel('Group', d) : nextName(d, kind === 'section' ? 'section' : 'frame'), parentId, x: x0 - p.x, y: y0 - p.y, w: x1 - x0, h: y1 - y0, children: [], style: kind === 'group' ? { clip: false } : kind === 'section' ? { ...DEFAULT_STYLE.section } : { clip: true } } // 감싸서 만든 프레임(⌥⌘G · 여럿에 ⇧A)은 칠 없음 — 안의 내용이 가려지지 않게(피그마와 같아요)
       sib.splice(at + 1, 0, id)
       for (const b of boxes.sort((a, c) => sib.indexOf(a.id) - sib.indexOf(c.id))) {
         sib.splice(sib.indexOf(b.id), 1)

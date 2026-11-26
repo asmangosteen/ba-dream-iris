@@ -2,6 +2,7 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { showsTabs, useTabReload } from '~/composables/useTabs'
 import ContextMenu from '~/components/editor/ContextMenu.vue'
+import AppBoot from '~/components/app/AppBoot.vue'
 
 useThemeHead()
 useLangHead()
@@ -22,5 +23,7 @@ const pageKey = (r: RouteLocationNormalizedLoaded) => {
     <NuxtPage :page-key="pageKey" />
     <!-- 우클릭 메뉴는 앱에 하나(탭 막대 · 편집기 모두) -->
     <ContextMenu />
+    <!-- 들어올 때 늘 보이는 로딩 화면(로그인돼 있어도 — 편집기는 자기 로딩 화면) -->
+    <AppBoot />
   </div>
 </template>

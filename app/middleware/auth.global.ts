@@ -11,8 +11,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (useDevPreview()) return
   if (to.path === '/confirm') return
-  // 랜딩(로그인 전 첫 화면)은 누구나 볼 수 있음. Sign in 을 누르면 /login
-  if (to.path === '/welcome') return
+  // 랜딩(로그인 전 첫 화면): 로그인돼 있으면 바로 프로젝트 홈으로(들어올 때 로딩 화면 — AppBoot). Sign in 을 누르면 /login
+  if (to.path === '/welcome') {
+    if (user.value) return navigateTo('/')
+    return
+  }
   if (to.path === '/login') {
     if (user.value) return navigateTo('/')
     return

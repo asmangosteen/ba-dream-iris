@@ -18,6 +18,8 @@ const up = ref(false)
 const active = ref(-1)
 const root = ref<HTMLElement | null>(null)
 const list = ref<HTMLElement | null>(null)
+/** 메뉴 바깥 상자(자리 맞추기 · 포커스 확인) — 스크롤은 안쪽 list 만 */
+const menuEl = ref<HTMLElement | null>(null)
 const uid = useId()
 /** 메뉴를 닫을 때 포커스를 버튼으로 돌려줘요(항목을 눌러 포커스가 메뉴 안으로 갔을 때도) */
 const focusTrigger = () => (root.value?.querySelector(':scope > button') as HTMLElement | null)?.focus()
@@ -27,7 +29,7 @@ function toggle() { open.value ? close() : show() }
 /** 메뉴가 사이드바 · 설정 창 밖으로 나가면(오른쪽 칸의 메뉴 등) 안쪽 8 에 맞게 당겨요 — 밖으로 나가면 패널이 옆으로 밀려 스크롤돼요 */
 const shift = ref<Record<string, string>>({})
 function fit() {
-  const m = list.value
+  const m = menuEl.value
   if (!m) return
   const box = root.value?.closest('aside, [role="dialog"], .float')?.getBoundingClientRect() ?? { left: 0, right: window.innerWidth }
   const r = m.getBoundingClientRect()
@@ -63,7 +65,7 @@ function show() {
 }
 function close(refocus = false) {
   if (!open.value) return
-  const inside = !!list.value?.contains(document.activeElement)
+  const inside = !!menuEl.value?.contains(document.activeElement)
   open.value = false
   if (refocus || inside) focusTrigger()
 }
@@ -112,7 +114,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
       <EditorIcon name="chevron_down" :size="12" class="cv" />
     </button>
     <button v-else type="button" :class="['ib', 's24', { on: open }]" :aria-label="aria" :data-tip="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle"><slot /></button>
-    <div v-if="open" :id="uid" ref="list" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline' }]" :style="shift" role="listbox" :aria-label="aria">
+    <!-- 바깥(검은 바탕 · 테두리)은 그대로, 안쪽 목록만 스크롤 — 바탕을 그리는 ::before 가 내용과 함께 스크롤되어 아래 행이 바탕 밖으로 튀어나오던 문제 -->
+    <div v-if="open" :id="uid" ref="menuEl" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline' }]" :style="shift" role="listbox" :aria-label="aria">
+      <div ref="list" class="menu-sc esel-sc">
       <template v-for="(o, i) in options" :key="o.value">
         <div v-if="o.sep && i > 0" class="msep" role="separator" />
         <button
@@ -130,6 +134,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
           <span class="l">{{ L(o.label, o.raw) }}</span>
         </button>
       </template>
+      </div>
     </div>
   </div>
 </template>
@@ -139,7 +144,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 .dd .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd .v.ph { color: var(--sys-color-neutral-500); }
 .dd .cv { flex: none; color: var(--sys-color-neutral-500); }
-.esel-m { font-weight: 400; text-align: left; bottom: auto; height: auto; left: 0; right: auto; min-width: 100%; width: max-content; max-width: 240px; max-height: 320px; overflow-x: hidden; overflow-y: auto; }
+.esel-m { font-weight: 400; text-align: left; bottom: auto; height: auto; left: 0; right: auto; min-width: 100%; width: max-content; max-width: 240px; }
+/* 스크롤은 안쪽만(.menu-sc, main.css) — 바깥 높이 최대 320(안쪽 여백 8 · 8 빼고 304) */
+.esel-sc { max-height: 304px; }
 .esel-m.up { top: auto; bottom: calc(100% + 4px); }
 .esel-m.right { left: auto; right: 0; min-width: 160px; }
 /* 칸 안 글자 버튼의 메뉴는 칸(.fld) 왼쪽 끝 · 아래에 맞춰 열려요 */

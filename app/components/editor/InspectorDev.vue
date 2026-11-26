@@ -52,6 +52,13 @@ const tokenUse = computed(() => {
       if (v.startsWith('token:')) add(v.slice(6), store.color(v))
       else raw.set(v.toUpperCase(), (raw.get(v.toUpperCase()) ?? 0) + 1)
     }
+    // 글자마다 다른 색(글자 구간 서식)도
+    for (const sp of n.spans ?? []) {
+      const v = sp.style.color
+      if (!v) continue
+      if (v.startsWith('token:')) add(v.slice(6), store.color(v))
+      else raw.set(v.toUpperCase(), (raw.get(v.toUpperCase()) ?? 0) + 1)
+    }
   }
   return { tokens: [...tk.entries()].map(([name, e]) => ({ name, n: e.n, value: e.value })), raw: [...raw.keys()] }
 })
