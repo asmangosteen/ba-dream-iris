@@ -55,17 +55,20 @@ function follow(p: Peer) { emit('follow', props.following === p.key ? null : p.k
 .ring { position: relative; display: grid; place-items: center; border-radius: 50%; box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis), 0 0 0 3.5px var(--c); }
 .stack .ring + .ring { margin-left: -4px; }
 .ring.away { opacity: .45; }
+.list .ring { box-shadow: 0 0 0 2px #1E1E1E, 0 0 0 3.5px var(--c); }
 .ring.fol { box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis), 0 0 0 4px var(--c); }
 .more { width: 20px; height: 20px; font-size: 10px; font-weight: 600; background: var(--sys-color-neutral-200); color: var(--sys-color-neutral-700); --c: transparent; }
-.list { top: calc(100% + 6px); left: auto; right: 0; width: 280px; z-index: 30; padding: var(--ref-spacing-02); }
-.hd { height: 32px; display: flex; align-items: center; padding: 0 var(--ref-spacing-06); }
+/* 앱 공용 검은 메뉴(main.css .menu) — 패널 안쪽으로 열려요(왼쪽 끝 맞춤, 패널 폭 288 안) */
+.list { top: calc(100% + 6px); left: 0; right: auto; width: 256px; z-index: 30; }
+.hd { height: 28px; display: flex; align-items: center; padding: 0 var(--ref-spacing-06); }
+.hd .tx-head { color: #FFFFFF; }
 .row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 44px; padding: 0 var(--ref-spacing-06); }
 .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.who b { font-weight: 500; color: var(--sys-color-neutral-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.who > span { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fbtn { flex: none; height: 28px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: var(--sys-color-brand-primary-default); }
-.fbtn:hover:not(:disabled) { --sq-fill: var(--sys-color-neutral-100); }
-.fbtn:disabled { color: var(--sys-color-neutral-400); }
-.fbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.who b { font-weight: 500; color: #FFFFFF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who > span { font-size: 11px; line-height: 16px; color: rgb(255 255 255 / 70%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fbtn { flex: none; height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: #FFFFFF; --sq-fill: rgb(255 255 255 / 12%); }
+.fbtn:hover:not(:disabled) { --sq-fill: var(--iris-select, #0E97FC); }
+.fbtn:disabled { color: rgb(255 255 255 / 40%); --sq-fill: transparent; }
+.fbtn:focus-visible { outline: 2px solid var(--iris-select, #0E97FC); outline-offset: 1px; }
 .note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); font-size: 11px; line-height: 16px; }
 </style>
