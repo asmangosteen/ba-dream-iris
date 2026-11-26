@@ -95,7 +95,8 @@ function createProject() { newOpen.value = true }
 .no-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-06); }
 .ghost { width: 44px; height: 72px; border-radius: 6px; --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; --sq-fill: var(--sys-color-common-white-default); }
 .proj:focus-visible { outline: 0; }
-.proj:focus-visible .thumb { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
+/* 카드 포커스: Tab 으로 옮길 때만(전역 kbd-nav), 1.5px squircle 선 */
+:global(html.kbd-nav) .proj:focus-visible .thumb { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; }
 .proj:hover .name { color: var(--sys-color-neutral-900, var(--sys-color-neutral-800)); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--ref-color-gray-900-20); }
 .thumb { transition: box-shadow .12s ease; }
 /* 카드 ⋮ 버튼: 흰 바탕 + 1px 테두리(썸네일 그림 위에서도 버튼 경계가 보이게), 올리면 테두리 진하게.

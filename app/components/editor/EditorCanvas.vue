@@ -3503,7 +3503,21 @@ function insertInstance(component: string, at?: { x: number; y: number }) {
   const fixed = INSERT_SIZE[component]
   // 가운데에 여러 번 넣으면 조금씩 비켜서
   const nudge = at ? 0 : (Object.values(store.doc(target.id).nodes).filter((n) => n.type === 'instance').length % 8) * 16
-  store.add(target.id, parentId, { type: 'instance', name: component, component, props: {}, x: full ? 0 : Math.round(lx - p.x + nudge), y: Math.round(ly - p.y + nudge), w: fixed ? fixed.w : full ? pw ?? 375 : 120, h: fixed?.h ?? 48, sizeH: full || fixed ? undefined : 'hug', sizeV: fixed?.h ? undefined : 'hug' })
+  const w0 = fixed ? fixed.w : full ? pw ?? 375 : 120, h0 = fixed?.h ?? 48
+  // 끌어 놓기(at): 놓은 자리가 가운데(사용자 요청 — 왼쪽 위가 아니라). 부모 안 좌표
+  const cx = lx - p.x, cy = ly - p.y
+  const sid = target.id
+  const id = store.add(sid, parentId, { type: 'instance', name: component, component, props: {}, x: full ? 0 : Math.round(at ? cx - w0 / 2 : cx + nudge), y: Math.round(at ? cy - h0 / 2 : cy + nudge), w: w0, h: h0, sizeH: full || fixed ? undefined : 'hug', sizeV: fixed?.h ? undefined : 'hug' })
+  // 내용 크기(Hug)는 그려진 뒤 정해져요 — 크기가 정해지면 다시 가운데로(기록 없이 자리만, 잠깐 동안만 지켜봐요)
+  if (at) {
+    const stop = watch(() => { const n = store.node(sid, id); return n ? `${n.w}x${n.h}` : '' }, () => {
+      const n = store.node(sid, id)
+      if (!n) return
+      if (!full) n.x = Math.round(cx - n.w / 2)
+      n.y = Math.round(cy - n.h / 2)
+    })
+    setTimeout(stop, 1500)
+  }
   tool.value = 'move'
 }
 /** 화면(프레임) 자체의 모양: 채우기 · 선(안쪽) · 모서리 · 투명도 · 내용 자르기 */

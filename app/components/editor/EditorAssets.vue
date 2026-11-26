@@ -85,7 +85,7 @@ async function copyCode() {
       <section v-for="g in groups" :key="g.label" class="grp-sec">
         <span class="glabel">{{ tr(g.label) }}</span>
         <div class="grid">
-          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="tr('View {name} details', { name: c.name })" :title="exportName(c) ? tr('Drag onto the canvas') : undefined" :draggable="exportName(c) ? 'true' : 'false'" @dragstart="(e) => { const n = exportName(c); if (n) onDrag(e, n); else e.preventDefault() }" @click="emit('update:open', c.id)">
+          <button v-for="c in g.items" :key="c.id" class="tile" :aria-label="tr('View {name} details', { name: c.name })" :title="exportName(c) ? tr('Drag onto the canvas') : undefined" :draggable="exportName(c) ? 'true' : 'false'" @dragstart="(e) => { const n = exportName(c); if (n) onDrag(e, n); else e.preventDefault() }" @click="emit('update:open', c.id)"><i class="sq tring" aria-hidden="true" />
             <span class="sq sq-clip asset-thumb" data-preview><DsPreview :names="[c.name, c.code_name, ...(c.match_aliases ?? [])]" :label="c.name" /></span>
             <span class="tname" :title="c.name">{{ c.name }}</span>
           </button>
@@ -166,7 +166,11 @@ async function copyCode() {
 .asset-thumb :deep(.pv) { position: absolute; left: 0; top: 0; width: 166.67%; height: 166.67%; transform: scale(.6); transform-origin: 0 0; }
 .asset-thumb { overflow: hidden; height: 80px; border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; display: grid; place-items: center; margin-bottom: var(--ref-spacing-04); }
 .tile { text-align: left; border-radius: var(--ref-radius-04); }
-.tile:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+/* 카드 포커스(Tab 으로 옮길 때만 — 전역 kbd-nav): 바깥 3px 띄운 squircle 1.5px 선(outline 은 squircle 이 안 돼서 선 층으로) */
+.tile { position: relative; }
+.tile:focus-visible { outline: none; }
+.tring { position: absolute; inset: -3px; border-radius: calc(var(--ref-radius-04) + 3px); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; pointer-events: none; opacity: 0; }
+:global(html.kbd-nav) .tile:focus-visible > .tring { opacity: 1; }
 .tile:active > .asset-thumb { --sq-overlay: var(--interaction-light-gray-pressed); }
 .empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); }
 .self-start { align-self: flex-start; }
