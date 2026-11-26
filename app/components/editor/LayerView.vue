@@ -651,5 +651,5 @@ function onKey(e: KeyboardEvent) {
 /* 섹션 이름: 피그마처럼 안쪽 왼쪽 위 이름표. 확대와 상관없이 같은 크기 */
 .sec-name { position: absolute; left: calc(8px / var(--z, 1)); top: calc(8px / var(--z, 1)); padding: calc(2px / var(--z, 1)) calc(6px / var(--z, 1)); border-radius: calc(4px / var(--z, 1)); background: rgb(255 255 255 / 85%); font-size: calc(11px / var(--z, 1)); line-height: calc(16px / var(--z, 1)); font-weight: 500; color: #202837; white-space: nowrap; z-index: 2; cursor: default; }
 .sec-in { width: calc(160px / var(--z, 1)); padding: 0; border: 0; outline: none; background: transparent; font: inherit; color: inherit; }
-.sec-name:has(.sec-in) { box-shadow: 0 0 0 calc(1px / var(--z, 1)) #0D99FF; background: #FFFFFF; pointer-events: auto; }
+.sec-name:has(.sec-in) { box-shadow: 0 0 0 calc(1px / var(--z, 1)) #0E97FC; background: #FFFFFF; pointer-events: auto; }
 </style>

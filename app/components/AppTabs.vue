@@ -352,7 +352,7 @@ function onFocusIn(e: FocusEvent) {
 /* 핀: 아이콘 안쪽 여백만큼 왼쪽을 2 당겨요 — 홈 · 탭 사이 간격과 눈으로 맞게 */
 .pinic { margin-left: -2px; }
 /* 이름 바꾸기(탭 두 번 누르기 · 메뉴 'Rename file') */
-.ren { flex: 1; min-width: 0; height: 24px; margin-left: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04); border: 0; font: inherit; color: var(--sys-color-neutral-800); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-select, #0D99FF); --sq-line-w: 1px; outline: none; }
+.ren { flex: 1; min-width: 0; height: 24px; margin-left: var(--ref-spacing-06); padding: 0 var(--ref-spacing-04); border: 0; font: inherit; color: var(--sys-color-neutral-800); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-select, #0E97FC); --sq-line-w: 1px; outline: none; }
 /* 링크 복사 등 짧은 알림: 탭 막대 아래 가운데 */
 .note { position: fixed; left: 50%; top: calc(var(--iris-tabs-h, 44px) + 12px); transform: translateX(-50%); z-index: 100; padding: 6px 12px; border-radius: var(--ref-radius-04); --sq-fill: #1E1E1E; color: #FFFFFF; font-size: 12px; line-height: 16px; pointer-events: none; }
 /* + 뒤 빈 곳(두 번 누르면 새 탭): 탭이 넘치면 0 까지 줄어 + 가 홈과 같은 여백(막대 끝 8)에 붙어요 */

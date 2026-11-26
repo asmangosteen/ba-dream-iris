@@ -1041,7 +1041,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .ct { position: absolute; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 3px; }
 .ct > i { display: block; border-radius: 1px; background: var(--sys-color-neutral-400); }
 .ct:hover > i { background: var(--sys-color-neutral-700); }
-.ct.on > i, .ct.on:hover > i { background: var(--iris-select, #0D99FF); }
+.ct.on > i, .ct.on:hover > i { background: var(--iris-select, #0E97FC); }
 .ct:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 0; }
 .ct.l { left: calc(50% - 50px); top: calc(50% - 10px); width: 20px; height: 20px; } .ct.r { left: calc(50% + 30px); top: calc(50% - 10px); width: 20px; height: 20px; }
 .ct.l > i, .ct.r > i { width: 10px; height: 2px; }
@@ -1051,7 +1051,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .ct.ch { left: calc(50% - 27px); top: calc(50% - 5px); width: 54px; height: 10px; } .ct.ch > i { width: 14px; height: 2px; }
 .ct.cv { left: calc(50% - 5px); top: calc(50% - 11px); width: 10px; height: 22px; } .ct.cv > i { width: 2px; height: 14px; }
 .ct.cc { left: calc(50% - 6px); top: calc(50% - 6px); width: 12px; height: 12px; border-radius: 2px; }
-.ct.cc:hover { background: color-mix(in srgb, var(--iris-select, #0D99FF) 22%, transparent); }
+.ct.cc:hover { background: color-mix(in srgb, var(--iris-select, #0E97FC) 22%, transparent); }
 /* 글자 버튼(AG · Butt · Fill …): 묶음 안에서 칸 폭을 나눠 가져요 */
 .txt-b { width: auto; min-width: 24px; padding: 0 var(--ref-spacing-02); font-size: 11px; font-weight: 500; }
 /* 블렌드 ▾ 버튼도 머리의 다른 아이콘 버튼처럼 24 */

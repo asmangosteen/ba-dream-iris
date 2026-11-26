@@ -214,17 +214,17 @@ const seg = (g: { axis: 'x' | 'y'; f: GuideFrame | null }) => (!g.f ? null : g.a
 <style scoped>
 .rul { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
 .guide { position: absolute; pointer-events: auto; }
-.guide::after { content: ''; position: absolute; background: var(--g-c, #F24822); }
+.guide::after { content: ''; position: absolute; background: var(--g-c, #F04A26); }
 .gx { top: 0; bottom: 0; width: 7px; margin-left: -3px; cursor: ew-resize; }
 .gx::after { left: 3px; top: 0; bottom: 0; width: 1px; }
 .gy { left: 0; right: 0; height: 7px; margin-top: -3px; cursor: ns-resize; }
 .gy::after { top: 3px; left: 0; right: 0; height: 1px; }
 .live { pointer-events: none; }
 /* 끄는 중인 프레임 가이드선: 밖은 점선(4 · 4), 프레임 위(.seg)는 실선 */
-.guide.fr::after { background: repeating-linear-gradient(var(--g-dir), var(--g-c, #F24822) 0 4px, transparent 4px 8px); }
+.guide.fr::after { background: repeating-linear-gradient(var(--g-dir), var(--g-c, #F04A26) 0 4px, transparent 4px 8px); }
 .gx.fr { --g-dir: to bottom; }
 .gy.fr { --g-dir: to right; }
-.seg { position: absolute; background: var(--g-c, #F24822); pointer-events: none; }
+.seg { position: absolute; background: var(--g-c, #F04A26); pointer-events: none; }
 .gx .seg { left: 3px; width: 1px; }
 .gy .seg { top: 3px; height: 1px; }
 /* 올리면 조금 굵게 — 프레임 가이드선은 점선 사이를 메우지 않게 실선 부분만 */
@@ -232,7 +232,7 @@ const seg = (g: { axis: 'x' | 'y'; f: GuideFrame | null }) => (!g.f ? null : g.a
 .gx.thin::after { transform: scaleX(0.5); }
 .gy.thin::after { transform: scaleY(0.5); }
 .guide.thin:hover::after { transform: none; }
-.guide.gsel { --g-c: var(--iris-select, #0D99FF); }
+.guide.gsel { --g-c: var(--iris-select, #0E97FC); }
 .bar { position: absolute; background: var(--sys-color-common-white-default); pointer-events: auto; font-family: var(--font-family-base); color: var(--sys-color-neutral-500); overflow: hidden; }
 .bar.top { top: 0; height: 18px; box-shadow: 0 1px 0 var(--iris-line); cursor: ns-resize; }
 .bar.left { top: 0; bottom: 0; left: 0; width: 18px; box-shadow: 1px 0 0 var(--iris-line); cursor: ew-resize; }
@@ -244,12 +244,12 @@ const seg = (g: { axis: 'x' | 'y'; f: GuideFrame | null }) => (!g.f ? null : g.a
 .top .lb { top: 1px; }
 .left .lb { left: 1px; writing-mode: vertical-rl; transform: rotate(180deg); }
 /* 가이드선 숫자: 빨강 500, 선 오른쪽(아래)에 흰 바탕 */
-.lb.gm { color: #F24822; font-weight: 500; background: var(--sys-color-common-white-default); padding: 0 2px; margin-left: 2px; }
+.lb.gm { color: #F04A26; font-weight: 500; background: var(--sys-color-common-white-default); padding: 0 2px; margin-left: 2px; }
 .left .lb.gm { margin: 2px 0 0; }
-.band { position: absolute; background: color-mix(in srgb, var(--iris-select, #0D99FF) 14%, transparent); }
+.band { position: absolute; background: color-mix(in srgb, var(--iris-select, #0E97FC) 14%, transparent); }
 .top .band { top: 0; bottom: 0; }
 .left .band { left: 0; right: 0; }
-.lb.sv { color: var(--iris-select, #0D99FF); font-weight: 500; background: var(--sys-color-common-white-default); padding: 0 2px; }
+.lb.sv { color: var(--iris-select, #0E97FC); font-weight: 500; background: var(--sys-color-common-white-default); padding: 0 2px; }
 .top .lb.sv.end { transform: translateX(-100%); }
 .left .lb.sv.end { transform: rotate(180deg) translateY(100%); }
 </style>

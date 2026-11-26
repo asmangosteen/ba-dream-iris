@@ -3790,7 +3790,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
 </template>
 
 <style scoped>
-.canvas { --iris-select: #0D99FF; --iris-measure: #F24822; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
+.canvas { --iris-select: #0E97FC; --iris-measure: #F04A26; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
 /* 움직이는 동안만 GPU 층으로(부드럽게), 멈추면 풀어서 확대 비율대로 다시 그려요 — 글자 · 도형이 늘 선명한 벡터 */
 .world.moving { will-change: transform; }

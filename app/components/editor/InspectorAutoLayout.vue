@@ -232,7 +232,7 @@ const isOn = (col: number, row: number) => {
 .dot:hover .pt, .dot.on .pt { display: none; }
 .dot:hover .bars, .dot.on .bars { display: flex; }
 .dot:hover { color: var(--sys-color-neutral-500); }
-.dot.on { color: var(--iris-select, #0D99FF); }
+.dot.on { color: var(--iris-select, #0E97FC); }
 /* 간격 Auto: 고른 줄의 세 칸에 막대 하나씩(양끝은 길게, 가운데는 짧게) — 피그마와 같아요 */
 .spread .dot.on .bars > i:nth-child(n + 2) { display: none; }
 .spread .dot.vt.on .bars > i:first-child { width: 12px; } .spread .dot.vt.on.r1 .bars > i:first-child { width: 6px; }
