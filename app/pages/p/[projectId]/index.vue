@@ -375,6 +375,9 @@ watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
 }, { deep: true })
 watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
 watch(following, (k) => { followVp = null; if (k) { const p = room.people.value.find((x) => x.key === k); if (p) say(tr('Following {name}', { name: p.name })) } })
+/** 따라가는 사람(편집기 테두리를 그 사람 색으로) */
+const followPeer = computed(() => (following.value ? room.peers.value.find((p) => p.key === following.value) ?? null : null))
+watch(followPeer, (p) => { if (following.value && !p) following.value = null }) // 그 사람이 나가면 멈춤
 function stopFollowKey(e: KeyboardEvent) { if (e.key === 'Escape' && following.value) following.value = null }
 onMounted(() => window.addEventListener('keydown', stopFollowKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', stopFollowKey))
@@ -1417,6 +1420,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @reply="replyComment" @resolve="resolveComment" @remove="(r) => (confirmThread = r)"
     />
     <div v-if="commentMode" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
+    <div v-if="followPeer" class="follow-ring" :style="{ '--c': followPeer.color }" aria-hidden="true" />
     <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
@@ -1715,6 +1719,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
 <style scoped>
 .editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
+/* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
+.follow-ring { position: absolute; inset: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
