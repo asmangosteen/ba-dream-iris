@@ -50,8 +50,8 @@ const frameName = (t: Thread) => props.screens.find((s) => s.id === t.root.scree
 const host = ref<HTMLElement | null>(null)
 function boxAt(w: { x: number; y: number }) {
   const W = host.value?.clientWidth ?? 1200, H = host.value?.clientHeight ?? 800
-  const left = Math.min(sx(w.x) + 36, W - 300 - 320 - 16)
-  const top = Math.max(56, Math.min(sy(w.y) - 28, H - 360))
+  const left = Math.min(sx(w.x) + 44, W - 300 - 320 - 16)
+  const top = Math.max(56, Math.min(sy(w.y) - 36, H - 360))
   return { left: Math.max(264, left) + 'px', top: top + 'px' }
 }
 
@@ -77,17 +77,17 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
     <button
       v-for="p in pins" :key="p.t.root.id" type="button"
       :class="['pin', { on: p.t.root.id === openId, unread: p.t.unread, done: !!p.t.root.resolved_at }]"
-      :style="{ left: sx(p.w.x) + 'px', top: sy(p.w.y) - 28 + 'px' }"
+      :style="{ left: sx(p.w.x) + 'px', top: sy(p.w.y) - 36 + 'px' }"
       :aria-label="tr('Comment #{no} by {name}', { no: p.t.root.no ?? '', name: nameOf(p.t.root.author_id) })"
       @click="emit('open', p.t.root.id === openId ? null : p.t.root.id)"
     >
       <svg class="pin-bg" viewBox="0 0 28 28" aria-hidden="true"><path :d="PIN" /></svg>
-      <MemberAvatar :name="nameOf(p.t.root.author_id)" :src="person(p.t.root.author_id)?.avatar" :size="22" />
+      <MemberAvatar :name="nameOf(p.t.root.author_id)" :src="person(p.t.root.author_id)?.avatar" :size="28" />
     </button>
 
     <!-- 새 코멘트 — 팝업 양식(.pop-*: 머리 48 · 제목 14/600 · 닫기 28 · 본문 16 · DS 버튼) -->
     <template v-if="draft && draftPos">
-      <span class="pin draft" :style="{ left: sx(draftPos.x) + 'px', top: sy(draftPos.y) - 28 + 'px' }" aria-hidden="true"><svg class="pin-bg" viewBox="0 0 28 28"><path :d="PIN" /></svg></span>
+      <span class="pin draft" :style="{ left: sx(draftPos.x) + 'px', top: sy(draftPos.y) - 36 + 'px' }" aria-hidden="true"><svg class="pin-bg" viewBox="0 0 28 28"><path :d="PIN" /></svg></span>
       <section class="sq pop th" role="dialog" aria-labelledby="cmtNewT" :style="boxAt(draftPos)">
         <div class="pop-top">
           <h2 id="cmtNewT" class="pop-ttl">{{ tr('New comment') }}</h2>
@@ -133,13 +133,13 @@ const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canMode
 .cl { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .cl > * { pointer-events: auto; }
 /* 핀: 모양은 위 PIN 경로(svg) — 곡률이 이어지게 그린 모양이라 squircle 처리 대신 */
-.pin { position: absolute; width: 28px; height: 28px; padding: 0; border: 0; background: none; display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
+.pin { position: absolute; width: 36px; height: 36px; padding: 0; border: 0; background: none; display: grid; place-items: center; transition: transform .12s ease; transform-origin: 0 100%; }
 .pin > :not(.pin-bg) { position: relative; }
 .pin-bg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 3px rgb(3 9 26 / 18%)); }
 .pin-bg path { fill: var(--sys-color-common-white-emphasis); stroke: var(--iris-float-line); stroke-width: .5px; }
 .pin:hover { transform: scale(1.08); }
 .pin.on .pin-bg path { stroke: var(--sys-color-brand-primary-default); stroke-width: 2px; }
-.pin.unread::after { content: ''; position: absolute; top: -1px; right: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
+.pin.unread::after { content: ''; position: absolute; top: 0; right: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); box-shadow: 0 0 0 2px var(--sys-color-common-white-emphasis); }
 .pin.done { opacity: .6; }
 .pin.draft { pointer-events: none; }
 .pin.draft .pin-bg path { fill: var(--sys-color-brand-primary-default); stroke: none; }

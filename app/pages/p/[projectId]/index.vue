@@ -248,8 +248,8 @@ watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = nu
 /** 코멘트 달기 커서: 내 이름 첫 글자가 든 핀(누르는 점 = 왼쪽 아래 뾰족한 끝) */
 const commentCursor = computed(() => {
   const ch = (myName.value || '?').trim().charAt(0).toUpperCase().replace(/[<>&"']/g, '')
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'><path transform='translate(1 1)' d='M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z' fill='%23fff' stroke='%232C7BE2' stroke-width='1.5'/><circle cx='15' cy='15' r='10' fill='%23EEF4FC'/><text x='15' y='19' text-anchor='middle' font-family='Pretendard, -apple-system, sans-serif' font-size='11' font-weight='600' fill='%232C7BE2'>${encodeURIComponent(ch)}</text></svg>`
-  return `url("data:image/svg+xml,${svg.replace(/#/g, '%23')}") 1 28, crosshair`
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='38' height='38' viewBox='0 0 30 30'><path transform='translate(1 1)' d='M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z' fill='%23fff' stroke='%232C7BE2' stroke-width='1.5'/><circle cx='15' cy='15' r='10' fill='%23EEF4FC'/><text x='15' y='19' text-anchor='middle' font-family='Pretendard, -apple-system, sans-serif' font-size='11' font-weight='600' fill='%232C7BE2'>${encodeURIComponent(ch)}</text></svg>`
+  return `url("data:image/svg+xml,${svg.replace(/#/g, '%23')}") 1 36, crosshair`
 })
 /** 코멘트 모드에서 캔버스를 누르면: 그 자리(위에 있는 화면 기준)에 새 코멘트 */
 function onCommentDown(e: PointerEvent) {
