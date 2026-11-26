@@ -245,10 +245,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 // 새 탭: + 버튼 · 빈 곳 두 번 누르기(이미 열려 있으면 그 탭으로 — track 이 탭을 하나만 둬요)
 function openNew() { navigateTo(NEW_TAB_PATH) }
 function onEmptyDbl(e: MouseEvent) { if (e.target === e.currentTarget) openNew() }
+// 탭바는 마우스로 누른 뒤 포커스를 남기지 않아요(크롬 · 피그마 탭과 같아요). 남겨 두면 이어서 단축키(⇧R 자 등)를 누를 때
+// 브라우저가 그 탭에 포커스 링을 그려요. 키보드(Tab)로 온 포커스는 :focus-visible 이라 그대로 둬요. 이름 고치는 칸은 제외
+function onFocusIn(e: FocusEvent) {
+  const el = e.target as HTMLElement | null
+  if (!el || el.tagName === 'INPUT' || el.matches(':focus-visible')) return
+  el.blur()
+}
 </script>
 
 <template>
-  <nav class="tabbar" :aria-label="tr('Tabs')" @dblclick="onEmptyDbl">
+  <nav class="tabbar" :aria-label="tr('Tabs')" @dblclick="onEmptyDbl" @focusin="onFocusIn">
     <NuxtLink :to="homePath" :class="['sq', 'tab', 'home', { on: !activeId }]" :aria-label="tr('Home')" :data-tip="tr('Home')" :aria-current="!activeId ? 'page' : undefined" :aria-busy="spinning(null) || undefined" @contextmenu.prevent="homeMenu"><i v-if="spinning(null)" class="spin" aria-hidden="true" /><EditorIcon v-else name="home" :size="20" /></NuxtLink>
     <div :class="['wrap', { fl: fade.l, fr: fade.r, even }]" @dblclick="onEmptyDbl">
       <div ref="listEl" :class="['list', { even }]" @scroll.passive="edges" @wheel="onWheel">
