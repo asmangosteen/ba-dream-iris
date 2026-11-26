@@ -5,6 +5,12 @@ import type { CommentRow } from '~~/shared/types/database'
  * 모든 역할이 쓸 수 있어요(보기 전용도). 다른 사람 코멘트는 실시간으로 들어와요.
  */
 export type { CommentRow }
+/** 영역 코멘트 네모(핀과 같은 기준 좌표) */
+/** 읽지 않음으로 표시한 스레드의 '읽은 시각' */
+const UNREAD_AT = '1970-01-01T00:00:00.000Z'
+export interface CommentArea { x: number; y: number; w: number; h: number }
+/** 핀 자리: 화면(프레임) · 캔버스 섹션 · 프레임 레이어 · 캔버스 중 하나를 기준으로 */
+export interface CommentAt { pageId: string | null; screenId: string | null; layerId?: string | null; x: number; y: number; area?: CommentArea | null }
 export interface Thread { root: CommentRow; replies: CommentRow[]; last: CommentRow; unread: boolean }
 
 const iso = (minAgo: number) => new Date(Date.now() - minAgo * 60_000).toISOString()
@@ -51,7 +57,8 @@ export function useComments(projectId: string) {
       const replies = all.filter((c) => c.thread_id === root.id)
       const last = replies[replies.length - 1] ?? root
       const seen = reads.value[root.id]
-      const unread = last.author_id !== myId.value && (!seen || seen < last.created_at)
+      // '읽지 않음으로 표시'는 읽은 시각을 맨 처음(UNREAD_AT)으로 — 내가 마지막에 쓴 스레드도 다시 새 글로 보여요
+      const unread = !!seen?.startsWith('1970-01-01') || (last.author_id !== myId.value && (!seen || seen < last.created_at))
       return { root, replies, last, unread }
     }).sort((a, b) => (b.last.created_at > a.last.created_at ? 1 : -1))
   })
@@ -90,24 +97,25 @@ export function useComments(projectId: string) {
   }
 
   /** 새 스레드(핀) */
-  async function create(at: { pageId: string | null; screenId: string | null; x: number; y: number }, body: string, mentions: string[]) {
+  async function create(at: CommentAt, body: string, mentions: string[], attachments: string[] = []) {
     if (preview) {
       const no = Math.max(0, ...(list.data.value ?? []).map((c) => c.no ?? 0)) + 1
-      const row: CommentRow = { id: 'pv-' + Math.random().toString(36).slice(2, 8), project_id: projectId, page_id: at.pageId, screen_id: at.screenId, thread_id: null, no, x: at.x, y: at.y, author_id: 'preview-me', body, mentions, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null }
+      const row: CommentRow = { id: 'pv-' + Math.random().toString(36).slice(2, 8), project_id: projectId, page_id: at.pageId, screen_id: at.screenId, layer_id: at.layerId ?? null, area: at.area ?? null, thread_id: null, no, x: at.x, y: at.y, author_id: 'preview-me', body, mentions, attachments, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null }
       put(row)
       return row
     }
-    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, page_id: at.pageId, screen_id: at.screenId, x: at.x, y: at.y, body, mentions }).select('*').single()
+    // 이미지가 있을 때만 attachments 를 보내요(마이그레이션 전 DB 에서도 글만 쓰기는 되게)
+    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, page_id: at.pageId, screen_id: at.screenId, x: at.x, y: at.y, body, mentions, ...(attachments.length ? { attachments } : {}), ...(at.layerId ? { layer_id: at.layerId } : {}), ...(at.area ? { area: at.area } : {}) }).select('*').single()
     if (error) throw error
     put(data as CommentRow)
     return data as CommentRow
   }
-  async function reply(root: CommentRow, body: string, mentions: string[]) {
+  async function reply(root: CommentRow, body: string, mentions: string[], attachments: string[] = []) {
     if (preview) {
-      put({ ...root, id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: root.id, no: null, x: null, y: null, author_id: 'preview-me', body, mentions, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null })
+      put({ ...root, id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: root.id, no: null, x: null, y: null, author_id: 'preview-me', body, mentions, attachments, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null })
       return
     }
-    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, thread_id: root.id, body, mentions }).select('*').single()
+    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, thread_id: root.id, body, mentions, ...(attachments.length ? { attachments } : {}) }).select('*').single()
     if (error) throw error
     put(data as CommentRow)
     markRead(root.id)
@@ -135,12 +143,35 @@ export function useComments(projectId: string) {
     if (error) { put(prev); throw error }
   }
   /** 핀을 다른 자리로(쓴 사람만) */
-  async function movePin(root: CommentRow, at: { screenId: string | null; x: number; y: number }) {
+  async function movePin(root: CommentRow, at: { screenId: string | null; layerId?: string | null; x: number; y: number; area?: CommentArea | null }) {
     const prev = { ...root }
-    put({ ...root, screen_id: at.screenId, x: at.x, y: at.y })
+    put({ ...root, screen_id: at.screenId, layer_id: at.layerId ?? null, x: at.x, y: at.y, area: at.area ?? null })
+    // 답글도 같은 곳(화면)으로 — 목록 · 실시간이 같은 자리로 보이게
+    for (const c of list.data.value ?? []) if (c.thread_id === root.id) put({ ...c, screen_id: at.screenId })
     if (preview) return
-    const { error } = await supabase.from('comments').update({ screen_id: at.screenId, x: at.x, y: at.y }).eq('id', root.id)
+    const { error } = await supabase.from('comments').update({ screen_id: at.screenId, x: at.x, y: at.y, ...(at.layerId || root.layer_id ? { layer_id: at.layerId ?? null } : {}), ...(at.area || root.area ? { area: at.area ?? null } : {}) }).eq('id', root.id)
     if (error) { put(prev); throw error }
+  }
+  /** 이모지 반응 넣기 · 빼기(내가 단 건 다시 누르면 빠져요) — 바로 보이고, 실패하면 되돌려요 */
+  async function react(c: CommentRow, emoji: string) {
+    const me = myId.value
+    if (!me) return
+    const prev = { ...c }
+    const cur = { ...(c.reactions ?? {}) }
+    const ids = cur[emoji] ?? []
+    const next = ids.includes(me) ? ids.filter((x) => x !== me) : [...ids, me]
+    if (next.length) cur[emoji] = next; else delete cur[emoji]
+    put({ ...c, reactions: cur })
+    if (preview) return
+    const { data, error } = await supabase.rpc('toggle_reaction', { cid: c.id, emo: emoji })
+    if (error) { put(prev); throw error }
+    if (data) put({ ...(list.data.value ?? []).find((x) => x.id === c.id) ?? c, reactions: data as Record<string, string[]> })
+  }
+  /** 읽지 않음으로 표시(스레드 ⋯ — 피그마와 같아요) */
+  function markUnread(threadId: string) {
+    reads.value = { ...reads.value, [threadId]: UNREAD_AT }
+    if (preview || !myId.value) return
+    supabase.from('comment_reads').upsert({ member_id: myId.value, thread_id: threadId, seen_at: UNREAD_AT }).then(() => undefined, () => undefined)
   }
   function markRead(threadId: string) {
     const at = new Date().toISOString()
@@ -149,7 +180,7 @@ export function useComments(projectId: string) {
     supabase.from('comment_reads').upsert({ member_id: myId.value, thread_id: threadId, seen_at: at }).then(() => undefined, () => undefined)
   }
 
-  return { list, threads, myId, create, reply, resolve, remove, edit, movePin, markRead }
+  return { list, threads, myId, create, reply, resolve, remove, edit, movePin, markRead, markUnread, react }
 }
 
 /** 글 속 @이름 → 멤버 id(글에 아직 남아 있는 것만) */

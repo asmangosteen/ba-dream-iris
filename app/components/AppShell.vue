@@ -173,8 +173,8 @@ async function signOut(scope: 'local' | 'global' = 'local') {
 /* 맨 아래: 테두리 0.75px(gray-900 10%) 상자에 담아 가운데 — 좌우 · 아래 여백은 위 메뉴 줄과 같게(사이드바 안쪽 8), 높이 36 · 모서리 8 · squircle 60%(.sq) — 사용자 요청으로 40 → 36.
    안의 한 줄(50% 흐리게, 테두리는 그대로): Iris 로고(높이 16) · 사이 6 · Powered by CYCLOID(아래 맞춤: 글자 기준선을 로고 바닥에 · Pretendard 11/11, 자간 -0.15 — 대문자도 벌리지 않아요. 브랜드 문구라 번역 안 함) */
 .side-foot { margin-top: auto; display: flex; align-items: center; justify-content: center; height: 36px; box-sizing: border-box; min-width: 0; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 0.75px; }
-:global(:root[data-theme="dark"]) .side-foot { --sq-line: rgb(255 255 255 / 12%); }
-@media (prefers-color-scheme: dark) { :global(:root:not([data-theme="light"])) .side-foot { --sq-line: rgb(255 255 255 / 12%); } }
+:root[data-theme="dark"] .side-foot { --sq-line: rgb(255 255 255 / 12%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side-foot { --sq-line: rgb(255 255 255 / 12%); } }
 .foot-in { display: flex; align-items: flex-end; gap: var(--ref-spacing-05); min-width: 0; opacity: .5; }
 /* 문구는 로고 바닥보다 1px 위로(사용자 요청) */
 .powered { position: relative; top: -1px; font-family: Pretendard, var(--font-family-base); font-size: 11px; line-height: 11px; color: var(--sys-color-neutral-600); letter-spacing: -0.15px; white-space: nowrap; }

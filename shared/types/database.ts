@@ -3,7 +3,7 @@
 /** 프로젝트 역할(PRD/12): 방장 · 부방장 · 기획 편집 · 디자인 편집 · 검토자 · 보기 전용 */
 export type ProjectRole = 'owner' | 'deputy' | 'planner_editor' | 'designer_editor' | 'reviewer' | 'viewer'
 /** 코멘트(스레드 첫 글 = thread_id 없음, 핀 자리 x · y 는 화면 기준 — 화면 없으면 페이지 캔버스 기준) */
-export type CommentRow = { id: string; project_id: string; page_id: string | null; screen_id: string | null; thread_id: string | null; no: number | null; x: number | null; y: number | null; author_id: string; body: string; mentions: string[]; resolved_at: string | null; resolved_by: string | null; created_at: string; edited_at: string | null }
+export type CommentRow = { id: string; project_id: string; page_id: string | null; screen_id: string | null; thread_id: string | null; no: number | null; x: number | null; y: number | null; author_id: string; body: string; mentions: string[]; /** 붙인 이미지(storage://screens/comments/…) — 20261128 마이그레이션 */ attachments?: string[]; /** 핀이 붙은 캔버스 섹션 · 프레임 레이어(x · y 는 그 기준) */ layer_id?: string | null; /** 영역 코멘트: 핀과 같은 기준 { x, y, w, h } */ area?: { x: number; y: number; w: number; h: number } | null; /** 이모지 반응 { 이모지: 멤버 id[] } */ reactions?: Record<string, string[]>; resolved_at: string | null; resolved_by: string | null; created_at: string; edited_at: string | null }
 type Row<T> = { Row: T; Insert: Partial<T>; Update: Partial<T>; Relationships: [] }
 
 export interface Database {
@@ -33,6 +33,7 @@ export interface Database {
     Functions: {
       invite_to_project: { Args: { pid: string; mail: string; r?: string | null }; Returns: string }
       request_join: { Args: { pid: string }; Returns: string }
+      toggle_reaction: { Args: { cid: string; emo: string }; Returns: Record<string, string[]> }
       decide_invite: { Args: { inv: string; approve: boolean; r?: string | null }; Returns: undefined }
       cancel_invite: { Args: { inv: string }; Returns: undefined }
       set_project_role: { Args: { pid: string; mid: string; r: string }; Returns: undefined }

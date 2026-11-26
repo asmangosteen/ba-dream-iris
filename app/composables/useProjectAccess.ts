@@ -164,6 +164,22 @@ export function useProjectAccess(projectId: string) {
     return out
   }
   const pv = () => previewAccess()
+  /**
+   * 요청을 처리하면(승인 · 거절 · 취소) 그 요청 알림도 바로 '처리됨'으로 — 읽음 + 결과 표시(사용자 요청 2026-11-27).
+   * 다른 방장 · 부방장의 알림은 DB 트리거가 같이 바꿔요(20261128000001_invite_notifications.sql)
+   */
+  const pvNotes = useState<{ id: string; target_id: string | null; read_at: string | null; payload: Record<string, unknown> }[] | undefined>('pv-notes')
+  const notes = useNuxtData<{ id: string; target_id: string | null; read_at: string | null; payload: Record<string, unknown> }[]>('notifications')
+  function settleNotes(inviteId: string, status: 'approved' | 'rejected' | 'cancelled') {
+    const at = new Date().toISOString()
+    const list = notes.data.value ?? []
+    const ids = list.filter((n) => n.target_id === inviteId).map((n) => n.id)
+    if (!ids.length) return
+    const mark = <T extends { target_id: string | null; read_at: string | null; payload: Record<string, unknown> }>(n: T): T => (n.target_id === inviteId ? { ...n, read_at: n.read_at ?? at, payload: { ...n.payload, decided: status } } : n)
+    notes.data.value = list.map(mark)
+    if (preview) { if (pvNotes.value) pvNotes.value = pvNotes.value.map(mark); return }
+    supabase.from('notifications').update({ read_at: at }).in('id', ids).is('read_at', null).then(() => undefined, () => undefined)
+  }
   const actions = {
     /** 초대: 방장 · 부방장은 역할과 함께 바로, 다른 멤버는 승인 요청 */
     async invite(email: string, r?: Exclude<ProjectRole, 'owner'> | null) {
@@ -182,12 +198,16 @@ export function useProjectAccess(projectId: string) {
     },
     async decide(id: string, approve: boolean, r?: Exclude<ProjectRole, 'owner'> | null) {
       if (approve && !r) throw new Error('role_required')
-      if (preview) { const inv = pv().value.invites.find((x) => x.id === id); if (inv) { inv.status = approve ? 'approved' : 'rejected'; inv.role = r ?? null } return data.refresh() }
-      return call(() => supabase.rpc('decide_invite', { inv: id, approve, r: r ?? null }))
+      if (preview) { const inv = pv().value.invites.find((x) => x.id === id); if (inv) { inv.status = approve ? 'approved' : 'rejected'; inv.role = r ?? null } settleNotes(id, approve ? 'approved' : 'rejected'); return data.refresh() }
+      const out = await call(() => supabase.rpc('decide_invite', { inv: id, approve, r: r ?? null }))
+      settleNotes(id, approve ? 'approved' : 'rejected')
+      return out
     },
     async cancel(id: string) {
-      if (preview) { const inv = pv().value.invites.find((x) => x.id === id); if (inv) inv.status = 'cancelled'; return data.refresh() }
-      return call(() => supabase.rpc('cancel_invite', { inv: id }))
+      if (preview) { const inv = pv().value.invites.find((x) => x.id === id); if (inv) inv.status = 'cancelled'; settleNotes(id, 'cancelled'); return data.refresh() }
+      const out = await call(() => supabase.rpc('cancel_invite', { inv: id }))
+      settleNotes(id, 'cancelled')
+      return out
     },
     async setRole(memberId: string, r: Exclude<ProjectRole, 'owner'>) {
       if (preview) { previewRoles(projectId)[memberId] = r; return data.refresh() }

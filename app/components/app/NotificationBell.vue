@@ -38,6 +38,10 @@ function textOf(n: NotificationRow): string {
     default: return tr('Something changed in {project}', { project: p })
   }
 }
+/** 처리된 요청: 승인 · 거절 · 취소 · 만료 */
+function decidedTx(v: unknown) {
+  return v === 'approved' ? tr('Approved') : v === 'rejected' ? tr('Declined') : v === 'expired' ? tr('Expired') : tr('Cancelled')
+}
 /** 요청 알림 = 할 일(방장 · 부방장이 승인해야) → 공유 창을 열어 줘요 */
 const isAsk = (n: NotificationRow) => n.kind === 'invite_request' || n.kind === 'join_request'
 
@@ -93,7 +97,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
             <span class="body">
               <span class="txt">{{ textOf(n) }}</span>
               <span v-if="n.target_type === 'comment' && n.payload?.excerpt" class="sq quote">{{ n.payload.excerpt }}</span>
-              <span class="tx-meta">{{ relativeTime(n.created_at) }}<template v-if="isAsk(n) && !n.read_at"> · <span class="ask">{{ tr('Needs your approval') }}</span></template></span>
+              <span class="tx-meta">{{ relativeTime(n.created_at) }}<template v-if="isAsk(n) && n.payload?.decided"> · {{ decidedTx(n.payload.decided) }}</template><template v-else-if="isAsk(n) && !n.read_at"> · <span class="ask">{{ tr('Needs your approval') }}</span></template></span>
             </span>
             <i v-if="!n.read_at" class="dot" :aria-label="tr('Unread')" />
           </button>
@@ -109,14 +113,18 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
 .bell:hover, .bell.on { --sq-overlay: var(--interaction-light-gray-hover); color: var(--sys-color-neutral-800); }
 .bell:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 /* 안 읽은 수: 종 오른쪽 위 작은 원(원형이라 squircle 예외) */
-.cnt { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; display: grid; place-items: center; background: var(--sys-color-theme-error-default); color: var(--sys-color-common-white-default); font-size: 10px; line-height: 16px; font-weight: 600; box-shadow: 0 0 0 2px var(--iris-canvas); }
+.cnt { position: absolute; top: 4px; right: 3px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; display: grid; place-items: center; background: var(--sys-color-theme-error-default); color: #FFFFFF; font-size: 9px; line-height: 14px; font-weight: 600; box-shadow: 0 0 0 1.5px var(--iris-canvas); }
+/* 다크: 어두운 바탕에서 묻히지 않게 더 선명한 빨강(사용자 요청 2026-11-27) */
+:root[data-theme="dark"] .cnt { background: #FF3B42; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cnt { background: #FF3B42; } }
 .panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 360px; max-height: min(520px, calc(100vh - 80px)); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: drop-shadow(0 12px 20px rgb(69 76 88 / 28%)); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .hd { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
 .hd .tx-head { font-size: 14px; line-height: 22px; }
 .act { height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); font-weight: 500; color: var(--sys-color-brand-primary-default); }
 .act:hover { --sq-fill: var(--sys-color-neutral-100); }
 .items { list-style: none; margin: 0; padding: 0 var(--ref-spacing-06) var(--ref-spacing-06); overflow-y: auto; }
-.item { width: 100%; display: flex; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-04); text-align: left; }
+/* 줄 모서리: 창(20)에서 안쪽 여백(8)만큼 뺀 12 — 맨 아래 줄 호버가 창 모서리와 같은 중심으로 둥글어요 */
+.item { width: 100%; display: flex; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-06); text-align: left; }
 .item:hover { --sq-fill: var(--sys-color-neutral-100); }
 .item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

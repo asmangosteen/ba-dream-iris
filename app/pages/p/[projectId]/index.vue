@@ -32,11 +32,11 @@ import ProjectModal from '~/components/project/ProjectModal.vue'
 import ShareModal from '~/components/project/ShareModal.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
 import ConflictDialog from '~/components/editor/ConflictDialog.vue'
-import { ScreenConflict } from '~/composables/useEditor'
+import { ScreenConflict, pageCanvasId } from '~/composables/useEditor'
 import CanvasPresence from '~/components/editor/CanvasPresence.vue'
 import CommentLayer from '~/components/editor/CommentLayer.vue'
 import CommentPanel from '~/components/editor/CommentPanel.vue'
-import { useComments, type Thread, type CommentRow } from '~/composables/useComments'
+import { useComments, type Thread, type CommentRow, type CommentArea } from '~/composables/useComments'
 import PresenceStack from '~/components/editor/PresenceStack.vue'
 import { ROLE_NAME } from '~/composables/useProjectAccess'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
@@ -236,56 +236,134 @@ function useTheirs() {
 }
 // 실시간 반영: 다른 사람이 저장한 화면을 바로 받아요(내 저장 대기가 있는 화면은 저장할 때 충돌 창으로)
 liveScreens((id, layers) => { if (store.hasPending(id)) return false; store.loadRemote(id, layers); return true })
-// 코멘트(2단계): C 로 켜고 끄기, 켜면 캔버스를 눌러 핀을 달아요. 오른쪽 패널은 코멘트 목록으로
+// 코멘트(2단계): C 로 켜고 끄기, 켜면 캔버스를 눌러(또는 끌어 영역을 그려) 핀을 달아요
 const comments = useComments(projectId)
 const commentMode = ref(false)
 const openThread = ref<string | null>(null)
-const draft = ref<{ screenId: string | null; x: number; y: number } | null>(null)
+const draft = ref<{ screenId: string | null; layerId: string | null; x: number; y: number; area: CommentArea | null } | null>(null)
 const confirmThread = ref<CommentRow | null>(null)
 const mentionPeople = computed(() => access.members.value.map((m) => ({ id: m.member_id, name: m.member?.name || m.member?.email || '?', avatar: m.member?.avatar_url ?? null, role: ROLE_NAME[m.role] })))
-// 핀 · 스레드는 늘 보여요. 코멘트 모드(도구 막대 · C)는 '새 코멘트 달기'만: 커서가 내 프로필 핀으로 바뀌고 어디든 누르면 달아요
+/**
+ * 오른쪽 패널을 코멘트 목록으로(피그마와 같아요): 코멘트 모드(도구 막대 · C)면 계속, 아니면 핀을 열었거나 새 코멘트를 쓰는 동안만 —
+ * 캔버스 빈 곳을 누르면 스레드가 닫히고 원래 패널로 돌아와요
+ */
+const commentsShown = computed(() => commentMode.value || !!openThread.value || !!draft.value)
+// 핀 · 스레드는 늘 보여요. 코멘트 모드는 '새 코멘트 달기'만: 커서가 말풍선으로 바뀌고 어디든 누르거나 끌면 달아요
 watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else draft.value = null })
 /**
- * 코멘트 달기 커서: 내 이름 첫 글자가 든 핀(누르는 점 = 왼쪽 아래 뾰족한 끝).
- * 글자가 든 SVG 커서는 움직일 때마다 다시 그려져 깜빡여서, 한 번만 PNG(1배 · 2배)로 그려 두고 그대로 써요
+ * 코멘트 달기 커서: 흰 말풍선 + 진한 테두리(피그마 코멘트 커서 — 누르는 점 = 왼쪽 아래 뾰족한 끝).
+ * 브라우저 이미지 커서는 화면이 계속 다시 그려질 때(다른 사람 커서 · 호버 표시) 움직이는 동안 화살표로 바뀌었다가 멈추면 돌아왔어요 →
+ * 캔버스 위에서는 브라우저 커서를 숨기고(cursor: none) 같은 그림을 마우스 자리에 직접 그려요. 화면 다시 그리기를 거치지 않게 바로 옮겨요
  */
-const commentCursor = ref('crosshair')
-async function drawCommentCursor() {
-  if (!import.meta.client) return
-  try { await document.fonts?.ready } catch { /* 글꼴을 못 기다려도 그려요 */ }
-  const ch = (myName.value || '?').trim().charAt(0).toUpperCase() || '?'
-  const make = (k: number) => {
-    const c = document.createElement('canvas')
-    c.width = c.height = 38 * k
-    const g = c.getContext('2d')
-    if (!g) return ''
-    g.scale((38 * k) / 30, (38 * k) / 30)
-    g.translate(1, 1)
-    const pin = new Path2D('M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H2C0.9 28 0 27.1 0 26V16C0 6 5 0 14 0Z')
-    g.fillStyle = '#FFFFFF'; g.fill(pin)
-    g.lineWidth = 1.5; g.strokeStyle = '#2C7BE2'; g.stroke(pin)
-    g.beginPath(); g.arc(14, 14, 10, 0, Math.PI * 2); g.fillStyle = '#EEF4FC'; g.fill()
-    g.fillStyle = '#2C7BE2'; g.font = '600 11px Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-    g.fillText(ch, 14, 14.5)
-    return c.toDataURL('image/png')
-  }
-  const x1 = make(1), x2 = make(2)
-  if (!x1) return
-  const set = `image-set(url("${x1}") 1x, url("${x2}") 2x) 1 36, crosshair`
-  commentCursor.value = CSS.supports('cursor', set) ? set : `url("${x1}") 1 36, crosshair`
+const cmCursor = ref<HTMLImageElement | null>(null)
+function onCmCursorMove(e: PointerEvent) {
+  const el = cmCursor.value
+  if (!el) return
+  const cv = canvasEl()
+  const over = commentMode.value && !!cv && e.target instanceof Node && cv.contains(e.target)
+  el.style.opacity = over ? '1' : '0'
+  if (over) el.style.transform = `translate(${e.clientX - 3}px, ${e.clientY - 17}px)`
 }
-onMounted(() => { drawCommentCursor(); watch(myName, drawCommentCursor) })
-/** 코멘트 모드에서 캔버스를 누르면: 그 자리(위에 있는 화면 기준)에 새 코멘트 */
+const hideCmCursor = () => { if (cmCursor.value) cmCursor.value.style.opacity = '0' }
+onMounted(() => { window.addEventListener('pointermove', onCmCursorMove, { capture: true, passive: true }); document.documentElement.addEventListener('pointerleave', hideCmCursor) })
+onBeforeUnmount(() => { window.removeEventListener('pointermove', onCmCursorMove, { capture: true }); document.documentElement.removeEventListener('pointerleave', hideCmCursor) })
+watch(commentMode, (on) => { if (!on) hideCmCursor() })
+/** 캔버스 섹션 · 프레임 레이어(페이지 캔버스)의 캔버스 위 자리 — 핀이 그 안에 있으면 그걸 기준으로 붙어 같이 움직여요 */
+function layerBox(id: string) {
+  if (!pageId.value) return null
+  const d = store.doc(pageCanvasId(pageId.value))
+  let n = d.nodes[id]
+  if (!n) return null
+  const w = n.w, h = n.h
+  let x = 0, y = 0
+  while (n) { x += n.x; y += n.y; n = n.parentId ? d.nodes[n.parentId] : undefined }
+  return { x, y, w, h }
+}
+/** 캔버스 좌표 → 핀 기준: 맨 위 화면(프레임) → 가장 안쪽 캔버스 섹션 · 프레임 레이어 → 캔버스 */
+function anchorAt(wx: number, wy: number): { screenId: string | null; layerId: string | null; ox: number; oy: number } {
+  const s = [...list.value].reverse().find((v) => wx >= v.x && wx <= v.x + v.width && wy >= v.y && wy <= v.y + v.height)
+  if (s) return { screenId: s.id, layerId: null, ox: s.x, oy: s.y }
+  if (pageId.value) {
+    const d = store.doc(pageCanvasId(pageId.value))
+    const depth = (id: string) => { let k = 0, c = d.nodes[id]; while (c?.parentId) { k++; c = d.nodes[c.parentId] } return k }
+    const hits = Object.values(d.nodes)
+      .filter((n) => (n.type === 'section' || n.type === 'frame') && !n.hidden)
+      .map((n) => ({ id: n.id, b: layerBox(n.id) }))
+      .filter((v) => v.b && wx >= v.b.x && wx <= v.b.x + v.b.w && wy >= v.b.y && wy <= v.b.y + v.b.h)
+      .sort((p, q) => depth(q.id) - depth(p.id))
+    const top = hits[0]
+    if (top?.b) return { screenId: null, layerId: top.id, ox: top.b.x, oy: top.b.y }
+  }
+  return { screenId: null, layerId: null, ox: 0, oy: 0 }
+}
+/** 새 영역 코멘트의 영역을 점으로 끌어 바꿨어요: 캔버스 좌표 → 그 코멘트 기준(화면 · 레이어 · 캔버스) 좌표 */
+function setDraftArea(a: { x: number; y: number; w: number; h: number }) {
+  const d = draft.value
+  if (!d) return
+  const s = d.screenId ? list.value.find((v) => v.id === d.screenId) : null
+  const lb = !s && d.layerId ? layerBox(d.layerId) : null
+  const ox = s?.x ?? lb?.x ?? 0, oy = s?.y ?? lb?.y ?? 0
+  draft.value = { ...d, area: { x: a.x - ox, y: a.y - oy, w: a.w, h: a.h } }
+}
+/** 새 코멘트 · 옮긴 핀: 캔버스 좌표 핀 · 영역 → 기준 좌표 */
+function placeAt(p: { x: number; y: number }, area: { x: number; y: number; w: number; h: number } | null) {
+  const a = anchorAt(p.x, p.y)
+  return { screenId: a.screenId, layerId: a.layerId, x: p.x - a.ox, y: p.y - a.oy, area: area ? { x: area.x - a.ox, y: area.y - a.oy, w: area.w, h: area.h } : null }
+}
+const toWorld = (e: { clientX: number; clientY: number }, el: HTMLElement) => { const r = el.getBoundingClientRect(); return { x: (e.clientX - r.left - vp.value.x) / vp.value.zoom, y: (e.clientY - r.top - vp.value.y) / vp.value.zoom } }
+/** 새 코멘트 입력칸에 쓰던 게 있는지 · 바깥을 한 번 눌러 알려 줬는지 · 알려 주기 신호 */
+const draftDirty = ref(false)
+const draftWarned = ref(false)
+const draftNudge = ref(0)
+watch(draft, () => { draftWarned.value = false; if (!draft.value) draftDirty.value = false })
+watch(draftDirty, () => { draftWarned.value = false })
+/** 답글 입력칸도 같은 방식(열린 스레드가 바뀌면 처음부터) */
+const replyDirty = ref(false)
+const replyWarned = ref(false)
+const replyNudge = ref(0)
+watch(openThread, () => { replyWarned.value = false; replyDirty.value = false })
+watch(replyDirty, () => { replyWarned.value = false })
+/** 코멘트 커서로 끄는 중인 영역(캔버스 좌표) */
+const drawing = ref<{ x: number; y: number; w: number; h: number } | null>(null)
+/**
+ * 캔버스를 누르면: 코멘트 모드면 그 자리에 새 코멘트(끌면 점선 영역 — 놓은 자리에 핀).
+ * 코멘트 모드가 아니면 열린 스레드 · 새 코멘트를 닫아요(오른쪽 패널도 원래대로)
+ */
 function onCommentDown(e: PointerEvent) {
-  if (!commentMode.value || e.button !== 0) return
+  if (e.button !== 0) return
   const el = canvasEl()
   if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return
+  // 답글 · 새 코멘트에 쓰던 게 있으면(피그마와 같아요): 처음 누름은 글을 골라 흔들어 알려 주기만, 한 번 더 누르면 닫아요
+  if (openThread.value && replyDirty.value && !replyWarned.value) { e.preventDefault(); e.stopPropagation(); replyWarned.value = true; replyNudge.value++; return }
+  if (!commentMode.value && draft.value && draftDirty.value && !draftWarned.value) { e.preventDefault(); e.stopPropagation(); draftWarned.value = true; draftNudge.value++; return }
+  if (!commentMode.value) { if (openThread.value || draft.value) { openThread.value = null; draft.value = null } return }
   e.preventDefault(); e.stopPropagation()
-  const r = el.getBoundingClientRect()
-  const wx = (e.clientX - r.left - vp.value.x) / vp.value.zoom, wy = (e.clientY - r.top - vp.value.y) / vp.value.zoom
-  const s = [...list.value].reverse().find((v) => wx >= v.x && wx <= v.x + v.width && wy >= v.y && wy <= v.y + v.height)
-  draft.value = s ? { screenId: s.id, x: wx - s.x, y: wy - s.y } : { screenId: null, x: wx, y: wy }
-  openThread.value = null
+  // 피그마와 같아요: 열린 스레드가 있으면 이번 누름은 닫기만(새 코멘트는 한 번 더 눌러야)
+  if (openThread.value) { openThread.value = null; return }
+  // 새 코멘트에 쓰던 게 있으면: 처음엔 글을 골라 흔들어 알려 주고, 한 번 더 누르면 닫기만(새 입력칸은 안 생겨요)
+  if (draft.value && draftDirty.value) {
+    if (!draftWarned.value) { draftWarned.value = true; draftNudge.value++; return }
+    draft.value = null
+    return
+  }
+  // 빈 입력창이 열려 있어도 이번 누름은 닫기만(새 입력창은 한 번 더 눌러야 — 사용자 요청 2026-11-27)
+  if (draft.value) { draft.value = null; return }
+  const start = toWorld(e, el)
+  let end = start
+  const move = (ev: PointerEvent) => {
+    end = toWorld(ev, el)
+    const far = Math.hypot((end.x - start.x) * vp.value.zoom, (end.y - start.y) * vp.value.zoom) > 4
+    drawing.value = far ? { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), w: Math.abs(end.x - start.x), h: Math.abs(end.y - start.y) } : null
+  }
+  const up = () => {
+    window.removeEventListener('pointermove', move, true)
+    window.removeEventListener('pointerup', up, true)
+    const area = drawing.value
+    drawing.value = null
+    draft.value = placeAt(area ? end : start, area)
+  }
+  window.addEventListener('pointermove', move, true)
+  window.addEventListener('pointerup', up, true)
 }
 onMounted(() => window.addEventListener('pointerdown', onCommentDown, true))
 onBeforeUnmount(() => window.removeEventListener('pointerdown', onCommentDown, true))
@@ -293,7 +371,7 @@ function onCommentKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
   if (e.code === 'KeyC' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); commentMode.value = !commentMode.value; return }
-  if (e.key === 'Escape' && (commentMode.value || openThread.value)) {
+  if (e.key === 'Escape' && (commentMode.value || openThread.value || draft.value)) {
     e.stopPropagation()
     if (draft.value) draft.value = null
     else if (openThread.value) openThread.value = null
@@ -302,17 +380,45 @@ function onCommentKey(e: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onCommentKey, true))
 onBeforeUnmount(() => window.removeEventListener('keydown', onCommentKey, true))
-async function createComment(body: string, mentions: string[]) {
+async function createComment(body: string, mentions: string[], attachments: string[]) {
   const d = draft.value
   if (!d) return
-  try { const row = await comments.create({ pageId: pageId.value, screenId: d.screenId, x: d.x, y: d.y }, body, mentions); draft.value = null; openThread.value = row.id }
+  try { const row = await comments.create({ pageId: pageId.value, screenId: d.screenId, layerId: d.layerId, x: d.x, y: d.y, area: d.area }, body, mentions, attachments); draft.value = null; openThread.value = row.id }
   catch { sayFail(tr('Couldn\'t post the comment. Try again')) }
 }
-async function replyComment(root: CommentRow, body: string, mentions: string[]) {
-  try { await comments.reply(root, body, mentions) } catch { sayFail(tr('Couldn\'t post the reply. Try again')) }
+async function replyComment(root: CommentRow, body: string, mentions: string[], attachments: string[]) {
+  try { await comments.reply(root, body, mentions, attachments) } catch { sayFail(tr('Couldn\'t post the reply. Try again')) }
 }
 async function resolveComment(root: CommentRow, done: boolean) {
-  try { await comments.resolve(root, done); if (done) { openThread.value = null; say(tr('Resolved #{no}', { no: root.no ?? '' })) } } catch { sayFail(tr('Something went wrong. Try again')) }
+  try { await comments.resolve(root, done); if (done) { if (openThread.value === root.id) openThread.value = null; say(tr('Resolved comment')) } } catch { sayFail(tr('Something went wrong. Try again')) }
+}
+/** 모두 읽음으로(코멘트 패널 ⋯) */
+function readAllComments() { for (const t of comments.threads.value) if (t.unread) comments.markRead(t.root.id) }
+/** 핀을 끌어 놓으면: 놓은 자리의 화면 · 섹션 · 프레임 기준으로 다시 붙여요 */
+async function moveComment(root: CommentRow, at: { x: number; y: number }, area: { x: number; y: number; w: number; h: number } | null) {
+  try { await comments.movePin(root, placeAt(at, area)) } catch { sayFail(tr('Couldn\'t move the comment. Try again')) }
+}
+/** 글 고치기(내 글) */
+async function editComment(c: CommentRow, body: string, mentions: string[]) {
+  try { await comments.edit(c, body, mentions) } catch { sayFail(tr('Couldn\'t save. Try again')) }
+}
+/** 이모지 반응 넣기 · 빼기 */
+async function reactComment(c: CommentRow, emoji: string) {
+  try { await comments.react(c, emoji) } catch { sayFail(tr('Something went wrong. Try again')) }
+}
+/** 답글 하나 지우기(확인 창 뒤) */
+const confirmMsg = ref<CommentRow | null>(null)
+async function removeMsg() {
+  const c = confirmMsg.value
+  confirmMsg.value = null
+  if (!c) return
+  try { await comments.remove(c) } catch { sayFail(tr('Couldn\'t delete. Try again')) }
+}
+/** 읽지 않음으로 표시: 스레드를 닫아요(열려 있으면 바로 다시 읽음이 되니까) */
+function unreadThread(root: CommentRow) { openThread.value = null; comments.markUnread(root.id); say(tr('Marked as unread')) }
+/** 스레드 링크 복사: 열면 그 스레드로 바로(?comment=) */
+async function copyCommentLink(root: CommentRow) {
+  try { await navigator.clipboard.writeText(`${location.origin}/p/${projectId}?comment=${root.id}`); say(tr('Link copied')) } catch { sayFail(tr('Couldn\'t copy the link')) }
 }
 async function removeThread() {
   const r = confirmThread.value
@@ -323,13 +429,13 @@ async function removeThread() {
 /** 목록 · 알림에서 스레드로: 그 페이지로 가서 핀이 보이게 옮기고 열어요 */
 function goThread(t: Thread) {
   if (t.root.page_id && t.root.page_id !== pageId.value) pageId.value = t.root.page_id
-  commentMode.value = true
   draft.value = null
   openThread.value = t.root.id
   comments.markRead(t.root.id)
   nextTick(() => {
     const s = list.value.find((v) => v.id === t.root.screen_id)
-    const wx = (s?.x ?? 0) + (t.root.x ?? 0), wy = (s?.y ?? 0) + (t.root.y ?? 0)
+    const lb = !s && t.root.layer_id ? layerBox(t.root.layer_id) : null
+    const wx = (s?.x ?? lb?.x ?? 0) + (t.root.x ?? 0), wy = (s?.y ?? lb?.y ?? 0) + (t.root.y ?? 0)
     const el = canvasEl()
     if (!el) return
     const r = el.getBoundingClientRect()
@@ -349,8 +455,8 @@ watch([() => route.query.comment, () => comments.threads.value.length, () => lis
 // 함께 보는 중(PRD/16 J-1): 접속자 · 커서 · 따라가기
 const editingAt = ref(0)
 watch(() => store.saveState.state, (v) => { if (v === 'saving') editingAt.value = Date.now() })
-const room = useRoom(projectId, { pageId, screenId: store.screenId, editingAt })
 const following = ref<string | null>(null)
+const room = useRoom(projectId, { pageId, screenId: store.screenId, editingAt, following })
 function canvasEl() { return document.querySelector<HTMLElement>('main.canvas') }
 function onRoomMove(e: PointerEvent) {
   const el = canvasEl()
@@ -374,13 +480,69 @@ watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
   vp.value = followVp
 }, { deep: true })
 watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
-watch(following, () => { followVp = null })
+watch(following, (k) => { followVp = null; if (!k) followBySpot.value = false })
 /** 따라가는 사람(편집기 테두리를 그 사람 색으로) */
 const followPeer = computed(() => (following.value ? room.peers.value.find((p) => p.key === following.value) ?? null : null))
 watch(followPeer, (p) => { if (following.value && !p) following.value = null }) // 그 사람이 나가면 멈춤
-function stopFollowKey(e: KeyboardEvent) { if (e.key === 'Escape' && following.value) following.value = null }
+function stopFollowKey(e: KeyboardEvent) {
+  if (!following.value) return
+  if (e.key === 'Escape') { following.value = null; return }
+  // 확대 · 맞춤 단축키(⌘+ · ⌘− · ⌘0 · ⇧1 · ⇧2 …)로 화면을 직접 바꾸면 멈춰요
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+  if (((e.metaKey || e.ctrlKey) && ['=', '+', '-', '0'].includes(e.key)) || (e.shiftKey && /^Digit[0-9]$/.test(e.code))) following.value = null
+}
 onMounted(() => window.addEventListener('keydown', stopFollowKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', stopFollowKey))
+/**
+ * 따라가는 중에 내가 캔버스를 직접 움직이면(휠 · 트랙패드 스크롤 · 확대 · 끌기 · 누르기) 바로 멈춰요(피그마와 같아요).
+ * 그 사람이 한동안 안 움직여 '따라간 자리'가 아직 없을 때도 멈추게, 화면 값 비교가 아니라 내 입력으로 판단해요
+ */
+function stopFollowInput(e: Event) {
+  if (!following.value) return
+  const el = canvasEl()
+  if (el && e.target instanceof Node && el.contains(e.target)) following.value = null
+}
+onMounted(() => { window.addEventListener('wheel', stopFollowInput, { capture: true, passive: true }); window.addEventListener('pointerdown', stopFollowInput, true) })
+onBeforeUnmount(() => { window.removeEventListener('wheel', stopFollowInput, { capture: true }); window.removeEventListener('pointerdown', stopFollowInput, true) })
+/**
+ * Spotlight me(피그마와 같아요): 내 아바타를 누르면 켜고 끄기. 켜면 같은 파일을 보는 사람에게 위쪽에 '따라갈까요?' 안내가 떠요.
+ * 받는 쪽: 15초 안에 Follow 를 누르면 그 사람을 따라가요(띠 바탕이 15초 동안 차오르고, 다 차면 사라져요).
+ * Spotlight 로 따라가던 중 그 사람이 끄면 따라가기도 멈춰요
+ */
+function toggleSpotlight() {
+  room.spot.value = room.spot.value ? 0 : Date.now()
+  if (room.spot.value) following.value = null
+}
+const followBySpot = ref(false)
+const spotPrompt = ref<{ key: string; spot: number; name: string; avatar: string | null; color: string } | null>(null)
+const SPOT_MS = 15_000
+const seenSpots = new Set<string>()
+let spotTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => room.peers.value.map((p) => `${p.key}:${p.spot ?? 0}`).join(), () => {
+  const peers = room.peers.value
+  // 안내 중이던 사람이 껐거나 나갔으면 안내를 닫아요
+  const sp = spotPrompt.value
+  if (sp && !peers.some((p) => p.key === sp.key && p.spot === sp.spot)) spotPrompt.value = null
+  // Spotlight 로 따라가던 사람이 끄면 따라가기도 멈춰요
+  if (following.value && followBySpot.value && !peers.find((p) => p.key === following.value)?.spot) { following.value = null; followBySpot.value = false }
+  // 새로 켠 사람: 한 번만 안내(이미 그 사람을 따라가는 중이면 생략)
+  const p = peers.find((x) => x.spot && !seenSpots.has(`${x.key}:${x.spot}`))
+  if (!p) return
+  seenSpots.add(`${p.key}:${p.spot}`)
+  if (following.value === p.key || room.spot.value) return
+  spotPrompt.value = { key: p.key, spot: p.spot!, name: p.name, avatar: p.avatar, color: p.color }
+  clearTimeout(spotTimer)
+  spotTimer = setTimeout(() => { if (spotPrompt.value?.key === p.key) spotPrompt.value = null }, SPOT_MS)
+})
+onBeforeUnmount(() => clearTimeout(spotTimer))
+function acceptSpot() {
+  const sp = spotPrompt.value
+  if (!sp) return
+  spotPrompt.value = null
+  following.value = sp.key
+  followBySpot.value = true
+}
 /** 보기 전용에서 쓸 수 있는 도구: 이동 · 손 */
 watch([tool, readOnly], () => { if (readOnly.value && tool.value !== 'move' && tool.value !== 'hand') tool.value = 'move' })
 let blockedAt = 0
@@ -1377,7 +1539,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 </script>
 
 <template>
-  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady, rulers: rulersShown, commenting: commentMode }]" :style="commentMode ? { '--cm-cursor': commentCursor } : undefined">
+  <div :class="['editor', { 'ui-hidden': uiHidden, unready: !viewReady, rulers: rulersShown, commenting: commentMode }]" >
     <Transition name="ld"><IrisLoading v-if="booting" :progress="bootP" /></Transition>
     <EditorCanvas
       ref="canvas"
@@ -1414,18 +1576,42 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
  <CommentLayer
       v-if="!gateActive"
       :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :my-id="comments.myId.value"
-      :can-moderate="access.can.value.manage" :draft="draft" :open-id="openThread"
+      :can-moderate="access.can.value.manage" :draft="draft" :drawing="drawing" :open-id="openThread" :layer-box="layerBox"
       @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
+      :draft-nudge="draftNudge" @draft-dirty="(v) => (draftDirty = v)" @draft-area="setDraftArea" :reply-nudge="replyNudge" @reply-dirty="(v) => (replyDirty = v)"
       @create="createComment" @cancel-draft="draft = null"
-      @reply="replyComment" @resolve="resolveComment" @remove="(r) => (confirmThread = r)"
+      @reply="replyComment" @resolve="resolveComment" @remove="(r) => (confirmThread = r)" @move="moveComment"
+      @edit="editComment" @remove-msg="(c) => (confirmMsg = c)" @unread="unreadThread" @copy-link="copyCommentLink" @react="reactComment"
     />
-    <div v-if="commentMode" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
+    <img ref="cmCursor" class="cm-cursor" src="/cursors/comment@2x.png" width="20" height="20" alt="" aria-hidden="true" draggable="false">
+    <div v-if="commentMode && !followPeer && !room.spot.value && !spotPrompt" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
     <div v-if="followPeer" class="follow-ring" :style="{ '--c': followPeer.color }" aria-hidden="true" />
+    <!-- Spotlight 중인 나(피그마와 같아요): 편집기 테두리를 내 색으로 -->
+    <div v-else-if="room.spot.value" class="follow-ring" :style="{ '--c': room.myColor.value }" aria-hidden="true" />
     <!-- 따라가는 중: 위 가운데에 계속(그만두면 바로 사라져요) -->
     <div v-if="followPeer" class="sq follow-band" role="status" :style="{ '--c': followPeer.color }">
       <MemberAvatar :name="followPeer.name" :src="followPeer.avatar" :size="20" />
       <span>{{ tr('Following {name}', { name: followPeer.name }) }}</span>
       <button type="button" class="sq fb-stop" @click="following = null">{{ tr('Stop') }}</button>
+    </div>
+    <!-- Spotlight 중인 나: 위 가운데 띠 — 아무도 안 따라오면 'Waiting for followers…', 따라오면 그 사람들 -->
+    <div v-else-if="room.spot.value" :key="'spot' + room.spot.value" :class="['sq', 'follow-band', { 'spot-ask': !room.followers.value.length }]" role="status" :style="{ '--c': room.myColor.value, '--t': SPOT_MS + 'ms' }">
+      <!-- 아무도 안 따라왔을 때: 다른 사람이 Follow 를 누를 수 있는 15초 동안 바탕이 차올라요(받는 쪽 안내와 같은 시간) -->
+      <i v-if="!room.followers.value.length" class="gauge" aria-hidden="true" />
+      <template v-if="room.followers.value.length">
+        <span class="fav"><MemberAvatar v-for="f in room.followers.value.slice(0, 3)" :key="f.key" :name="f.name" :src="f.avatar" :size="20" /></span>
+        <span>{{ room.followers.value.length === 1 ? tr('{name} is following you', { name: room.followers.value[0]!.name }) : tr('{n} people are following you', { n: room.followers.value.length }) }}</span>
+      </template>
+      <span v-else class="fb-l">{{ tr('Waiting for followers…') }}</span>
+      <button type="button" class="sq fb-stop dark" @click="toggleSpotlight">{{ room.followers.value.length ? tr('Stop') : tr('Cancel') }}</button>
+    </div>
+    <!-- 다른 사람이 Spotlight 를 켰어요: 15초 동안 바탕이 차오르고, Follow 를 누르면 따라가요 -->
+    <div v-else-if="spotPrompt" :key="spotPrompt.key + spotPrompt.spot" class="sq follow-band spot-ask" role="alertdialog" :aria-label="tr('{name} is spotlighting', { name: spotPrompt.name })" :style="{ '--c': spotPrompt.color, '--t': SPOT_MS + 'ms' }">
+      <i class="gauge" aria-hidden="true" />
+      <MemberAvatar :name="spotPrompt.name" :src="spotPrompt.avatar" :size="20" />
+      <span>{{ tr('{name} is spotlighting', { name: spotPrompt.name }) }}</span>
+      <button type="button" class="sq fb-stop ok" @click="acceptSpot">{{ tr('Follow') }}</button>
+      <button type="button" class="sq fb-x" :aria-label="tr('Dismiss')" @click="spotPrompt = null"><EditorIcon name="close" :size="12" /></button>
     </div>
     <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
@@ -1536,15 +1722,18 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <aside spellcheck="false" :aria-label="tr('Right sidebar')" :class="['sq', 'float', 'panel-right', { collapsed: collapsed.right && !hasPick }]">
       <!-- 맨 위: 나 · Share — 예전 떠 있던 알약을 사이드바에 합쳤어요(아래 구분선) -->
       <div class="panel-top r line-b">
-        <PresenceStack :people="room.people.value" :following="following" :pages="pages.data.value ?? []" :screens="list" @follow="(k) => (following = k)" />
-        <MemberAvatar :size="24" :name="myName" :src="me?.avatar_url" :title="myName" />
+        <PresenceStack
+          :people="room.people.value" :following="following" :pages="pages.data.value ?? []" :screens="list"
+          :me="{ name: myName, avatar: me?.avatar_url, color: room.myColor.value }" :spotlight="!!room.spot.value"
+          @follow="(k) => { following = k; followBySpot = false }" @spotlight="toggleSpotlight"
+        />
         <span class="pill-acts">
           <Button size="s" type="primary" @click="share">{{ tr('Share') }}</Button>
         </span>
       </div>
-      <p v-if="readOnly && tab === 'design' && !commentMode" class="sq ro-note"><EditorIcon name="lock" :size="16" />{{ tr('View only. Only people who can edit design can change these') }}</p>
+      <p v-if="readOnly && tab === 'design' && !commentsShown" class="sq ro-note"><EditorIcon name="lock" :size="16" />{{ tr('View only. Only people who can edit design can change these') }}</p>
       <!-- 인스펙터(문서를 열어도 그대로) — 코멘트 모드면 코멘트 목록 -->
-      <template v-if="!commentMode">
+      <template v-if="!commentsShown">
         <div role="tablist" :aria-label="tr('Properties tabs')" class="seg tabs">
           <button v-for="t in [['design', 'Design'], ['plan', 'Plan'], ['dev', 'Dev']] as const" :key="t[0]" role="tab" :aria-selected="tab === t[0]" :class="['sq', 'seg-item', { on: tab === t[0] }]" @click="tab = t[0]; expandPanels()">{{ tr(t[1]) }}</button>
           <div class="zoom-wrap">
@@ -1618,7 +1807,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
-      <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false" />
+      <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false; openThread = null; draft = null" @resolve="resolveComment" @read-all="readAllComments" />
     </aside>
 
     <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
@@ -1628,6 +1817,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
     </div>
 
+    <!-- 알림: 공유 창 같은 어두운 바탕(팝업) 위에도 보이게 body 맨 위층으로 -->
+    <Teleport to="body">
     <div class="toast-wrap" role="status" aria-live="polite">
       <!-- 오래 남는 알림(닫을 때까지): 인터넷 끊김 · 저장 실패 — 피그마 'This file has unsaved changes' 처럼 도구 막대 위 -->
       <div v-if="banner" class="sq toast bell" role="alert">
@@ -1638,6 +1829,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       </div>
       <Transition name="toast"><div v-if="toast" class="sq toast">{{ toast }}</div></Transition>
     </div>
+    </Teleport>
 
     <!-- 불러오기 실패: 캔버스 자리에 안내 · 다시 시도(없거나 권한이 없으면 홈으로) -->
     <div v-if="loadErr && !booting" class="load-err" role="alert">
@@ -1718,19 +1910,43 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmThread = null) }, { label: tr('Delete thread'), kind: 'destructed', onClick: removeThread }]"
       @close="confirmThread = null"
     />
+    <AppConfirm
+      v-if="confirmMsg"
+      :title="tr('Delete this comment?')"
+      :desc="tr('It\'s deleted for everyone')"
+      :actions="[{ label: tr('Cancel'), onClick: () => (confirmMsg = null) }, { label: tr('Delete'), kind: 'destructed', onClick: removeMsg }]"
+      @close="confirmMsg = null"
+    />
     <!-- 멤버가 아니거나 처음 초대받은 경우: 편집기 대신 안내(PRD/16 B) -->
     <AccessGate :project-id="projectId" :project-name="project.data.value?.name" />
   </div>
 </template>
 
 <style scoped>
-.editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: var(--cm-cursor) !important; }
+.editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: none !important; }
+/* 코멘트 커서: 브라우저 커서 대신 마우스 자리에 직접 그려요(움직이는 동안 화살표로 바뀌던 것 — 사용자 요청 2026-11-27). 누르는 점 = 말풍선 왼쪽 아래(3, 17) */
+.cm-cursor { position: fixed; left: 0; top: 0; z-index: 45; width: 20px; height: 20px; pointer-events: none; opacity: 0; will-change: transform; }
 /* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
 .follow-ring { position: fixed; top: var(--iris-tabs-h, 44px); left: 0; right: 0; bottom: 0; z-index: 40; pointer-events: none; box-shadow: inset 0 0 0 3px var(--c); }
 .follow-band { position: fixed; top: calc(var(--iris-tabs-h, 44px) + 12px); left: 50%; transform: translateX(-50%); z-index: 41; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-03, 3px) 0 var(--ref-spacing-05); border-radius: var(--ref-radius-05); --sq-fill: var(--c); color: #FFFFFF; font-size: 12px; font-weight: 500; white-space: nowrap; filter: drop-shadow(0 2px 6px rgb(3 9 26 / 18%)); }
+/* Spotlight 안내(받는 쪽): 연한 그 사람 색 바탕 위로 15초 동안 진한 색이 왼쪽부터 차올라요 — 다 차면 사라져요 */
+.spot-ask { --sq-fill: color-mix(in srgb, var(--c) 55%, #FFFFFF); overflow: hidden; padding-right: var(--ref-spacing-02); }
+.spot-ask > :not(.gauge) { position: relative; z-index: 1; }
+.spot-ask .gauge { position: absolute; inset: 0; z-index: 0; background: var(--c); transform-origin: 0 50%; transform: scaleX(0); animation: spot-fill var(--t) linear forwards; border-radius: inherit; }
+@keyframes spot-fill { to { transform: scaleX(1); } }
+.fb-l { padding-left: var(--ref-spacing-02); }
+.fb-stop.dark { --sq-fill: rgb(3 9 26 / 85%); }
+.fb-stop.dark:hover { --sq-fill: rgb(3 9 26); }
+.fav { display: flex; }
+.fav > * + * { margin-left: -4px; }
+.fav :deep(> *) { box-shadow: 0 0 0 1.5px var(--c); border-radius: 50%; }
+.fb-x { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: #FFFFFF; }
+.fb-x:hover { --sq-fill: rgb(255 255 255 / 18%); }
+@media (prefers-reduced-motion: reduce) { .spot-ask .gauge { animation-duration: 0s; animation-delay: var(--t); } }
 .fb-stop { height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); --sq-fill: rgb(255 255 255 / 18%); color: #FFFFFF; font-size: 12px; font-weight: 500; }
 .fb-stop:hover { --sq-fill: rgb(255 255 255 / 28%); }
 .fb-stop:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 1px; }
+/* 코멘트 모드 안내: 위 가운데 — 따라가는 중 · Spotlight 띠가 뜨면 그동안 숨겨요(겹치지 않게 — 사용자 요청 2026-11-27) */
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
@@ -1845,7 +2061,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .self-start { align-self: flex-start; }
 /* 토스트: 도구 막대(아래 16 + 높이 44 = 60) 위로 16 띄워서 */
-.toast-wrap { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 10; pointer-events: none; }
+.toast-wrap { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; pointer-events: none; font-size: 12px; line-height: 18px; } /* body 로 옮겨서 편집기 글자 크기(12 · 18)를 직접 정해요 — 예전 모양 그대로 */
 /* 라이트 · 다크 모두 어두운 토스트(neutral-800 · white 토큰은 다크에서 뒤집혀서 고정값을 써요). 다크에선 옅은 흰 테두리로 캔버스와 구분 */
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 /* 피그마 UI3 토스트: 도구 막대 바로 위, 3초, 애니메이션 없이 바로 나타나고 사라져요 */

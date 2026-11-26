@@ -6,8 +6,12 @@
 export type ThemeMode = 'system' | 'light' | 'dark'
 
 export function useTheme() {
-  const mode = useCookie<ThemeMode>('iris-theme', { default: () => 'system', maxAge: 60 * 60 * 24 * 400, sameSite: 'lax' })
-  return { mode, setMode: (m: ThemeMode) => { mode.value = m } }
+  const cookie = useCookie<ThemeMode>('iris-theme', { default: () => 'system', maxAge: 60 * 60 * 24 * 400, sameSite: 'lax' })
+  // 모든 화면이 같은 값 하나를 봐요(쿠키 ref 는 부른 곳마다 따로라, 한 곳에서 바꿔도 다른 곳은 늦게 바뀌던 것 — 사용자 요청 2026-11-27)
+  const state = useState<ThemeMode>('iris-theme-mode', () => cookie.value ?? 'system')
+  const setMode = (m: ThemeMode) => { state.value = m; cookie.value = m }
+  const mode = computed<ThemeMode>({ get: () => state.value, set: setMode })
+  return { mode, setMode }
 }
 
 /** app.vue 에서 한 번: <html data-theme> 와 color-scheme 를 맞춥니다 */

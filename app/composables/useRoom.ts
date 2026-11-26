@@ -17,6 +17,10 @@ export interface Peer {
   /** editing = 화면을 고친 지 30초 안 · viewing · away = 다른 탭으로 감 */
   doing: 'editing' | 'viewing' | 'away'
   since: number
+  /** Spotlight me(피그마와 같아요): 켠 시각 — 0 이면 꺼짐. 다른 사람에게 '따라갈까요?' 안내가 떠요 */
+  spot?: number
+  /** 지금 따라가는 사람(그 사람의 key) — Spotlight 중인 사람이 '몇 명이 따라오는지' 알 수 있게 */
+  follows?: string | null
 }
 export interface PeerCursor { x: number; y: number; pageId: string | null; at: number; view?: { cx: number; cy: number; zoom: number } }
 
@@ -28,7 +32,7 @@ export function peerColor(id: string) {
   return COLORS[h % COLORS.length]!
 }
 
-export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; screenId: Ref<string | null>; editingAt: Ref<number> }) {
+export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; screenId: Ref<string | null>; editingAt: Ref<number>; following?: Ref<string | null> }) {
   const supabase = useSupabaseClient()
   const preview = useDevPreview()
   const { data: me } = useMe()
@@ -36,6 +40,8 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   const peers = ref<Peer[]>([])
   const cursors = reactive<Record<string, PeerCursor>>({})
   const away = ref(false)
+  /** 내 Spotlight(켠 시각, 0 = 꺼짐) — 접속 정보(presence)에 실어서 나중에 들어온 사람에게도 안내가 떠요 */
+  const spot = ref(0)
   let ch: RealtimeChannel | null = null
   let ready = false
 
@@ -45,7 +51,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     return {
       id: me.value?.id ?? '', name: me.value?.name || me.value?.email || '', avatar: me.value?.avatar_url ?? null,
       pageId: opts.pageId.value, screenId: opts.screenId.value,
-      doing: away.value ? 'away' : editing ? 'editing' : 'viewing', since: Date.now(),
+      doing: away.value ? 'away' : editing ? 'editing' : 'viewing', since: Date.now(), spot: spot.value, follows: opts.following?.value ?? null,
     }
   }
   function readPresence() {
@@ -83,6 +89,14 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
       { key: 'pv-2', id: 'preview-2', name: '김디자인', avatar: null, color: peerColor('preview-2'), pageId: opts.pageId.value, screenId: null, doing: 'editing', since: t0 },
       { key: 'pv-3', id: 'preview-3', name: '이개발', avatar: null, color: peerColor('preview-3'), pageId: opts.pageId.value, screenId: null, doing: 'viewing', since: t0 },
     ]
+    // 미리보기: 주소에 ?people=7 이면 나 포함 7명(아바타 줄 · +n 확인용)
+    const extra = Math.max(0, Math.min(20, Number(useRoute().query.people ?? 0) - 3))
+    const NAMES = ['박기획', '최마케팅', '정QA', '한운영', '오PM', '윤데이터', '장CS', '임백엔드']
+    for (let i = 0; i < extra; i++) { const id = `preview-x${i}`; peers.value.push({ key: `pv-x${i}`, id, name: NAMES[i % NAMES.length]!, avatar: null, color: peerColor(id), pageId: opts.pageId.value, screenId: null, doing: 'viewing', since: t0 }) }
+    // 미리보기에서 받는 쪽 안내 보기: 주소에 ?spot=1 이면 2초 뒤 김디자인이 Spotlight 를 켜요
+    if (useRoute().query.spot) setTimeout(() => { const p = peers.value[0]; if (p) p.spot = Date.now() }, 2000)
+    // 미리보기: 내가 Spotlight 를 켜면 3초 뒤 김디자인이 따라와요(따라오는 사람 표시 확인용), 끄면 그만 따라와요
+    watch(spot, (v) => { const p = peers.value[0]; if (!p) return; if (v) setTimeout(() => { if (spot.value) p.follows = myKey() }, 3000); else p.follows = null })
     demo = setInterval(() => {
       const t = (Date.now() - t0) / 1000
       const pg = opts.pageId.value
@@ -102,7 +116,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     })
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') { ready = true; track() } })
   })
-  watch([opts.pageId, opts.screenId, () => me.value?.id], track)
+  watch([opts.pageId, opts.screenId, () => me.value?.id, spot, () => opts.following?.value], track)
   // 고치는 중 → 30초 뒤 보는 중으로
   let editT: ReturnType<typeof setTimeout> | null = null
   watch(opts.editingAt, () => { track(); if (editT) clearTimeout(editT); editT = setTimeout(track, 30_500) })
@@ -133,5 +147,9 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     return [...by.values()]
   })
 
-  return { peers, people, cursors, liveCursors, sendCursor }
+  /** 내 색(커서 · 테두리 — 다른 사람 화면에 보이는 색과 같아요) */
+  const myColor = computed(() => peerColor(me.value?.id ?? 'preview-me'))
+  /** 나를 따라오는 사람(Spotlight 중에 보여 줘요) */
+  const followers = computed(() => people.value.filter((p) => p.follows === myKey()))
+  return { peers, people, cursors, liveCursors, sendCursor, spot, myColor, followers, myKey }
 }

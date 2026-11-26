@@ -50,7 +50,7 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <Teleport to="body">
     <div v-if="open" class="pop-overlay" @mousedown.self="close">
-      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle" class="sq pop" style="--pop-w: 480px" @keydown="onKeydown">
+      <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle" class="sq pop" style="--pop-w: 520px" @keydown="onKeydown">
         <header class="pop-top">
           <h2 id="shareTitle" class="pop-ttl">{{ tr('Share “{name}”', { name: projectName }) }}</h2>
           <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
@@ -60,7 +60,7 @@ function onKeydown(e: KeyboardEvent) {
         </div>
         <footer class="pop-foot foot">
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="copyLink">{{ tr('Copy link') }}</Button>
-          <span class="tx-meta f1">{{ tr('Only members of this project can open the link') }}</span>
+          <span class="f1" />
           <Button v-if="role && role !== 'owner'" size="s" type="tertiary" @click="confirmLeave = true">{{ tr('Leave') }}</Button>
         </footer>
       </section>
@@ -78,5 +78,5 @@ function onKeydown(e: KeyboardEvent) {
 <style scoped>
 /* 팝업 양식은 main.css .pop-*(프로필 창 기준) */
 .foot { justify-content: flex-start; }
-.f1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f1 { flex: 1; }
 </style>

@@ -47,9 +47,13 @@ watch(email, () => { if (err.value) err.value = '' })
 const pickRole = reactive<Record<string, Assignable | undefined>>({})
 const nameOf = (id: string | null) => members.value.find((m) => m.member_id === id)?.member?.name ?? null
 function waitingMeta(i: { kind: string; requested_by: string; created_at: string; expires_at: string }) {
-  const who = i.kind === 'join' ? tr('Asked to join') : tr('Requested by {name}', { name: nameOf(i.requested_by) ?? tr('a member') })
+  const who = i.kind === 'join' ? tr('Asked to join') : tr('Invited by {name}', { name: nameOf(i.requested_by) ?? tr('a member') })
   const left = Math.max(0, Math.ceil((new Date(i.expires_at).getTime() - Date.now()) / 86_400_000))
-  return [who, relativeTime(i.created_at), left <= 5 ? tr('{n} days left', { n: left }) : ''].filter(Boolean).join(' · ')
+  return [who, left <= 5 ? tr('{n} days left', { n: left }) : ''].filter(Boolean).join(' · ')
+}
+/** 줄에 올리면 보이는 전체 설명(언제 요청했는지 포함) */
+function waitingTip(i: { kind: string; requested_by: string; created_at: string; expires_at: string }) {
+  return `${waitingMeta(i)} · ${relativeTime(i.created_at)}`
 }
 async function decide(id: string, approve: boolean) {
   busy.value = id
@@ -110,31 +114,30 @@ onMounted(() => { if (props.autofocus) nextTick(() => root.value?.querySelector<
     <p v-else-if="role && !can.manage" class="tx-meta hint">{{ tr('An owner or co-owner approves invites and picks the role') }}</p>
 
     <!-- 승인 대기 -->
-    <section v-if="waiting.length" class="sec" :aria-label="tr('Waiting for approval')">
-      <div class="sec-h"><span class="tx-head">{{ can.manage ? tr('Waiting for approval') : tr('Your requests') }} <span class="num muted">{{ waiting.length }}</span></span><span class="tx-meta">{{ tr('Auto-cancels after 7 days') }}</span></div>
+    <section v-if="waiting.length" class="mgrp" :aria-label="tr('Waiting for approval')">
+      <h3 class="gh">{{ can.manage ? tr('Waiting for approval') : tr('Your requests') }}<span class="num muted">{{ waiting.length }}</span></h3>
       <div v-for="i in waiting" :key="i.id" class="row">
         <MemberAvatar :name="i.email" :size="28" />
-        <span class="who"><b>{{ i.email }}</b><span>{{ waitingMeta(i) }}</span></span>
+        <span class="who" :title="waitingTip(i)"><b>{{ i.email }}</b><span>{{ waitingMeta(i) }}</span></span>
         <template v-if="can.manage">
           <EditorSelect v-model="pickRole[i.id]" class="row-role" :options="roleOptions" placeholder="Choose role" :aria-label="`Role for ${i.email}`" />
           <Button size="s" type="primary" :disabled="!pickRole[i.id]" :loading="busy === i.id" @click="decide(i.id, true)">{{ tr('Approve') }}</Button>
-          <Button size="s" type="tertiary" @click="decide(i.id, false)">{{ tr('Decline') }}</Button>
+          <button type="button" class="sq ib dec" :aria-label="tr('Decline')" :data-tip="tr('Decline')" @click="decide(i.id, false)"><Icon name="close" :size="16" /></button>
         </template>
         <Button v-else size="s" type="tertiary" :loading="busy === i.id" @click="cancel(i.id)">{{ tr('Cancel request') }}</Button>
       </div>
     </section>
 
     <!-- 멤버 -->
-    <section class="sec" :aria-label="tr('Members')">
-      <div class="sec-h"><span class="tx-head">{{ tr('Members') }} <span class="num muted">{{ members.length }}</span></span></div>
+    <section class="mgrp" :aria-label="tr('Members')">
+      <h3 class="gh">{{ tr('Members') }}<span class="num muted">{{ members.length }}</span></h3>
       <div v-for="m in members" :key="m.member_id" class="row">
         <MemberAvatar :name="m.member?.name || m.member?.email || '?'" :src="m.member?.avatar_url" :size="28" />
         <span class="who"><b>{{ m.member?.name || m.member?.email || tr('Former member') }}<span v-if="m.member_id === me" class="you">{{ tr('(you)') }}</span></b><span>{{ m.member?.email }}</span></span>
         <EditorSelect v-if="canEdit(m)" class="row-role" :model-value="m.role" :options="memberOptions(m)" :aria-label="`Role for ${m.member?.name ?? ''}`" @update:model-value="(v) => onMemberRole(m, v)" />
-        <span v-else class="tx-meta role-tx">{{ tr(ROLE_NAME[m.role]) }}</span>
+        <span v-else class="row-role role-tx">{{ tr(ROLE_NAME[m.role]) }}</span>
       </div>
     </section>
-    <p v-if="useDevPreview()" class="tx-meta">{{ tr("Preview mode — changes stay on this screen and aren't saved") }}</p>
     <AppConfirm
       v-if="confirmRemove"
       :title="tr('Remove {name}?', { name: confirmRemove.member?.name ?? '' })"
@@ -146,21 +149,31 @@ onMounted(() => { if (props.autofocus) nextTick(() => root.value?.querySelector<
 </template>
 
 <style scoped>
-.pm { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
+/* 공유 창 · 설정 '멤버' 탭: 초대 줄 → 승인 대기 → 멤버. 묶음 사이 20, 제목과 줄 사이 4, 줄 높이 48 — 선 없이 여백으로만 나눠요 */
+.pm { display: flex; flex-direction: column; gap: var(--ref-spacing-11); }
 .inv { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .f1 { flex: 1; min-width: 0; }
-.inv-role { flex: none; width: 136px; }
-.err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: calc(-1 * var(--ref-spacing-06)) 0 0; color: var(--sys-color-theme-error-default); }
-.hint { margin: calc(-1 * var(--ref-spacing-06)) 0 0; }
-.sec { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-.sec-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); height: 28px; }
+.inv-role { flex: none; width: 140px; }
+/* 초대 줄: 입력칸(30) · 역할 · 버튼 높이를 모두 30 으로 */
+.inv-role :deep(.dd) { height: 30px; }
+.inv :deep(.bd-button) { height: 30px; min-height: 30px; }
+/* 줄 안 버튼(Approve 등)은 역할 칸 · ✕ 와 같은 28 */
+.row :deep(.bd-button) { height: 28px; min-height: 28px; }
+.err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: calc(-1 * var(--ref-spacing-08)) 0 0; color: var(--sys-color-theme-error-default); }
+.hint { margin: calc(-1 * var(--ref-spacing-08)) 0 0; }
+.mgrp { display: flex; flex-direction: column; }
+/* 묶음 제목: 줄 왼쪽 끝(아바타)과 같은 선 */
+.gh { display: flex; align-items: center; gap: var(--ref-spacing-03); height: 24px; margin: 0 0 var(--ref-spacing-02); font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .muted { color: var(--sys-color-neutral-500); font-weight: 400; }
-.row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 44px; }
-.who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 48px; }
+.who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12px; line-height: 18px; }
 .who b { font-weight: 500; color: var(--sys-color-neutral-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who > span { color: var(--sys-color-neutral-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.you { margin-left: var(--ref-spacing-02); color: var(--sys-color-neutral-500); font-weight: 400; }
-.row-role { flex: none; width: 136px; }
-.role-tx { flex: none; padding-right: var(--ref-spacing-04); }
+.you { margin-left: var(--ref-spacing-03); color: var(--sys-color-neutral-500); font-weight: 400; }
+/* 역할 칸: 선택 칸 · 글자 모두 같은 폭(140) — 바꿀 수 없는 역할은 선택 칸 글자와 같은 자리에서 시작해요 */
+.row-role { flex: none; width: 140px; }
+.role-tx { box-sizing: border-box; padding: 0 var(--ref-spacing-06); font-size: 12px; color: var(--sys-color-neutral-500); }
+.dec { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-600); }
+.dec:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 p.tx-meta { margin: 0; }
 </style>

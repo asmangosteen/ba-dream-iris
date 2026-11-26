@@ -67,7 +67,6 @@ function createProject() { newOpen.value = true }
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
             <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" :class="['sq', 'cover', { wide: isWide(covers[p.id]!) }]"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" :fit="isWide(covers[p.id]!) ? 'top' : 'width'" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
-            <span v-if="access?.pendingByProject[p.id]" class="sq waiting" :title="tr('Invites waiting for your approval')">{{ tr('{n} waiting', { n: access.pendingByProject[p.id] ?? 0 }) }}</span>
             <button class="ib more" :aria-label="tr('{name} settings', { name: p.name })" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
@@ -90,7 +89,6 @@ function createProject() { newOpen.value = true }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
 .filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08); }
-.waiting { position: absolute; top: var(--ref-spacing-06); left: var(--ref-spacing-06); z-index: 2; height: 22px; padding: 0 var(--ref-spacing-04); display: inline-flex; align-items: center; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-brand-primary-default); color: var(--sys-color-common-white-default); font-size: 11px; line-height: 16px; font-weight: 600; }
 .card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
 /* 썸네일 칸은 화면 폭과 상관없이 딱 3:2 — 썸네일용 프레임도 3:2(예: 1200 × 800)로 만들면 그대로 꽉 차요 */
 .thumb { aspect-ratio: 3 / 2; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line); --sq-line-w: 1px; }

@@ -115,4 +115,7 @@ export default {
   'View only. Only people who can edit design can change these': '보기 전용이에요. 디자인 편집 권한이 있어야 바꿀 수 있어요',
   'Editing is locked. Only people who can edit design can edit': '편집이 잠겨 있어요. 디자인 편집 권한이 있어야 해요',
   'Only people who can edit design can do this': '디자인 편집 권한이 있어야 해요',
+  'Invited by {name}': '{name}님이 초대',
+  'Expired': '만료됨',
+  'Cancelled': '취소됨',
 }
