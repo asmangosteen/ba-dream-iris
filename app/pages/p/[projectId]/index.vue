@@ -30,7 +30,7 @@ import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
-import type { Viewport } from '~/components/editor/EditorCanvas.vue'
+import type { Viewport } from '~/components/editor/canvas/types'
 import type { PageSettings, ScreenRow } from '~/composables/useEditor'
 import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
 

@@ -1,0 +1,146 @@
+.canvas { --iris-select: #0E97FC; --iris-measure: #F04A26; position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;  }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+/* 움직이는 동안만 GPU 층으로(부드럽게), 멈추면 풀어서 확대 비율대로 다시 그려요 — 글자 · 도형이 늘 선명한 벡터 */
+.world.moving { will-change: transform; }
+.free { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
+.free :deep(.ly:not(.lk)) { pointer-events: auto; }
+/* 화면(screen) 요소만 — 맨 위 단계 프레임 레이어(.ly.frame)도 이 컴포넌트의 scope 를 받아서, 화면에만 걸리게 [data-screen] 으로 */
+.frame[data-screen] { position: absolute; pointer-events: auto; background: var(--iris-paper); overflow: hidden; outline: none; }
+/* 피그마처럼 기본 테두리 · 그림자 없음. 마우스를 올리면 얇은 파란 선(확대와 상관없이 1px) */
+.ghost { position: absolute; width: 0; height: 0; overflow: visible; pointer-events: none; z-index: 3; }
+.ghost.clipped { overflow: hidden; }
+.ghost-at { position: absolute; width: 0; height: 0; overflow: visible; }
+.ghost :deep(.ly) { pointer-events: none !important; }
+.drop-at.line { outline-width: calc(1.5px / var(--z, 1)); background: none; }
+.drop-at { position: absolute; pointer-events: none; outline: calc(2px / var(--z, 1)) solid var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); z-index: 4; }
+.thumb { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; pointer-events: none; }
+.frame-stk { position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; }
+/* Corner smoothing 화면: 바탕 · 그림자 층은 내용 뒤, 선은 내용 위 */
+.fsmw { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.rmask { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.rmask > * { pointer-events: auto; }
+.fsmb { position: absolute; inset: 0; }
+.frame-sqk { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+.draft { position: absolute; background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
+.draft.shape { background: none; }
+.draft-svg { position: absolute; inset: 0; overflow: visible; }
+.overlay { position: absolute; inset: 0; pointer-events: none; }
+/* 픽셀 격자 두 겹(줌 400–800% 사이는 opacity 로 서서히):
+   1) 흰 선 5% difference — 밝은 바탕은 살짝 어둡게, 어두운 바탕은 살짝 밝게
+   2) 중간 회색 선 6% — 파랑 · 빨강 같은 중간 밝기 색 위에서도 옅게 보이게
+   선 굵기는 기기 픽셀 1칸(<canvas> 에 선마다 기기 픽셀로 맞춰 그려요). 캔버스 #F5F5F5 위 ≈ #E3E3E3(피그마와 같아요), 검은 바탕 ≈ #121212, 파랑 위는 살짝 바랜 선 */
+.pxgrid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.pxgrid.dif { mix-blend-mode: difference; }
+.label { position: absolute; pointer-events: auto; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.label.on { color: var(--iris-select); font-weight: 500; }
+.lb-ic { display: inline-block; vertical-align: -2px; margin-right: 3px; }
+.label:has(.label-in) { overflow: visible; }
+/* 이름 고치기: 이름표 자리 그대로, 파란 1px 테두리 */
+.label-in { display: block; width: 160px; height: 18px; margin: -1px 0 0 -3px; padding: 0 2px; border: 0; outline: 1px solid var(--iris-select); border-radius: 2px; background: var(--sys-color-common-white-emphasis); font: inherit; font-weight: 500; color: var(--sys-color-neutral-800); }
+/* 피그마 연결 표시: 프레임 이름 줄 오른쪽 끝 */
+.fig-tag { position: absolute; transform: translateX(-100%); pointer-events: auto; display: grid; place-items: center end; width: 16px; height: 16px; cursor: default; }
+a.fig-tag { cursor: pointer; }
+a.fig-tag:hover svg { transform: scale(1.15); }
+.fig-tag svg { flex: none; transition: transform .12s ease; }
+.sel { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 오토 레이아웃 간격 표시(피그마와 같아요): 분홍 칠 + 테두리 */
+.al-hint { position: absolute; pointer-events: none; transform-origin: center; }
+.al-zone { position: absolute; box-sizing: border-box; background: color-mix(in srgb, var(--iris-spacing, #E5399F) 16%, transparent); box-shadow: inset 0 0 0 1px var(--iris-spacing, #E5399F); }
+/* 컴포넌트(인스턴스) 선택 · 마우스 올림: 피그마 보라 */
+.comp { --iris-select: var(--iris-component); }
+/* ⌘ + 마우스 올림: 요소 1px 테두리 · 글자 밑줄 1px */
+.cmd-box { position: absolute; pointer-events: none; box-shadow: 0 0 0 1px var(--iris-select); }
+.cmd-ul { position: absolute; pointer-events: none; background: var(--iris-select); }
+/* 마우스 올림: 모양(둥근 모서리 · 원)을 따라 2px — 피그마 UI3(선택 상자는 1px) */
+/* 이름은 .hover-ol — 앱 공용 .hov(목록 줄 호버)에 걸린 0.12초 전환이 캔버스 테두리에 묻지 않게(피그마처럼 바로 바뀌어요) */
+.hover-ol { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-select); }
+/* Corner smoothing 모양: 상자 대신 squircle 경로로 그려요 */
+.hover-ol.shaped, .cmd-box.shaped { box-shadow: none; }
+.shape-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.shape-line path { fill: none; stroke: var(--iris-select); }
+/* 올린 프레임 · 그룹의 바로 아래 자식: 1px 점선 */
+/* 점선 상자(그룹 · 프레임 안 레이어 표시): 브라우저 dashed 는 마디가 길어서, 2 칠 · 2 빔의 짧고 촘촘한 점선을 직접 그려요(가장자리 1px 네 줄) */
+.kid, .parent { --dl: var(--iris-select); background:
+  repeating-linear-gradient(90deg, var(--dl) 0 2px, transparent 2px 4px) top left / 100% 1px no-repeat,
+  repeating-linear-gradient(90deg, var(--dl) 0 2px, transparent 2px 4px) bottom left / 100% 1px no-repeat,
+  repeating-linear-gradient(180deg, var(--dl) 0 2px, transparent 2px 4px) top left / 1px 100% no-repeat,
+  repeating-linear-gradient(180deg, var(--dl) 0 2px, transparent 2px 4px) top right / 1px 100% no-repeat; }
+.kid { position: absolute; pointer-events: none; }
+/* 오토 레이아웃 안쪽 여백: 파란 빗금 */
+.pad { position: absolute; pointer-events: none; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--iris-select) 30%, transparent) 0 1px, transparent 1px 4px), color-mix(in srgb, var(--iris-select) 8%, transparent); }
+/* 고른 레이어의 부모: 옅은 1px 점선 */
+.parent { position: absolute; pointer-events: none; --dl: color-mix(in srgb, var(--iris-select) 70%, transparent); }
+/* 오토 레이아웃 간격: 분홍 빗금 + 가운데 짧은 손잡이 선 */
+.gap { position: absolute; pointer-events: none; display: grid; place-items: center; background: repeating-linear-gradient(-45deg, rgb(242 72 156 / 32%) 0 1px, transparent 1px 4px), rgb(242 72 156 / 8%); }
+.gap i { position: relative; width: 8px; height: 1px; background: rgb(242 72 156); pointer-events: auto; }
+.gap:not(.v) i { width: 1px; height: 8px; }
+/* 손잡이: 잡기 쉬운 넓은 자리(보이는 선은 그대로) */
+.gap i::before, .pad i::before { content: ''; position: absolute; inset: -6px -4px; }
+.pad { display: grid; place-items: center; }
+.pad i { position: relative; width: 1px; height: 8px; background: var(--iris-select); pointer-events: auto; }
+.pad.v i { width: 8px; height: 1px; }
+.glabel.gapl { --sq-fill: rgb(242 72 156); }
+.sel.dim { box-shadow: 0 0 0 1px color-mix(in srgb, var(--iris-select) 45%, transparent); }
+.sel.none { box-shadow: none; }
+/* 문서 REQ 미리 보기(마우스 올림): 청록(turquoise) 2px 선 + 바깥 은은한 번짐 + 옅은 칠, 왼쪽 위에 REQ 번호 꼬리표 — 파란 선택선과 겹쳐도 잘 보이게 */
+/* 문서 REQ 가 가리키는 항목: 청록 선만(안은 칠하지 않아요 — 사용자 요청 2026-11-26) */
+.peek { position: absolute; pointer-events: none; box-shadow: 0 0 0 2px var(--iris-peek), 0 0 0 5px color-mix(in srgb, var(--iris-peek) 28%, transparent); border-radius: 2px; }
+.peek-tag { position: absolute; left: -2px; bottom: calc(100% + 4px); padding: 0 6px; border-radius: 4px; background: var(--iris-peek); color: #fff; font-size: 11px; line-height: 18px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 3px rgb(3 9 26 / 18%); }
+.hl { position: absolute; box-shadow: 0 0 0 2px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 6%, transparent); }
+.handle.live { pointer-events: auto; width: 7px; height: 7px; border-radius: 1px; box-shadow: 0 0 0 1px var(--iris-select); }
+/* 보이는 건 7px(피그마 UI3), 잡는 범위는 15px */
+.handle.live::after { content: ""; position: absolute; inset: -4px; }
+.handle.at-nw { left: -3.5px; top: -3.5px; cursor: nwse-resize; }
+.handle.at-se { right: -3.5px; bottom: -3.5px; cursor: nwse-resize; }
+.handle.at-ne { right: -3.5px; top: -3.5px; cursor: nesw-resize; }
+.handle.at-sw { left: -3.5px; bottom: -3.5px; cursor: nesw-resize; }
+.edge { position: absolute; pointer-events: auto; }
+.edge.n { left: 4px; right: 4px; top: -4px; height: 8px; }
+.edge.s { left: 4px; right: 4px; bottom: -4px; height: 8px; }
+.edge.e { top: 4px; bottom: 4px; right: -4px; width: 8px; }
+.edge.w { top: 4px; bottom: 4px; left: -4px; width: 8px; }
+/* 모서리 바로 바깥: 끌어서 돌리기 */
+.rot { position: absolute; pointer-events: auto; width: 16px; height: 16px; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 16.5a7 7 0 0 1 10-10M17.5 3v4h-4' stroke='white' stroke-width='4'/%3E%3Cpath d='M6.5 16.5a7 7 0 0 1 10-10M17.5 3v4h-4' stroke='black' stroke-width='1.5'/%3E%3C/g%3E%3C/svg%3E") 12 12, alias; }
+.rot.at-nw { left: -18px; top: -18px; }
+.rot.at-ne { right: -18px; top: -18px; }
+.rot.at-sw { left: -18px; bottom: -18px; }
+.rot.at-se { right: -18px; bottom: -18px; }
+.size.below { top: auto; }
+.guides { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.pen, .vedit { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.pen .pp { fill: none; stroke: var(--iris-select); stroke-width: 1; }
+.pen .pr { fill: none; stroke: var(--iris-select); stroke-width: 1; stroke-dasharray: 3 3; }
+.pen .hl, .vedit .hl { stroke: var(--iris-select); stroke-width: 1; }
+.pen .hd, .vedit .hd { fill: #FFFFFF; stroke: var(--iris-select); stroke-width: 1; }
+.pen .an, .vedit .an { fill: #FFFFFF; stroke: var(--iris-select); stroke-width: 1; }
+/* 펜 · 점 편집: 점은 흰 원(파란 테), 지금 찍은 점 · 고른 점은 파랑 — 피그마 UI3 */
+.pen .an.cur { fill: var(--iris-select); }
+.vedit .an, .vedit .hd { pointer-events: auto; cursor: default; }
+.vedit .an.on { fill: var(--iris-select); }
+/* 점 고르기 상자(빈 곳 끌기) */
+.vedit .vmarq { fill: color-mix(in srgb, var(--iris-select) 8%, transparent); stroke: var(--iris-select); stroke-width: 1; pointer-events: none; }
+/* 선 손잡이: 누를 자리는 12px 굵기(투명), 마우스를 올리면 파란 1px, 고르면 파란 2px(피그마와 같아요) */
+.vedit .vs-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: default; }
+.vedit .vs-line { fill: none; stroke: #B3B3B3; stroke-width: 1; pointer-events: none; }
+.vedit .vseg:hover .vs-line { stroke: var(--iris-select); }
+.vedit .vseg.on .vs-line { stroke: var(--iris-select); stroke-width: 2; }
+/* 아직 도형인 채 점 편집: 모양 대신 회색 상자 선(피그마와 같아요) */
+.vedit .vhatch { fill: transparent; pointer-events: fill; }
+.vedit .vhatch:hover { fill: url(#vhatch); }
+.shape-ol { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.shape-ol path { fill: none; stroke: var(--iris-select); }
+.vedit .vh-line { stroke: var(--iris-select); opacity: .7; }
+/* 모서리 원형 손잡이(Corner radius 끌기) */
+.rh { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 0 1px var(--iris-select); pointer-events: auto; cursor: default; }
+.rh::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+.rlabel { position: absolute; left: auto; top: auto; margin: 0; transform: translateX(-50%); }
+.guides.draw polyline { fill: none; stroke: var(--iris-select); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+/* 스마트 가이드(자석) 선: 자 가이드를 잡았을 때의 빨간 선과 같은 1px — crispEdges 는 소수 자리에서 2px 로 번져 진해 보여서 빼고 자리를 픽셀에 맞춰요 */
+.guides line { stroke: var(--iris-measure); stroke-width: 1; }
+.guides .gmark { fill: none; stroke: var(--iris-measure); stroke-width: 1; }
+/* 간격 · 맞춤선 숫자: 피그마처럼 빨간 바탕 흰 글자(라이트 · 다크 같음) */
+.glabel { position: absolute; transform: translate(-50%, -50%); padding: 0 4px; border-radius: 2px; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; --sq-fill: var(--iris-measure); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; pointer-events: none; }
+/* 크기 표시: 파란 바탕, 넉넉한 안쪽 여백, 크기 방식(Hug) 표시 */
+.size { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 8px; padding: 0 4px; border-radius: 2px; font-variant-numeric: proportional-nums; font-feature-settings: 'pnum'; pointer-events: none; --sq-fill: var(--iris-select); color: #FFFFFF; font-family: var(--font-family-base); font-size: 11px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.size .mode { font-weight: 500; opacity: .8; margin-left: 3px; }
+.marq { position: absolute; box-shadow: 0 0 0 1px var(--iris-select); background: color-mix(in srgb, var(--iris-select) 8%, transparent); }
