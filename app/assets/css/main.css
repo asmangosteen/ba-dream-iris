@@ -403,8 +403,8 @@ section:not(:hover):not(:focus-within) .styl:not(.on){opacity:0}
 .pop-foot{flex:none;display:flex;justify-content:flex-end;align-items:center;gap:var(--ref-spacing-04);padding:var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10)}
 /* 글자를 고치는 중 패널을 눌러도 고른 글자가 보이게(CSS Custom Highlight — LayerView 의 고른 글자 구간) */
 ::highlight(iris-text-sel){background-color:color-mix(in srgb,var(--iris-select,#0D99FF) 30%,transparent)}
-/* 변수(토큰)를 연결한 칸: 칸 전체가 흰 토큰 상자(피그마와 같아요 — 회색 칸 안에 흰 칩을 넣지 않아요). 안의 칩은 테두리 · 바탕 없이 글자만 */
-.editor .fld:has(> .tchip-w){--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--sys-color-neutral-400);--sq-line-w:.5px}
-.editor .fld:has(> .tchip-w:hover){--sq-line:var(--sys-color-neutral-500)}
-.editor .fld:has(> .tchip-w .tchip.open){--sq-line:var(--iris-open-line);--sq-line-w:1px}
-.editor .fld:has(> .tchip-w) .tchip{--sq-fill:transparent;--sq-line:transparent;--sq-line-w:0px;margin-left:0;padding-left:0}
+/* 칠(색) · 글자(굵기 등) 변수를 연결한 칸: 칸 전체가 흰 토큰 상자(안의 칩은 테두리 · 바탕 없이 글자만). 숫자 변수(모서리 · 투명도 · 간격 · 크기 …)는 회색 칸 안 흰 칩 그대로 — 피그마와 같아요 */
+.editor .fld:has(> .tchip-w:not(.num)){--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--sys-color-neutral-400);--sq-line-w:.5px}
+.editor .fld:has(> .tchip-w:not(.num):hover){--sq-line:var(--sys-color-neutral-500)}
+.editor .fld:has(> .tchip-w:not(.num) .tchip.open){--sq-line:var(--iris-open-line);--sq-line-w:1px}
+.editor .fld:has(> .tchip-w:not(.num)) .tchip{--sq-fill:transparent;--sq-line:transparent;--sq-line-w:0px;margin-left:0;padding-left:0}

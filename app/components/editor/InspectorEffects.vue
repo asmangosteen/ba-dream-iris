@@ -316,10 +316,14 @@ function detach() {
 .efb.on .nm, .efb.on .ic { color: var(--sys-color-brand-primary-default); }
 /* 누른 뒤 포커스만 남은 칸은 보통 모습(파란 선은 연 동안만) — 키보드 포커스는 바깥 링 */
 .efb:not(.on):focus-within { --sq-line: transparent; }
-.prow.bound .efb:not(.on):focus-within { --sq-line: var(--iris-line-strong); }
+.prow.bound .efb:not(.on):focus-within { --sq-line: var(--sys-color-neutral-400); }
 .efb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.prow.bound .efb { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.prow.bound .efb.on { --sq-fill: var(--iris-sel); --sq-line: var(--sys-color-brand-primary-default); }
+/* 스타일이 연결된 칸: 칠 · 글자 변수와 같은 흰 토큰 상자(흰 바탕 + 0.5px neutral-400, 올리면 500, 연 동안 회색 1px — main.css --iris-open-line) */
+.prow.bound .efb { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--sys-color-neutral-400); --sq-line-w: 0.5px; }
+.prow.bound .efb:hover { --sq-line: var(--sys-color-neutral-500); }
+.prow.bound .efb.on { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-open-line); --sq-line-w: 1px; }
+.prow.bound .efb.on .nm { color: var(--sys-color-neutral-800); }
+.prow.bound .efb.on .ic { color: var(--sys-color-neutral-700); }
 /* 설정 창: 폭 240 · 머리 40(아래 선) · 본문 안쪽 12 · 줄 사이 8 · [이름 72 | 값] */
 .fx-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; text-align: left; }
 .pop-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }

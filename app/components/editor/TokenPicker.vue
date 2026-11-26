@@ -41,8 +41,13 @@ const TEXTY = ['color', 'fontWeight', 'textStyle', 'shadow'] // 굵기는 이름
 const numericShort = computed(() => props.kinds.every((k) => !TEXTY.includes(k)))
 /** 칩 글자: 숫자 토큰은 늘 실제 값(피그마와 같아요), 글자 속성 · 색 등은 이름(좁은 칸은 끝 마디) */
 const chipName = computed(() => (mixed.value ? tr('Mixed') : numericShort.value && chipValue.value ? chipValue.value : props.short ? boundName.value.split('/').pop()! : boundName.value))
-/** 토큰의 실제 값('radius/04' → '8') */
-const chipValue = computed(() => (boundToken.value ? (boundToken.value.num !== undefined ? String(boundToken.value.num) : boundToken.value.value) : ''))
+/** 토큰의 실제 값('radius/04' → '8'). 투명도는 칸과 같은 % ('opacity/60' → '60%', 저장 값 0.6 — 피그마와 같아요) */
+const chipValue = computed(() => {
+  const t = boundToken.value
+  if (!t) return ''
+  if (t.kind === 'opacity' && t.num !== undefined) return `${Math.round(t.num * 1000) / 10}%`
+  return t.num !== undefined ? String(t.num) : t.value
+})
 const asChip = computed(() => props.variant === 'auto' && !!props.bound)
 /** 글자 스타일 목록: 피그마 Text styles 창 모양. 떼기는 목록이 아니라 칸 옆 버튼으로(피그마와 같아요) */
 const isTS = computed(() => props.kinds[0] === 'textStyle')
@@ -253,7 +258,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
     :title="title || undefined"
     @click="toggle"
   ><span class="tsf-ag" aria-hidden="true" :style="{ fontWeight: boundWeight }">Ag</span><span class="tsf-n">{{ boundName }}<span v-if="boundToken" class="tsf-v"> · {{ boundToken.value }}</span></span></button>
-  <span v-else-if="asChip" :class="['tchip-w', { short }]">
+  <span v-else-if="asChip" :class="['tchip-w', { short, num: numericShort }]">
     <button
       ref="trigger"
       :class="['sq', 'tchip', { open, mixed }]"
