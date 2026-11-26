@@ -17,12 +17,20 @@ const custom = computed(() => base.value !== px.value)
 const letter = computed(() => (Array.from(props.name.trim())[0] ?? '').toUpperCase())
 const hangul = computed(() => /[ㄱ-ㆎ가-힣]/.test(letter.value))
 /**
- * 바탕색: 여린 파스텔 8가지(디자인 시스템 100 을 흰색에 반쯤 섞은 바탕 · 같은 색 글자(TEXT_STEP)) 중 하나.
- * 이름으로 정해서 같은 사람은 늘 같은 색(사용자 요청)
+ * 바탕색: 여린 파스텔 8가지(디자인 시스템 100 을 흰색에 반쯤 섞은 바탕) · 글자는 같은 색 톤(밝은 색은 한두 단계 진하게).
+ * 이름으로 정해서 같은 사람은 늘 같은 색(사용자 요청). 다크 모드에서도 바탕이 사라지지 않게 투명도 없는 고정 색(사용자 요청 2026-11-26)
  */
-const HUES = ['blue', 'purple', 'emerald', 'orange', 'turquoise', 'red', 'yellow', 'green'] as const
-/** 글자: 바탕과 같은 색, 밝은 색(초록 계열 · 노랑)은 읽히게 한두 단계 진하게 */
-const TEXT_STEP: Record<(typeof HUES)[number], number> = { blue: 500, purple: 500, emerald: 600, orange: 500, turquoise: 600, red: 500, yellow: 700, green: 600 }
+const PALETTE = {
+  blue: { bg: '#E5F0FE', fg: '#2C7BE2' },
+  purple: { bg: '#F5E1F9', fg: '#AF3BC6' },
+  emerald: { bg: '#E0F4EB', fg: '#2D9F7A' },
+  orange: { bg: '#FFEADE', fg: '#FF792C' },
+  turquoise: { bg: '#D7F6F2', fg: '#00ACA2' },
+  red: { bg: '#FDDFDC', fg: '#E72F37' },
+  yellow: { bg: '#FFF6DC', fg: '#B0871A' },
+  green: { bg: '#DEF6DE', fg: '#1F8F30' },
+} as const
+const HUES = Object.keys(PALETTE) as (keyof typeof PALETTE)[]
 const hue = computed(() => {
   let h = 0
   for (const ch of props.name.trim().toLowerCase()) h = (h * 31 + ch.codePointAt(0)!) >>> 0
@@ -33,7 +41,7 @@ const fs = computed(() => Math.round(px.value * (hangul.value ? 0.44 : 0.5)))
 </script>
 
 <template>
-  <span v-if="!url" class="mav-f" :style="{ width: px + 'px', height: px + 'px', fontSize: fs + 'px', background: `color-mix(in srgb, var(--ref-color-${hue}-100) 55%, #FFFFFF)`, color: `var(--ref-color-${hue}-${TEXT_STEP[hue]})` }" role="img" :aria-label="name">{{ letter }}</span>
+  <span v-if="!url" class="mav-f" :style="{ width: px + 'px', height: px + 'px', fontSize: fs + 'px', background: PALETTE[hue].bg, color: PALETTE[hue].fg }" role="img" :aria-label="name">{{ letter }}</span>
   <span v-else-if="custom" class="mav" :style="{ width: px + 'px', height: px + 'px' }"><Avatar :key="url" :src="url" :alt="name" :size="base" /></span>
   <Avatar v-else :key="url" :src="url" :alt="name" :size="base" />
 </template>
@@ -43,5 +51,5 @@ const fs = computed(() => Math.round(px.value * (hangul.value ? 0.44 : 0.5)))
 .mav :deep(.bd-avatar) { width: 100% !important; height: 100% !important; }
 /* 사진 없을 때: 디자인 시스템 Avatar 의 이니셜 모양(굵게 · 옅은 테두리), 바탕은 이름별 여린 파스텔 · 글자는 같은 색 톤 */
 .mav-f { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: var(--ref-radius-12); background: var(--sys-color-neutral-200); color: var(--sys-color-neutral-600); font-family: var(--font-family-base); font-weight: var(--font-weight-semibold); line-height: 1; letter-spacing: 0; user-select: none; overflow: hidden; }
-.mav-f::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 var(--ref-borderwidth-02) var(--ref-color-gray-900-5); pointer-events: none; }
+.mav-f::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgb(3 9 26 / 5%); pointer-events: none; }
 </style>
