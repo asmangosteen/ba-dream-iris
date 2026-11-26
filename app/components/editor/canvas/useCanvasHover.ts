@@ -304,7 +304,7 @@ export function useCanvasHover(canvas: Ctx) {
   const shown = computed(() => (dragHover.value && measure.value ? measure.value : guides.value ?? measure.value))
   return {
     altOn, hover, trackHover, leave, metaHeld, cmdMarks, updateCmd, selTextLines, ptr, hoverOutline, hoverTextLines, hoverKids,
-    parentOutline, dragHover, dragTarget, shown,
+    parentOutline, dragHover, dragTarget, shown, baselineLines,
   }
 }
 export type CanvasHover = ReturnType<typeof useCanvasHover>

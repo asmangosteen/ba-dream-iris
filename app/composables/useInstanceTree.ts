@@ -108,4 +108,4 @@ export function subAt(sid: string, id: string, x: number, y: number): SubNode | 
   return all.filter((n) => n.kind === 'text').reverse().find(hit) ?? all.filter((n) => n.kind !== 'text').reverse().find(hit) ?? null
 }
 /** 캔버스에서 두 번 눌러 고치는 인스턴스 글자(InstanceTextEdit 가 그 자리에 입력칸을 띄워요) */
-export const instEdit = shallowRef<{ sid: string; id: string; key: string } | null>(null)
+export const instEdit = shallowRef<{ sid: string; id: string; key: string; /** 두 번 누른 자리(그 자리 단어를 골라요) */ at?: { x: number; y: number }; /** Enter 로 들어오면 전체 */ all?: boolean } | null>(null)

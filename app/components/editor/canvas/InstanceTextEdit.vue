@@ -37,6 +37,16 @@ watch(instEdit, (e) => {
     t.textContent = start
     t.focus()
     const sel = getSelection()
+    // 두 번 눌러 들어왔으면 누른 자리의 단어를, Enter 로 들어왔으면 전체를 골라요(일반 글자 레이어와 같아요)
+    const hit = e.at && !e.all ? (document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(e.at.x, e.at.y) : null
+    if (hit && t.contains(hit.startContainer) && sel) {
+      sel.removeAllRanges()
+      sel.addRange(hit)
+      const m = sel as Selection & { modify?: (a: string, d: string, g: string) => void }
+      m.modify?.('move', 'backward', 'word')
+      m.modify?.('extend', 'forward', 'word')
+      return
+    }
     const range = document.createRange()
     range.selectNodeContents(t)
     sel?.removeAllRanges()

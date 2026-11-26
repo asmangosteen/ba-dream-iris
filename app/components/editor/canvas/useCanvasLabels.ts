@@ -105,7 +105,7 @@ export function useCanvasLabels(canvas: Ctx) {
         store.selectLayer(screen.id, lid)
         subSel.value = { sid: screen.id, id: lid, key: sn.key, kind: sn.kind, name: sn.name }
         const ov = n.subOverrides?.[sn.key]
-        if (sn.kind === 'text' && !n.locked && !ov?.locked && !ov?.hidden && !store.readonly.value) instEdit.value = { sid: screen.id, id: lid, key: sn.key }
+        if (sn.kind === 'text' && !n.locked && !ov?.locked && !ov?.hidden && !store.readonly.value) instEdit.value = { sid: screen.id, id: lid, key: sn.key, at: { x: ev.clientX, y: ev.clientY } }
         return
       }
     }

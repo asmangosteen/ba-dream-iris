@@ -3,6 +3,7 @@ import { markIrisClip, pickedLayers, selectMatchingSay } from '~/composables/use
 import type { AlignKind } from '~/canvas/geom'
 import { textShortcut } from '~/canvas/textKeys'
 import { download, fileNameOf, renderExport } from '~/canvas/exporter'
+import { instEdit, subSel } from '~/composables/useInstanceTree'
 import { EDITABLE, type CanvasBase } from './types'
 import type { CanvasGeom } from './useCanvasGeom'
 import type { CanvasViewport } from './useCanvasViewport'
@@ -355,6 +356,13 @@ export function useCanvasKeys(canvas: Ctx) {
     if (bare && e.code === 'Backslash' && native) { stop(); store.selectParent(sid); return }
     if (e.key === 'Enter' && native) {
       stop()
+      // 인스턴스 안 하위 줄을 골랐으면(피그마와 같아요): Enter = 글자 고치기(전체 선택), Shift+Enter = 인스턴스로 돌아가기
+      const sub = subSel.value
+      if (sub && sub.sid === sid && ids.length === 1 && ids[0] === sub.id) {
+        if (e.shiftKey) { subSel.value = null; return }
+        if (sub.kind === 'text' && !store.readonly.value) instEdit.value = { sid: sub.sid, id: sub.id, key: sub.key, all: true }
+        return
+      }
       if (e.shiftKey) { store.selectParent(sid); return }
       const n = ids.length === 1 ? store.node(sid, ids[0]!) : undefined
       // 글자 여러 개(이 프레임 · 다른 프레임)를 골랐으면 첫 글자를 고치고, 치는 대로 나머지에도 똑같이

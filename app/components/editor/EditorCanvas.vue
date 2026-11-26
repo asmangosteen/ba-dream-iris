@@ -14,7 +14,7 @@ import { useImageSrc } from '~/canvas/images'
 import ImageCropOverlay from '~/components/editor/ImageCropOverlay.vue'
 import { rotCursor } from '~/canvas/cursors'
 import { useImageEdit } from '~/composables/useImageEdit'
-import { subHover } from '~/composables/useInstanceTree'
+import { instEdit, instTick, readInstanceTree, subAt, subHover, subRect, subSel, type SubNode } from '~/composables/useInstanceTree'
 import type { CanvasBase, CanvasBox, CanvasEmits, CanvasProps, DragRef, Viewport } from './canvas/types'
 import { useCanvasGeom } from './canvas/useCanvasGeom'
 import { useCanvasViewport } from './canvas/useCanvasViewport'
@@ -106,7 +106,7 @@ const {
   zoomAt, focusOn, reveal, fit, onWheel, fitSelection, onGestureStart, onGestureChange, moving, zooming,
   guideFrames, guideSnaps, guideActive, onGuides,
   onDragOver, onDrop, dropAt, dropLine, onFileDragOver, onDragLeave, insertInstance,
-  hover, leave, cmdMarks, selTextLines, hoverOutline, hoverTextLines, hoverKids, parentOutline, shown,
+  hover, leave, cmdMarks, selTextLines, hoverOutline, hoverTextLines, hoverKids, parentOutline, shown, ptr, baselineLines,
   radDrag, radHandles, startRadius, screenRad, startScreenRadius, radLabel, gapBands, padBands, padHot, gapHot, bandDrag,
   startBand, bandLabel,
   penView, selWorld,
@@ -163,6 +163,53 @@ const subBox = computed(() => {
   if (!r.width && !r.height) return null
   return { left: r.left - c.left + 'px', top: r.top - c.top + 'px', width: r.width + 'px', height: r.height + 'px' }
 })
+/**
+ * 인스턴스 안(피그마와 같아요 — 일반 레이어와 똑같이): 인스턴스를 고른 채 하위 줄을 고르면 그 줄에 보라 선택 상자 · 크기,
+ * 글자면 기준선 밑줄(얇게, 마우스 올리면 굵게). 고른 인스턴스 위에 마우스를 올리면 그 자리 하위 줄을 표시(글자 = 밑줄, 나머지 = 테두리)
+ */
+const subActive = computed(() => {
+  const s = subSel.value
+  return s && store.screenId.value === s.sid && store.layerIds.value.length === 1 && store.layerIds.value[0] === s.id ? s : null
+})
+const findSub = (l: SubNode[], key: string): SubNode | null => { for (const x of l) { if (x.key === key) return x; const f = findSub(x.children, key); if (f) return f } return null }
+const subTextHost = (sn: SubNode) => (sn.tnode?.parentElement ?? sn.el) as Element
+const subMarks = computed(() => {
+  void tick.value
+  void vp.value
+  void instTick.value
+  const p = ptr.value
+  const host = el.value
+  if (!host || moving.value || cmdMarks.value) return null
+  const hr = host.getBoundingClientRect()
+  const rel = (r: DOMRect) => ({ left: r.left - hr.left + 'px', top: r.top - hr.top + 'px', width: r.width + 'px', height: r.height + 'px' })
+  const s = subActive.value
+  const editing = !!instEdit.value
+  const selSn = s ? findSub(readInstanceTree(s.sid, s.id), s.key) : null
+  const selR = selSn ? subRect(selSn) : null
+  // 마우스 올린 하위 줄: 고른 인스턴스 위에서만(고치는 중엔 없음)
+  const h = hover.value
+  const id = store.layerIds.value.length === 1 ? store.layerIds.value[0] : null
+  const hovSn = !editing && p && h && id && h.sid === store.screenId.value && h.id === id && store.node(h.sid, id)?.type === 'instance' ? subAt(h.sid, id, p.x + hr.left, p.y + hr.top) : null
+  const hovOn = !!hovSn && hovSn.key === selSn?.key
+  const hovR = hovSn && !hovOn ? subRect(hovSn) : null
+  const z = vp.value.zoom
+  return {
+    sel: selR && selR.width ? rel(selR) : null,
+    size: selR && selR.width ? { left: selR.left - hr.left + selR.width / 2 + 'px', top: selR.bottom - hr.top + 'px', text: `${Math.round(selR.width / z)} × ${Math.round(selR.height / z)}` } : null,
+    lines: selSn?.kind === 'text' && !editing ? baselineLines(subTextHost(selSn), hovOn ? 2 : 1, hr) : [],
+    hover: hovSn && hovSn.kind !== 'text' && hovR?.width ? rel(hovR) : null,
+    hoverLines: hovSn?.kind === 'text' && !hovOn ? baselineLines(subTextHost(hovSn), 2, hr) : [],
+  }
+})
+/** 고른 인스턴스를 누르면(피그마와 같아요): 하위 줄을 고른 채면 누른 자리의 하위 줄로 옮겨 가요. 하위 줄이 없는 자리면 인스턴스로 */
+function subPress(e: PointerEvent) {
+  const s = subActive.value
+  if (!s || e.button !== 0 || e.shiftKey || e.metaKey) return
+  const ly = (e.target as HTMLElement | null)?.closest?.('[data-layer]') as HTMLElement | null
+  if (ly?.dataset.layer !== s.id) return
+  const sn = subAt(s.sid, s.id, e.clientX, e.clientY)
+  subSel.value = sn ? { sid: s.sid, id: s.id, key: sn.key, kind: sn.kind, name: sn.name } : null
+}
 /** 이미지 자르기 화면: 자르는 레이어 자리(레이어 안 좌표 → 캔버스 화면 좌표) */
 const cropView = computed(() => {
   void tick.value
@@ -205,6 +252,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     @drop.prevent="onDrop"
     @contextmenu="onContext"
     @dblclick="onDblAny"
+    @pointerdown.capture="subPress"
   >
     <div class="world" :class="{ moving: moving && !zooming }" :style="{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }">
       <!-- 캔버스 위 섹션: 화면들 아래에 깔아요(피그마처럼 화면을 묶는 바탕) -->
@@ -359,7 +407,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <!-- 돌린 화면의 크기 · 각도 표시: 아래에 오는 변 가운데 아래, 각도를 따라 기울되 거꾸로 서지 않게(피그마와 같아요) -->
       <span v-if="selFrame && !multi.length && !selBoxes.length && scrRot(selFrame)" class="sq size below" :style="frameTags(selFrame)!.size">{{ rotating ? fmt(scrRot(selFrame)) + '°' : `${fmt(selFrame.width)} × ${fmt(selFrame.height)}` }}</span>
       <!-- 점 편집 중에는 선택 상자 · 크기를 감춰요(피그마와 같아요 — 점 · 선만) -->
-      <div v-for="b in vedit ? [] : selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
+      <div v-for="b in vedit || subMarks?.sel ? [] : selBoxes" :key="'s' + b.id" class="sel" :class="{ comp: compIds.has(b.id) }" :style="rbox(b)" />
       <div v-for="b in vedit ? [] : xBoxes" :key="'x' + b.id" class="sel" :style="rbox(b)" />
       <!-- 오토 레이아웃 간격 · 여백 표시(오른쪽 패널 칸에 올렸을 때) -->
       <div v-for="a in alZones" :key="'al' + a.key" class="al-hint" :style="rbox(a.g)" aria-hidden="true">
@@ -375,7 +423,15 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <!-- 점 편집 중에는 상자 · 손잡이 · 크기 표시를 숨겨요(피그마와 같아요) -->
       <div v-if="subBox" class="hover-ol comp" :style="subBox" />
       <ImageCropOverlay v-if="cropView" :edit="cropView.e" :node="cropView.n" :mat="cropView.mat" />
-      <template v-if="single && !vhandles && !cropView">
+      <!-- 인스턴스 안 하위 줄: 선택 상자 · 크기 · 글자 밑줄, 마우스 올린 하위 줄(보라) -->
+      <template v-if="subMarks">
+        <div v-if="subMarks.sel" class="sel comp" :style="subMarks.sel" />
+        <span v-if="subMarks.size && !instEdit" class="sq size below comp" :style="{ left: subMarks.size.left, top: subMarks.size.top }">{{ subMarks.size.text }}</span>
+        <div v-for="(l, i) in subMarks.lines" :key="'sl' + i" class="cmd-ul comp" :style="l" />
+        <div v-if="subMarks.hover" class="hover-ol comp" :style="subMarks.hover" />
+        <div v-for="(l, i) in subMarks.hoverLines" :key="'sh' + i" class="cmd-ul comp" :style="l" />
+      </template>
+      <template v-if="single && !vhandles && !cropView && !subMarks?.sel">
         <div class="sel none" :class="{ comp: selComp }" :style="rbox(single)">
           <template v-if="!single.locked">
             <span v-for="c in CORNERS" :key="'r' + c" :class="['rot', 'at-' + c]" :style="{ cursor: rotCursor(c, single.angle) }" @pointerdown.stop.prevent="startRotate($event)" />
