@@ -491,7 +491,8 @@ function onFrameClick(c: Col) {
     activeLayer.value = same ? null : { screen: c.screen.id, layer: h.layer }
     const first = same ? null : docLinks.value.find((l) => l.screen_id === c.screen!.id && l.layer_ids?.includes(h.layer!))
     if (first) nextTick(() => reader.value?.scrollToReq(first.requirement_id))
-    if (!same) focusCols([c.key])
+    // 요소를 누르면 그 요소로 확대해 맞춰요(화면과 같게 — 사용자 요청 2026-11-27)
+    if (!same) focusLayer(c.key, h.layer)
     return
   }
   pickCol(c)
@@ -602,6 +603,20 @@ function fit(animate = false, keys?: string[]) {
   const top = idOrder.value && !keys ? 64 : 28, bottom = 28
   const z = Math.min(1, Math.max(0.02, Math.min(a.w / bw, (a.h - top - bottom) / bh)))
   setView({ z, x: a.L + (a.w - bw * z) / 2 - bx * z, y: a.T + top + (a.h - top - bottom - bh * z) / 2 - by * z }, animate)
+}
+/** 요소(레이어)로 확대해 맞추기: 둘레에 여유를 두고, 작은 요소가 너무 커지지 않게 최대 200% */
+function focusLayer(col: string, layer: string) {
+  const el = canvas.value?.querySelector(`[data-col="${col}"] .sthumb [data-layer="${layer}"]`)
+  const a = visibleArea()
+  if (!el || !a) return
+  const r = el.getBoundingClientRect(), cr = canvas.value!.getBoundingClientRect()
+  const { x, y, z } = view.value
+  // 화면 좌표 → 캔버스(편집기) 좌표
+  const wx = (r.left - cr.left - x) / z, wy = (r.top - cr.top - y) / z, ww = r.width / z, wh = r.height / z
+  const pad = 0.2
+  const k = Math.min(2, Math.max(0.05, Math.min(a.w * (1 - pad * 2) / ww, (a.h - 56) * (1 - pad * 2) / wh)))
+  userMoved = true
+  setView({ z: k, x: a.L + a.w / 2 - (wx + ww / 2) * k, y: a.T + 28 + (a.h - 56) / 2 - (wy + wh / 2) * k }, true)
 }
 /** 그 화면들로 확대해 맞추기 — 캔버스 배치에 없는 칸(디자인 없는 빈 칸)이면 ID 순서 보기로 바꿔서 */
 function focusCols(keys: string[]) {
