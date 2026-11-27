@@ -381,7 +381,10 @@ function measureLines() {
   for (const p of pairs) {
     // 선은 요소(없으면 화면) 상하좌우 가운데 점 가운데 정책 줄에 가장 가까운 점에서 나가요
     const col = canvas.value?.querySelector(`[data-col="${p.col}"]`)
-    const src = ((p.layer ? col?.querySelector(`.sthumb [data-layer="${p.layer}"]`) : null) ?? col?.querySelector('.frame'))?.getBoundingClientRect()
+    const lel = p.layer ? col?.querySelector(`.sthumb [data-layer="${p.layer}"]`) : null
+    const raw = (lel ?? col?.querySelector('.frame'))?.getBoundingClientRect()
+    const k = lel ? 0 : ringOf(frames.value.find((x) => x.key === p.col))
+    const src = raw ? new DOMRect(raw.x - k, raw.y - k, raw.width + k * 2, raw.height + k * 2) : null
     const row = root?.querySelector(`[data-reqs~="${p.req}"]`)?.getBoundingClientRect()
     if (!src || !row || !cv || !body) continue
     const x2 = row.left, y2 = row.top + row.height / 2
@@ -442,9 +445,12 @@ const hover = ref<Box | null>(null)
 const selBox = ref<Box | null>(null)
 const SIDES = ['top', 'right', 'bottom', 'left'] as const
 /** 칸 안 상자 → 동그라미 자리(상하좌우 가운데) */
+/** 화면 테두리(외곽선) 두께 가운데까지 바깥으로: 기본 1px(0.5) · 고름 1.5px + 띄움 2(2.75) · 메모 2px + 띄움 2(3) — 동그라미가 선 한가운데 오게(사용자 요청 2026-11-27) */
+const ringOf = (c: Col | undefined) => (!c ? 0 : isNoteLit(c) ? 3 : isLit(c) ? 2.75 : 0.5)
 function dotAt(b: Box, side: (typeof SIDES)[number]) {
-  const x = side === 'left' ? b.x : side === 'right' ? b.x + b.w : b.x + b.w / 2
-  const y = side === 'top' ? b.y : side === 'bottom' ? b.y + b.h : b.y + b.h / 2
+  const k = b.layer ? 0 : ringOf(frames.value.find((x) => x.key === b.col))
+  const x = side === 'left' ? b.x - k : side === 'right' ? b.x + b.w + k : b.x + b.w / 2
+  const y = side === 'top' ? b.y - k : side === 'bottom' ? b.y + b.h + k : b.y + b.h / 2
   return { left: x + 'px', top: y + 'px' }
 }
 const boxStyle = (b: Box) => ({ left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' })
