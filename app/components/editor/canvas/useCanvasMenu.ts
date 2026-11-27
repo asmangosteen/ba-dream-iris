@@ -141,6 +141,20 @@ export function useCanvasMenu(canvas: Ctx) {
     const screen = scrEl ? props.screens.find((v) => v.id === scrEl.dataset.screen) : undefined
     const lid = (t.closest('[data-layer]') as HTMLElement | null)?.dataset.layer
     const at = toWorld(e.clientX, e.clientY)
+    // 선택 상자 · 손잡이(테두리 · 모서리 · 돌리기)를 우클릭: 지금 고른 것의 메뉴(전엔 빈 캔버스 메뉴가 떴어요)
+    if (t.closest('.sel, .edge, .handle, .rot, .rh')) {
+      const sid = store.screenId.value
+      const scr = sid ? props.screens.find((v) => v.id === sid) : undefined
+      if (scr && store.layerIds.value.length) {
+        const ids = [...store.layerIds.value]
+        const items = layerMenuItems(store, scr.id, ids, { lastCopy, paste: menuPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (h) => emit('hint', h) })
+        const n0 = ids.length === 1 ? store.node(scr.id, ids[0]!) : undefined
+        if (n0 && EDITABLE.has(n0.type)) items.splice(Math.max(0, items.length - 2), 0, { label: tr('Edit vector'), shortcut: '↵', action: () => enterVectorEdit(scr.id, n0.id) })
+        ctx.open(e, items)
+        return
+      }
+      if (scr && !isCanvas(scr)) { ctx.open(e, screenMenuItems(scr, at)); return }
+    }
     // 누른 자리에 겹친 레이어들(맨 위부터) — 'Select layer' 로 골라요(피그마와 같아요, ⌘ 우클릭은 바로 이 목록)
     const under = screen ? [...new Set(document.elementsFromPoint(e.clientX, e.clientY).filter((x) => (x as HTMLElement).closest?.('[data-screen]')?.getAttribute('data-screen') === screen.id).map((x) => (x.closest('[data-layer]') as HTMLElement | null)?.dataset.layer).filter((v): v is string => !!v))] : []
     const pickMenu = (sid: string) => ctx.open(e, under.map((id) => ({ label: store.node(sid, id)?.name ?? id, action: () => store.selectLayer(sid, id) })))

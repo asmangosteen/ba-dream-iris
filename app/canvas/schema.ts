@@ -33,8 +33,8 @@ export interface ImageCrop { x: number; y: number; w: number; h: number }
 
 /** 효과 (v5): 그림자 · 안쪽 그림자 · 레이어 흐림 · 배경 흐림 */
 export type Effect =
-  | { type: 'drop' | 'inner'; x: number; y: number; blur: number; spread?: number; color: string; visible?: boolean; token?: string }
-  | { type: 'blur' | 'bgblur'; blur: number; visible?: boolean }
+  | { type: 'drop' | 'inner'; x: number; y: number; blur: number; spread?: number; color: string; visible?: boolean; token?: string; /** 숫자 칸에 연결한 토큰(간격 등) — 값은 x · y · blur · spread 에 그대로 */ vars?: Partial<Record<'x' | 'y' | 'blur' | 'spread', string>> }
+  | { type: 'blur' | 'bgblur'; blur: number; visible?: boolean; vars?: Partial<Record<'blur', string>> }
 
 export type ArrowHead = 'none' | 'arrow' | 'triangle' | 'circle'
 
@@ -226,6 +226,8 @@ export interface LayerNode {
   lockRatio?: boolean
   hidden?: boolean
   locked?: boolean
+  /** 캔버스(페이지) 맨 위 단계 레이어만: 화면들 아래에 그려요(뒤로 보내기로 화면 뒤로 간 것 — 피그마와 같아요). 섹션은 늘 아래 */
+  under?: boolean
   /** 그룹(⌘G): true 면 그룹, false 면 프레임(오토 레이아웃을 풀어 프레임이 된 것). 비어 있으면 모양으로 짐작(채우기 · 자르기 · 오토 레이아웃 없는 프레임) */
   group?: boolean
   text?: string

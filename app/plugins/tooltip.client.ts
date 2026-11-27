@@ -91,11 +91,20 @@ export default defineNuxtPlugin(() => {
     target = null
   }
 
+  /**
+   * 스크롤하는 동안 · 직후엔 툴팁을 쉬어요: 목록이 마우스 아래로 지나가면 줄마다 pointerover 가 생겨서,
+   * '바로 뜨기(warm)'와 스크롤 숨기기가 번갈아 검은 말풍선이 깜빡였어요(사용자 요청 2026-11-27)
+   */
+  let scrolledAt = 0
+  const QUIET = 400
+  /** 목록 줄(변수 · 스타일 목록 등)은 옆 줄로 옮겨도 바로 뜨지 않고 매번 1초 머물러야 떠요 — 훑어 내려갈 때 말풍선이 줄마다 따라오지 않게 */
+  const isRow = (el: HTMLElement) => !!el.closest('[role="option"], .menu-item, .st-row')
   document.addEventListener('pointerover', (e) => {
     if (e.pointerType === 'touch') return
     const t = find(e.target)
     if (t === target) return
-    const warm = !tip.hidden || performance.now() - hiddenAt < WARM
+    if (performance.now() - scrolledAt < QUIET) { hide(); hiddenAt = 0; return }
+    const warm = (!tip.hidden || performance.now() - hiddenAt < WARM) && !(t && isRow(t))
     hide()
     // 이 버튼이 연 메뉴가 떠 있으면 툴팁은 쉬어요(접기 버튼처럼 메뉴 없이 aria-expanded 만 쓰는 건 그대로 보여요)
     if (!t || (t.getAttribute('aria-expanded') === 'true' && document.querySelector('[role=menu]'))) return
@@ -106,5 +115,5 @@ export default defineNuxtPlugin(() => {
   document.addEventListener('pointerdown', () => { hide(); hiddenAt = 0 }, true)
   document.addEventListener('keydown', () => hide(), true)
   window.addEventListener('blur', hide)
-  window.addEventListener('scroll', hide, true)
+  window.addEventListener('scroll', () => { hide(); hiddenAt = 0; scrolledAt = performance.now() }, true)
 })

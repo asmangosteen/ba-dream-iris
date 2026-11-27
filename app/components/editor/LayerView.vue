@@ -104,8 +104,10 @@ const style = computed(() => {
   if (shadow.length) css.boxShadow = shadow.join(', ')
   // smoothing: 그림자(drop-shadow)는 .smw 가 그려서 여기선 흐림(blur)만
   // 내용을 자르는 프레임(overflow)은 .smw 그림자까지 잘라서, 그땐 그림자를 레이어 자체 filter 로(자기 filter 는 안 잘려요)
+  // (상자 도형의 effectCss 는 바깥 그림자를 box-shadow 로만 주니, 여기선 모양을 따르는 drop-shadow(smoothShadow)를 직접 넣어요 — 빠지면 그림자가 통째로 사라졌어요)
   const clipFrame = !!sq && clipsContent(v)
-  const filters = sq && v.type !== 'image' && !clipFrame ? e.filter.filter((x) => !x.startsWith('drop-shadow')) : e.filter // 이미지는 잘린 그림에 그대로 그림자가 따라가요
+  const noDrop = e.filter.filter((x) => !x.startsWith('drop-shadow'))
+  const filters = sq ? [...noDrop, ...((clipFrame || v.type === 'image') && smoothShadow.value ? [smoothShadow.value] : [])] : e.filter // 이미지 · 자르는 프레임은 잘린 모양 그대로 그림자가 따라가요
   if (filters.length) css.filter = filters.join(' ')
   if (e.backdrop && !sq) { css.backdropFilter = e.backdrop; css.WebkitBackdropFilter = e.backdrop }
   // 선을 SVG 로 그리는 프레임(그라디언트 · 이미지 · 점선 · smoothing 선)은 레이어가 아니라 안쪽 층(.clipw)이 내용을 잘라요 — 선이 같이 잘리지 않게

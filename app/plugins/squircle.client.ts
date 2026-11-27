@@ -64,6 +64,7 @@ function irisSquircle(): void {
     }
     const outer = path(ow, oh, r, 1, 1);
     el.style.setProperty('--sq-path', "path('" + outer + "')");
+    el.style.setProperty('--sq-r', Math.min(r, Math.min(ow, oh) / 2) + 'px'); // 선(::after 안쪽 그림자)의 둥글기
     el.style.setProperty('--sq-ring', lw > 0 && ow > lw * 2 && oh > lw * 2 ? "path('" + outer + ' ' + path(ow - lw * 2, oh - lw * 2, Math.max(r - lw, 0), 1 + lw, 1 + lw, true) + "')" : 'inset(50%)');
     if (el.classList.contains('sq-clip')) el.style.setProperty('--sq-clip', "path('" + path(ow, oh, r, 0, 0) + "')");
     if (!el.hasAttribute('data-sq')) el.setAttribute('data-sq', '');

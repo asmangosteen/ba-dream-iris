@@ -358,9 +358,11 @@ export function useCanvasKeys(canvas: Ctx) {
     if (e.key === 'Delete' || e.key === 'Backspace') { stop(); if (layerMode) { if (mix.value.length) emit('screen-action', 'remove'); store.remove(sid, ids) } else emit('screen-action', 'remove'); return }
     // 순서: ⌘] · ⌘[ 한 칸, ] · [ 맨 앞 · 맨 뒤(피그마와 같아요), ⌥⌘] · ⌥⌘[ 도 맨 앞 · 맨 뒤
     // ⌥ 가 e.key 를 바꾸는 맥에서도 되게 e.code 로. 화면만 골랐으면 화면 순서
-    if ((e.code === 'BracketRight' || e.code === 'BracketLeft') && !e.shiftKey && (mod || !e.altKey)) {
+    // 자판 위치(code)가 비어 오는 경우(일부 입력기 · 원격 · 자동화)에도 되게 글자(key)로도 받아요
+    const brk = e.code === 'BracketRight' || e.code === 'BracketLeft' ? e.code : !e.code && (e.key === ']' || e.key === '[') ? (e.key === ']' ? 'BracketRight' : 'BracketLeft') : ''
+    if (brk && !e.shiftKey && (mod || !e.altKey)) {
       stop()
-      const up = e.code === 'BracketRight'
+      const up = brk === 'BracketRight'
       const toEnd = !mod || e.altKey
       if (layerMode) store.arrange(sid, ids, up ? (toEnd ? 'top' : 1) : (toEnd ? 'bottom' : -1))
       else if (!isPageCanvas(sid)) emit('screen-action', up ? (toEnd ? 'front' : 'forward') : (toEnd ? 'back' : 'backward'))

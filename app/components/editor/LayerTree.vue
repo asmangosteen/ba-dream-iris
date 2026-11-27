@@ -189,7 +189,12 @@ const items = computed<Item[]>(() => {
         if (n.type === 'section') for (const s of [...props.screens].reverse()) if (inSec.get(s.id) === id) pushScreen(s, depth + 1, under || sel.has(id))
       }
     }
-    walk(d.rootIds, 0, false)
+    // 그리는 순서대로: 화면 위 레이어 → 화면들 → 화면 아래(섹션 · 뒤로 보낸 레이어)
+    const below = (id: string) => d.nodes[id]?.type === 'section' || !!d.nodes[id]?.under
+    walk(d.rootIds.filter((id) => !below(id)), 0, false)
+    for (const s of [...props.screens].reverse()) if (!isCanvasRow(s) && !inSec.has(s.id)) pushScreen(s, 0, false)
+    walk(d.rootIds.filter(below), 0, false)
+    return out
   }
   // 화면도 레이어처럼 앞(나중에 그리는 것)이 위로 — 맨 앞으로 보내면 목록 맨 위에 와요(피그마와 같아요)
   for (const s of [...props.screens].reverse()) if (!isCanvasRow(s) && !inSec.has(s.id)) pushScreen(s, 0, false)

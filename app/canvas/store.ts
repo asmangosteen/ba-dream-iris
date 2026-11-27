@@ -514,12 +514,26 @@ export function createLayerStore(opts: {
     layerIds.value = []
   }
   /** 같은 부모 안에서 앞(위)·뒤(아래)로. dir: 1 = 한 칸 위, -1 = 한 칸 아래, 'top' · 'bottom' */
+  /**
+   * 캔버스(페이지) 맨 위 단계: 화면들을 한 덩어리(SCREENS)로 보고 그 아래(under) · 위로 오가요(피그마처럼 뒤로 보내면 화면 뒤로).
+   * 보이는 순서 = [아래 레이어들 …, 화면들, 위 레이어들 …] — 섹션은 늘 화면 아래
+   */
+  const SCREENS = '\u0000screens'
+  function arrangePageRoots(d: LayerDoc, picked: Set<string>, dir: 1 | -1 | 'top' | 'bottom') {
+    const isUnder = (id: string) => d.nodes[id]?.type === 'section' || !!d.nodes[id]?.under
+    const under = d.rootIds.filter(isUnder), over = d.rootIds.filter((id) => !isUnder(id))
+    const next = moveOrder([...under, SCREENS, ...over], picked, dir)
+    const at = next.indexOf(SCREENS)
+    next.forEach((id, i) => { const n = d.nodes[id]; if (!n || n.type === 'section') return; if (i < at) n.under = true; else delete n.under })
+    d.rootIds.splice(0, d.rootIds.length, ...next.filter((id) => id !== SCREENS))
+  }
   function arrange(sid: string, ids: string[], dir: 1 | -1 | 'top' | 'bottom') {
     // 여러 개를 고르면 부모별로 함께 옮기고, 고른 것끼리의 순서는 그대로(피그마와 같아요). 다른 프레임에서 함께 고른 것도
     withX(sid, ids, (sid, ids) => mutate(sid, (d) => {
       const byParent = new Map<string | null, Set<string>>()
       for (const id of ids) { const n = d.nodes[id]; if (!n) continue; const p = n.parentId ?? null; if (!byParent.has(p)) byParent.set(p, new Set()); byParent.get(p)!.add(id) }
       for (const [p, picked] of byParent) {
+        if (p === null && sid.startsWith('page:')) { arrangePageRoots(d, picked, dir); continue }
         const sib = siblings(d, p)
         const next = moveOrder(sib, picked, dir)
         sib.splice(0, sib.length, ...next)

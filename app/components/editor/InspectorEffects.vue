@@ -32,7 +32,6 @@ const mixed = computed(() => all.value.some((l) => JSON.stringify(l ?? []) !== J
 const list = computed<Effect[]>(() => (mixed.value ? [] : all.value[0] ?? []))
 /** 연결된 효과 스타일(그림자 토큰) — 모두 같을 때만 */
 const boundId = computed(() => { const v = styles.value.map((s) => (s.vars as Record<string, string> | undefined)?.shadow ?? null); return v.every((x) => x === v[0]) ? v[0] ?? null : null })
-const boundTok = computed(() => (boundId.value ? catalog.find(boundId.value) : undefined))
 
 /** 피그마 효과 메뉴 순서 */
 const TYPES: { value: Effect['type']; label: string }[] = [
@@ -44,7 +43,7 @@ const ICON: Record<Effect['type'], string> = { inner: 'shadow_inner', drop: 'sha
 
 // --- 설정 창 ---
 const open = ref<number | null>(null)
-watch(() => props.ids.join() + props.sid, () => { open.value = null; stylesOpen.value = false })
+watch(() => props.ids.join() + props.sid, () => { open.value = null })
 const rowEls = new Map<number, HTMLElement>()
 const rowRef = (i: number) => (el: unknown) => { if (el) rowEls.set(i, el as HTMLElement); else rowEls.delete(i) }
 const pop = ref<HTMLElement | null>(null)
@@ -59,7 +58,7 @@ function placeAt(anchor: HTMLElement | undefined | null, el: HTMLElement | null,
   out.value = { left: Math.max(8, panel.left - 240 - 8) + 'px', top: Math.max(8, Math.min(window.innerHeight - h - 8, r.top - 8)) + 'px' }
 }
 const place = () => placeAt(open.value === null ? null : rowEls.get(open.value), pop.value, pos)
-watch(open, (v) => { pos.value = { visibility: 'hidden' }; if (v !== null) { stylesOpen.value = false; nextTick(() => { place(); nextTick(place) }) } }, { flush: 'post' })
+watch(open, (v) => { pos.value = { visibility: 'hidden' }; if (v !== null) nextTick(() => { place(); nextTick(place) }) }, { flush: 'post' })
 watch(list, () => { if (open.value !== null) { if (!list.value[open.value]) open.value = null; else nextTick(place) } }, { deep: true })
 function closePop(refocus = false) {
   const i = open.value
@@ -71,17 +70,14 @@ function onDoc(e: PointerEvent) {
   if (!t) return
   if (t.closest?.('.paint-pop, .tp, .esel-m, .menu')) return
   if (open.value !== null && !pop.value?.contains(t) && !rowEls.get(open.value)?.contains(t)) closePop()
-  if (stylesOpen.value && !stylesEl.value?.contains(t) && !stylesBtn.value?.contains(t) && !boundBtn.value?.contains(t)) stylesOpen.value = false
 }
 function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape' || document.querySelector('.esel-m')) return
-  if (stylesOpen.value) { e.stopPropagation(); stylesOpen.value = false; return }
   if (open.value !== null && pop.value?.contains(e.target as Node)) { e.stopPropagation(); closePop(true) }
 }
 const onReflow = (e: Event) => {
-  if (e.target instanceof Node && (pop.value?.contains(e.target) || stylesEl.value?.contains(e.target))) return
+  if (e.target instanceof Node && pop.value?.contains(e.target)) return
   if (open.value !== null) place()
-  if (stylesOpen.value) placeStyles()
 }
 onMounted(() => { document.addEventListener('pointerdown', onDoc, true); window.addEventListener('keydown', onKey, true); window.addEventListener('resize', onReflow); window.addEventListener('scroll', onReflow, true) })
 onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true); window.removeEventListener('keydown', onKey, true); window.removeEventListener('resize', onReflow); window.removeEventListener('scroll', onReflow, true) })
@@ -127,34 +123,46 @@ function num(i: number, key: 'x' | 'y' | 'blur' | 'spread', ev: Event) {
   const input = ev.target as HTMLInputElement
   const v = Number(input.value.replace(/[^\d.-]/g, ''))
   if (!input.value.trim() || !Number.isFinite(v)) { const e = list.value[i] as Record<string, unknown> | undefined; input.value = String(e?.[key] ?? 0); return }
-  set(i, { [key]: key === 'blur' ? Math.max(0, v) : v })
+  setNum(i, key, key === 'blur' ? Math.max(0, v) : v)
 }
+type NumKey = 'x' | 'y' | 'blur' | 'spread'
+/** 숫자 칸에 연결된 토큰 id */
+const numVar = (e: Effect, key: NumKey) => (e.vars as Partial<Record<NumKey, string>> | undefined)?.[key] ?? null
+const withoutVar = (e: Effect, key: NumKey) => { const v = { ...(e.vars as Record<string, string> | undefined) }; delete v[key]; return Object.keys(v).length ? v : undefined }
+/** 숫자를 직접 바꾸면 그 칸의 토큰 연결은 풀려요 */
+function setNum(i: number, key: NumKey, v: number) { setList((l) => l.map((e, k) => (k === i ? ({ ...e, [key]: v, vars: withoutVar(e, key) } as Effect) : e))) }
+/** 토큰 고르기: 값 = 토큰 숫자, 연결 기억 */
+function pickVar(i: number, key: NumKey, t: CatalogToken) {
+  if (t.num === undefined) return
+  const v = key === 'blur' ? Math.max(0, t.num) : t.num
+  setList((l) => l.map((e, k) => (k === i ? ({ ...e, [key]: v, vars: { ...(e.vars as Record<string, string> | undefined), [key]: t.id } } as Effect) : e)))
+}
+function unbindVar(i: number, key: NumKey) { setList((l) => l.map((e, k) => (k === i ? ({ ...e, vars: withoutVar(e, key) } as Effect) : e))) }
+function stepVar(i: number, key: NumKey, d: number) { const e = list.value[i] as Record<string, number> | undefined; const v = (e?.[key] ?? 0) + d; setNum(i, key, key === 'blur' ? Math.max(0, v) : v) }
 function stepNum(i: number, key: 'x' | 'y' | 'blur' | 'spread', ev: KeyboardEvent) {
   if (ev.key === 'Enter') { (ev.target as HTMLInputElement).blur(); return }
   if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return
   ev.preventDefault()
   const e = list.value[i] as Record<string, number> | undefined
   const v = (e?.[key] ?? 0) + (ev.key === 'ArrowUp' ? 1 : -1) * (ev.shiftKey ? 10 : 1)
-  set(i, { [key]: key === 'blur' ? Math.max(0, v) : v })
+  setNum(i, key, key === 'blur' ? Math.max(0, v) : v)
 }
 const hex = (c: string) => parseColor(c)?.hex ?? '#000000'
 const alpha = (c: string) => parseColor(c)?.a ?? 1
 const blur = (e: KeyboardEvent) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }
 const shadow = (e: Effect): e is Extract<Effect, { type: 'drop' | 'inner' }> => e.type === 'drop' || e.type === 'inner'
 
-// --- Effect styles(디자인 시스템 그림자) ---
-const stylesOpen = ref(false)
-const stylesBtn = ref<HTMLElement | null>(null)
-const boundBtn = ref<HTMLElement | null>(null)
-const stylesEl = ref<HTMLElement | null>(null)
-const stylesPos = ref<Record<string, string>>({ visibility: 'hidden' })
-const placeStyles = () => placeAt(boundBtn.value ?? stylesBtn.value, stylesEl.value, stylesPos)
-watch(stylesOpen, (v) => { stylesPos.value = { visibility: 'hidden' }; q.value = ''; if (v) { open.value = null; catalog.ensure(); nextTick(() => { placeStyles(); nextTick(placeStyles) }) } })
-const q = ref('')
-const shadowStyles = computed(() => {
-  const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  return catalog.list(['shadow']).filter((t) => words.every((w) => t.name.toLowerCase().includes(w)))
-})
+// --- Effect styles(디자인 시스템 그림자): 고르기 · 바꾸기는 TokenPicker(채우기 토큰 목록과 같은 창) ---
+/** 연결된 스타일의 효과가 모두 숨김이면 눈 끔 */
+const allOff = computed(() => list.value.length > 0 && list.value.every((e) => e.visible === false))
+/** 같은 색(값 · 투명도)의 색 토큰 — 그림자 색 묶음(shadow/…)을 먼저 */
+function colorTokenFor(pc: { hex: string; a: number }) {
+  const same = catalog.list(['color']).filter((t) => { const q = parseColor(t.color); return !!q && q.hex === pc.hex && Math.abs(q.a - pc.a) < 0.006 })
+  return same.find((t) => t.name.startsWith('shadow/')) ?? same[0]
+}
+/** 같은 값의 간격(spacing) 토큰 */
+const numTokenFor = (v: number) => (v ? catalog.list(['spacing']).find((t) => t.num === v) : undefined)
+const colorOf = (c: string) => { const p = parseColor(c); return p ? (p.a < 1 ? withAlpha(p.hex, p.a) : p.hex) : c }
 /** box-shadow 글 → 효과 목록('0 4px 8px 0 rgba(0,0,0,.1), inset …') */
 function parseShadow(css: string): Effect[] {
   const parts: string[] = []
@@ -174,14 +182,19 @@ function parseShadow(css: string): Effect[] {
     if (cm) s = s.replace(raw, '')
     const [x = 0, y = 0, b = 0, sp = 0] = (s.match(/-?\d*\.?\d+/g) ?? []).map(Number)
     const pc = parseColor(raw)
-    return { type: inset ? 'inner' : 'drop', x, y, blur: b, spread: sp, color: pc ? (pc.a < 1 ? withAlpha(pc.hex, pc.a) : pc.hex) : '#00000040' }
+    const color = pc ? (pc.a < 1 ? withAlpha(pc.hex, pc.a) : pc.hex) : '#00000040'
+    // 색은 같은 값의 색 토큰(그림자 색 shadow/01 …)에 연결해 둬요 — 스타일을 떼도 안쪽 색은 토큰으로 남아요(피그마와 같아요)
+    const tok = pc ? colorTokenFor(pc) : undefined
+    // 숫자도 같은 값의 간격 토큰에 연결(있는 값만 — 0 · -1 처럼 토큰이 없는 값은 숫자 그대로)
+    const vars: Partial<Record<'x' | 'y' | 'blur' | 'spread', string>> = {}
+    for (const [k, v] of [['x', x], ['y', y], ['blur', b], ['spread', sp]] as const) { const t = numTokenFor(v); if (t) vars[k] = t.id }
+    return { type: inset ? 'inner' : 'drop', x, y, blur: b, spread: sp, color: tok?.color ? colorOf(tok.color) : color, ...(tok ? { token: tok.id } : {}), ...(Object.keys(vars).length ? { vars } : {}) }
   })
 }
 function applyStyle(t: CatalogToken) {
   const effects = parseShadow(t.css ?? t.value)
   if (props.frame) store.batch(() => { for (const id of frameIds.value) store.frameStyle(id, { effects }, { shadow: t.id }) })
   else store.bind(props.sid, props.ids, 'shadow', t.id, () => ({ style: { effects } }))
-  stylesOpen.value = false
 }
 /** 연결 풀기: 효과는 그대로 */
 function detach() {
@@ -195,19 +208,22 @@ function detach() {
     <div :class="['sec-h', 'h24', { empty: !list.length && !mixed }]">
       <span>{{ tr('Effects') }}</span>
       <span class="acts">
-        <button ref="stylesBtn" class="ib s24 styl" :class="{ on: stylesOpen }" :aria-label="tr('Apply styles')" :data-tip="tr('Apply styles')" @click="stylesOpen = !stylesOpen"><EditorIcon name="apply_styles" /></button>
+        <!-- 스타일 적용: 채우기 · 글자와 같은 토큰 목록 창(검색 · 라이브러리 · 묶음) -->
+        <TokenPicker variant="icon" icon="apply_styles" :kinds="['shadow']" label="Effect styles" @pick="applyStyle" />
         <button class="ib s24" :aria-label="tr('Add effect')" :data-tip="tr('Add effect')" aria-haspopup="menu" @click="addMenu"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
     <p v-if="mixed" class="tx-meta m0">{{ tr('Click + to replace mixed content') }}</p>
 
-    <!-- 스타일이 연결됐어요: [스타일 이름] [연결 풀기] [−] (피그마와 같아요) -->
-    <div v-if="boundId && list.length" class="prow bound">
-      <button ref="boundBtn" type="button" :class="['sq', 'fld', 'efb', { on: stylesOpen }]" :aria-label="tr('Change effect style')" @click="stylesOpen = !stylesOpen">
+    <!-- 스타일이 연결됐어요: 채우기 토큰 칸과 같아요 — [아이콘 · 스타일 칩(누르면 목록 · 올리면 연결 풀기)] [👁] [−] (사용자 요청 2026-11-27) -->
+    <div v-if="boundId && list.length" class="prow bound" :class="{ off: allOff }">
+      <div class="sq fld pf bound">
         <EditorIcon class="keep ic" name="effect_style" />
-        <span class="nm">{{ boundTok?.name ?? boundId }}</span>
+        <TokenPicker :kinds="['shadow']" :bound="boundId" label="Effect style" @pick="applyStyle" @unbind="detach" />
+      </div>
+      <button class="ib s24" :aria-label="allOff ? tr('Show effect') : tr('Hide effect')" :data-tip="allOff ? tr('Show') : tr('Hide')" @click="setList((l) => l.map((e) => ({ ...e, visible: allOff ? undefined : false }) as Effect))">
+        <EditorIcon :name="allOff ? 'eye_off' : 'eye'" :size="16" />
       </button>
-      <button class="ib s24" :aria-label="tr('Detach style')" :data-tip="tr('Detach style')" @click="detach"><EditorIcon name="unlink" :size="16" /></button>
       <button class="ib s24" :aria-label="tr('Remove effect')" :data-tip="tr('Remove')" @click="replaceAll([])"><EditorIcon name="minus" :size="16" /></button>
     </div>
 
@@ -240,21 +256,21 @@ function detach() {
               <template v-if="shadow(e)">
                 <div class="row">
                   <span class="lb">{{ tr('Position') }}</span>
-                  <label class="sq fld"><span class="k">X</span><input :key="'x' + e.x" :value="e.x" inputmode="numeric" aria-label="X" @change="num(i, 'x', $event)" @keydown="stepNum(i, 'x', $event)"></label>
+                  <label class="sq fld pf2"><span class="k">X</span><input v-if="!numVar(e, 'x')" :key="'x' + e.x" :value="e.x" inputmode="numeric" aria-label="X" @change="num(i, 'x', $event)" @keydown="stepNum(i, 'x', $event)"><TokenPicker :kinds="['spacing']" :bound="numVar(e, 'x')" reveal label="X" @pick="(t) => pickVar(i, 'x', t)" @unbind="unbindVar(i, 'x')" @step="(d) => stepVar(i, 'x', d)" /></label>
                 </div>
                 <div class="row">
                   <span />
-                  <label class="sq fld"><span class="k">Y</span><input :key="'y' + e.y" :value="e.y" inputmode="numeric" aria-label="Y" @change="num(i, 'y', $event)" @keydown="stepNum(i, 'y', $event)"></label>
+                  <label class="sq fld pf2"><span class="k">Y</span><input v-if="!numVar(e, 'y')" :key="'y' + e.y" :value="e.y" inputmode="numeric" aria-label="Y" @change="num(i, 'y', $event)" @keydown="stepNum(i, 'y', $event)"><TokenPicker :kinds="['spacing']" :bound="numVar(e, 'y')" reveal label="Y" @pick="(t) => pickVar(i, 'y', t)" @unbind="unbindVar(i, 'y')" @step="(d) => stepVar(i, 'y', d)" /></label>
                 </div>
               </template>
               <div class="row">
                 <span class="lb">{{ tr('Blur') }}</span>
-                <label class="sq fld"><EditorIcon class="keep k" name="blur" /><input :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="stepNum(i, 'blur', $event)"></label>
+                <label class="sq fld pf2"><EditorIcon class="keep k" name="blur" /><input v-if="!numVar(e, 'blur')" :key="'b' + e.blur" :value="e.blur" inputmode="numeric" :aria-label="tr('Blur')" @change="num(i, 'blur', $event)" @keydown="stepNum(i, 'blur', $event)"><TokenPicker :kinds="['spacing']" :bound="numVar(e, 'blur')" reveal label="Blur" @pick="(t) => pickVar(i, 'blur', t)" @unbind="unbindVar(i, 'blur')" @step="(d) => stepVar(i, 'blur', d)" /></label>
               </div>
               <template v-if="shadow(e)">
                 <div class="row">
                   <span class="lb">{{ tr('Spread') }}</span>
-                  <label class="sq fld"><EditorIcon class="keep k" name="spread" /><input :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" :aria-label="tr('Spread')" @change="num(i, 'spread', $event)" @keydown="stepNum(i, 'spread', $event)"></label>
+                  <label class="sq fld pf2"><EditorIcon class="keep k" name="spread" /><input v-if="!numVar(e, 'spread')" :key="'s' + e.spread" :value="e.spread ?? 0" inputmode="numeric" :aria-label="tr('Spread')" @change="num(i, 'spread', $event)" @keydown="stepNum(i, 'spread', $event)"><TokenPicker :kinds="['spacing']" :bound="numVar(e, 'spread')" reveal label="Spread" @pick="(t) => pickVar(i, 'spread', t)" @unbind="unbindVar(i, 'spread')" @step="(d) => stepVar(i, 'spread', d)" /></label>
                 </div>
                 <div class="row">
                   <span class="lb">{{ tr('Color') }}</span>
@@ -276,21 +292,6 @@ function detach() {
       </div>
     </template>
 
-    <!-- Effect styles: 디자인 시스템 그림자(피그마와 같아요) -->
-    <Teleport v-if="stylesOpen" to="body">
-      <div ref="stylesEl" v-front class="sq fx-pop st-pop editor" role="dialog" :aria-label="tr('Effect styles')" :style="stylesPos">
-        <div class="pop-h"><span class="pop-t">{{ tr('Effect styles') }}</span><button type="button" class="ib s24" :aria-label="tr('Close')" :data-tip="tr('Close')" @click="stylesOpen = false"><EditorIcon name="close" :size="16" /></button></div>
-        <div class="st-s"><label class="sq st-q"><EditorIcon name="search" :size="16" class="muted" /><input v-model="q" :placeholder="tr('Search')" :aria-label="tr('Search effect styles')" spellcheck="false"></label></div>
-        <div v-ovscroll class="st-l">
-          <div class="st-g">바드림 Design System</div>
-          <button v-for="t in shadowStyles" :key="t.id" type="button" :class="['sq', 'st-row', { on: t.id === boundId }]" :data-tip="t.value" @click="applyStyle(t)">
-            <span class="sq st-pv" :style="{ boxShadow: t.css }" />
-            <span class="nm">{{ t.name }}</span>
-          </button>
-          <p v-if="!shadowStyles.length" class="tx-meta m0 st-empty">{{ tr('No styles found') }}</p>
-        </div>
-      </div>
-    </Teleport>
     <div v-if="drag" class="row-drop" :style="{ top: drag.y + 'px', left: drag.x + 'px', width: drag.w + 'px' }" />
   </section>
 </template>
@@ -303,7 +304,6 @@ function detach() {
 .acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
-.muted { color: var(--sys-color-neutral-500); }
 /* 피그마 Effects 행: [아이콘 + 이름] 8 [👁 24][− 24] — Fill 행과 같은 열 */
 .prow { display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; min-width: 0; }
 .prow > .efb { margin-right: var(--ref-spacing-06); }
@@ -316,23 +316,20 @@ function detach() {
 .efb.on .nm, .efb.on .ic { color: var(--sys-color-brand-primary-default); }
 /* 누른 뒤 포커스만 남은 칸은 보통 모습(파란 선은 연 동안만) — 키보드 포커스는 바깥 링 */
 .efb:not(.on):focus-within { --sq-line: transparent; }
-.prow.bound .efb:not(.on):focus-within { --sq-line: var(--sys-color-neutral-400); }
 .efb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-/* 스타일이 연결된 칸: 칠 · 글자 변수와 같은 흰 토큰 상자(흰 바탕 + 0.5px neutral-400, 올리면 500, 연 동안 회색 1px — main.css --iris-open-line) */
-.prow.bound .efb { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--sys-color-neutral-400); --sq-line-w: 0.5px; }
-.prow.bound .efb:hover { --sq-line: var(--sys-color-neutral-500); }
-.prow.bound .efb.on { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-open-line); --sq-line-w: 1px; }
-.prow.bound .efb.on .nm { color: var(--sys-color-neutral-800); }
-.prow.bound .efb.on .ic { color: var(--sys-color-neutral-700); }
+/* 스타일이 연결된 칸: 채우기 토큰 칸과 같아요 — [스타일 아이콘(견본 자리) · 토큰 칩] (칩 · 목록 · 연결 풀기는 TokenPicker) */
+.prow > .pf { margin-right: var(--ref-spacing-06); }
+.prow.off .pf { opacity: 0.45; }
+.pf > .ic { flex: none; color: var(--sys-color-neutral-700); }
 /* 설정 창: 폭 240 · 머리 40(아래 선) · 본문 안쪽 12 · 줄 사이 8 · [이름 72 | 값] */
 .fx-pop { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); font-size: 12px; line-height: 18px; text-align: left; }
 .pop-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; box-sizing: border-box; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
-.pop-k { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; color: var(--sys-color-neutral-800); }
+/* 종류 ▾ 메뉴는 이 칸 바로 아래에 열려요(기준 상자 — 없으면 창 맨 아래로 떨어져 잘렸어요) */
+.pop-k { position: relative; display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; color: var(--sys-color-neutral-800); }
 .pop-k :deep(.inl) { font-size: 12px; font-weight: 600; color: var(--sys-color-neutral-800); }
 /* 종류 ▾: 처음부터 꺾쇠가 보여요(피그마와 같아요) */
 .pop-k :deep(.inl .cv) { display: block; }
 .pop-k :deep(.inl) { height: 24px; padding: 0 var(--ref-spacing-03) 0 var(--ref-spacing-04); gap: var(--ref-spacing-03); }
-.pop-t { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .pop-b { padding: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .row { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-04); min-height: 28px; }
 .lb { color: var(--sys-color-neutral-500); white-space: nowrap; }
@@ -343,25 +340,13 @@ function detach() {
 .pf.bound { padding-right: var(--ref-spacing-06); }
 /* 좁은 칸: 변수 버튼은 올리거나 입력 중일 때만 자리를 차지해요(색 값이 잘리지 않게) */
 .pf:not(:hover):not(:focus-within) > :deep(.reveal) { display: none; }
+/* 숫자 칸: 변수 버튼은 올리거나 입력 중일 때만(채우기 · 레이어 숫자 칸과 같아요), 연결되면 칸 안 토큰 칩 */
+.pf2:not(:hover):not(:focus-within) > :deep(.reveal) { display: none; }
+.pf2:has(.tchip-w) { padding-right: var(--ref-spacing-04); }
 .hex { flex: 1; min-width: 0; padding: 0; text-transform: uppercase; }
 .vsep { width: 1px; align-self: stretch; margin: 1px 0; background: var(--sys-color-common-white-emphasis); flex: none; }
 .op { flex: none; width: 48px; height: 100%; box-sizing: border-box; margin-left: calc(-1 * var(--ref-spacing-06)); padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
 .op .pct { flex: 1; width: auto; min-width: 0; padding: 0; text-align: right; }
 .op .unit { flex: none; font-style: normal; color: var(--sys-color-neutral-500); }
-.fld:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
-/* Effect styles 창: 검색(이리스 검색칸) · 묶음 이름 · 행 32(연결된 스타일은 옅은 파랑) */
-.st-pop { max-height: min(440px, calc(100vh - 16px)); }
-.st-s { flex: none; padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-04); }
-.st-q { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; box-sizing: border-box; padding: 0 var(--ref-spacing-06); border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); cursor: text; }
-.st-q input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--sys-color-neutral-800); }
-.st-q input::placeholder { color: var(--sys-color-neutral-500); }
-.st-q:focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; }
-.st-l { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: var(--ref-spacing-04) 0 var(--ref-spacing-04); display: flex; flex-direction: column; }
-.st-g { padding: var(--ref-spacing-04) var(--ref-spacing-08); font-weight: 600; color: var(--sys-color-neutral-800); }
-.st-row { display: flex; align-items: center; gap: var(--ref-spacing-06); height: 32px; padding: 0 var(--ref-spacing-08); border-radius: 0; text-align: left; color: var(--sys-color-neutral-800); }
-.st-row:hover { --sq-fill: var(--sys-color-neutral-100); }
-.st-row.on { --sq-fill: var(--iris-sel); }
-.st-pv { flex: none; width: 14px; height: 14px; border-radius: 3px; --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.st-row .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.st-empty { padding: var(--ref-spacing-06) var(--ref-spacing-08); }
+.fld:not(.bound):focus-within { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
 </style>

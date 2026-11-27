@@ -51,7 +51,8 @@ const chipValue = computed(() => {
 const asChip = computed(() => props.variant === 'auto' && !!props.bound)
 /** 글자 스타일 목록: 피그마 Text styles 창 모양. 떼기는 목록이 아니라 칸 옆 버튼으로(피그마와 같아요) */
 const isTS = computed(() => props.kinds[0] === 'textStyle')
-const hasDetach = computed(() => !!props.bound && !isTS.value)
+/** 목록 맨 위 'Detach variable' 줄은 없어요 — 떼기는 칸 옆 연결 풀기 버튼으로(사용자 요청 2026-11-27) */
+const hasDetach = computed(() => false)
 
 const open = ref(false)
 const q = ref('')
@@ -145,10 +146,10 @@ function focusCaret() { caretOn.value = true; nextTick(() => caret.value?.focus(
 /** 칩 한 번 누르기: 칩 오른쪽 커서 + 토큰 목록 창을 함께 — 바로 다른 값을 고르거나 Backspace(연결 끊기) · 글자(찾기) */
 let caretWas = false
 function chipDown() { caretWas = caretOn.value || open.value }
+/** 칩 누르기 = 토큰 목록 창 열고 닫기. 칩 오른쪽 커서는 없어요(사용자 요청 2026-11-27) */
 function chipClick() {
-  if (caretWas && open.value) { close(); caretOn.value = false; return }
-  focusCaret()
-  show(false)
+  if (caretWas && open.value) { close(); return }
+  show()
 }
 async function caretKey(e: KeyboardEvent) {
   if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -315,7 +316,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
             role="option"
             :aria-selected="t.id === bound"
             :class="['sq', 'menu-item', { on: t.id === bound, cur: active === i }]"
-            :title="t.kind === 'color' ? t.name : `${t.name} · ${t.value}`"
+            :title="t.kind === 'color' || t.kind === 'shadow' ? t.name : `${t.name} · ${t.value}`"
             @click="choose(i)"
             @pointermove="active = i"
           >
@@ -327,7 +328,8 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
             <span v-if="t.kind === 'textStyle'" class="nm">{{ leaf(t.name) }}<span class="tsv"> · {{ t.value }}</span></span>
             <template v-else>
               <span class="nm">{{ leaf(t.name) }}</span>
-              <span v-if="t.kind !== 'color'" class="vl">{{ t.value }}</span>
+              <!-- 색 · 그림자 스타일은 이름만(세부 값은 감춰요 — 피그마 Effect styles 와 같아요) -->
+              <span v-if="t.kind !== 'color' && t.kind !== 'shadow'" class="vl">{{ t.value }}</span>
             </template>
           </button>
         </template>

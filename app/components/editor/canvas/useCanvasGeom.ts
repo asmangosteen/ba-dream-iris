@@ -17,12 +17,13 @@ export function useCanvasGeom(canvas: Ctx) {
   /** 캔버스에 그리는 화면들: 캔버스 층 · 숨긴 화면(레이어 목록 눈)은 빼요 — 숨긴 화면은 그리지도, 붙지도, 잡히지도 않아요 */
   const realScreens = computed(() => props.screens.filter((s) => !isCanvas(s) && !store.doc(s.id).frame?.hidden))
   const canvasDoc = computed(() => props.screens.find(isCanvas) ?? null)
-  /** 캔버스 위 맨 위 단계 레이어: 섹션은 화면 아래(under), 나머지는 화면 위(over) */
+  /** 캔버스 위 맨 위 단계 레이어: 섹션 · 뒤로 보내 화면 뒤로 간 레이어(under)는 화면 아래, 나머지는 화면 위(over) */
   const canvasRoots = computed(() => {
     const c = canvasDoc.value
     if (!c) return { under: [] as string[], over: [] as string[] }
     const d = store.doc(c.id)
-    return { under: d.rootIds.filter((id) => d.nodes[id]?.type === 'section'), over: d.rootIds.filter((id) => d.nodes[id]?.type !== 'section') }
+    const below = (id: string) => d.nodes[id]?.type === 'section' || !!d.nodes[id]?.under
+    return { under: d.rootIds.filter(below), over: d.rootIds.filter((id) => !below(id)) }
   })
 
   const rectOf = (s: { x: number; y: number; width: number; height: number }): Rect => ({ x: s.x, y: s.y, w: s.width, h: s.height })
