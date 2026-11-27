@@ -202,7 +202,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .notes { display: flex; flex-direction: column; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .nh { display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 28px; }
 /* 메모 칸 머리: 수정 기록 머리와 같은 위 막대(높이 44 · 아래 선 · 스크롤해도 위에) — 칸 안쪽 여백(--notes-pad-*)만큼 바깥으로 */
-.notes > .nh { position: sticky; top: calc(-1 * var(--notes-pad-t, 16px)); z-index: 1; min-height: 44px; box-sizing: border-box; margin: calc(-1 * var(--notes-pad-t, 16px)) calc(-1 * var(--notes-pad-x, 16px)) var(--ref-spacing-04); padding: var(--ref-spacing-06) calc(var(--notes-pad-x, 16px) - 4px) var(--ref-spacing-06) var(--notes-pad-x, 16px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+.notes > .nh { position: sticky; top: calc(-1 * var(--notes-pad-t, 16px)); z-index: 2; height: 44px; box-sizing: border-box; margin: calc(-1 * var(--notes-pad-t, 16px)) calc(-1 * var(--notes-pad-x, 16px)) var(--ref-spacing-04); padding: 0 calc(var(--notes-pad-x, 16px) - 4px) 0 var(--notes-pad-x, 16px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
 /* 닫기(X): 수정 기록 머리의 X 와 같은 28 버튼 */
 .xbtn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
 .xbtn:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }

@@ -277,4 +277,5 @@ export default {
   'Fill in the Policy column': '\'정책\' 열 채우기',
   'Go to the row': '그 행으로',
   'Notes {n}': '메모 {n}',
+  'Discard unsaved changes?': '저장하지 않은 내용을 버릴까요?',
 } satisfies Record<string, string>

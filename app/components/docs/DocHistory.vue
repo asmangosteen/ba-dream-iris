@@ -145,7 +145,7 @@ function restore(before = false) {
 
 <style scoped>
 .hist { display: flex; flex-direction: column; gap: var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.hh { position: sticky; top: calc(-1 * var(--doc-pad-t, 16px)); z-index: 1; display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 44px; box-sizing: border-box; margin: calc(-1 * var(--doc-pad-t, 16px)) calc(-1 * var(--doc-pad-x, 24px)) 0; padding: var(--ref-spacing-06) calc(var(--doc-pad-x, 24px) - 4px) var(--ref-spacing-06) var(--doc-pad-x, 24px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+.hh { position: sticky; top: calc(-1 * var(--doc-pad-t, 16px)); z-index: 2; display: flex; align-items: center; gap: var(--ref-spacing-04); height: 44px; box-sizing: border-box; margin: calc(-1 * var(--doc-pad-t, 16px)) calc(-1 * var(--doc-pad-x, 24px)) 0; padding: 0 calc(var(--doc-pad-x, 24px) - 4px) 0 var(--doc-pad-x, 24px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
 .desc { margin: 0; }
 .f1 { flex: 1; }
 .ib.s { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }

@@ -8,6 +8,7 @@ import DocNotes, { type DocAnchor } from '~/components/docs/DocNotes.vue'
 import DocHistory from '~/components/docs/DocHistory.vue'
 import type { DocBlock, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import AppConfirm from '~/components/app/AppConfirm.vue'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
 const route = useRoute()
@@ -572,20 +573,22 @@ async function removeDoc() {
       </div>
       </div>
 
-      <!-- 확인 줄 -->
-      <div v-if="bar === 'leave'" class="confirm" role="alertdialog" aria-labelledby="leaveMsg">
-        <span id="leaveMsg" class="tx-body confirm-t">{{ tr('You have unsaved changes. Discard them and leave?') }}</span>
-        <Button size="s" type="tertiary" @click="closeBars">{{ tr('Keep editing') }}</Button>
-        <Button size="s" type="destructed" stroke @click="discard">{{ tr('Discard') }}</Button>
-      </div>
-      <div v-else-if="bar === 'delete' && doc" class="confirm" role="alertdialog" aria-labelledby="delMsg" aria-describedby="delSub">
-        <span class="confirm-col">
-          <span id="delMsg" class="tx-head">{{ tr('Delete “{name}”?', { name: doc.title }) }}</span>
-          <span id="delSub" class="tx-meta">{{ tr('Its policies and screen links will be deleted too. This can’t be undone.') }}</span>
-        </span>
-        <Button size="s" type="tertiary" :disabled="deleting" @click="closeBars">{{ tr('Cancel') }}</Button>
-        <Button size="s" type="destructed" :loading="deleting" @click="removeDoc">{{ tr('Delete') }}</Button>
-      </div>
+      <!-- 확인: 공용 확인 팝업(AppConfirm · 프로필 편집 창 양식) — 아래 줄로 띄우지 않아요(사용자 요청 2026-11-27) -->
+      <AppConfirm
+        v-if="bar === 'leave'"
+        :title="tr('Discard unsaved changes?')"
+        :desc="tr('You have unsaved changes. Discard them and leave?')"
+        :actions="[{ label: tr('Keep editing'), onClick: closeBars }, { label: tr('Discard'), kind: 'destructed', onClick: discard }]"
+        @close="closeBars"
+      />
+      <AppConfirm
+        v-else-if="bar === 'delete' && doc"
+        :title="tr('Delete “{name}”?', { name: doc.title })"
+        :desc="tr('Its policies and screen links will be deleted too. This can’t be undone.')"
+        :closable="!deleting"
+        :actions="[{ label: tr('Cancel'), onClick: closeBars }, { label: tr('Delete'), kind: 'destructed', loading: deleting, onClick: removeDoc }]"
+        @close="closeBars"
+      />
 
       <p class="sr" role="status" aria-live="polite">{{ notice }}</p>
       <Transition name="fade">
@@ -649,10 +652,10 @@ async function removeDoc() {
 .doc.wide { width: 880px; }
 .doc-main { flex: 1; min-height: 0; display: flex; }
 .doc-main > .doc-body { flex: 1; min-width: 0; }
-.notes-col { position: relative; flex: none; width: 0; overflow: hidden; display: flex; transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
+.notes-col { position: relative; z-index: 0; flex: none; width: 0; overflow: hidden; display: flex; transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
 .notes-col.open { width: 280px; }
 /* 위아래 긴 구분선: 맨 위 층에 따로 그려서 메모 머리 막대(흰 바탕)가 덮지 않게 */
-.notes-col::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--iris-line); z-index: 2; pointer-events: none; }
+.notes-col::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--iris-line); z-index: 3; pointer-events: none; }
 .notes-in { --notes-pad-t: var(--ref-spacing-10); --notes-pad-x: var(--ref-spacing-10); width: 280px; flex: none; overflow: auto; box-sizing: border-box; padding: var(--notes-pad-t) var(--notes-pad-x) var(--ref-spacing-08); margin-bottom: var(--ref-spacing-12); }
 @media (prefers-reduced-motion: reduce) { .doc, .notes-col, .canvas { transition: none; } }
 .read-main { flex: 1; min-width: 0; }
@@ -678,7 +681,8 @@ async function removeDoc() {
 .dicon { flex: none; display: inline-flex; }
 /* 안쪽 여백: 위 16 · 좌우 24 · 아래 32(예전 32 · 40 · 48 이 너무 넓다는 요청 2026-11-27). 편집 위 막대도 이 값을 따라요 */
 /* 아래도 좌우 여백(24)만큼 비워 두고 스크롤 영역은 그 위에서 끝나요 — 내용이 패널 바닥까지 흘러 보이지 않게(사용자 요청 2026-11-27) */
-.doc-body { --doc-pad-t: var(--ref-spacing-10); --doc-pad-x: var(--ref-spacing-12); flex: 1; min-height: 0; overflow: auto; padding: var(--doc-pad-t) var(--doc-pad-x) var(--ref-spacing-08); margin-bottom: var(--doc-pad-x); }
+/* position · z-index 0: 안쪽 층(분류 버튼 z 1 등)을 이 칸 안에 가둬요 — 위 막대(z 2)가 늘 위, 패널 테두리(z 1)는 이 칸 위 */
+.doc-body { position: relative; z-index: 0; --doc-pad-t: var(--ref-spacing-10); --doc-pad-x: var(--ref-spacing-12); flex: 1; min-height: 0; overflow: auto; padding: var(--doc-pad-t) var(--doc-pad-x) var(--ref-spacing-08); margin-bottom: var(--doc-pad-x); }
 .loading { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .missing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
 .missing p { margin: 0 0 var(--ref-spacing-04); }
@@ -698,11 +702,6 @@ async function removeDoc() {
 .code:hover, .code[aria-pressed='true'] { --sq-fill: var(--sys-color-brand-primary-lighter); }
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
-/* 확인 줄이 뜨면 아래 여백 자리를 확인 줄이 써요 */
-.doc-main + .confirm { margin-top: calc(-1 * var(--ref-spacing-12)); }
-.confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }
-.confirm-t, .confirm-col { flex: 1; min-width: 0; }
-.confirm-col { display: flex; flex-direction: column; }
 
 .toast { position: absolute; left: 50%; bottom: var(--ref-spacing-12); transform: translateX(-50%); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-weight: 500; white-space: nowrap; filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); }
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }
