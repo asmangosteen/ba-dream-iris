@@ -990,7 +990,8 @@ async function removeDoc() {
       </div>
       <!-- 왼쪽 아래: ID 순서 · 확대 + 안내 -->
       <div class="bl">
-      <div class="sq float zoombar" @pointerdown.stop @click.stop>
+      <!-- 위 알약(.float.s)과 같은 곡률 12 · 높이 40 -->
+      <div class="sq float s zoombar" @pointerdown.stop @click.stop>
         <button type="button" :class="['sq', 'zb', 'zb-txt', { on: idOrder }]" :aria-pressed="idOrder" :data-tip="idOrder ? tr('Back to layout') : tr('Sort by screen ID')" data-tip-at="top" @click="toggleIdOrder"><EditorIcon name="list_numbered" :size="16" />{{ tr('Sort by screen ID') }}</button>
         <span class="zsep" aria-hidden="true" />
         <button type="button" class="sq zb" :aria-label="tr('Zoom out')" :data-tip="tr('Zoom out')" data-tip-at="top" @click="zoomBy(1 / 1.25)"><EditorIcon name="minus" :size="16" /></button>
