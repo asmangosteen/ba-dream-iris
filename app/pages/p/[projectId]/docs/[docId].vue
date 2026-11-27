@@ -23,7 +23,7 @@ const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const screens = useProjectScreens(projectId)
 const slots = useScreenSlots(projectId)
-const { addRequirement, removeRequirement, linkMany, syncDocFormat, addHistory } = useIrisMutations()
+const { addRequirement, removeRequirement, linkMany, setLink, removeLink, syncDocFormat, addHistory } = useIrisMutations()
 const comments = useComments(projectId)
 
 const projectName = computed(() => projects.value?.find((p) => p.id === projectId)?.name ?? '')
@@ -348,7 +348,7 @@ const editing = ref(route.query.edit === '1')
  * 양 끝에 동그라미(화면 오른쪽 점 · 정책 줄 왼쪽 가장자리). 스크롤 · 패널 움직임을 따라가도록 고른 동안 매 프레임 자리를 다시 재요.
  * 한쪽 끝이 보이는 영역 밖(문서 · 캔버스 스크롤 밖)이면 그 선은 숨겨요
  */
-type LinkLine = { key: string; col: string; layer: string | null; x1: number; y1: number; x2: number; y2: number }
+type LinkLine = { key: string; col: string; screen: string; req: string; layer: string | null; x1: number; y1: number; x2: number; y2: number }
 const linkLines = ref<LinkLine[]>([])
 type LinePair = { col: string; req: string; layer: string | null }
 /** 연결 하나 → 선(요소에 연결됐으면 요소마다, 아니면 화면에서) */
@@ -391,7 +391,7 @@ function measureLines() {
     const [x1, y1] = nearestSide(src, x2, y2)
     if (x1 < cv.left || x1 > Math.min(cv.right, docLeft) || y1 < cv.top || y1 > cv.bottom) continue
     if (y2 < body.top || y2 > body.bottom) continue
-    out.push({ key: p.col + '|' + p.req + '|' + (p.layer ?? ''), col: p.col, layer: p.layer, x1, y1, x2, y2 })
+    out.push({ key: p.col + '|' + p.req + '|' + (p.layer ?? ''), col: p.col, screen: frames.value.find((x) => x.key === p.col)?.screen?.id ?? '', req: p.req, layer: p.layer, x1, y1, x2, y2 })
   }
   const same = out.length === linkLines.value.length && out.every((l, i) => { const o = linkLines.value[i]!; return o.key === l.key && Math.abs(o.x1 - l.x1) < 0.5 && Math.abs(o.y1 - l.y1) < 0.5 && Math.abs(o.x2 - l.x2) < 0.5 && Math.abs(o.y2 - l.y2) < 0.5 })
   if (!same) linkLines.value = out
@@ -498,6 +498,126 @@ function onFrameClick(c: Col) {
   pickCol(c)
 }
 watch(activeLayer, (v) => { if (!v) selBox.value = null })
+
+/**
+ * 선 끝 잡기(피그마 프로토타입 연결선처럼 — 사용자 요청 2026-11-27):
+ * 끝 동그라미를 누르면 그 선 하나만 골라져서 무엇과 무엇이 이어졌는지 보여요.
+ * 끝을 끌어 다른 정책 줄(문서 쪽) · 다른 요소나 화면(화면 쪽)에 놓으면 연결이 옮겨지고, 빈 곳에 놓으면 연결이 끊어져요
+ */
+const pickedLine = ref<string | null>(null)
+type EndTarget = { kind: 'req'; req: ReqRow } | { kind: 'layer'; col: Col; layer: string | null }
+const endDrag = ref<{ key: string; end: 'a' | 'b'; x: number; y: number; moved: boolean; sx: number; sy: number; target: EndTarget | null } | null>(null)
+const shownLines = computed(() => {
+  const list = pickedLine.value ? linkLines.value.filter((l) => l.key === pickedLine.value) : linkLines.value
+  const d = endDrag.value
+  if (!d?.moved) return list
+  return list.map((l) => (l.key !== d.key ? l : d.end === 'a' ? { ...l, x1: d.x, y1: d.y } : { ...l, x2: d.x, y2: d.y }))
+})
+watch(linkLines, (v) => { if (pickedLine.value && !endDrag.value && !v.some((l) => l.key === pickedLine.value)) pickedLine.value = null })
+watch(linePairs, () => { if (!endDrag.value) pickedLine.value = null })
+const pickedInfo = computed(() => {
+  const l = linkLines.value.find((x) => x.key === pickedLine.value)
+  if (!l) return null
+  const sc = frames.value.find((x) => x.key === l.col)
+  const r = docReqs.value.find((x) => x.id === l.req)
+  const from = (sc?.name ?? '') + (l.layer ? ' · ' + layerName(l.screen, l.layer) : '')
+  return { line: l, text: `${from} ↔ ${r?.code ?? ''}${r?.title ? ' ' + r.title : ''}`, x: (l.x1 + l.x2) / 2, y: (l.y1 + l.y2) / 2 }
+})
+/** 화면 쪽 동그라미(4개 중 하나)를 눌렀는데 그 자리에서 선이 나가고 있으면 새 연결 대신 그 선 끝을 잡아요 */
+function onDotDown(c: Col, e: PointerEvent, layer: string | null) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2
+  const l = linkLines.value.find((x) => x.col === c.key && x.layer === layer && Math.abs(x.x1 - cx) < 3 && Math.abs(x.y1 - cy) < 3 && (!pickedLine.value || x.key === pickedLine.value))
+  if (l) return grabEnd(l, 'a', e)
+  startLinkDrag(c, e, layer)
+}
+function grabEnd(l: LinkLine, end: 'a' | 'b', e: PointerEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  pickedLine.value = l.key
+  endDrag.value = { key: l.key, end, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, target: null }
+  window.addEventListener('pointermove', onEndMove)
+  window.addEventListener('pointerup', onEndUp, { once: true })
+}
+function endTargetAt(end: 'a' | 'b', x: number, y: number): { t: EndTarget | null; sx: number; sy: number } {
+  if (end === 'b') {
+    const hit = reqAt(x, y)
+    if (dropEl !== hit?.el) { dropEl?.classList.remove('drop-on'); dropEl = hit?.el ?? null; dropEl?.classList.add('drop-on') }
+    const rr = hit?.el.getBoundingClientRect()
+    return { t: hit ? { kind: 'req', req: hit.req } : null, sx: rr ? rr.left : x, sy: rr ? rr.top + rr.height / 2 : y }
+  }
+  const colEl = (document.elementFromPoint(x, y)?.closest('[data-col]') ?? null) as HTMLElement | null
+  const c = colEl ? frames.value.find((f) => f.key === colEl.getAttribute('data-col')) : null
+  if (!colEl || !c?.screen) { hover.value = null; return { t: null, sx: x, sy: y } }
+  const frame = colEl.querySelector('.frame')!
+  const el = layerAt(colEl, x, y)
+  const r = (el ?? frame).getBoundingClientRect(), cr = colEl.getBoundingClientRect()
+  const layer = el?.getAttribute('data-layer') ?? null
+  hover.value = { col: c.key, layer, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height }
+  return { t: { kind: 'layer', col: c, layer }, sx: x, sy: y }
+}
+function onEndMove(e: PointerEvent) {
+  const d = endDrag.value
+  if (!d) return
+  if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return
+  d.moved = true
+  const { t, sx, sy } = endTargetAt(d.end, e.clientX, e.clientY)
+  d.target = t
+  d.x = sx
+  d.y = sy
+}
+function stopEndDrag() {
+  dropEl?.classList.remove('drop-on')
+  dropEl = null
+  endDrag.value = null
+  window.removeEventListener('pointermove', onEndMove)
+}
+/** 연결 하나 끊기 — 요소 연결이면 그 요소만 빼고, 마지막 요소였으면 연결 자체를 지워요 */
+async function detach(screen: string, req: string, layer: string | null) {
+  const ex = docLinks.value.find((l) => l.screen_id === screen && l.requirement_id === req)
+  if (!ex) return
+  if (layer && (ex.layer_ids?.length ?? 0) > 1) await setLink({ ...ex, layer_ids: ex.layer_ids!.filter((x) => x !== layer) })
+  else await removeLink(screen, req)
+}
+async function onEndUp() {
+  const d = endDrag.value
+  window.removeEventListener('pointermove', onEndMove)
+  const l = d ? linkLines.value.find((x) => x.key === d.key) : null
+  stopEndDrag()
+  if (!d || !l || !d.moved) return
+  const sc = frames.value.find((x) => x.key === l.col)
+  const oldReq = docReqs.value.find((x) => x.id === l.req)
+  const nameOf = (c: Col | undefined, layer: string | null) => (c?.name ?? '') + (layer && c?.screen ? ' · ' + layerName(c.screen.id, layer) : '')
+  const t = d.target
+  // 제자리에 놓았으면 그대로
+  if (t?.kind === 'req' && t.req.id === l.req) return
+  if (t?.kind === 'layer' && t.col.key === l.col && t.layer === l.layer) return
+  try {
+    await detach(l.screen, l.req, l.layer)
+    if (t?.kind === 'req' && sc?.screen) {
+      await linkMany([{ screen_id: sc.screen.id, requirement_id: t.req.id, ...(l.layer ? { layer_ids: [l.layer] } : {}) }], links.data.value ?? [])
+      await links.refresh()
+      say(tr('Linked {code} to {name}', { code: t.req.code, name: nameOf(sc, l.layer) }))
+    } else if (t?.kind === 'layer' && t.col.screen) {
+      await linkMany([{ screen_id: t.col.screen.id, requirement_id: l.req, ...(t.layer ? { layer_ids: [t.layer] } : {}) }], links.data.value ?? [])
+      await links.refresh()
+      say(tr('Linked {code} to {name}', { code: oldReq?.code ?? '', name: nameOf(t.col, t.layer) }))
+    } else {
+      await links.refresh()
+      say(tr('Unlinked {code} from {name}', { code: oldReq?.code ?? '', name: nameOf(sc, l.layer) }))
+    }
+  } catch { await links.refresh(); say(tr("Couldn't change it. Try again")) }
+}
+function onPickedKey(e: KeyboardEvent) { if (e.key === 'Escape' && pickedLine.value && !endDrag.value) pickedLine.value = null }
+/** 선 · 끝 동그라미 밖을 누르면 선 고르기를 풀어요 */
+function onPickedDown(e: PointerEvent) {
+  if (!pickedLine.value || endDrag.value) return
+  const t = e.target as Element | null
+  if (t?.closest?.('.link-lines circle, .ldot')) return
+  pickedLine.value = null
+}
+onMounted(() => { window.addEventListener('keydown', onPickedKey); window.addEventListener('pointerdown', onPickedDown, true) })
+onBeforeUnmount(() => { stopEndDrag(); window.removeEventListener('keydown', onPickedKey); window.removeEventListener('pointerdown', onPickedDown, true) })
 
 const curve = (x1: number, y1: number, x2: number, y2: number) => `M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`
 const dirty = ref(false)
@@ -684,7 +804,7 @@ async function removeDoc() {
               v-for="sd in SIDES" :key="sd" type="button" class="ldot" :style="dotAt(hover, sd)"
               :aria-label="tr('Drag onto a policy row to link {name}', { name: hover.layer ? layerName(c.screen.id, hover.layer) : c.name })"
               :title="tr('Drag onto a policy row to link')"
-              @pointerdown="startLinkDrag(c, $event, hover.layer)"
+              @pointerdown="onDotDown(c, $event, hover.layer)"
             />
           </template>
         </div>
@@ -699,14 +819,20 @@ async function removeDoc() {
       <circle v-else :cx="drag.x" :cy="drag.y" r="4" />
     </svg>
     <!-- 고른 정책 · 화면의 연결 선 -->
-    <svg v-if="linkLines.length" class="drag-line" aria-hidden="true">
-      <g v-for="l in linkLines" :key="l.key">
+    <svg v-if="shownLines.length" class="drag-line link-lines" aria-hidden="true">
+      <g v-for="l in shownLines" :key="l.key" :class="{ on: pickedLine === l.key }">
         <path :d="curve(l.x1, l.y1, l.x2, l.y2)" />
-        <!-- 그 요소 · 화면에 마우스를 올려 동그라미 4개가 떠 있으면 겹쳐 진해 보이지 않게 선 쪽 동그라미는 빼요 -->
-        <circle v-if="!(hover && hover.col === l.col && hover.layer === l.layer)" class="end" :cx="l.x1" :cy="l.y1" r="5.25" />
-        <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" />
+        <!-- 그 요소 · 화면에 마우스를 올려 동그라미 4개가 떠 있으면 겹쳐 진해 보이지 않게 선 쪽 동그라미는 빼요(끝을 끄는 중엔 보여요) -->
+        <circle v-if="(endDrag?.moved && endDrag.key === l.key) || !(hover && hover.col === l.col && hover.layer === l.layer)" class="end" :cx="l.x1" :cy="l.y1" r="5.25" @pointerdown="grabEnd(l, 'a', $event)" />
+        <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" @pointerdown="grabEnd(l, 'b', $event)" />
       </g>
     </svg>
+    <!-- 고른 선: 무엇과 무엇이 이어졌는지 + 끝을 끌어 옮기기 · 떼기 안내 -->
+    <div v-if="pickedInfo && !endDrag?.moved" class="sq line-chip" :style="{ left: pickedInfo.x + 'px', top: pickedInfo.y + 'px' }">
+      <b class="ellipsis">{{ pickedInfo.text }}</b>
+      <span>{{ tr('Drag an end onto another place to move the link, or onto empty space to unlink') }}</span>
+    </div>
+    <span v-if="endDrag?.moved" class="sq drag-chip" :style="{ left: endDrag.x + 12 + 'px', top: endDrag.y + 12 + 'px' }">{{ endDrag.target?.kind === 'req' ? tr('Link to {code}', { code: endDrag.target.req.code }) : endDrag.target?.kind === 'layer' ? tr('Move to {name}', { name: endDrag.target.layer && endDrag.target.col.screen ? layerName(endDrag.target.col.screen.id, endDrag.target.layer) : endDrag.target.col.name }) : tr('Release to unlink') }}</span>
     <span v-if="drag" class="sq drag-chip" :style="{ left: drag.cx + 12 + 'px', top: drag.cy + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
 
     <!-- 오른쪽: 문서 -->
@@ -903,6 +1029,13 @@ async function removeDoc() {
 .drag-line circle { fill: var(--iris-peek); }
 /* 선 양 끝 동그라미: 화면 쪽 끌기 점과 같은 모양(흰 바탕 + 선 색 테두리) */
 .drag-line circle.end { fill: var(--sys-color-common-white-default); stroke: var(--iris-peek); stroke-width: 1.5; }
+/* 연결 선 끝 동그라미는 잡을 수 있어요(피그마 프로토타입 연결선처럼). 고른 선은 실선 · 조금 굵게 */
+.link-lines circle.end { pointer-events: auto; cursor: grab; }
+.link-lines circle.end:hover { fill: var(--iris-peek); }
+.link-lines g.on path { stroke-width: 2; stroke-dasharray: none; }
+.line-chip { position: fixed; z-index: 21; transform: translate(-50%, calc(-100% - 10px)); max-width: 320px; display: flex; flex-direction: column; gap: 2px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; pointer-events: none; }
+.line-chip b { font-weight: 600; }
+.line-chip span { color: rgb(255 255 255 / 70%); }
 .drag-chip { position: fixed; z-index: 21; pointer-events: none; height: 24px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .split :deep(.drop-on) td, .split :deep(.drop-on.blk) { background: color-mix(in srgb, var(--iris-peek) 12%, transparent) !important; }
 .split :deep(.drop-on) td:first-child { box-shadow: inset 2px 0 0 var(--iris-peek); }

@@ -292,4 +292,8 @@ export default {
   'Add {code} to a screen’s Policy column — or if it has no screen, write 〔화면 없음〕 after the policy name': '화면의 \'정책\' 열에 {code}을 넣거나, 화면이 없는 정책이면 정책 이름 뒤에 〔화면 없음〕을 적으세요',
   'Give one of the {code} rows a new number': '{code} 행 중 하나에 새 번호를 주세요',
   'Whole block': '블록 전체',
+  'Drag an end onto another place to move the link, or onto empty space to unlink': '끝 동그라미를 다른 곳에 놓으면 옮겨지고, 빈 곳에 놓으면 연결이 끊어져요',
+  'Release to unlink': '놓으면 연결 해제',
+  'Move to {name}': '\'{name}\'으로 옮기기',
+  'Unlinked {code} from {name}': '{code}과 \'{name}\' 연결을 끊었어요',
 } satisfies Record<string, string>
