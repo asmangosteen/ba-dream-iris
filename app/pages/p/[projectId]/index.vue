@@ -536,6 +536,7 @@ function openChat() {
   const p = lastPt && lastPt.x >= r.left && lastPt.x <= r.right && lastPt.y >= r.top && lastPt.y <= r.bottom ? lastPt : { x: r.left + r.width / 2, y: r.top + r.height / 2 }
   chatPt.value = p
   chatText.value = ''
+  if (chatEl.value) chatEl.value.value = ''
   chatTyped.value = false
   chatFading.value = false
   chatOpen.value = true
@@ -559,11 +560,13 @@ function onChatInput(e: Event) {
 }
 function onChatKey(e: KeyboardEvent) {
   if (e.isComposing) return
+  // 스르륵 사라진 뒤(칸은 열려 있어요) / 를 누르면 글자로 넣지 않고 새 채팅으로 다시 열어요
+  if ((e.code === 'Slash' || e.key === '/') && chatFading.value && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); openChat(); return }
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeChat(); return }
   if (e.key === 'Enter' && !e.shiftKey) e.preventDefault() // 보내기는 따로 없어요 — 치는 대로 보이고, 멈추면 5초 뒤 사라져요. ⇧Enter 는 줄바꿈
 }
 function onSlashKey(e: KeyboardEvent) {
-  if (e.code !== 'Slash' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || chatOpen.value || commentMode.value) return
+  if ((e.code !== 'Slash' && e.key !== '/') || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || chatOpen.value || commentMode.value) return
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
   if (store.editing.value) return
