@@ -160,14 +160,16 @@ onBeforeUnmount(endLinkDrag)
 
 // 문서 옆 메모 · 수정 기록 ---------------------------------------------------
 /** 문서 옆 메모 칸: 메모가 있으면 열고, 없으면 닫아 둬요(캔버스를 넓게). 직접 열고 닫으면 그대로 */
-const notesOpen = ref(false)
-let notesTouched = false
+// 문서를 바꾸면 이 화면이 새로 그려져서 켠 상태를 프로젝트 단위로 기억해 둬요
+const notesOpen = useState(`doc-notes-open-${projectId}`, () => false)
+const notesTouchedS = useState(`doc-notes-touched-${projectId}`, () => false)
 const notesRef = ref<{ count: number } | null>(null)
 /** 문서 옆 메모만(자리가 있는 댓글) — 아래 게시판 글은 빼요 */
 const noteCount = computed(() => comments.docThreads(docId.value).filter((t) => !!t.root.doc_anchor && !t.root.resolved_at).length)
-watch(noteCount, (n) => { if (n > 0 && !notesTouched) notesOpen.value = true }, { immediate: true })
-watch(docId, () => { notesTouched = false; notesOpen.value = noteCount.value > 0 })
-function toggleNotes() { notesTouched = true; notesOpen.value = !notesOpen.value }
+watch(noteCount, (n) => { if (n > 0 && !notesTouchedS.value) notesOpen.value = true }, { immediate: true })
+// 다른 문서로 가도 메모 칸을 켠 상태는 그대로(사용자 요청 2026-11-27) — 꺼져 있고 직접 끈 적이 없을 때만 메모가 있으면 열어요
+watch(docId, () => { if (!notesOpen.value && !notesTouchedS.value && noteCount.value > 0) notesOpen.value = true })
+function toggleNotes() { notesTouchedS.value = true; notesOpen.value = !notesOpen.value }
 /** 메모 칸이 실제로 보이는지(고치기 · 기록 화면에서는 접어요) */
 const notesShown = computed(() => notesOpen.value && !editing.value && !histOpen.value && !!doc.value)
 function onComment(p: { quote: string; block: string | null; row: number | null; code: string | null }) {
@@ -190,6 +192,22 @@ function goBlock(at: { block: string; row: number | null }) {
   el.classList.add('flash')
   setTimeout(() => el.classList.remove('flash'), 1400)
 }
+/** 고른 문서 탭이 탭 줄 끝에 잘리지 않게: 고를 때마다 탭 전체가 보이도록 옆으로 넘겨요(사용자 요청 2026-11-27) */
+const tabsEl = ref<HTMLElement | null>(null)
+function revealTab(smooth = true) {
+  nextTick(() => {
+    const nav = tabsEl.value
+    const el = nav?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!nav || !el) return
+    const pad = 8
+    const left = el.offsetLeft - nav.offsetLeft, right = left + el.offsetWidth
+    if (left - pad < nav.scrollLeft) nav.scrollTo({ left: Math.max(0, left - pad), behavior: smooth ? 'smooth' : 'auto' })
+    else if (right + pad > nav.scrollLeft + nav.clientWidth) nav.scrollTo({ left: right + pad - nav.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
+  })
+}
+watch(docId, () => revealTab())
+watch(() => docs.data.value?.length, () => revealTab(false))
+onMounted(() => revealTab(false))
 const histOpen = ref(false)
 watch(docId, () => { histOpen.value = false; activeNote.value = null; noteDraft.value = null; activeCol.value = null })
 /** 기록에서 [이 버전으로 되돌리기]: 그때 글로 저장하고, 되돌린 것도 기록으로 남겨요 */
@@ -456,7 +474,7 @@ async function removeDoc() {
     <!-- 오른쪽: 문서 -->
     <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesShown }]">
       <div class="doc-tabs">
-        <nav class="seg tabs" :aria-label="tr('Choose a document')">
+        <nav ref="tabsEl" class="seg tabs" :aria-label="tr('Choose a document')">
           <NuxtLink
             v-for="d in docs.data.value ?? []"
             :key="d.id"
@@ -651,8 +669,10 @@ async function removeDoc() {
 .f-cta { position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: #2C7BE2; }
 
 .doc { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); z-index: 3; width: 600px; max-width: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
-.doc-tabs { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06); box-shadow: 0 1px 0 var(--iris-line); }
-.tabs { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+/* z-index 2: 아래 선(그림자 1px)이 메모 칸 위 막대에 덮이지 않게 */
+.doc-tabs { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06); box-shadow: 0 1px 0 var(--iris-line); }
+/* 가로로만 넘기고 세로로는 움직이지 않게(높이 고정) */
+.tabs { flex: 1; min-width: 0; height: 28px; overflow-x: auto; overflow-y: hidden; overscroll-behavior: contain; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { max-width: 168px; }
 .dicon { flex: none; display: inline-flex; }
