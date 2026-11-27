@@ -1,5 +1,5 @@
 import type { ScreenRow } from '~/composables/useEditor'
-import { layerMenuItems, markIrisClip, svgOf, useLastCopy, useRenameReq } from '~/composables/useLayerMenu'
+import { canIrisPaste, irisMenuPaste, layerMenuItems, markIrisClip, svgOf, useLastCopy, useRenameReq } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { union, type Rect } from '~/canvas/geom'
 import { EDITABLE, type CanvasBase } from './types'
@@ -47,6 +47,8 @@ export function useCanvasMenu(canvas: Ctx) {
     if (lastCopy.value !== 'screen' && store.hasClipboard()) store.batch(() => { store.paste(native || (sid && isPageCanvas(sid)) ? undefined : canvasDoc.value?.id); bringIntoView() })
     else emit('screen-action', 'paste')
   }
+  /** 우클릭 Paste: 다른 페이지 · 다른 파일 · 섹션(안의 화면까지)은 편집기 페이지가 먼저 맡아요 */
+  const menuPaste = () => irisMenuPaste(doPaste)
   /**
    * 붙인 레이어가 지금 보이는 곳 밖이면 보이는 곳 가운데로(피그마와 같아요). 들어간 화면 자체가 안 보이면 캔버스 위로 꺼내요
    */
@@ -101,8 +103,8 @@ export function useCanvasMenu(canvas: Ctx) {
   function screenMenuItems(screen: ScreenRow, at: { x: number; y: number }): MenuItem[] {
     const native = isNative(screen)
     return [
-      { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip() } },
-      { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+      { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip(null, true) } },
+      { label: tr('Paste'), shortcut: '⌘V', action: menuPaste, disabled: !canIrisPaste(store, lastCopy.value) },
       ...(native ? [{ label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
       { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
       { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => sectionScreens(multi.value.includes(screen.id) ? multi.value : [screen.id]) },
@@ -148,7 +150,7 @@ export function useCanvasMenu(canvas: Ctx) {
       const inSel = store.screenId.value === screen.id && (store.layerIds.value.includes(lid) || (!!sb && at.x >= sb.x && at.x <= sb.x + sb.w && at.y >= sb.y && at.y <= sb.y + sb.h))
       if (!inSel) store.selectLayer(screen.id, lid)
       const n0 = store.node(screen.id, lid)
-      const items = layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: doPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (t) => emit('hint', t) })
+      const items = layerMenuItems(store, screen.id, [...store.layerIds.value], { lastCopy, paste: menuPaste, pasteHere: () => pasteAt(at), fit: fitSelection, hint: (t) => emit('hint', t) })
       // 이름 바꾸기 · 점 편집은 Delete 위에(Delete 가 늘 맨 끝)
       const extra: MenuItem[] = n0 && store.layerIds.value.length === 1 && EDITABLE.has(n0.type) ? [{ label: tr('Edit vector'), shortcut: '↵', action: () => enterVectorEdit(screen.id, lid) }] : []
       items.splice(Math.max(0, items.length - 2), 0, ...extra)
@@ -162,7 +164,7 @@ export function useCanvasMenu(canvas: Ctx) {
       return
     }
     ctx.open(e, [
-      { label: tr('Paste'), shortcut: '⌘V', action: doPaste, disabled: !store.hasClipboard() && lastCopy.value !== 'screen' },
+      { label: tr('Paste'), shortcut: '⌘V', action: menuPaste, disabled: !canIrisPaste(store, lastCopy.value) },
       { label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' },
       'sep',
       { label: tr('Zoom in'), shortcut: '⌘+', action: () => zoomAt(vp.value.zoom * 2) },

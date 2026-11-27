@@ -5,6 +5,8 @@ export interface PageRow { id: string; name: string; sort_order: number; layers?
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId
 export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
+/** 화면 복사본의 원본(같은 탭이면 화면 목록에서, 다른 파일 · 탭이면 클립보드에 실려 온 것) */
+export interface ScreenCopySource { id?: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; layers?: unknown; thumbnail_path?: string | null; figma_url?: string | null }
 export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown; updated_at?: string; updated_by?: string | null }
 
 /**
@@ -195,6 +197,44 @@ export function useEditor(projectId: string) {
     return row
   }
 
+  /**
+   * 화면 복사본 만들기(복제 · 붙여넣기 — 피그마와 같아요, 속성 그대로): 레이어 · 화면 모양 · 내보내기 설정 + 피그마 화면이면 피그마 연결 · 썸네일 · 컴포넌트 기록까지.
+   * src.id 가 있으면 저장된 원본에서 피그마 연결 · 기기 값을 읽어 오고(다른 파일 · 탭에서 복사한 것도), 없거나 못 읽으면 src 값으로.
+   * 썸네일 파일은 같이 써요(화면을 지워도 파일은 지우지 않아요)
+   */
+  async function addScreenCopy(src: ScreenCopySource, rect: { x: number; y: number; width: number; height: number }, name: string): Promise<ScreenRow | null> {
+    if (!pageId.value) return null
+    const list = screens.data.value ?? []
+    const layers = src.layers ?? null
+    const row: ScreenRow = { id: tmpId(), name, source: src.source, status: 'draft', ...rect, thumbnail_path: src.thumbnail_path ?? null, figma_url: src.figma_url ?? null, layers }
+    if (!preview) {
+      type Full = { device: string | null; figma_file_key: string | null; figma_node_id: string | null; figma_url: string | null; thumbnail_path: string | null; figma_layer_summary: unknown; figma_synced_at: string | null }
+      const orig = src.id && !src.id.startsWith('tmp')
+        ? ((await supabase.from('screens').select('device, figma_file_key, figma_node_id, figma_url, thumbnail_path, figma_layer_summary, figma_synced_at').eq('id', src.id).maybeSingle()).data as Full | null)
+        : null
+      const { data, error } = await supabase
+        .from('screens')
+        .insert({
+          page_id: pageId.value, name, source: src.source, x: rect.x, y: rect.y, width: rect.width, height: rect.height, sort_order: list.length, updated_by: me(), layers,
+          device: orig?.device ?? null,
+          figma_file_key: orig?.figma_file_key ?? null, figma_node_id: orig?.figma_node_id ?? null, figma_url: orig?.figma_url ?? src.figma_url ?? null,
+          thumbnail_path: orig?.thumbnail_path ?? src.thumbnail_path ?? null, figma_layer_summary: orig?.figma_layer_summary ?? null, figma_synced_at: orig?.figma_synced_at ?? null,
+        })
+        .select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers, updated_at, updated_by')
+        .single()
+      if (error) throw error
+      Object.assign(row, data)
+      remember(row.id, row.updated_at, layers)
+      // 피그마 화면의 컴포넌트 기록(검수 · 개발 탭)도 함께 — 못 옮겨도 화면은 그대로 둬요
+      if (src.id && src.source === 'figma') {
+        const { data: uses } = await supabase.from('screen_component_usages').select('component_id, detected_name, count, source').eq('screen_id', src.id)
+        if (uses?.length) await supabase.from('screen_component_usages').insert((uses as { component_id: string | null; detected_name: string; count: number; source: 'figma' | 'native' }[]).map((u) => ({ ...u, screen_id: row.id })))
+      }
+    } else (PREVIEW_SCREENS[pageId.value] ??= []).push(row)
+    screens.data.value = preview ? [...(PREVIEW_SCREENS[pageId.value] ?? [])] : [...(screens.data.value ?? []), row]
+    return row
+  }
+
   /** 화면 속성 저장 (위치 · 크기 · 이름 · 상태). 화면에는 먼저 반영하고, 저장이 실패하면 되돌립니다 */
   /**
    * 레이어 저장: 내가 안 판 그대로일 때만. 다른 사람이 먼저 저장했으면 —
@@ -309,5 +349,5 @@ export function useEditor(projectId: string) {
   /** 충돌에서 '그 사람 것'을 골랐을 때: 그 판을 내가 아는 판으로 */
   const rememberScreen = (id: string, at: string, layers: unknown) => { remember(id, at, layers); const s = (screens.data.value ?? []).find((x) => x.id === id); if (s) { s.layers = layers; s.updated_at = at } }
 
-  return { project, pages, pageId, screens, saveLayers, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen }
+  return { project, pages, pageId, screens, saveLayers, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, addScreenCopy, updateScreen, removeScreen }
 }

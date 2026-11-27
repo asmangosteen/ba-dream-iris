@@ -2,7 +2,7 @@
 import { fmtNum } from '~/canvas/num'
 import { guessReqLayers, matchReqLayers, reqLost } from '~/canvas/reqMatch'
 import { topImagePaint } from '~/canvas/paint'
-import { descendants } from '~/canvas/schema'
+import { descendants, DEFAULT_STYLE, SCHEMA_VERSION, type LayerNode } from '~/canvas/schema'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
@@ -21,8 +21,8 @@ import InspectorExport from '~/components/editor/InspectorExport.vue'
 import InspectorPage from '~/components/editor/InspectorPage.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
-import { useMixScreens, useToastReq } from '~/composables/useLayerMenu'
-import { createLayerStore, LAYER_STORE } from '~/canvas/store'
+import { IRIS_CLIP, isFigmaClip, isMyClip, myLastClip, readIrisClip, setIrisDupHook, setIrisPasteHook, setIrisScreenSource, unsetIrisDupHook, unsetIrisPasteHook, unsetIrisScreenSource, useLastCopy, type IrisClipPayload, useMixScreens, useToastReq } from '~/composables/useLayerMenu'
+import { createLayerStore, LAYER_STORE, type LayerClip } from '~/canvas/store'
 import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUploads, prepareImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
@@ -42,13 +42,13 @@ import PresenceStack from '~/components/editor/PresenceStack.vue'
 import { ROLE_NAME } from '~/composables/useProjectAccess'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/canvas/types'
-import type { PageSettings, ScreenRow } from '~/composables/useEditor'
+import type { PageSettings, ScreenCopySource, ScreenRow } from '~/composables/useEditor'
 import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = route.params.projectId as string
-const { project, pages, pageId, screens, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, updateScreen, removeScreen } = useEditor(projectId)
+const { project, pages, pageId, screens, liveScreens, rememberScreen, addPage, renamePage, removePage, setPageOrder, reorderScreen, setScreenOrder, updatePageSettings, addScreen, addScreenCopy, updateScreen, removeScreen } = useEditor(projectId)
 // 좌우 사이드바 접기(위로 접혀서 탭 줄만 남아요): 왼쪽 패널의 접기 버튼 하나로 좌우가 함께 접히고 펼쳐져요. 이 브라우저에 기억
 const collapsed = ref<{ left: boolean; right: boolean }>({ left: false, right: false })
 onMounted(() => { try { const v = JSON.parse(localStorage.getItem('iris-panels') ?? '{}'); const c = !!(v.left || v.right); collapsed.value = { left: c, right: c } } catch { /* 저장소를 못 쓰면 펼친 채로 */ } })
@@ -159,7 +159,7 @@ const docReq = ref<string | null>(null)
 const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
-const canvas = ref<{ fit: (ids?: string[]) => void; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; focusOn: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
+const canvas = ref<{ fit: (ids?: string[]) => void; viewWorld: () => { x: number; y: number; w: number; h: number } | null; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; focusOn: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
 
 const list = computed(() => screens.data.value ?? [])
@@ -854,17 +854,75 @@ async function onPreset(p: { name: string; w: number; h: number }) {
     }
   } catch { sayFail(tr('Couldn\'t create the frame. Try again')) }
 }
+/**
+ * 캔버스에 프레임 그리기 → 새 화면. 그 자리 안에 통째로 드는 캔버스 요소(도형 · 글자 · 섹션 안 요소 …)는 새 프레임 안으로(피그마와 같아요 — 보이는 자리 그대로).
+ * 실행취소 한 번이면 요소는 캔버스로 돌아가고 프레임은 지워져요
+ */
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
   if (blockEdit()) return
   try {
     // 이름은 캔버스 레이어 · 화면을 통틀어 'Frame' 가장 큰 번호 + 1(store.nextLabel)
-    const row = await addScreen(rect, store.nextLabel('Frame'))
-    if (row) {
-      store.selectScreen(row.id); tab.value = 'design'
-      let cur = row.id
-      store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
-    }
+    const name = store.nextLabel('Frame')
+    const cid = canvasScreen.value?.id ?? null
+    const inside = cid ? canvasLayersIn(cid, rect) : []
+    const layers = cid && inside.length ? layersFromCanvas(cid, inside, rect) : null
+    const row = await addScreen(rect, name)
+    if (!row) return
+    if (layers) { await updateScreen(row.id, { layers }); delete store.docs[row.id] } // 먼저 프레임에 넣고(저장 실패로 잃지 않게) 캔버스에서 빼요
+    let cur = row.id
+    const action = () => store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => {
+      const r = await addScreen(rect, row.name)
+      if (!r) return
+      cur = r.id
+      if (layers) { await updateScreen(r.id, { layers: JSON.parse(JSON.stringify(layers)) }); delete store.docs[r.id] }
+    })
+    store.batch(() => {
+      action()
+      if (cid && inside.length) store.mutate(cid, (d) => {
+        for (const id of inside) {
+          const n = d.nodes[id]
+          if (!n) continue
+          const sib = n.parentId ? d.nodes[n.parentId]?.children ?? [] : d.rootIds
+          const i = sib.indexOf(id)
+          if (i >= 0) sib.splice(i, 1)
+          for (const k of descendants(d, id)) delete d.nodes[k]
+        }
+      })
+    })
+    store.selectScreen(row.id); tab.value = 'design'
   } catch { sayFail(tr('Couldn\'t create the frame. Try again')) }
+}
+/** 새 프레임 자리 안에 통째로 드는 캔버스 요소: 맨 위 · 섹션 바로 안 요소, 잠기거나 숨기거나 돌린 것은 빼요(프레임 안에 그릴 때와 같아요). 앞뒤 순서대로 */
+function canvasLayersIn(cid: string, rect: { x: number; y: number; width: number; height: number }): string[] {
+  const d = store.doc(cid)
+  const out: string[] = []
+  const e = 0.01
+  const visit = (ids: string[]) => {
+    for (const id of ids) {
+      const n = d.nodes[id]
+      if (!n) continue
+      const a = store.absPos(cid, id)
+      const fits = !n.locked && !n.hidden && !((n.rotation ?? 0) % 360) && a.x >= rect.x - e && a.y >= rect.y - e && a.x + n.w <= rect.x + rect.width + e && a.y + n.h <= rect.y + rect.height + e
+      if (fits) out.push(id)
+      else if (n.type === 'section' && n.children?.length) visit(n.children)
+    }
+  }
+  visit(d.rootIds)
+  return out
+}
+/** 캔버스 요소들 → 새 프레임의 레이어 문서(프레임 왼쪽 위 기준 자리, 앞뒤 순서 그대로) */
+function layersFromCanvas(cid: string, ids: string[], rect: { x: number; y: number }) {
+  const d = store.doc(cid)
+  const nodes: Record<string, LayerNode> = {}
+  for (const id of ids) {
+    const a = store.absPos(cid, id)
+    for (const k of descendants(d, id)) {
+      const n = JSON.parse(JSON.stringify(d.nodes[k])) as LayerNode
+      if (k === id) { n.parentId = null; n.x = Math.round((a.x - rect.x) * 100) / 100; n.y = Math.round((a.y - rect.y) * 100) / 100 }
+      nodes[k] = n
+    }
+  }
+  return { rootIds: [...ids], nodes, schemaVersion: SCHEMA_VERSION }
 }
 /** 값이 서로 다른(Mixed) 프레임들의 칸에서 ↑ ↓: 각자 값에 더해요(실행취소 한 번) */
 function onStepMany(key: 'x' | 'y' | 'width' | 'height', d: number) {
@@ -943,21 +1001,68 @@ const screenClip = ref<string[]>([])
 /** 화면 스마트 복제 기억(⌘D · ⌥ 끌기 복제): 원본 → 복제본 */
 const screenDup = ref<{ src: string; copy: string } | null>(null)
 const mixScreens = useMixScreens()
-/** 화면 복제: 레이어까지 그대로, 오른쪽(또는 지정한 자리)에 */
+const lastCopy = useLastCopy()
+// 화면을 복사하면(⌘C · 우클릭) 클립보드에 그 화면들 데이터도 함께 써요 — 다른 페이지 · 파일 · 탭에서도 속성 그대로 붙게.
+// 캔버스의 섹션을 복사하면 그 안에 든 화면들도 함께(피그마와 같아요)
+const irisScreens = (clip: LayerClip | null, withScreens: boolean) => {
+  const ids = new Set(withScreens ? screenClip.value : [])
+  for (const v of sectionScreensOf(clip)) ids.add(v.id)
+  return [...ids].map((id) => list.value.find((v) => v.id === id)).filter((v): v is ScreenRow => !!v && !isPageCanvas(v.id)).map(screenSource)
+}
+const irisMenuHook = () => { const p = myLastClip(); return !!p && !pastingIris && pasteIris(p) }
+setIrisScreenSource(irisScreens)
+setIrisPasteHook(irisMenuHook)
+/** ⌘D 로 캔버스의 섹션을 복제하면 안의 화면까지 함께, 서로 자리 그대로 바로 오른쪽에(피그마와 같아요). 안에 화면이 없으면 원래 복제 */
+const irisDupHook = (): boolean => {
+  const cid = canvasScreen.value?.id
+  if (!cid || store.screenId.value !== cid || !store.layerIds.value.length) return false
+  const keep = store.clipData()
+  if (!store.copy()) return false
+  const clip = store.clipData()!
+  store.setClipboard(keep) // 복사해 둔 것은 그대로(⌘D 는 클립보드를 건드리지 않아요)
+  const inside = sectionScreensOf(clip)
+  if (!inside.length) return false
+  if (blockEdit()) return true
+  void pasteGroup(clip, inside.map(screenSource), cid)
+  return true
+}
+setIrisDupHook(irisDupHook)
+onBeforeUnmount(() => { unsetIrisScreenSource(irisScreens); unsetIrisPasteHook(irisMenuHook); unsetIrisDupHook(irisDupHook) })
+/** 복사한 캔버스 레이어 안 섹션(안쪽 섹션까지)에 통째로 든 화면들 */
+function sectionScreensOf(clip: LayerClip | null): ScreenRow[] {
+  if (!clip || !isPageCanvas(clip.sid)) return []
+  const byId = new Map(clip.nodes.map((n) => [n.id, n]))
+  const at = (n: LayerNode): { x: number; y: number } => {
+    if (clip.rootIds.includes(n.id)) return clip.abs[n.id] ?? { x: n.x, y: n.y }
+    const p = n.parentId ? byId.get(n.parentId) : undefined
+    if (!p) return { x: n.x, y: n.y }
+    const pa = at(p)
+    return { x: pa.x + n.x, y: pa.y + n.y }
+  }
+  const boxes = clip.nodes.filter((n) => n.type === 'section').map((n) => ({ ...at(n), w: n.w, h: n.h }))
+  if (!boxes.length) return []
+  return list.value.filter((v) => !isPageCanvas(v.id) && boxes.some((b) => v.x >= b.x && v.y >= b.y && v.x + v.width <= b.x + b.w && v.y + v.height <= b.y + b.h))
+}
+/** 복사 · 복제할 화면 데이터: 지금 레이어(저장 전 것까지) · 피그마 연결 · 썸네일 */
+function screenSource(v: ScreenRow): ScreenCopySource {
+  return { id: v.id, name: v.name, source: v.source, x: v.x, y: v.y, width: v.width, height: v.height, layers: JSON.parse(JSON.stringify(store.doc(v.id))), thumbnail_path: v.thumbnail_path ?? null, figma_url: v.figma_url ?? null }
+}
+/** 화면 복제: 레이어 · 속성 그대로(피그마 화면도), 오른쪽(또는 지정한 자리)에 */
 async function cloneScreen(srcId: string, at?: { x: number; y: number }, select = true) {
   const src = list.value.find((v) => v.id === srcId)
-  if (!src) return null
-  if (src.source !== 'native') { say(tr('Figma frames can\'t be duplicated. Import it again from Figma')); return null }
+  return src ? cloneFrom(screenSource(src), at, select) : null
+}
+/** 화면 데이터로 새 화면(같은 파일 · 다른 파일 모두). 실행취소 한 번 */
+async function cloneFrom(src: ScreenCopySource, at?: { x: number; y: number }, select = true, record = true) {
   const rect = { x: at?.x ?? src.x + src.width + 40, y: at?.y ?? src.y, width: src.width, height: src.height }
   // 이름: 기본 이름('Frame 3')이면 다음 번호, 바꾼 이름은 그대로(피그마와 같아요)
-  const row = await addScreen(rect, /^Frame \d+$/.test(src.name) ? store.nextLabel('Frame') : src.name)
+  const name = /^Frame \d+$/.test(src.name) ? store.nextLabel('Frame') : src.name
+  const row = await addScreenCopy(src, rect, name)
   if (!row) return null
-  const layers = JSON.parse(JSON.stringify(store.doc(src.id)))
-  await updateScreen(row.id, { layers })
   delete store.docs[row.id] // 새 레이어로 다시 읽기
   if (select) store.selectScreen(row.id)
   let cur = row.id
-  store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(src.id) }, async () => { const r = await addScreen(rect, row.name); if (r) { cur = r.id; await updateScreen(r.id, { layers }); delete store.docs[r.id] } })
+  if (record) store.pushAction(null, async () => { await removeScreen(cur); if (src.id && list.value.some((v) => v.id === src.id)) store.selectScreen(src.id); else store.selectScreen(null) }, async () => { const r = await addScreenCopy(src, rect, row.name); if (r) { cur = r.id; delete store.docs[r.id] } })
   return row
 }
 /** 피그마처럼 원래 화면 바로 오른쪽(40px 띄워서). 그 자리에 다른 화면이 있으면 맨 오른쪽 끝 */
@@ -972,25 +1077,58 @@ function spotRightOf(id: string): { x: number; y: number } {
  * 여러 화면 복제(⌥ 끌기 · 붙여넣기): 한 번에 만들고 새 화면들을 골라 둬요.
  * withLayers: 레이어와 섞어 고른 경우 — 레이어 선택은 그대로 두고 새 화면들을 함께 골라요
  */
-async function cloneMany(items: { id: string; x: number; y: number }[], withLayers: boolean) {
-  if (blockEdit()) return
-  const rows = (await Promise.all(items.map((it) => cloneScreen(it.id, { x: it.x, y: it.y }, false)))).filter((r): r is NonNullable<typeof r> => !!r)
-  const ids = rows.map((r) => r.id)
-  if (!ids.length) return
-  if (withLayers) { mixScreens.value = ids; return }
+async function cloneMany(items: { id?: string; src?: ScreenCopySource; x: number; y: number }[], withLayers: boolean, after?: (record: () => void) => void): Promise<string[]> {
+  if (blockEdit()) return []
+  const srcs = items.map((it) => it.src ?? (() => { const v = list.value.find((o) => o.id === it.id); return v ? screenSource(v) : null })())
+  const rows = await Promise.all(srcs.map((src, i) => (src ? cloneFrom(src, { x: items[i]!.x, y: items[i]!.y }, false, false) : null)))
+  // 실행취소 한 번에 전부(after 가 있으면 그 안에서 레이어 붙이기와 함께 한 번)
+  const made = rows.flatMap((r, i) => (r ? [{ src: srcs[i]!, rect: { x: items[i]!.x, y: items[i]!.y, width: srcs[i]!.width, height: srcs[i]!.height }, name: r.name, cur: r.id }] : []))
+  const record = () => {
+    if (made.length) store.pushAction(null, async () => { await Promise.all(made.map((m) => removeScreen(m.cur))); store.selectScreen(null); multiScreens.value = []; mixScreens.value = [] }, async () => {
+      await Promise.all(made.map(async (m) => { const r = await addScreenCopy(m.src, m.rect, m.name); if (r) { m.cur = r.id; delete store.docs[r.id] } }))
+    })
+  }
+  if (after) after(record); else record()
+  const ids = made.map((m) => m.cur)
+  if (!ids.length) return []
+  if (withLayers) { mixScreens.value = ids; return ids }
   store.selectScreen(ids[0]!)
   multiScreens.value = ids.length > 1 ? ids : []
+  return ids
 }
 /** 복사한 화면들 붙여넣기(피그마처럼): 배치는 그대로, 원래 자리 바로 오른쪽 — 비어 있지 않으면 맨 오른쪽 끝 */
 async function pasteScreens(withLayers: boolean) {
   if (blockEdit()) return
   const src = screenClip.value.map((id) => list.value.find((v) => v.id === id)).filter((v): v is ScreenRow => !!v)
   if (!src.length) return
-  const minX = Math.min(...src.map((v) => v.x)), maxX = Math.max(...src.map((v) => v.x + v.width))
-  let dx = maxX + 40 - minX
-  const hit = src.some((v) => list.value.some((o) => o.x < v.x + dx + v.width && o.x + o.width > v.x + dx && o.y < v.y + v.height && o.y + o.height > v.y))
-  if (hit) dx = nextX.value - minX
+  const dx = pasteShift(src, false)
   await cloneMany(src.map((v) => ({ id: v.id, x: v.x + dx, y: v.y })), withLayers)
+}
+/**
+ * 붙일 화면들을 옮길 거리(피그마와 같아요 — 사용자 요청 2026-11-27):
+ * - 다른 페이지 · 파일 · 탭에서 처음 붙이면: 원래 좌표 그대로
+ * - 같은 페이지에서 처음 붙이면: 원래 자리 바로 오른쪽(묶음 폭 + 40)
+ * - 같은 것을 같은 페이지에 연달아 붙이면: 직전에 붙인 것 바로 오른쪽으로 같은 간격씩 — 자리가 비었는지 보지 않아요(겹쳐도 일정하게, 건너뛰지 않게)
+ */
+let pasteSeq: { key: string; n: number } | null = null
+function pasteShift(src: { x: number; y: number; width: number; height: number }[], tryOrigin: boolean) {
+  const minX = Math.min(...src.map((v) => v.x)), maxX = Math.max(...src.map((v) => v.x + v.width))
+  const step = maxX - minX + 40
+  const key = src.map((v) => `${v.x},${v.y},${v.width},${v.height}`).join('|') + '@' + (pageId.value ?? '')
+  const n = pasteSeq?.key === key ? pasteSeq.n + 1 : tryOrigin ? 0 : 1
+  pasteSeq = { key, n }
+  return n * step
+}
+/** 빈 페이지에 붙였으면 붙인 것이 가운데에 다 보이게(최대 100%) — 그 밖에는 시점을 옮기지 않아요 */
+function showIfWasEmpty(wasEmpty: boolean, ids: string[]) {
+  if (wasEmpty && ids.length) nextTick(() => canvas.value?.fit(ids))
+}
+/** 다른 페이지 · 파일 · 탭에서 복사한 화면들 붙여넣기(속성 그대로 — 피그마 화면도): 원래 좌표 그대로(막히면 오른쪽으로 같은 간격). 시점은 그대로, 빈 페이지면 붙인 것이 보이게 */
+async function pasteScreenData(items: ScreenCopySource[], withLayers: boolean) {
+  if (blockEdit() || !items.length) return
+  const wasEmpty = !list.value.length
+  const dx = pasteShift(items, true)
+  showIfWasEmpty(wasEmpty, await cloneMany(items.map((v) => ({ src: v, x: v.x + dx, y: v.y })), withLayers))
 }
 async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' | 'nudge' | 'front' | 'back' | 'forward' | 'backward' | 'section', dx = 0, dy = 0) {
   if (action !== 'copy' && blockEdit()) return
@@ -1027,11 +1165,11 @@ async function onScreenAction(action: 'remove' | 'duplicate' | 'copy' | 'paste' 
       return
     }
     if (action === 'remove') {
-      // 고른 화면 전부 지우기. 피그마 화면은 남기고 알려요. 요구사항이 연결된 화면이 있으면 확인 창으로 물은 뒤 연결도 함께 끊고 지워요
+      // 고른 화면 전부 지우기 — 피그마에서 가져온 화면도 같이(사용자 요청 2026-11-27). 요구사항이 연결된 화면이 있으면 확인 창으로 물은 뒤 연결도 함께 끊고 지워요
       const linkedIds = new Set((links.data.value ?? []).map((l) => l.screen_id))
-      const ok = targets.filter((v) => v.source === 'native')
-      const kept = targets.length - ok.length
-      if (!ok.length) { tab.value = 'design'; say(tr('Figma frames can be deleted from the Design tab')); return }
+      const ok = targets
+      const kept = 0
+      if (!ok.length) return
       const nLinks = (links.data.value ?? []).filter((l) => ok.some((v) => v.id === l.screen_id)).length
       if (ok.some((v) => linkedIds.has(v.id))) { confirmFrames.value = { frames: ok, links: nLinks, kept }; return }
       await removeFrames(ok, kept)
@@ -1044,7 +1182,8 @@ async function removeFrames(ok: ScreenRow[], kept: number) {
   const linkSnap = (links.data.value ?? []).filter((l) => okIds.has(l.screen_id)).map((l) => ({ ...l }))
   if (linkSnap.length) await Promise.all(linkSnap.map((l) => removeLink(l.screen_id, l.requirement_id)))
   const order = list.value.map((v) => v.id)
-  const snaps = ok.map((v) => ({ id: v.id, rect: { x: v.x, y: v.y, width: v.width, height: v.height }, name: v.name, status: v.status, layers: JSON.parse(JSON.stringify(store.doc(v.id))) }))
+  // 되살릴 때 피그마 연결 · 썸네일 · 레이어까지 그대로(screenSource)
+  const snaps = ok.map((v) => ({ id: v.id, rect: { x: v.x, y: v.y, width: v.width, height: v.height }, name: v.name, status: v.status, src: screenSource(v) }))
   let cur = snaps.map((v) => v.id)
   await Promise.all(cur.map((id) => removeScreen(id)))
   store.selectScreen(null)
@@ -1055,8 +1194,8 @@ async function removeFrames(ok: ScreenRow[], kept: number) {
   store.pushAction(null, async () => {
     // 되살리기: 같은 자리 · 같은 앞뒤 순서로
     const made = await Promise.all(snaps.map(async (sn) => {
-      const r = await addScreen(sn.rect, sn.name)
-      if (r) { await updateScreen(r.id, { layers: sn.layers, status: sn.status }); delete store.docs[r.id] }
+      const r = await addScreenCopy(sn.src, sn.rect, sn.name)
+      if (r) { await updateScreen(r.id, { status: sn.status }); delete store.docs[r.id] }
       return r?.id ?? null
     }))
     const swap = new Map(snaps.map((sn, k) => [sn.id, made[k]]))
@@ -1350,12 +1489,72 @@ async function onDropFiles(files: File[], at: { x: number; y: number }, place?: 
     await insertImage(f, p, place)
   }
 }
-/** 붙여넣기: 이미지 파일 · SVG 코드(피그마 'Copy as SVG' 등) */
+let pastingIris = false
+/**
+ * Iris 에서 복사한 것 붙여넣기 — 어느 페이지 · 파일 · 탭에서 복사했든 같아요(피그마와 같아요).
+ * 이 탭에서 이 페이지 것만 복사했으면 false(캔버스의 원래 붙여넣기 — 원래 자리 · 고른 프레임 안 · 섞어 고른 것 그대로).
+ * 그 밖에는 여기서: 다른 페이지 · 파일이면 화면은 원래 자리(비어 있으면), 섹션은 안의 화면과 함께 옮겨요
+ */
+function pasteIris(iris: IrisClipPayload): boolean {
+  const mine = isMyClip(iris)
+  const screensIn = Array.isArray(iris.screens) ? iris.screens.filter((v) => v && typeof v.name === 'string' && (v.source === 'native' || v.source === 'figma') && v.width > 0 && v.height > 0) : []
+  const clip = iris.clip ?? null
+  const cid = canvasScreen.value?.id ?? null
+  const here = (sid: string) => sid === cid || list.value.some((v) => v.id === sid)
+  // 캔버스 레이어(섹션 등)와 화면을 함께 복사했으면 한 덩어리로 옮겨요
+  const grouped = !!clip && isPageCanvas(clip.sid) && screensIn.length > 0
+  const allHere = (!clip || here(clip.sid)) && screensIn.every((v) => !!v.id && list.value.some((o) => o.id === v.id))
+  if (mine && allHere && !grouped) return false
+  if (blockEdit()) return true
+  // 다른 탭 · 파일이거나, 이 탭이라도 다른 프로젝트에서 복사했으면(프로젝트마다 편집기를 새로 열어요) 클립보드에 실려 온 레이어로
+  if (clip && (!mine || !store.hasClipboard()) && !store.setClipboard(clip)) return screensIn.length ? (pasteScreenData(screensIn, false), true) : true
+  pastingIris = true
+  try {
+    if (grouped && clip && cid) { pasteGroup(clip, screensIn, cid); return true }
+    if (clip) { const keep = lastCopy.value; lastCopy.value = 'layers'; canvas.value?.paste(); lastCopy.value = keep }
+    if (screensIn.length) pasteScreenData(screensIn, !!clip)
+  } finally { pastingIris = false }
+  return true
+}
+/**
+ * 섹션(캔버스 레이어) + 안의 화면들: 서로 자리는 그대로, 함께 옮겨요.
+ * 다른 페이지 · 파일이면 원래 자리(비어 있으면), 같은 페이지면 바로 오른쪽(막히면 맨 오른쪽 끝)
+ */
+function pasteGroup(clip: LayerClip, items: ScreenCopySource[], cid: string) {
+  const roots = clip.nodes.filter((n) => clip.rootIds.includes(n.id))
+  const rects = [...roots.map((n) => ({ x: clip.abs[n.id]?.x ?? n.x, y: clip.abs[n.id]?.y ?? n.y, width: n.w, height: n.h })), ...items]
+  const wasEmpty = !list.value.length
+  // 다른 페이지 · 파일이면 원래 좌표 그대로(막히면 오른쪽으로 같은 간격), 같은 페이지면 오른쪽으로 — 시점은 그대로
+  const dx = pasteShift(rects, clip.sid !== cid)
+  // 화면들을 다 만든 뒤 섹션(레이어)을 붙이고, 화면 · 섹션을 실행취소 한 번으로 묶어요. 붙이는 동안만 이 클립을 써요(지금 클립보드는 그대로)
+  return cloneMany(items.map((v) => ({ src: v, x: v.x + dx, y: v.y })), true, (record) => store.batch(() => {
+    record()
+    const prev = store.clipData()
+    store.setClipboard(clip)
+    store.layerIds.value = []
+    store.paste(cid)
+    store.setClipboard(prev)
+    const fresh = [...store.layerIds.value]
+    if (dx && fresh.length) store.update(cid, fresh, (n) => ({ x: Math.round((n.x + dx) * 100) / 100 }))
+  })).then((ids) => showIfWasEmpty(wasEmpty, ids))
+}
+/**
+ * 붙여넣기(⌘V — 피그마와 같아요, 마지막에 복사한 것이 붙어요)
+ * 1) Iris 에서 복사한 레이어: 이 탭이면 이 탭 클립보드, 다른 파일 · 탭 · 새로고침 전이면 클립보드에 실려 온 데이터로
+ * 2) 이미지 파일 3) SVG 코드(피그마 'Copy as SVG' 등) 4) 그 밖의 글자 → 텍스트 레이어
+ */
 function onPaste(e: ClipboardEvent) {
   const t = e.target as HTMLElement | null
   if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
   const cd = e.clipboardData
   if (!cd) return
+  const html = cd.getData('text/html')
+  const iris = html ? readIrisClip(html) : null
+  if (iris) {
+    e.preventDefault()
+    if (!pasteIris(iris)) canvas.value?.paste()
+    return
+  }
   const files = [...cd.files].filter((f) => f.type.startsWith('image/'))
   const text = cd.getData('text/plain').trim()
   const center = { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
@@ -1366,9 +1565,31 @@ function onPaste(e: ClipboardEvent) {
     if (!importSvgVectors(text, current.value ? undefined : center)) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
     return
   }
-  // 그 밖에는 Iris 안에서 복사한 것(레이어 · 화면) — ⌘V 키는 캔버스가 막지 않고 이 이벤트로 와요
   e.preventDefault()
-  canvas.value?.paste()
+  // 피그마 ⌘C 는 피그마만 읽는 형식이에요 — 엉뚱한 것을 붙이지 않고 다른 복사 방법을 알려요
+  if (html && isFigmaClip(html)) return say(tr('Figma copies can’t be pasted yet. In Figma, use Copy as SVG or Copy as PNG'), 5000)
+  // 옛 표시(이 탭 클립보드) 이거나, 클립보드에 쓰지 못했을 때는 이 탭 클립보드
+  if (!text || text === IRIS_CLIP) return canvas.value?.paste()
+  insertPlainText(cd.getData('text/plain'), current.value ? undefined : center)
+}
+/** 다른 앱에서 복사한 글자 → 텍스트 레이어(피그마와 같아요: 글자 폭에 맞춘 텍스트, 줄바꿈 그대로). 고른 Iris 화면(없으면 캔버스) 가운데에 */
+function insertPlainText(raw: string, at?: { x: number; y: number }) {
+  if (blockEdit()) return
+  const text = raw.replace(/\r\n?/g, '\n').replace(/^\n+|\s+$/g, '')
+  if (!text) return
+  const s = (at ? null : current.value?.source === 'native' ? current.value : null) ?? canvasScreen.value
+  if (!s) return
+  const onCanvas = isPageCanvas(s.id)
+  // 붙인 뒤 글자에 맞춰 크기가 다시 재져요 — 처음 자리를 가운데로 잡으려고 대강 재요
+  const st = DEFAULT_STYLE.text
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (ctx) ctx.font = `${st.fontWeight} ${st.fontSize}px Pretendard, sans-serif`
+  const lines = text.split('\n')
+  const w = Math.max(1, Math.ceil(Math.max(...lines.map((l) => ctx?.measureText(l).width ?? l.length * 8))))
+  const h = Math.round(lines.length * (st.fontSize ?? 16) * ((st.lineHeight ?? 100) / 100))
+  const c = at ? (onCanvas ? at : { x: at.x - s.x, y: at.y - s.y }) : (onCanvas ? { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) } : { x: s.width / 2, y: s.height / 2 })
+  store.add(s.id, null, { type: 'text', text, x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h, style: {} })
+  tab.value = 'design'
 }
 /** SVG 코드 → 'svg' 프레임 안 벡터 레이어들. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false */
 function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?: string): boolean {

@@ -23,6 +23,9 @@ type Entry =
   | { kind?: 'layers'; screenId: string; before: string; after: string; selBefore?: string[]; selAfter?: string[] }
   | { kind: 'action'; screenId: string | null; undo: () => unknown; redo: () => unknown }
 
+/** 복사해 둔 레이어들: 맨 위 레이어 id · 그 아래 전부 · 복사한 문서(sid) · 맨 위 레이어의 문서 위 자리 */
+export interface LayerClip { nodes: LayerNode[]; rootIds: string[]; sid: string; abs: Record<string, { x: number; y: number }> }
+
 export function createLayerStore(opts: {
   screens: Ref<ScreenRow[]>
   /** edited = 사람이 직접 고친 변경이 들었나(크기 재기 · 요구사항 짝 같은 자동 저장만이면 false — 충돌 때 묻지 않아요) */
@@ -59,7 +62,7 @@ export function createLayerStore(opts: {
   /** 캔버스가 알려 준 화면 · 캔버스 좌표(레이어 패널에서 붙여넣어도 같은 자리 계산을 쓰게) */
   let pasteGeo: PasteGeo | undefined
   const setPasteGeo = (g: PasteGeo | undefined) => { pasteGeo = g }
-  let clipboard: { nodes: LayerNode[]; rootIds: string[]; sid: string; abs: Record<string, { x: number; y: number }> } | null = null
+  let clipboard: LayerClip | null = null
 
   function doc(sid: string): LayerDoc {
     if (!docs[sid]) {
@@ -1318,6 +1321,22 @@ export function createLayerStore(opts: {
     readonly, loadRemote, hasPending, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
+    /** 복사해 둔 레이어(운영체제 클립보드에 함께 써서 다른 파일 · 탭에서도 붙게) */
+    clipData: (): LayerClip | null => clipboard,
+    /** 다른 파일 · 탭에서 복사한 레이어를 이 탭의 클립보드로(모양이 맞지 않으면 false) */
+    setClipboard: (cb: LayerClip | null): boolean => {
+      if (!cb) { clipboard = null; return true }
+      const ok = !!cb && Array.isArray(cb.nodes) && Array.isArray(cb.rootIds) && cb.rootIds.length > 0 && typeof cb.sid === 'string'
+        && cb.nodes.every((n) => n && typeof n.id === 'string' && typeof n.type === 'string' && n.style && typeof n.style === 'object')
+        && cb.rootIds.every((id) => cb.nodes.some((n) => n.id === id))
+      if (!ok) return false
+      // 옛 버전 탭에서 복사한 것도 지금 형식으로(이미지 레이어 → 이미지 칠 등). 맨 위 레이어의 원래 부모는 그대로 둬요(같은 파일이면 그 안에 붙게)
+      const raw = JSON.parse(JSON.stringify(cb.nodes)) as LayerNode[]
+      const m = migrate({ rootIds: [...cb.rootIds], nodes: Object.fromEntries(raw.map((n) => [n.id, n])), schemaVersion: 0 }).nodes
+      const nodes = raw.map((n) => (m[n.id] ? { ...m[n.id]!, parentId: n.parentId } : n))
+      clipboard = { nodes, rootIds: [...cb.rootIds], sid: cb.sid, abs: cb.abs && typeof cb.abs === 'object' ? { ...cb.abs } : {} }
+      return true
+    },
     rotateBy, flip, align, distribute, space, boxes,
     absPos: (sid: string, id: string) => absPos(doc(sid), id),
   }

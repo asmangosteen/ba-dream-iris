@@ -1,5 +1,5 @@
 import type { ExportSetting } from '~/canvas/schema'
-import { markIrisClip, pickedLayers, selectMatchingSay } from '~/composables/useLayerMenu'
+import { irisDuplicate, markIrisClip, pickedLayers, selectMatchingSay } from '~/composables/useLayerMenu'
 import type { AlignKind } from '~/canvas/geom'
 import { textShortcut } from '~/canvas/textKeys'
 import { download, fileNameOf, renderExport } from '~/canvas/exporter'
@@ -268,10 +268,10 @@ export function useCanvasKeys(canvas: Ctx) {
       else if (!layerMode && multi.value.length > 1) { lastCopy.value = 'screen'; emit('clip-screens', [...multi.value]); stop() }
       else if (sid && !layerMode && !isPageCanvas(sid)) { lastCopy.value = 'screen'; emit('screen-action', 'copy'); stop() }
       else return
-      markIrisClip()
+      markIrisClip(layerMode ? store.clipData() : null, lastCopy.value !== 'layers')
       return
     }
-    if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); markIrisClip(); store.remove(sid!, ids) } return }
+    if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); markIrisClip(store.clipData()); store.remove(sid!, ids) } return }
     // ⌘V 는 막지 않아요: 붙여넣기 이벤트(onPaste)가 다른 앱에서 복사한 그림 · SVG 를 먼저 보고, 없으면 Iris 클립보드를 붙여요
     if (mod && key === 'v') return
     if (mod && key === 'd') {
@@ -284,7 +284,8 @@ export function useCanvasKeys(canvas: Ctx) {
         lastCopy.value = keep
         return
       }
-      if (layerMode) store.duplicate(); else if (sid) emit('screen-action', 'duplicate')
+      // 캔버스의 섹션은 안의 화면까지 함께 복제해요(피그마와 같아요)
+      if (layerMode) { if (!irisDuplicate()) store.duplicate() } else if (sid) emit('screen-action', 'duplicate')
       return
     }
     // 모두 고르기 ⌘A(같은 단계 — 레이어를 골랐으면 그 형제, 화면이나 아무것도 안 골랐으면 모든 화면) · 반전 ⇧⌘A · 같은 것 모두 ⌥⌘A

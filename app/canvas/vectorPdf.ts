@@ -1,6 +1,13 @@
 import { toCanvas } from 'html-to-image'
+
 import type { PDFDocument as PDFDoc, PDFPage, PDFOperator as Op } from 'pdf-lib'
 import { ellipsePath, rectPath } from './paint'
+
+/** 내보낼 요소를 그림 왼쪽 위(0, 0)에 — 물리 · 논리 위치 속성 모두 */
+export const PLACE: Partial<CSSStyleDeclaration> = {
+  inset: '0px auto auto 0px', insetBlock: '0px auto', insetInline: '0px auto', left: '0px', top: '0px', right: 'auto', bottom: 'auto',
+  margin: '0', translate: 'none', rotate: 'none', scale: 'none', transform: 'none', outline: 'none',
+}
 
 /**
  * 벡터 PDF(피그마 Export PDF 처럼): 그려진 화면을 따라가며 도형 · 선 · 글자를 PDF 벡터로 다시 그려요.
@@ -117,7 +124,7 @@ export async function vectorPdf(root: HTMLElement, W: number, H: number): Promis
   }
   const rasterEl = async (el: HTMLElement, x: number, y: number, w: number, h: number, op: number, alone = false) => {
     try {
-      const c = await toCanvas(el, { pixelRatio: 2, width: el.offsetWidth || undefined, height: el.offsetHeight || undefined, style: { transform: 'none', left: '0', top: '0', margin: '0' }, filter: alone ? () => false : (n) => !(n instanceof Element && skip(n)), preferredFontFormat: 'woff2' })
+      const c = await toCanvas(el, { pixelRatio: 2, width: el.offsetWidth || undefined, height: el.offsetHeight || undefined, style: PLACE, filter: alone ? () => false : (n) => !(n instanceof Element && skip(n)), preferredFontFormat: 'woff2' })
       await drawRaster(c, x, y, w, h, op)
     } catch { /* 못 그리면 건너뛰어요 */ }
   }

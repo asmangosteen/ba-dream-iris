@@ -4,6 +4,8 @@
  * - 칸마다 있는 ↑↓ 처리(여러 레이어는 각자 · 토큰 칩은 연결을 풀고)를 그대로 써요. 그게 없는 칸은 숫자를 바꿔 change 를 보내요
  * - 끄는 동안의 변경은 실행 취소 한 번으로 돌아가요(onStart · onEnd 로 hold · release)
  * - ↑↓ 처리가 없는 숫자 칸도 ↑↓ 로 1씩(⇧ 10씩) 바뀌어요
+ * - 숫자 칸을 눌러 들어가면 값 전체가 골라져서, 바로 치면 기존 값 대신 새 값이 들어가요(피그마와 같아요 — Export 배율 '1x' 등 모든 숫자 칸).
+ *   이미 들어가 있는 칸을 다시 누르면 그 자리에 글자 커서
  */
 const NUM = /^\s*-?\d*\.?\d+/
 /** 칸 전체가 숫자(+ % · ° · px · x)일 때만 — 검색칸 등은 빼요 */
@@ -123,6 +125,21 @@ export function useScrub(onStart: () => void, onEnd: () => void) {
       if (best && bd < 40) { best.focus(); best.select() }
     })
   }
-  onMounted(() => { document.addEventListener('pointerdown', down, true); document.addEventListener('pointerover', over, true); document.addEventListener('keydown', arrowKey) })
-  onBeforeUnmount(() => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerover', over, true); document.removeEventListener('keydown', arrowKey) })
+  // 숫자 칸에 들어갈 때 값 전체 고르기: 눌러서 들어오면 뒤따르는 mouseup 이 고른 걸 풀어 커서를 놓지 않게 막아요(그 한 번만)
+  let keepSel: HTMLInputElement | null = null
+  const numberish = (t: HTMLInputElement) => t.type !== 'search' && !t.readOnly && !t.disabled && !!t.closest('.fld') &&
+    (t.inputMode === 'numeric' || t.inputMode === 'decimal' || FULL.test(t.value) || (!t.value && !!t.placeholder))
+  function focusIn(e: FocusEvent) {
+    const t = e.target
+    if (!(t instanceof HTMLInputElement) || !numberish(t)) return
+    t.select()
+    keepSel = t
+    setTimeout(() => { if (keepSel === t) keepSel = null }, 400)
+  }
+  function mouseUp(e: MouseEvent) {
+    if (keepSel && e.target === keepSel) e.preventDefault()
+    keepSel = null
+  }
+  onMounted(() => { document.addEventListener('pointerdown', down, true); document.addEventListener('pointerover', over, true); document.addEventListener('keydown', arrowKey); document.addEventListener('focusin', focusIn); document.addEventListener('mouseup', mouseUp, true) })
+  onBeforeUnmount(() => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerover', over, true); document.removeEventListener('keydown', arrowKey); document.removeEventListener('focusin', focusIn); document.removeEventListener('mouseup', mouseUp, true) })
 }

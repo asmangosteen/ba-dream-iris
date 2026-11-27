@@ -251,7 +251,7 @@ export function useDragStart(canvas: Ctx) {
     // 고르지 않은 화면(맨 위 프레임)의 빈 곳 · 이름표: 누르면 곧바로 골라서, 끌면 그 방향으로 옮겨요(먼저 고를 필요 없이 — 사용자 요청). ⌥ 면 복제
     store.selectScreen(screen.id)
     const sid0 = screen.id
-    dragRef.current = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined, dup: e.altKey && isNative(screen) && !isCanvas(screen), canDup: isNative(screen) && !isCanvas(screen) }
+    dragRef.current = { kind: 'screen', id: sid0, sx: e.clientX, sy: e.clientY, ox: screen.x, oy: screen.y, w: screen.width, h: screen.height, targets: isCanvas(screen) ? [] : [...realScreens.value.filter((v) => v.id !== sid0).map(rectOf), ...guideRects()], moved: false, clickLayer: screenGrab ? lid : undefined, dup: e.altKey && !isCanvas(screen), canDup: !isCanvas(screen) } // 피그마 화면도 ⌥ 끌기로 복제(피그마 연결 · 썸네일 그대로)
   }
   function startResize(e: PointerEvent, handle: Handle) {
     if (e.button !== 0) return // 손잡이는 왼쪽 버튼으로만(우클릭 · 가운데 버튼은 무시)

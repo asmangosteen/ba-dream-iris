@@ -28,6 +28,7 @@ import { useVectorEdit } from './canvas/useVectorEdit'
 import { useDragStart } from './canvas/useDragStart'
 import { useDragMove } from './canvas/useDragMove'
 import { useDragEnd } from './canvas/useDragEnd'
+import { useAutoPan } from './canvas/useAutoPan'
 import { useCanvasLabels } from './canvas/useCanvasLabels'
 import { useCanvasMenu } from './canvas/useCanvasMenu'
 import { useCanvasKeys } from './canvas/useCanvasKeys'
@@ -96,6 +97,8 @@ const c9 = Object.assign(c8, useVectorEdit(c8))
 const c10 = Object.assign(c9, useDragStart(c9))
 const c11 = Object.assign(c10, useDragMove(c10))
 const c12 = Object.assign(c11, useDragEnd(c11))
+/** 끄는 동안 가장자리 자동 이동(모든 끄기 공통 — canvas/useAutoPan.ts) */
+const autoPan = useAutoPan(c11)
 const c13 = Object.assign(c12, useCanvasLabels(c12))
 const c14 = Object.assign(c13, useCanvasMenu(c13))
 const canvas = Object.assign(c14, useCanvasKeys(c14))
@@ -119,7 +122,15 @@ const {
   onKeyDown, onKeyUp, onBlur,
 } = canvas
 
-defineExpose({ fit, zoomAt, fitSelection, reveal, focusOn, insertInstance, sectionScreens, paste: doPaste })
+/** 지금 보이는 캔버스 영역(양쪽 패널 안쪽)의 캔버스 좌표 — 붙여넣기가 화면을 옮기지 않고 보이는 곳에 놓을 때 써요 */
+function viewWorld() {
+  const r = el.value?.getBoundingClientRect()
+  const a = autoPan.visibleArea()
+  if (!r || !a) return null
+  const z = vp.value.zoom
+  return { x: (a.left - r.left - vp.value.x) / z, y: (a.top - r.top - vp.value.y) / z, w: (a.right - a.left) / z, h: (a.bottom - a.top) / z }
+}
+defineExpose({ fit, zoomAt, fitSelection, reveal, focusOn, insertInstance, sectionScreens, paste: doPaste, viewWorld })
 
 onMounted(() => {
   el.value?.addEventListener('wheel', onWheel, { passive: false })
@@ -243,7 +254,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
     class="canvas canvas-dots"
     :style="{ cursor, ...gridStyle }"
     @pointerdown.self="start($event)"
-    @pointermove="move"
+    @pointermove="(e) => { move(e); autoPan.track(e) }"
     @pointerleave="leave"
     @pointerup="end"
     @pointercancel="end"

@@ -1,6 +1,6 @@
 import { toCanvas, toSvg } from 'html-to-image'
 import type { ExportSetting } from './schema'
-import { vectorPdf } from './vectorPdf'
+import { PLACE, vectorPdf } from './vectorPdf'
 
 /**
  * 내보내기(피그마 Export): 캔버스에 그려진 화면 · 레이어를 PNG · JPG · SVG · PDF 로.
@@ -46,9 +46,11 @@ function sizeOf(el: HTMLElement) {
 }
 function opts(el: HTMLElement, pixelRatio: number, backgroundColor?: string) {
   const { w, h } = sizeOf(el)
-  // 캔버스 안 자리 · 회전 · 마우스 올림 표시는 빼고 그 요소만 왼쪽 위 0 에
+  // 캔버스 안 자리 · 회전 · 마우스 올림 표시는 빼고 그 요소만 왼쪽 위 0 에.
+  // 위치는 left · top 만이 아니라 inset · inset-block · inset-inline 으로도 복사돼요(최신 크롬) — 이걸 같이 0 으로 안 하면
+  // 원래 자리(예: 20, 124)에 그려져 잘린 그림 밖으로 나가 빈 파일이 됐어요(사용자 지적 2026-11-27)
   // 글꼴은 woff2 한 형식만 넣어요(파일이 훨씬 가벼워요)
-  return { width: w, height: h, pixelRatio, backgroundColor, filter: skip, preferredFontFormat: 'woff2', style: { left: '0', top: '0', margin: '0', transform: 'none', outline: 'none' } }
+  return { width: w, height: h, pixelRatio, backgroundColor, filter: skip, preferredFontFormat: 'woff2', style: PLACE }
 }
 
 async function canvasOf(el: HTMLElement, pixelRatio: number, backgroundColor?: string) {

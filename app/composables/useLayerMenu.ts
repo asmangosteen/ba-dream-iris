@@ -1,9 +1,10 @@
 import { runCss } from '~/canvas/textRuns'
-import { isContainer, type LayerDoc, type LayerNode } from '~/canvas/schema'
+import { isContainer, SCHEMA_VERSION, type LayerDoc, type LayerNode } from '~/canvas/schema'
 import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
 import { nodePathIn } from '~/canvas/vector'
 import { canFlatten } from '~/canvas/boolean'
-import type { LayerStore } from '~/canvas/store'
+import type { LayerClip, LayerStore } from '~/canvas/store'
+import type { ScreenCopySource } from '~/composables/useEditor'
 import type { MenuItem } from './useContextMenu'
 
 /** 마지막에 복사한 것(레이어 · 화면) — 캔버스 단축키와 우클릭 메뉴가 함께 써요 */
@@ -82,8 +83,8 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
   const allHidden = nodes.every((n) => n.hidden), allLocked = nodes.every((n) => n.locked)
   const hasLayout = nodes.some((n) => n.style.layout)
   return [
-    { label: tr('Copy'), shortcut: '⌘C', action: () => { if (store.copy()) { opts.lastCopy.value = 'layers'; markIrisClip() } } },
-    { label: tr('Paste'), shortcut: '⌘V', action: opts.paste, disabled: !store.hasClipboard() && opts.lastCopy.value !== 'screen' },
+    { label: tr('Copy'), shortcut: '⌘C', action: () => { if (store.copy()) { opts.lastCopy.value = 'layers'; markIrisClip(store.clipData()) } } },
+    { label: tr('Paste'), shortcut: '⌘V', action: opts.paste, disabled: !canIrisPaste(store, opts.lastCopy.value) },
     ...(opts.pasteHere ? [{ label: tr('Paste here'), action: opts.pasteHere, disabled: !store.hasClipboard() || opts.lastCopy.value === 'screen' }] : []),
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => store.duplicate() },
     { label: tr('Copy as CSS'), action: () => copyText(nodes.map((n) => cssOf(n, store.color)).join('\n\n'), opts.hint) },
@@ -132,10 +133,82 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
 }
 
 /**
- * Iris 안에서 복사했다는 표시를 운영체제 클립보드에도 써 둬요. ⌘V 때 클립보드에 이 표시가 있으면 Iris 클립보드(레이어 · 화면)를,
- * 다른 앱에서 그 뒤에 복사한 그림 · SVG 가 있으면 그것을 붙여요(피그마와 같아요 — 마지막에 복사한 것이 붙어요)
+ * 운영체제 클립보드에 Iris 복사 내용을 써요(피그마와 같아요 — 다른 파일 · 다른 탭 · 새로고침 뒤에도 ⌘V 로 붙어요).
+ * - text/html: 레이어 데이터(data-iris) + 텍스트 레이어 글자(노션 · 메일 같은 곳에 붙이면 글자가 들어가요)
+ * - text/plain: 텍스트 레이어 글자(메모장 · 슬랙에 붙이면 글자)
+ * 화면을 복사하면 화면 데이터(레이어 · 속성 · 피그마 연결)도 함께 써요. 다른 앱에서 그 뒤에 복사한 것이 있으면 그것이 붙어요(마지막에 복사한 것)
  */
 export const IRIS_CLIP = '\u2063iris-clipboard\u2063'
-export function markIrisClip() {
-  try { navigator.clipboard?.writeText(IRIS_CLIP).catch(() => {}) } catch { /* 클립보드를 못 쓰면 Iris 클립보드만 */ }
+export interface IrisClipPayload { v: 1; stamp: string; schema: number; clip: LayerClip | null; screens?: ScreenCopySource[] }
+/**
+ * 복사한 화면들 데이터를 주는 곳(편집기 페이지가 등록해요 — 화면 목록 · 레이어를 들고 있어서).
+ * withScreens 면 고른 화면들, 그리고 복사한 섹션 안에 든 화면들은 늘 함께(피그마와 같아요)
+ */
+let screenSource: ((clip: LayerClip | null, withScreens: boolean) => ScreenCopySource[]) | null = null
+/** 편집기 페이지가 등록 · 해제해요. 프로젝트 탭을 옮기면 새 페이지가 먼저 등록하고 옛 페이지가 나중에 해제해서 — 자기 것일 때만 지워요 */
+export function setIrisScreenSource(fn: NonNullable<typeof screenSource>) { screenSource = fn }
+export function unsetIrisScreenSource(fn: NonNullable<typeof screenSource>) { if (screenSource === fn) screenSource = null }
+/** 이 탭에서 마지막으로 쓴 복사 내용(우클릭 Paste 처럼 클립보드를 못 읽는 붙여넣기에서 써요) */
+let lastPayload: IrisClipPayload | null = null
+export const myLastClip = () => lastPayload
+/** 붙일 것이 있는지(우클릭 Paste 켜기): 이 편집기 클립보드 · 복사한 화면 · 이 탭에서 다른 프로젝트 · 페이지에서 복사한 것 */
+export const canIrisPaste = (store: LayerStore, lastCopy: 'layers' | 'screen' | 'mixed' | null) => store.hasClipboard() || lastCopy === 'screen' || !!lastPayload?.clip || !!lastPayload?.screens?.length
+/** 우클릭 Paste: 편집기 페이지가 다른 페이지 · 섹션 붙여넣기를 먼저 맡아요(맡았으면 true) */
+let pasteHook: (() => boolean) | null = null
+export function setIrisPasteHook(fn: NonNullable<typeof pasteHook>) { pasteHook = fn }
+export function unsetIrisPasteHook(fn: NonNullable<typeof pasteHook>) { if (pasteHook === fn) pasteHook = null }
+export const irisMenuPaste = (fallback: () => void) => { if (!pasteHook?.()) fallback() }
+/** ⌘D: 캔버스의 섹션을 복제할 때 안의 화면까지 함께(편집기 페이지가 맡으면 true) */
+let dupHook: (() => boolean) | null = null
+export function setIrisDupHook(fn: NonNullable<typeof dupHook>) { dupHook = fn }
+export function unsetIrisDupHook(fn: NonNullable<typeof dupHook>) { if (dupHook === fn) dupHook = null }
+export const irisDuplicate = () => !!dupHook?.()
+/** 이 탭에서 마지막으로 복사한 표시 — ⌘V 때 같으면 이 탭의 클립보드를 그대로(화면 · 섞어 고른 것까지) */
+let myStamp = ''
+export const isMyClip = (p: IrisClipPayload) => !!myStamp && p.stamp === myStamp
+const b64 = (text: string) => { const bytes = new TextEncoder().encode(text); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(bin) }
+const unb64 = (b: string) => new TextDecoder().decode(Uint8Array.from(atob(b), (c) => c.charCodeAt(0)))
+const escHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+/** 복사한 레이어 안 텍스트 레이어 글자들(위에서부터 레이어 순서대로) */
+function clipTexts(clip: LayerClip | null): string[] {
+  if (!clip) return []
+  const byId = new Map(clip.nodes.map((n) => [n.id, n]))
+  const out: string[] = []
+  const walk = (id: string) => { const n = byId.get(id); if (!n || n.hidden) return; if (n.type === 'text' && n.text?.trim()) out.push(n.text); n.children?.forEach(walk) }
+  clip.rootIds.forEach(walk)
+  return out
 }
+/** clip: 복사한 레이어, withScreens: 복사한 화면들도 함께(화면 복사 · 레이어와 섞어 고른 복사) */
+export function markIrisClip(clip: LayerClip | null = null, withScreens = false) {
+  myStamp = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  const screens = screenSource?.(clip, withScreens) ?? []
+  const payload: IrisClipPayload = { v: 1, stamp: myStamp, schema: SCHEMA_VERSION, clip, ...(screens.length ? { screens } : {}) }
+  lastPayload = payload
+  const texts = clipTexts(clip)
+  const html = `<meta charset="utf-8"><span data-iris="${b64(JSON.stringify(payload))}"></span>${texts.map((t) => `<p>${escHtml(t).replace(/\n/g, '<br>')}</p>`).join('')}`
+  const plain = texts.join('\n\n')
+  // 1) 비동기 클립보드(크롬 · 사파리 · 데스크톱 앱) 2) 안 되면 copy 이벤트로 3) 그것도 안 되면 이 탭 안 클립보드만
+  const legacy = () => {
+    const on = (e: ClipboardEvent) => { e.preventDefault(); e.clipboardData?.setData('text/html', html); e.clipboardData?.setData('text/plain', plain || IRIS_CLIP) }
+    document.addEventListener('copy', on, { once: true, capture: true })
+    try { document.execCommand('copy') } catch { /* 이 탭 안 클립보드만 */ }
+    document.removeEventListener('copy', on, { capture: true })
+  }
+  try {
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return legacy()
+    const parts: Record<string, Blob> = { 'text/html': new Blob([html], { type: 'text/html' }) }
+    if (plain) parts['text/plain'] = new Blob([plain], { type: 'text/plain' })
+    navigator.clipboard.write([new ClipboardItem(parts)]).catch(legacy)
+  } catch { legacy() }
+}
+/** 붙여넣은 HTML 안 Iris 복사 내용. 없거나 읽지 못하면 null */
+export function readIrisClip(html: string): IrisClipPayload | null {
+  const m = /data-iris="([A-Za-z0-9+/=]+)"/.exec(html)
+  if (!m) return null
+  try {
+    const p = JSON.parse(unb64(m[1]!)) as IrisClipPayload
+    return p && p.v === 1 && typeof p.stamp === 'string' ? p : null
+  } catch { return null }
+}
+/** 피그마에서 복사한 것인지(피그마 클립보드 형식은 아직 읽지 못해요) */
+export const isFigmaClip = (html: string) => html.includes('(figmeta)') || html.includes('(figma)')
