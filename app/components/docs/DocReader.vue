@@ -527,8 +527,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .mark.dev_check { color: #1F63BD; --sq-fill: #EEF5FD; }
 
 .tool.below { transform: translate(-50%, 0); }
-/* 메모 자리: 노란 하이라이트 + 밑줄 */
-.nmark { background: #FFF1C2; color: inherit; border-radius: 2px; text-decoration: underline; text-decoration-color: #E8C14A; text-decoration-thickness: 2px; text-underline-offset: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* 메모 자리: 노란 하이라이트 + 굵은 글씨(밑줄 없이 — 사용자 요청 2026-11-27) */
+.nmark { background: #FFF1C2; color: inherit; font-weight: 600; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
 .tool-btn:hover { --sq-fill: rgb(253 253 253 / 12%); }
