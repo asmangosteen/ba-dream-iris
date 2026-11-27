@@ -136,10 +136,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 
     <!-- 새 메모 -->
     <div v-if="draft" class="sq card on">
-      <span class="where">
-        <span class="wq">{{ quote(draft) }}</span>
-        <span class="tx-meta wl">{{ placeOf(draft) }}</span>
-      </span>
+      <span class="where" :title="quote(draft) || undefined">{{ placeOf(draft) }}</span>
       <div class="newrow">
         <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
         <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[], a: string[]) => sendNote(b, m, a)" @cancel="draft = null" />
@@ -150,11 +147,8 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 
     <div v-for="t in notes" :key="t.root.id" :class="['sq', 'card', { on: active === t.root.id, done: !!t.root.resolved_at }]">
       <div class="ch">
-        <!-- 어디서 태그했는지: 고른 글(노란 줄) + 그 자리(장 · 행) · 이어진 화면 -->
-        <button type="button" class="where" :aria-expanded="active === t.root.id" @click="pick(t)">
-          <span class="wq">{{ quote(t.root.doc_anchor) || tr('Whole block') }}</span>
-          <span class="tx-meta wl">{{ placeOf(t.root.doc_anchor) }}<template v-for="sid in screensOf(t)" :key="sid"> · {{ screenName(sid) }}</template></span>
-        </button>
+        <!-- 어디서 태그했는지: 장 · ID(굵게) — 누르면 문서의 그 글에 노란 밑줄 -->
+        <button type="button" class="where" :aria-expanded="active === t.root.id" :title="quote(t.root.doc_anchor) || undefined" @click="pick(t)">{{ placeOf(t.root.doc_anchor) }}</button>
         <span v-if="t.unread" class="udot" :aria-label="tr('Unread')" />
         <button type="button" :class="['sq', 'pop-x', 'rs', { ok: !!t.root.resolved_at }]" :aria-pressed="!!t.root.resolved_at" :aria-label="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="resolve(t)"><EditorIcon name="resolve" :size="16" /></button>
       </div>
@@ -226,11 +220,9 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .card.done { opacity: .6; }
 .ch { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .tags { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
-/* 태그한 자리: 고른 글(왼쪽 노란 줄) + 장 · 행 */
-.where { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-left: var(--ref-spacing-05); box-shadow: inset 2px 0 0 #E8C14A; text-align: left; color: inherit; }
-.wq { color: var(--sys-color-neutral-800); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.wl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ch { align-items: flex-start; }
+/* 태그한 자리: 장 · ID 굵은 글씨 한 줄 */
+.where { flex: 1; min-width: 0; display: block; line-height: 24px; text-align: left; font-weight: 600; color: var(--sys-color-neutral-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch { align-items: center; }
 .where:focus-visible, .peek:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; border-radius: var(--ref-radius-03); }
 .qt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arrow { margin: 0 1px; }
