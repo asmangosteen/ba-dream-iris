@@ -10,6 +10,7 @@ import type { DocBlock, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import ScreenThumb from '~/components/editor/ScreenThumb.vue'
+import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
 import { migrate } from '~/canvas/schema'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
@@ -683,6 +684,34 @@ function toggleIdOrder() {
 // 데이터가 들어오는 동안은(사용자가 아직 움직이지 않았으면) 계속 맞춰 보기
 watch(() => placed.value.map((p) => `${p.c.key}:${p.x},${p.y},${p.w},${p.h}`).join('|'), () => { if (!userMoved) nextTick(() => fit()) })
 onMounted(() => nextTick(() => fit()))
+
+/**
+ * 로딩 화면(사용자 요청 2026-11-27): 함께 보기에 처음 들어올 때(새로 고침 · 이 프로젝트에서 처음 여는 함께 보기)만 편집기와 같은 IrisLoading.
+ * 문서끼리 옮길 땐(이 화면이 다시 그려져도) 이미 불러온 거라 바로 보여요. 편집기로 돌아갈 때도 편집기가 불러 둔 게 있으면 바로(편집기 쪽 규칙)
+ */
+const splitWarm = useState(`split-warm-${projectId}`, () => false)
+const hydratingSplit = import.meta.client && useNuxtApp().isHydrating
+const booting = ref(!(import.meta.client && !hydratingSplit && splitWarm.value))
+const bootP = ref(0)
+onMounted(async () => {
+  if (!booting.value) return
+  const paint = performance.getEntriesByName('first-contentful-paint')[0]?.startTime
+  const t0 = hydratingSplit && paint != null ? paint : performance.now()
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, Math.max(0, ms)))
+  bootP.value = 0.55
+  await Promise.race([document.fonts?.ready, wait(1500)])
+  bootP.value = 0.85
+  // 문서 · 화면 · 실제 화면 그림까지 받아 오면(최대 4초) 맞춰 보기
+  const ready = () => docs.status.value !== 'pending' && screens.status.value !== 'pending' && (art.status.value === 'success' || art.status.value === 'error')
+  if (!ready()) await new Promise<void>((r) => { const stop = watch(ready, (v) => { if (v) { stop(); r() } }); setTimeout(() => { stop(); r() }, 4000) })
+  await nextTick()
+  if (!userMoved) fit()
+  await wait(IRIS_LOADING_MIN - 500 - (performance.now() - t0))
+  bootP.value = 1
+  await wait(500)
+  booting.value = false
+  splitWarm.value = true
+})
 function onViewKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null
   if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
@@ -949,6 +978,7 @@ async function removeDoc() {
 <template>
   <!-- 문서 추가 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
   <div :class="['split', { 'notes-on': notesShown }]" :aria-hidden="addOpen ? 'true' : undefined">
+    <Transition name="ld"><IrisLoading v-if="booting" :progress="bootP" class="split-ld" /></Transition>
     <!-- 왼쪽 위: 편집기 캔버스와 같은 Iris 로고 메뉴(사용자 요청 2026-11-27) + 프로젝트 이름(누르면 편집기로) -->
     <div class="sq float s pill">
       <div ref="homeEl" class="home-wrap">
@@ -1213,6 +1243,10 @@ async function removeDoc() {
 </template>
 
 <style scoped>
+/* 처음 들어올 때 로딩 화면: 함께 보기 전체를 덮고 .35s 로 사라져요(편집기와 같게) */
+.split-ld { z-index: 50; }
+.ld-leave-active { transition: opacity .35s ease; }
+.ld-leave-to { opacity: 0; }
 /* 문서 패널 너비(사용자 요청 2026-11-27): 화면이 넓을수록 넓게(창 너비의 40%, 600 ~ 960). 메모를 켜면 메모 칸(280 고정)만큼 넓어지되 최대 960 을 넘지 않고, 최대일 땐 그 안에서 문서 · 메모로 나눠요 */
 .split { --doc-base: clamp(600px, 40vw, 960px); --doc-w: var(--doc-base); }
 .split.notes-on { --doc-w: min(calc(var(--doc-base) + 280px), 960px); }
