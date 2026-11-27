@@ -1,5 +1,5 @@
 import type { ExportSetting } from '~/canvas/schema'
-import { irisDuplicate, markIrisClip, pickedLayers, selectMatchingSay, setIrisImageSource, unsetIrisImageSource } from '~/composables/useLayerMenu'
+import { irisDuplicate, markIrisClip, pickedLayers, selectMatchingSay, setIrisImageSource, setIrisPngCopier, unsetIrisImageSource, unsetIrisPngCopier } from '~/composables/useLayerMenu'
 import type { AlignKind } from '~/canvas/geom'
 import { textShortcut } from '~/canvas/textKeys'
 import { download, fileNameOf, renderCombined, renderExport } from '~/canvas/exporter'
@@ -97,6 +97,9 @@ export function useCanvasKeys(canvas: Ctx) {
       emit('hint', tr('Copied as PNG'))
     } catch { emit('hint', tr('Couldn\'t copy to the clipboard')) }
   }
+  const pngCopier = () => { void copyPng() }
+  setIrisPngCopier(pngCopier)
+  onBeforeUnmount(() => unsetIrisPngCopier(pngCopier))
   /** ⇧⌘E 내보내기(피그마와 같아요): 고른 것의 Export 설정대로, 없으면 PNG 1x 로 내려받기 */
   async function exportNow() {
     const ts = exportTargets()

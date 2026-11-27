@@ -7,6 +7,8 @@ import { keepStorageImage, loadStorageImage } from '~/canvas/imageCache'
 const cache = reactive<Record<string, string>>({})
 const loading = new Set<string>()
 
+/** 화면에 한 번 그린 이미지의 실제 주소('storage://' → 서명 URL · 이 기기 보관본). 아직 안 그렸으면 undefined — SVG 로 복사할 때 써요 */
+export const loadedImageUrl = (src: string): string | undefined => (src.startsWith('storage://') ? cache[src] : src)
 export function useImageSrc() {
   const supabase = useSupabaseClient()
   return (src?: string): string | undefined => {

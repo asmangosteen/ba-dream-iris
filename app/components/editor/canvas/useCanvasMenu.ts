@@ -1,5 +1,5 @@
 import type { ScreenRow } from '~/composables/useEditor'
-import { canIrisPaste, irisMenuPaste, layerMenuItems, markIrisClip, svgOf, useLastCopy, useRenameReq } from '~/composables/useLayerMenu'
+import { canIrisPaste, copyPasteAs, copySvg, irisCopyPng, irisMenuPaste, layerMenuItems, markIrisClip, useLastCopy, useRenameReq } from '~/composables/useLayerMenu'
 import type { MenuItem } from '~/composables/useContextMenu'
 import { union, type Rect } from '~/canvas/geom'
 import { EDITABLE, type CanvasBase } from './types'
@@ -106,6 +106,11 @@ export function useCanvasMenu(canvas: Ctx) {
       { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip(null, true) } },
       { label: tr('Paste'), shortcut: '⌘V', action: menuPaste, disabled: !canIrisPaste(store, lastCopy.value) },
       ...(native ? [{ label: tr('Paste here'), action: () => pasteAt(at), disabled: !store.hasClipboard() || lastCopy.value === 'screen' }] : []),
+      // 화면 통째로(화면 배경 · 모서리 · 내용 자르기 + 안의 레이어) — 피그마에 붙이면 프레임으로
+      copyPasteAs({
+        svg: native ? () => { const d = store.doc(screen.id); copySvg(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color, (t) => emit('hint', t), { name: screen.name, w: screen.width, h: screen.height, style: d.frame }) } : undefined,
+        png: () => irisCopyPng(),
+      }),
       { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
       { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => sectionScreens(multi.value.includes(screen.id) ? multi.value : [screen.id]) },
       'sep',
@@ -117,7 +122,6 @@ export function useCanvasMenu(canvas: Ctx) {
       ...(native ? [
         { label: tr('Select all layers'), action: () => store.selectAll(screen.id), disabled: !store.doc(screen.id).rootIds.length },
         { label: store.doc(screen.id).frame?.grids?.length ? tr('Remove layout grid') : tr('Add layout grid'), action: () => store.frameStyle(screen.id, { grids: store.doc(screen.id).frame?.grids?.length ? undefined : [{ type: 'columns', count: 4, gutter: 16, margin: 16, color: '#FF000019' }] }) },
-        { label: tr('Copy as SVG'), action: () => { const d = store.doc(screen.id); const svg = svgOf(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color); if (svg) navigator.clipboard.writeText(svg).then(() => emit('hint', tr('Copied to clipboard')), () => emit('hint', tr('Couldn\'t copy to the clipboard'))); else emit('hint', tr('Nothing to copy as SVG')) } },
       ] : []),
       // 프로젝트 썸네일(피그마 Set as thumbnail): 홈 목록 카드에 이 프레임을 보여 줘요. 이미 썸네일이면 기본(첫 페이지의 첫 화면)으로 되돌리기
       props.coverId === screen.id

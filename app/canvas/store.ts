@@ -24,6 +24,8 @@ type Entry =
   | { kind: 'action'; screenId: string | null; undo: () => unknown; redo: () => unknown }
 
 /** 복사해 둔 레이어들: 맨 위 레이어 id · 그 아래 전부 · 복사한 문서(sid) · 맨 위 레이어의 문서 위 자리 */
+/** 여러 단계로 넣을 레이어(kids = 안쪽 레이어들, 좌표는 부모 기준) */
+export type TreePart = Partial<LayerNode> & { type: LayerType; kids?: TreePart[] }
 export interface LayerClip { nodes: LayerNode[]; rootIds: string[]; sid: string; abs: Record<string, { x: number; y: number }> }
 
 export function createLayerStore(opts: {
@@ -739,6 +741,24 @@ export function createLayerStore(opts: {
       return id
     })
   }
+  /** 여러 단계 묶음을 한 번에 넣기(SVG 가져오기 — 프레임 · 그룹 · 마스크 안 레이어까지). 좌표는 부모 기준. 실행취소 한 번 */
+  function insertDeep(sid: string, parentId: string | null, root: TreePart): string {
+    return mutate(sid, (d) => {
+      const put = (p: TreePart, parent: string | null): string => {
+        const id = newId()
+        const { kids, ...rest } = p
+        d.nodes[id] = { id, name: nextName(d, p.type), parentId: parent, x: 0, y: 0, w: 100, h: 100, ...rest, style: { ...DEFAULT_STYLE[p.type], ...rest.style } }
+        if (isContainer(p) || kids) d.nodes[id]!.children = []
+        siblings(d, parent).push(id)
+        for (const k of kids ?? []) put(k, id)
+        return id
+      }
+      const id = put(root, parentId)
+      layerIds.value = [id]
+      screenId.value = sid
+      return id
+    })
+  }
   /** 같은 부모 안에서 고른 것들(아래 → 위 순서) */
   function orderedSiblings(d: LayerDoc, ids: string[]) {
     const first = d.nodes[ids[0]!]
@@ -1318,7 +1338,7 @@ export function createLayerStore(opts: {
     pixelSnap, snapPx,
     docs, screenId, layerIds, editing, saveState, canUndo, canRedo,
     doc, node, begin, commit, mutate, undo, redo, flushAll, dispose, hasUnsaved, recoverDoc, pushAction,
-    readonly, loadRemote, hasPending, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null,
+    readonly, loadRemote, hasPending, hold, release, tidy, selectInverse, selectMatching, hasMatching, setReqBind, topIds, resizeToFit, setWrap, moveInFlow, clipSid: () => clipboard?.sid ?? null, insertDeep,
     nextLabel, selectScreen, selectLayer, toggleX, promoteX, xsel, xGroups, withX, add, addAround, batch, update, scaleLayers, scaleScreenContent, setScreenExports, style, frameStyle, reparent, transfer, addAutoLayout, removeAutoLayout, sizeTo, constrainRoot, relayout, setMeasured, insertTree, booleanOp, flatten, toCornerVector, toggleMask, bind, unbind, remove, arrange, moveTo, copy, paste, pasteOnSelection, duplicate, duplicateInPlace, color,
     selectAll, selectChildren, selectParent, selectSibling, wrap, unwrap, copyStyle, pasteStyle, hasClipboard: () => !!clipboard, setPasteGeo,
     /** 복사해 둔 레이어(운영체제 클립보드에 함께 써서 다른 파일 · 탭에서도 붙게) */

@@ -2,7 +2,7 @@
 import { fmtNum } from '~/canvas/num'
 import { guessReqLayers, matchReqLayers, reqLost } from '~/canvas/reqMatch'
 import { topImagePaint } from '~/canvas/paint'
-import { descendants, DEFAULT_STYLE, SCHEMA_VERSION, type LayerNode } from '~/canvas/schema'
+import { descendants, DEFAULT_STYLE, SCHEMA_VERSION, type LayerNode, type Paint } from '~/canvas/schema'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import IrisLoading, { IRIS_LOADING_MIN } from '~/components/app/IrisLoading.vue'
@@ -14,7 +14,7 @@ import KeyboardShortcuts from '~/components/editor/KeyboardShortcuts.vue'
 import FramePresets from '~/components/editor/FramePresets.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
-import { importSvg } from '~/canvas/vector'
+import { importSvgDoc, type SvgPart } from '~/canvas/svgImport'
 import InspectorLayer from '~/components/editor/InspectorLayer.vue'
 import InspectorScale from '~/components/editor/InspectorScale.vue'
 import InspectorExport from '~/components/editor/InspectorExport.vue'
@@ -22,7 +22,7 @@ import InspectorPage from '~/components/editor/InspectorPage.vue'
 import { arrangeRects, type ArrangeOp } from '~/canvas/geom'
 import LayerTree from '~/components/editor/LayerTree.vue'
 import { IRIS_CLIP, isFigmaClip, isMyClip, myLastClip, readIrisClip, setIrisDupHook, setIrisPasteHook, setIrisScreenSource, unsetIrisDupHook, unsetIrisPasteHook, unsetIrisScreenSource, useLastCopy, type IrisClipPayload, useMixScreens, useToastReq } from '~/composables/useLayerMenu'
-import { createLayerStore, LAYER_STORE, type LayerClip } from '~/canvas/store'
+import { createLayerStore, LAYER_STORE, type LayerClip, type TreePart } from '~/canvas/store'
 import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUploads, prepareImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
@@ -1488,7 +1488,10 @@ async function onImageFile(e: Event) {
 async function onPlaceImage(at: { x: number; y: number }, width: number | null, place?: { sid: string; parentId: string | null }) {
   const f = placing.value.shift()
   if (!placing.value.length) tool.value = 'move'
-  if (f) await insertImage(f, at, place, width)
+  if (!f) return
+  // SVG 파일은 끌어 놓기 · 붙여넣기처럼 고칠 수 있는 레이어로(피그마 'SVG 내보내기' 파일도). 읽지 못하면 그림으로
+  if (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name)) { const text = await f.text().catch(() => ''); if (text && await importSvgVectors(text, at, place?.sid)) return }
+  await insertImage(f, at, place, width)
 }
 /**
  * 이미지 넣기(도구 · 끌어 놓기 · 붙여넣기 공용). at 이 있으면 그 캔버스 좌표에, 없으면 고른 화면 가운데(없으면 보이는 캔버스 가운데)에.
@@ -1560,7 +1563,7 @@ async function onDropFiles(files: File[], at: { x: number; y: number }, place?: 
   for (const [i, f] of media.entries()) {
     const p = { x: at.x + i * 24, y: at.y + i * 24 }
     // SVG 파일은 고칠 수 있는 벡터로(SVG 코드 붙여넣기와 같아요 — 피그마와 같아요). 읽지 못하면 이미지로
-    if (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name)) { const text = await f.text().catch(() => ''); if (text && importSvgVectors(text, p, place?.sid)) continue }
+    if (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name)) { const text = await f.text().catch(() => ''); if (text && await importSvgVectors(text, p, place?.sid)) continue }
     await insertImage(f, p, place)
   }
 }
@@ -1641,7 +1644,7 @@ function applyClipboard(cd: { html: string; text: string; files: File[] }) {
   if (files.length) { onDropFiles(files, current.value ? { x: current.value.x + current.value.width / 2, y: current.value.y + current.value.height / 2 } : center); return }
   if (/^<svg[\s>]/i.test(text) || (/^<\?xml/i.test(text) && text.includes('<svg'))) {
     // 피그마처럼 벡터 레이어들로(안쪽 도형까지 고칠 수 있게). 읽지 못하면 이미지로
-    if (!importSvgVectors(text, current.value ? undefined : center)) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
+    void importSvgVectors(text, current.value ? undefined : center).then((ok) => { if (!ok) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center) })
     return
   }
   // 피그마 ⌘C 는 피그마만 읽는 형식이에요 — 엉뚱한 것을 붙이지 않고 다른 복사 방법을 알려요
@@ -1702,20 +1705,66 @@ function insertPlainText(raw: string, at?: { x: number; y: number }) {
   store.add(s.id, null, { type: 'text', text, x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h, style: {} })
   tab.value = 'design'
 }
-/** SVG 코드 → 'svg' 프레임 안 벡터 레이어들. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false */
-function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?: string): boolean {
-  const r = importSvg(text)
+/**
+ * SVG 코드 → 레이어(피그마 'SVG로 복사' · SVG 파일 · 다른 앱 SVG). 피그마 프레임은 프레임(배경 · 모서리 · 내용 자르기)으로, 그룹 · 마스크 · 그라디언트 · 사진 칠 ·
+ * 그림자 · 글자까지 옮겨요(app/canvas/svgImport.ts). SVG 안 사진은 저장소에 올려서 넣어요. 고른 Iris 화면(없으면 캔버스) 가운데에. 실패하면 false
+ */
+async function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?: string): Promise<boolean> {
+  if (blockEdit()) return true
+  const r = importSvgDoc(text)
   if (!r) return false
   const into = intoSid ? canvasList.value.find((v) => v.id === intoSid && v.source === 'native') : undefined
   const s = into ?? (at ? null : current.value?.source === 'native' ? current.value : null) ?? canvasScreen.value
   if (!s) return false
   const onCanvas = isPageCanvas(s.id)
-  const k = 1 // SVG 도 원래 크기 그대로
-  const w = r.w * k, h = r.h * k
   const c = at ? (onCanvas ? at : { x: at.x - s.x, y: at.y - s.y }) : (onCanvas ? { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) } : { x: s.width / 2, y: s.height / 2 })
+  // SVG 안 사진(data:) → 저장소(같은 사진은 한 번만). 못 올리면 그대로 넣어요(화면에는 보여요)
+  const uploaded = new Map<string, { src: string; iw: number; ih: number } | null>()
+  const paintsOf = (p: SvgPart): Paint[] => (p.kind === 'vector' || p.kind === 'frame' ? p.fills : [])
+  const all: SvgPart[] = []
+  const collect = (ps: SvgPart[]) => { for (const p of ps) { all.push(p); if (p.kind === 'group' || p.kind === 'frame') collect(p.children) } }
+  collect(r.parts)
+  const dataSrcs = [...new Set([...r.fills, ...all.flatMap(paintsOf)].flatMap((p) => (p.type === 'image' && p.src.startsWith('data:') ? [p.src] : [])))]
+  await Promise.all(dataSrcs.map(async (src, i) => {
+    try {
+      const blob = await (await fetch(src)).blob()
+      const img = await prepareImage(new File([blob], `svg-image-${i + 1}.${(blob.type.split('/')[1] ?? 'png').replace('+xml', '')}`, { type: blob.type || 'image/png' }), s.id.replace(':', '-'), { supabase, preview })
+      uploaded.set(src, { src: img.src, iw: img.w, ih: img.h })
+    } catch { uploaded.set(src, null) }
+  }))
+  const fixPaint = (p: Paint): Paint => { const u = p.type === 'image' ? uploaded.get(p.src) : null; return u && p.type === 'image' ? { ...p, ...u } : p }
   const r2 = (v: number) => Math.round(v * 100) / 100
-  store.insertTree(s.id, null, { type: 'frame', name: 'svg', x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w: r2(w), h: r2(h), style: { fill: undefined, clip: false } },
-    r.layers.map((l) => ({ type: 'vector' as const, name: l.name, x: r2(l.x * k), y: r2(l.y * k), w: r2(l.w * k), h: r2(l.h * k), vnet: l.vnet, evenodd: l.evenodd || undefined, style: { fill: l.fill, stroke: l.stroke, strokeWidth: l.strokeWidth ? r2(l.strokeWidth * k) : undefined, opacity: l.opacity } })))
+  /** 칠: 단색 하나면 fill(그동안처럼), 그 밖에는 fills */
+  const paintStyle = (fills: Paint[]) => (fills.length === 1 && fills[0]!.type === 'solid' && !fills[0]!.opacity ? { fill: fills[0]!.color } : { fill: undefined, fills: fills.length ? fills.map(fixPaint) : undefined })
+  const toTree = (p: SvgPart, ox: number, oy: number): TreePart => {
+    const pos = { name: p.name, x: r2(p.x - ox), y: r2(p.y - oy), w: Math.max(0.01, r2(p.w)), h: Math.max(0.01, r2(p.h)) }
+    if (p.kind === 'vector') {
+      return {
+        type: 'vector', ...pos, vnet: p.vnet, evenodd: p.evenodd || undefined, isMask: p.isMask || undefined,
+        style: { ...paintStyle(p.fills), stroke: p.stroke, strokeWidth: p.strokeWidth, strokeAlign: p.stroke ? 'center' : undefined, cap: p.cap, join: p.join, dash: p.dash, opacity: p.opacity, effects: p.effects },
+      }
+    }
+    if (p.kind === 'text') {
+      return {
+        type: 'text', ...pos, text: p.text,
+        style: { color: p.color, fontSize: p.fontSize, fontWeight: p.fontWeight, lineHeight: p.lineHeight, lineHeightUnit: undefined /* px — 기본 % 를 지워요 */, letterSpacing: p.letterSpacing, align: p.align ?? 'left', opacity: p.opacity, autoWidth: true },
+      }
+    }
+    if (p.kind === 'frame') {
+      return {
+        type: 'frame', group: false, ...pos,
+        style: { ...paintStyle(p.fills), radius: p.radius, stroke: p.stroke, strokeWidth: p.strokeWidth, clip: p.clip, opacity: p.opacity, effects: p.effects },
+        kids: p.children.map((k) => toTree(k, p.x, p.y)),
+      }
+    }
+    return { type: 'frame', group: true, ...pos, style: { fill: undefined, clip: false, opacity: p.opacity, effects: p.effects }, kids: p.children.map((k) => toTree(k, p.x, p.y)) }
+  }
+  const w = r2(r.w), h = r2(r.h)
+  store.insertDeep(s.id, null, {
+    type: 'frame', name: r.name || 'svg', x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h,
+    style: { ...paintStyle(r.fills), clip: r.clip, radius: r.radius, stroke: r.stroke, strokeWidth: r.strokeWidth },
+    kids: r.parts.map((p) => toTree(p, 0, 0)),
+  })
   tab.value = 'design'
   return true
 }

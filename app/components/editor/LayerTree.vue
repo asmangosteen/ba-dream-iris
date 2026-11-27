@@ -5,7 +5,7 @@ import { descendants, isContainer, isGroupNode, type LayerNode } from '~/canvas/
 import { LAYER_ICON } from '~/canvas/icons'
 import { radiiOf, rectPath, topImagePaint, vectorPath } from '~/canvas/paint'
 import { booleanPath } from '~/canvas/boolean'
-import { canIrisPaste, irisMenuPaste, layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq, useToastReq } from '~/composables/useLayerMenu'
+import { canIrisPaste, copyPasteAs, copySvg, irisCopyPng, irisMenuPaste, layerMenuItems, markIrisClip, pickedLayers, useLastCopy, useMixScreens, useRenameReq, useToastReq } from '~/composables/useLayerMenu'
 import RenameLayers from '~/components/editor/RenameLayers.vue'
 import { instTick, readInstanceTree, subHover, subSel, type SubNode } from '~/composables/useInstanceTree'
 import { useLayerStore } from '~/canvas/store'
@@ -549,6 +549,11 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
   ctx.open(e, [
     { label: tr('Copy'), shortcut: '⌘C', action: () => { lastCopy.value = 'screen'; emit('screen-action', 'copy'); markIrisClip(null, true) } },
     { label: tr('Paste'), shortcut: '⌘V', action: paste, disabled: !canIrisPaste(store, lastCopy.value) },
+    // 캔버스 화면 메뉴와 같아요(PNG 는 고른 화면을 — 메뉴를 열 때 이 화면을 골라요)
+    copyPasteAs({
+      svg: s.source === 'native' ? () => { const d = store.doc(s.id); copySvg(d, d.rootIds.map((id) => d.nodes[id]!).filter(Boolean), store.color, (t) => (toastReq.value = { text: t, at: Date.now() }), { name: s.name, w: s.width, h: s.height, style: d.frame }) } : undefined,
+      png: () => irisCopyPng(),
+    }),
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => emit('screen-action', 'duplicate') },
     { label: tr('Wrap in section'), shortcut: '⌥⌘S', action: () => emit('screen-action', 'section') },
     'sep',

@@ -1,8 +1,9 @@
 import { runCss } from '~/canvas/textRuns'
 import { isContainer, SCHEMA_VERSION, type LayerDoc, type LayerNode } from '~/canvas/schema'
 import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
-import { nodePathIn } from '~/canvas/vector'
 import { canFlatten } from '~/canvas/boolean'
+import { svgOfLayers, toDataUrl, type SvgExportOpts } from '~/canvas/svgExport'
+import { loadedImageUrl } from '~/canvas/images'
 import type { LayerClip, LayerStore } from '~/canvas/store'
 import type { ScreenCopySource } from '~/composables/useEditor'
 import type { MenuItem } from './useContextMenu'
@@ -56,25 +57,40 @@ export function cssOf(n: LayerNode, color: (v?: string) => string | undefined): 
   })
   return [head, ...runs].join('\n\n')
 }
-/** 레이어들 → SVG(피그마 'Copy as SVG'). 텍스트 · 이미지 · 인스턴스는 빼요 */
-export function svgOf(doc: LayerDoc, ns: LayerNode[], color: (v?: string) => string | undefined): string | null {
-  const shapes = ns.filter((n) => n.type !== 'text' && n.type !== 'image' && n.type !== 'instance')
-  if (!shapes.length) return null
-  const x0 = Math.min(...shapes.map((n) => n.x)), y0 = Math.min(...shapes.map((n) => n.y))
-  const W = Math.max(...shapes.map((n) => n.x + n.w)) - x0, H = Math.max(...shapes.map((n) => n.y + n.h)) - y0
-  const r = (v: number) => Math.round(v * 100) / 100
-  const body = shapes.map((n) => {
-    const d = nodePathIn(doc, n, -x0, -y0)
-    const fill = n.type === 'line' || (n.type === 'path' && !n.closed) ? 'none' : color(n.style.fill) ?? 'none'
-    const stroke = n.style.stroke && n.style.strokeWidth ? ` stroke="${color(n.style.stroke)}" stroke-width="${n.style.strokeWidth}"` : ''
-    return `  <path d="${d}" fill="${fill}"${n.evenodd ? ' fill-rule="evenodd"' : ''}${stroke}${n.style.opacity !== undefined && n.style.opacity < 1 ? ` opacity="${n.style.opacity}"` : ''}/>`
-  }).join('\n')
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${r(W)}" height="${r(H)}" viewBox="0 0 ${r(W)} ${r(H)}" fill="none">\n${body}\n</svg>`
+/**
+ * 'SVG로 복사'(피그마와 같아요): 프레임 · 그룹 · 마스크 구조, 이름, 글자, 사진, 그라디언트, 그림자까지 담아요(app/canvas/svgExport.ts).
+ * 피그마에 붙이면 레이어가 나뉜 채 고칠 수 있고, Iris 에 붙여도 그대로 돌아와요. frame 을 주면 화면 통째로(배경 · 모서리 · 자르기)
+ */
+export function copySvg(doc: LayerDoc, nodes: LayerNode[], color: (v?: string) => string | undefined, hint?: (t: string) => void, frame?: SvgExportOpts['frame']) {
+  const svg = svgOfLayers(doc, nodes, { color, frame, image: (src) => toDataUrl(loadedImageUrl(src)) })
+  // 사진을 그림 데이터로 바꾸는 동안 기다려도 클립보드 쓰기가 막히지 않게 바로 씁니다(내용은 나중에 채워져요)
+  const text = svg.then((t) => { if (!t) throw new Error('empty'); return new Blob([t], { type: 'text/plain' }) })
+  const done = typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write
+    ? navigator.clipboard.write([new ClipboardItem({ 'text/plain': text })])
+    : svg.then((t) => (t ? navigator.clipboard.writeText(t) : Promise.reject(new Error('empty'))))
+  done.then(() => hint?.(tr('Copied as SVG')), () => svg.then((t) => hint?.(t ? tr('Couldn\'t copy to the clipboard') : tr('Nothing to copy as SVG')), () => hint?.(tr('Couldn\'t copy to the clipboard'))))
 }
 async function copyText(text: string, hint?: (t: string) => void) {
   try { await navigator.clipboard.writeText(text); hint?.(tr('Copied to clipboard')) } catch { hint?.(tr('Couldn\'t copy to the clipboard')) }
 }
 
+/**
+ * 우클릭 'Copy/Paste as' › 하위 메뉴(피그마와 같아요): 코드(CSS) · SVG · PNG 로 복사, 속성 복사 · 붙여넣기. 레이어 · 화면 · 레이어 목록 메뉴가 함께 써요.
+ * 없는 항목(undefined)은 빼요
+ */
+export function copyPasteAs(o: { css?: () => void; svg?: () => void; png?: () => void; copyProps?: () => void; pasteProps?: () => void }): MenuItem {
+  const children: MenuItem[] = [
+    ...(o.css ? [{ label: tr('Copy as code'), action: o.css }] : []),
+    ...(o.svg ? [{ label: tr('Copy as SVG'), action: o.svg }] : []),
+    ...(o.png ? [{ label: tr('Copy as PNG'), shortcut: '⇧⌘C', action: o.png }] : []),
+    'sep',
+    ...(o.copyProps || o.pasteProps ? [
+      { label: tr('Copy properties'), shortcut: '⌥⌘C', action: o.copyProps ?? (() => {}), disabled: !o.copyProps },
+      { label: tr('Paste properties'), shortcut: '⌥⌘V', action: o.pasteProps ?? (() => {}), disabled: !o.pasteProps },
+    ] : []),
+  ]
+  return { label: tr('Copy/Paste as'), children }
+}
 export function layerMenuItems(store: LayerStore, sid: string, ids: string[], opts: { lastCopy: Ref<'layers' | 'screen' | 'mixed' | null>; paste: () => void; pasteHere?: () => void; fit?: () => void; hint?: (t: string) => void }): MenuItem[] {
   const d = store.doc(sid)
   const nodes = ids.map((id) => d.nodes[id]).filter((n): n is NonNullable<typeof n> => !!n)
@@ -86,9 +102,14 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     { label: tr('Copy'), shortcut: '⌘C', action: () => { if (store.copy()) { opts.lastCopy.value = 'layers'; markIrisClip(store.clipData()) } } },
     { label: tr('Paste'), shortcut: '⌘V', action: opts.paste, disabled: !canIrisPaste(store, opts.lastCopy.value) },
     ...(opts.pasteHere ? [{ label: tr('Paste here'), action: opts.pasteHere, disabled: !store.hasClipboard() || opts.lastCopy.value === 'screen' }] : []),
+    copyPasteAs({
+      css: () => copyText(nodes.map((n) => cssOf(n, store.color)).join('\n\n'), opts.hint),
+      svg: nodes.some((n) => n.type !== 'instance') ? () => copySvg(d, nodes, store.color, opts.hint) : undefined,
+      png: () => irisCopyPng(),
+      copyProps: ids.length ? () => store.copyStyle() : undefined,
+      pasteProps: () => store.pasteStyle(),
+    }),
     { label: tr('Duplicate'), shortcut: '⌘D', action: () => store.duplicate() },
-    { label: tr('Copy as CSS'), action: () => copyText(nodes.map((n) => cssOf(n, store.color)).join('\n\n'), opts.hint) },
-    ...(svgOf(d, nodes, store.color) ? [{ label: tr('Copy as SVG'), action: () => copyText(svgOf(d, nodes, store.color)!, opts.hint) }] : []),
     'sep',
     { label: tr('Select parent'), shortcut: '⇧↵', action: () => store.selectParent(sid), disabled: nodes.every((n) => !n.parentId) },
     ...(nodes.some((n) => isContainer(n) && n.children?.length) ? [{ label: tr('Select children'), shortcut: '↵', action: () => store.selectChildren(sid) }] : []),
@@ -124,9 +145,7 @@ export function layerMenuItems(store: LayerStore, sid: string, ids: string[], op
     { label: tr('Flip horizontal'), shortcut: '⇧H', action: () => store.flip(sid, ids, 'x') },
     { label: tr('Flip vertical'), shortcut: '⇧V', action: () => store.flip(sid, ids, 'y') },
     'sep',
-    { label: tr('Copy properties'), shortcut: '⌥⌘C', action: () => store.copyStyle(), disabled: !ids.length },
-    { label: tr('Paste properties'), shortcut: '⌥⌘V', action: () => store.pasteStyle() },
-    ...(opts.fit ? ['sep' as const, { label: tr('Zoom to selection'), shortcut: '2', action: opts.fit }] : []),
+    ...(opts.fit ? [{ label: tr('Zoom to selection'), shortcut: '2', action: opts.fit }] : []),
     'sep',
     { label: tr('Delete'), shortcut: '⌫', danger: true, action: () => store.remove(sid, ids) },
   ]
@@ -166,6 +185,11 @@ export const canIrisPaste = (store: LayerStore, lastCopy: 'layers' | 'screen' | 
 let pasteHook: (() => boolean) | null = null
 export function setIrisPasteHook(fn: NonNullable<typeof pasteHook>) { pasteHook = fn }
 export function unsetIrisPasteHook(fn: NonNullable<typeof pasteHook>) { if (pasteHook === fn) pasteHook = null }
+/** 우클릭 'Copy as PNG'(⇧⌘C 와 같아요): 캔버스가 등록해요 */
+let pngCopier: (() => void) | null = null
+export function setIrisPngCopier(fn: () => void) { pngCopier = fn }
+export function unsetIrisPngCopier(fn: () => void) { if (pngCopier === fn) pngCopier = null }
+export const irisCopyPng = () => pngCopier?.()
 export const irisMenuPaste = (fallback: () => void) => { if (!pasteHook?.()) fallback() }
 /** ⌘D: 캔버스의 섹션을 복제할 때 안의 화면까지 함께(편집기 페이지가 맡으면 true) */
 let dupHook: (() => boolean) | null = null
