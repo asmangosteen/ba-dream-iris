@@ -123,4 +123,6 @@ export default {
   'You': '나',
   'Resize comment area': '영역 크기 바꾸기',
   'Posted as a pin — area comments need a database update': '점 코멘트로 남겼어요 — 영역 코멘트는 데이터베이스 업데이트가 필요해요',
+  'Say something': '하고 싶은 말',
+  'Cursor chat': '커서 채팅',
 }

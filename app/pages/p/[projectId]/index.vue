@@ -481,6 +481,8 @@ const following = ref<string | null>(null)
 const room = useRoom(projectId, { pageId, screenId: store.screenId, editingAt, following })
 function canvasEl() { return document.querySelector<HTMLElement>('main.canvas') }
 function onRoomMove(e: PointerEvent) {
+  lastPt = { x: e.clientX, y: e.clientY }
+  if (chatOpen.value) chatPt.value = lastPt
   const el = canvasEl()
   if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return
   const r = el.getBoundingClientRect()
@@ -503,6 +505,43 @@ watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
 }, { deep: true })
 watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
 watch(following, (k) => { followVp = null; if (!k) followBySpot.value = false })
+// 커서 채팅(피그마 '/'): 캔버스 위에서 / 를 누르면 내 커서 옆 말풍선에 쳐요. 치는 대로 다른 사람에게 보이고, Enter 면 보낸 채로 비우고, Esc 면 닫아요
+let lastPt: { x: number; y: number } | null = null
+const chatOpen = ref(false)
+const chatText = ref('')
+const chatPt = ref<{ x: number; y: number }>({ x: 0, y: 0 })
+const chatEl = ref<HTMLInputElement | null>(null)
+function openChat() {
+  const el = canvasEl()
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  const p = lastPt && lastPt.x >= r.left && lastPt.x <= r.right && lastPt.y >= r.top && lastPt.y <= r.bottom ? lastPt : { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  chatPt.value = p
+  chatText.value = ''
+  chatOpen.value = true
+  nextTick(() => chatEl.value?.focus())
+}
+function closeChat(clear = true) {
+  if (clear) room.sendChat('')
+  chatOpen.value = false
+  chatText.value = ''
+}
+function onChatInput() { room.sendChat(chatText.value) }
+function onChatKey(e: KeyboardEvent) {
+  if (e.isComposing) return
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeChat(); return }
+  if (e.key === 'Enter') { e.preventDefault(); if (!chatText.value.trim()) closeChat(); else chatText.value = '' } // 보낸 글은 다른 사람 화면에 잠깐 남아요
+}
+function onSlashKey(e: KeyboardEvent) {
+  if (e.code !== 'Slash' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || chatOpen.value || commentMode.value) return
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+  if (store.editing.value) return
+  e.preventDefault(); e.stopPropagation()
+  openChat()
+}
+onMounted(() => window.addEventListener('keydown', onSlashKey, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onSlashKey, true))
 /** 따라가는 사람(편집기 테두리를 그 사람 색으로) */
 const followPeer = computed(() => (following.value ? room.peers.value.find((p) => p.key === following.value) ?? null : null))
 watch(followPeer, (p) => { if (following.value && !p) following.value = null }) // 그 사람이 나가면 멈춤
@@ -1884,6 +1923,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     />
     <img ref="cmCursor" class="cm-cursor" src="/cursors/comment@2x.png" width="20" height="20" alt="" aria-hidden="true" draggable="false">
     <div v-if="commentMode && !followPeer && !room.spot.value && !spotPrompt" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
+ <!-- 커서 채팅: 내 커서 옆(내 색) -->
+    <div v-if="chatOpen" class="sq cchat" :style="{ left: chatPt.x + 14 + 'px', top: chatPt.y + 16 + 'px', '--c': room.myColor.value }">
+      <input ref="chatEl" v-model="chatText" class="cchat-in" maxlength="120" :placeholder="tr('Say something')" :aria-label="tr('Cursor chat')" :size="Math.max(12, chatText.length + 1)" @input="onChatInput" @keydown="onChatKey" @blur="closeChat(false)">
+    </div>
     <div v-if="followPeer" class="follow-ring" :style="{ '--c': followPeer.color }" aria-hidden="true" />
     <!-- Spotlight 중인 나(피그마와 같아요): 편집기 테두리를 내 색으로 -->
     <div v-else-if="room.spot.value" class="follow-ring" :style="{ '--c': room.myColor.value }" aria-hidden="true" />
@@ -2253,6 +2296,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .fb-stop:hover { --sq-fill: rgb(255 255 255 / 28%); }
 .fb-stop:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 1px; }
 /* 코멘트 모드 안내: 위 가운데 — 따라가는 중 · Spotlight 띠가 뜨면 그동안 숨겨요(겹치지 않게 — 사용자 요청 2026-11-27) */
+.cchat { position: fixed; z-index: 45; max-width: 280px; padding: 5px 10px 6px; border-radius: var(--ref-radius-05); --sq-fill: var(--c); filter: drop-shadow(0 1px 2px rgb(3 9 26 / 24%)) drop-shadow(0 2px 6px rgb(3 9 26 / 12%)); pointer-events: auto; }
+.cchat-in { display: block; max-width: 260px; border: 0; outline: 0; background: none; padding: 0; font: inherit; font-size: 13px; line-height: 18px; font-weight: 500; color: #FFFFFF; }
+.cchat-in::placeholder { color: rgb(255 255 255 / 70%); }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }

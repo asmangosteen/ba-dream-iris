@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 /**
  * 함께 보는 중(PRD/16 J-1): 같은 프로젝트를 연 사람 · 그 사람이 보는 페이지 · 고른 화면 · 커서.
  * Supabase Realtime 채널 하나 — 접속자는 presence, 커서 · 보는 자리는 broadcast(초당 최대 20번). 표에는 아무것도 남기지 않아요.
+ * 커서 채팅(피그마 '/'): 치는 글자를 그대로 broadcast — 저장하지 않고, 멈추면 몇 초 뒤 사라져요.
  * 미리보기 모드는 예시 두 사람이 캔버스 위를 돌아다녀요.
  */
 export interface Peer {
@@ -23,6 +24,10 @@ export interface Peer {
   follows?: string | null
 }
 export interface PeerCursor { x: number; y: number; pageId: string | null; at: number; view?: { cx: number; cy: number; zoom: number } }
+/** 커서 채팅: 지금 치는(또는 방금 보낸) 글, at = 마지막으로 바뀐 시각 */
+export interface PeerChat { text: string; at: number }
+/** 커서 채팅이 멈춘 뒤 보이는 시간 */
+export const CHAT_LINGER = 5000
 
 /** 사람마다 정해진 색(커서 · 이름표 · 고른 화면 테두리 · 접속자 테두리) — 흰 글자와 대비 4.5:1 이상 */
 const COLORS = ['#E2601B', '#7C4DDB', '#1E8A5C', '#D1356F', '#0F7E96', '#A46A00', '#4F63E0', '#B04BB8']
@@ -39,6 +44,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   const tabKey = `${Math.random().toString(36).slice(2, 8)}`
   const peers = ref<Peer[]>([])
   const cursors = reactive<Record<string, PeerCursor>>({})
+  const chats = reactive<Record<string, PeerChat>>({})
   const away = ref(false)
   /** 내 Spotlight(켠 시각, 0 = 꺼짐) — 접속 정보(presence)에 실어서 나중에 들어온 사람에게도 안내가 떠요 */
   const spot = ref(0)
@@ -81,6 +87,19 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     }, 50)
   }
 
+  // 커서 채팅 보내기: 글이 바뀔 때마다(100ms 에 한 번, 마지막 값). 빈 글 = 닫음
+  let chatPending: string | null = null
+  let chatTimer: ReturnType<typeof setTimeout> | null = null
+  function sendChat(text: string) {
+    chatPending = text.slice(0, 120)
+    if (chatTimer) return
+    chatTimer = setTimeout(() => {
+      chatTimer = null
+      if (chatPending !== null && ch && ready) ch.send({ type: 'broadcast', event: 'chat', payload: { key: myKey(), text: chatPending } })
+      chatPending = null
+    }, 100)
+  }
+
   // 미리보기: 예시 두 사람
   let demo: ReturnType<typeof setInterval> | null = null
   function startDemo() {
@@ -97,8 +116,17 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     if (useRoute().query.spot) setTimeout(() => { const p = peers.value[0]; if (p) p.spot = Date.now() }, 2000)
     // 미리보기: 내가 Spotlight 를 켜면 3초 뒤 김디자인이 따라와요(따라오는 사람 표시 확인용), 끄면 그만 따라와요
     watch(spot, (v) => { const p = peers.value[0]; if (!p) return; if (v) setTimeout(() => { if (spot.value) p.follows = myKey() }, 3000); else p.follows = null })
+    // 미리보기: 김디자인이 몇 초마다 커서 채팅을 쳐요(한 글자씩)
+    const LINES = ['여기 간격 좀 넓혀 볼까요?', '이 버튼 색 괜찮아요 👍', '잠깐 이쪽 봐 주세요']
+    let li = 0, ci = 0, pause = 0
     demo = setInterval(() => {
       const t = (Date.now() - t0) / 1000
+      if (pause > 0) pause -= 1
+      else {
+        const line = LINES[li % LINES.length]!
+        if (ci < line.length) { ci += 1; chats['pv-2'] = { text: line.slice(0, ci), at: Date.now() } }
+        else { li += 1; ci = 0; pause = 140 } // 다 치면 잠깐 쉬었다가(그동안 말풍선은 5초 뒤 사라짐)
+      }
       const pg = opts.pageId.value
       for (const p of peers.value) p.pageId = pg
       cursors['pv-2'] = { x: 520 + Math.cos(t * 0.7) * 160, y: 380 + Math.sin(t * 1.1) * 120, pageId: pg, at: Date.now(), view: { cx: 600, cy: 400, zoom: 0.5 } }
@@ -114,6 +142,12 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
       const p = payload as PeerCursor & { key: string }
       if (p?.key && p.key !== myKey()) cursors[p.key] = { x: p.x, y: p.y, pageId: p.pageId, at: Date.now(), view: p.view }
     })
+    ch.on('broadcast', { event: 'chat' }, ({ payload }) => {
+      const p = payload as { key?: string; text?: string }
+      if (!p?.key || p.key === myKey()) return
+      if (p.text) chats[p.key] = { text: String(p.text).slice(0, 120), at: Date.now() }
+      else delete chats[p.key]
+    })
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') { ready = true; track() } })
   })
   watch([opts.pageId, opts.screenId, () => me.value?.id, spot, () => opts.following?.value], track)
@@ -126,6 +160,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     document.removeEventListener('visibilitychange', onVis)
     if (demo) clearInterval(demo)
     if (timer) clearTimeout(timer)
+    if (chatTimer) clearTimeout(chatTimer)
     if (editT) clearTimeout(editT)
     if (ch) { supabase.removeChannel(ch); ch = null }
   })
@@ -133,12 +168,13 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   /** 같은 페이지 · 10초 안에 움직인 커서만 */
   const now = ref(Date.now())
   let tick: ReturnType<typeof setInterval> | undefined
-  onMounted(() => { tick = setInterval(() => (now.value = Date.now()), 2000) })
+  onMounted(() => { tick = setInterval(() => (now.value = Date.now()), 500) })
   onBeforeUnmount(() => clearInterval(tick))
   const liveCursors = computed(() => peers.value
     .filter((p) => p.doing !== 'away')
     .map((p) => ({ peer: p, cur: cursors[p.key] }))
-    .filter((x): x is { peer: Peer; cur: PeerCursor } => !!x.cur && x.cur.pageId === opts.pageId.value && now.value - x.cur.at < 10_000))
+    .filter((x): x is { peer: Peer; cur: PeerCursor } => !!x.cur && x.cur.pageId === opts.pageId.value && now.value - x.cur.at < 10_000)
+    .map((x) => { const c = chats[x.peer.key]; return { ...x, chat: c && now.value - c.at < CHAT_LINGER ? c.text : '' } }))
 
   /** 같은 사람이 탭 여러 개면 하나로(목록 · 아바타 묶음) */
   const people = computed(() => {
@@ -151,5 +187,5 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   const myColor = computed(() => peerColor(me.value?.id ?? 'preview-me'))
   /** 나를 따라오는 사람(Spotlight 중에 보여 줘요) */
   const followers = computed(() => people.value.filter((p) => p.follows === myKey()))
-  return { peers, people, cursors, liveCursors, sendCursor, spot, myColor, followers, myKey }
+  return { peers, people, cursors, liveCursors, sendCursor, sendChat, spot, myColor, followers, myKey }
 }
