@@ -25,8 +25,13 @@ watch(() => props.modelValue, (v) => {
   hsv.value = next
 })
 const out = computed(() => fromRgba(hsvToRgb(hsv.value)))
+/**
+ * 투명(0%)인 색에서 색을 고르면(판 · 색상 막대 · 스포이트 · 값 입력) 100% 로(피그마와 같아요 — 사용자 요청 2026-11-27).
+ * 투명도 막대 · % 칸으로 직접 0 을 고른 건 그대로
+ */
+const aOr1 = () => hsv.value.a || 1
 function set(patch: Partial<HSVA>) {
-  hsv.value = { ...hsv.value, ...patch }
+  hsv.value = { ...hsv.value, ...('a' in patch ? {} : { a: aOr1() }), ...patch }
   last = out.value
   emit('update:modelValue', last)
 }
@@ -83,7 +88,7 @@ async function eyedrop() {
   try {
     const r = await new (window as unknown as { EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper().open()
     const c = normHex(r.sRGBHex) ?? r.sRGBHex
-    setRgba(fromRgba({ ...toRgba(c), a: hsv.value.a }))
+    setRgba(fromRgba({ ...toRgba(c), a: aOr1() }))
   } catch { /* 취소 */ }
 }
 
@@ -104,7 +109,7 @@ function onPart(i: number, e: Event) {
   if (!Number.isFinite(v) || fmt.value === 'hex') { input.value = String(parts.value[i]); return }
   const p = [...parts.value]
   p[i] = Math.min(PART_MAX[fmt.value][i]!, Math.max(0, v))
-  const a = hsv.value.a
+  const a = aOr1()
   if (fmt.value === 'rgb') setRgba(fromRgba({ r: p[0]!, g: p[1]!, b: p[2]!, a }))
   else if (fmt.value === 'hsl') setRgba(fromRgba(hslToRgb(p[0]!, p[1]! / 100, p[2]! / 100, a)))
   else set({ h: Math.min(359.9, p[0]!), s: p[1]! / 100, v: p[2]! / 100 })
@@ -113,7 +118,7 @@ function onHex(e: Event) {
   const input = e.target as HTMLInputElement
   const v = normHex(input.value)
   if (!v) { input.value = solid.value.slice(1); return }
-  setRgba(v.length > 7 ? v : fromRgba({ ...toRgba(v), a: hsv.value.a }))
+  setRgba(v.length > 7 ? v : fromRgba({ ...toRgba(v), a: aOr1() }))
 }
 function onAlpha(e: Event) {
   const input = e.target as HTMLInputElement

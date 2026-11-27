@@ -10,7 +10,7 @@ import TokenPicker from '~/components/editor/TokenPicker.vue'
 import PaintPopover from '~/components/editor/PaintPopover.vue'
 import { useTextRange } from '~/composables/useTextRange'
 import { rangeValues } from '~/canvas/textRuns'
-import { startCrop, useImageEdit } from '~/composables/useImageEdit'
+import { endCrop, startCrop, useImageEdit } from '~/composables/useImageEdit'
 import { useGradEdit } from '~/composables/useGradEdit'
 
 /**
@@ -201,7 +201,7 @@ const openAt = (i: number) => { libTab.value = false; open.value = open.value ==
 // 이미지 자르기(캔버스에서 두 번 누르기)로 들어오면 그 이미지 칠 창을 열어요(피그마와 같아요)
 const imgEdit = useImageEdit()
 watch(imgEdit, (e) => {
-  if (!e?.open || props.kind !== 'fill' || props.frame || e.sid !== props.sid || props.ids.length !== 1 || props.ids[0] !== e.id) return
+  if (!e?.open || (e.key ?? 'fills') !== extraKey.value || props.kind === 'text' || props.frame || e.sid !== props.sid || props.ids.length !== 1 || props.ids[0] !== e.id) return
   imgEdit.value = { ...e, open: false }
   nextTick(() => { libTab.value = false; open.value = e.i })
 }, { immediate: true })
@@ -232,12 +232,23 @@ function onPopUpdate(p: Paint) {
   // 이미지 맞춤을 Crop 으로: 캔버스 자르기 편집으로 들어가요(레이어 하나일 때 — 피그마와 같아요)
   const cur = open.value >= 0 ? extras.value[open.value] : undefined
   if (p.type === 'image' && p.fit === 'crop' && cur?.type === 'image' && cur.fit !== 'crop' && !props.frame && props.ids.length === 1) {
-    void startCrop(store, imageSrc, props.sid, props.ids[0]!, { i: open.value })
+    void startCrop(store, imageSrc, props.sid, props.ids[0]!, { i: open.value, key: extraKey.value }) // 선 이미지도 같은 자르기 편집(사용자 요청 2026-11-27)
     return
   }
   if (open.value < 0) { if (p.type === 'solid') setBase(withAlpha(p.color, p.opacity ?? 1)); return }
   setPaint(open.value, p)
 }
+/**
+ * 맞춤이 Crop 인 이미지 칠의 창을 열면 바로 캔버스 자르기 편집(피그마와 같아요 — 사용자 요청 2026-11-27). 채우기 · 선 모두, 레이어 하나일 때.
+ * 창을 닫으면 그 자르기는 적용하고 끝내요
+ */
+const myCrop = (i: number | null) => { const e = imgEdit.value; return !!e && i !== null && e.sid === props.sid && props.ids.length === 1 && e.id === props.ids[0] && e.i === i && (e.key ?? 'fills') === extraKey.value }
+watch(open, (v, old) => {
+  if (old !== null && old !== undefined && old >= 0 && myCrop(old)) endCrop(store, true)
+  if (v === null || v < 0 || props.frame || props.kind === 'text' || props.ids.length !== 1 || myCrop(v)) return
+  const p = extras.value[v]
+  if (p?.type === 'image' && p.fit === 'crop') void startCrop(store, imageSrc, props.sid, props.ids[0]!, { i: v, key: extraKey.value })
+})
 /** 그라디언트 칠 창이 열려 있으면 캔버스에 그라디언트 점을 보여요(GradientHandles) — 닫거나 다른 칠로 바뀌면 지워요 */
 const gradEdit = useGradEdit()
 const mineGrad = () => !!gradEdit.value && gradEdit.value.sid === props.sid && gradEdit.value.key === extraKey.value && gradEdit.value.ids.join() === props.ids.join()
@@ -263,8 +274,17 @@ function setType(i: number, t: Paint['type']) {
     ? { type: 'solid', color: hexOf(c), opacity: alphaOf(c) < 1 ? alphaOf(c) : undefined }
     : t === 'image'
       ? { type: 'image', src: '', fit: 'fill' }
-      : { type: t, angle: t === 'linear' ? 180 : t === 'angular' ? 0 : undefined, stops: grad ? cur.stops : [{ pos: 0, color: hexOf(c) }, { pos: 1, color: withAlpha(hexOf(c), 0) }] }
+      : { type: t, angle: t === 'linear' ? 180 : t === 'angular' ? 0 : undefined, stops: grad ? cur.stops : [{ pos: 0, color: hexOf(c) }, { pos: 1, color: gradEnd(hexOf(c)) }] }
   setPaint(i, { ...next, visible: cur.visible, ...(t === 'solid' ? {} : { opacity: grad || cur.type === 'image' ? cur.opacity : undefined }) } as Paint)
+}
+/**
+ * 그라디언트 끝 색(처음 켤 때): 투명(0%)이 아니라 100% — 사용자 요청 2026-11-27.
+ * 같은 색이면 그라디언트가 안 보여서, 밝은 색이면 검정 · 어두운 색이면 흰색으로 끝나요
+ */
+function gradEnd(hex: string): string {
+  const h = hex.replace('#', '').slice(0, 6)
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) || 0)
+  return 0.299 * r! + 0.587 * g! + 0.114 * b! > 186 ? '#000000' : '#FFFFFF'
 }
 function onPopType(t: Paint['type']) {
   if (open.value === null) return

@@ -89,12 +89,12 @@ export function gradientCss(p: Grad, color: ColorFn, box?: { w: number; h: numbe
 export type SvgPaintDef =
   | { kind: 'linear'; id: string; x1: number; y1: number; x2: number; y2: number; stops: { offset: number; color: string; opacity: number }[] }
   | { kind: 'radial'; id: string; cx: number; cy: number; r: number; stops: { offset: number; color: string; opacity: number }[] }
-  | { kind: 'image'; id: string; href: string; opacity: number; fit: ImageFit }
+  | { kind: 'image'; id: string; href: string; opacity: number; fit: ImageFit; paint: Extract<Paint, { type: 'image' }> }
 export function svgPaint(p: Paint, id: string, color: ColorFn, img: ImgFn): { ref: string; def: SvgPaintDef | null } | null {
   if (p.type === 'solid') return { ref: alpha(color(p.color) ?? p.color, p.opacity), def: null }
   if (p.type === 'image') {
     const href = img(p.src)
-    return href ? { ref: `url(#${id})`, def: { kind: 'image', id, href, opacity: p.opacity ?? 1, fit: p.fit ?? 'fill' } } : null
+    return href ? { ref: `url(#${id})`, def: { kind: 'image', id, href, opacity: p.opacity ?? 1, fit: p.fit ?? 'fill', paint: p } } : null
   }
   const stops = [...p.stops].sort((a, b) => a.pos - b.pos).map((s) => ({ offset: s.pos, color: color(s.color) ?? s.color, opacity: p.opacity ?? 1 }))
   if (p.type === 'angular') return { ref: alpha(stops[0]?.color ?? '#000000', p.opacity), def: null }
@@ -125,6 +125,30 @@ export function coverCrop(ar: number, nr: number): { x: number; y: number; w: nu
   if (ar > nr) { const w = ar / nr; return { x: (1 - w) / 2, y: 0, w, h: 1 } }
   const h = nr / ar
   return { x: 0, y: (1 - h) / 2, w: 1, h }
+}
+/**
+ * 이미지 칠이 상자(W × H) 안에서 놓이는 자리(px) — 채우기 배경(paintLayer)과 같은 규칙. 선(Stroke) 이미지를 SVG 로 그릴 때 써요.
+ * Fill = 덮기, Fit = 다 보이게, Crop = 자른 자리(+ 돌리기), Tile = 원래 크기 × 배율로 반복. 원래 크기를 모르면 null(상자에 맞춰 그려요)
+ */
+export function imagePlace(p: Extract<Paint, { type: 'image' }>, W: number, H: number): { x: number; y: number; w: number; h: number; rot: number; tile: boolean } | null {
+  const fit = p.fit ?? 'fill'
+  if (fit === 'crop' && p.crop) return { x: p.crop.x * W, y: p.crop.y * H, w: p.crop.w * W, h: p.crop.h * H, rot: p.rotation ?? 0, tile: false }
+  if (!p.iw || !p.ih || !(W > 0) || !(H > 0)) return null
+  if (fit === 'tile') { const k = p.scale ?? 1; return { x: 0, y: 0, w: p.iw * k, h: p.ih * k, rot: 0, tile: true } }
+  const ar = p.iw / p.ih, nr = W / H
+  if (fit === 'fit') {
+    if (ar > nr) { const h = W / ar; return { x: 0, y: (H - h) / 2, w: W, h, rot: 0, tile: false } }
+    const w = H * ar
+    return { x: (W - w) / 2, y: 0, w, h: H, rot: 0, tile: false }
+  }
+  const c = coverCrop(ar, nr)
+  return { x: c.x * W, y: c.y * H, w: c.w * W, h: c.h * H, rot: 0, tile: false }
+}
+/** 선이 상자 밖으로 나가는 두께(px): 바깥 = 두께, 가운데 = 절반, 안쪽 = 0 — 선 그라디언트 · 이미지는 이 넓힌 상자 기준이에요 */
+export function strokePad(s: LayerStyle, type: LayerType): number {
+  const w = Math.max(s.strokeWidth ?? 0, ...(s.strokeSides ?? []))
+  const align = s.strokeAlign ?? defaultAlign(type)
+  return align === 'outside' ? w : align === 'center' ? w / 2 : 0
 }
 /** 맨 위(보이는) 이미지 칠 — 이미지 편집 · 레이어 아이콘 · 바꾸기에 써요 */
 export function topImagePaint(s: LayerStyle): { i: number; p: Extract<Paint, { type: 'image' }> } | null {

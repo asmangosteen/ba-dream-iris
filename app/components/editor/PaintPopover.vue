@@ -74,8 +74,8 @@ function onDoc(e: PointerEvent) {
   const t = e.target as Node | null
   if (!t || el.value?.contains(t) || props.anchor?.contains(t)) return
   // 위에 겹친 칠 창 · 떠 있는 메뉴(토큰 목록 · 드롭다운) 안을 누른 것은 무시
-  // 캔버스 위 그라디언트 점(.gh)을 끄는 것도 칠 창을 닫지 않아요(피그마와 같아요)
-  if ((t as HTMLElement).closest?.('.tp, .esel-m, .gh')) return
+  // 캔버스 위 그라디언트 점(.gh) · 이미지 자르기 화면(막대 · 이미지 · 손잡이 .crop-ui)을 누르는 것도 칠 창을 닫지 않아요(피그마와 같아요)
+  if ((t as HTMLElement).closest?.('.tp, .esel-m, .gh, .crop-ui')) return
   const pop = (t as HTMLElement).closest?.('.paint-pop')
   if (pop && OPEN_STACK.indexOf(me) < OPEN_STACK.length - 1) return
   emit('close')

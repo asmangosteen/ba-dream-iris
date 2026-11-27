@@ -34,6 +34,8 @@ export function dismissPress(e: Event): boolean {
   if (t.closest('[aria-expanded="true"]')) return false
   // 칠 창이 열린 채 캔버스 위 그라디언트 점(.gh)을 끄는 건 그 창의 일부 — 막지 않아요(피그마와 같아요)
   if (t.closest('.gh')) return false
+  // 칠 창이 열린 채 이미지 자르기 화면(막대 · 이미지 · 손잡이)을 누르는 것도 그 창의 일부
+  if (t.closest('.crop-ui')) return false
   // 가운데 팝업 자체만 열려 있으면(안에 열린 메뉴 없음) 팝업 안 누름은 평소대로 — 바깥(어두운 바탕)은 팝업이 스스로 닫아요
   return true
 }

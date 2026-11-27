@@ -3,7 +3,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
 import { normAngle, type ImageCrop, type LayerNode } from '~/canvas/schema'
 import { rotCursor, type Corner } from '~/canvas/cursors'
-import { coverCrop, radiiOf, rectPath } from '~/canvas/paint'
+import { coverCrop, ellipsePath, radiiOf, rectPath, strokePad } from '~/canvas/paint'
 import { squirclePath } from '~/canvas/squircle'
 import { useLayerStore } from '~/canvas/store'
 import { useImageSrc } from '~/canvas/images'
@@ -21,9 +21,16 @@ const store = useLayerStore()
 const imageSrc = useImageSrc()
 const state = useImageEdit()
 
-const paint = computed(() => imagePaintAt(props.node, props.edit.i))
-const W = computed(() => props.node.w)
-const H = computed(() => props.node.h)
+/**
+ * 선(Stroke) 이미지: 자르는 창 = 선 바깥 끝까지 넓힌 상자(pad = 밖으로 나간 두께, LayerView 와 같아요).
+ * 그땐 창 크기 · 둥글기 · 비율은 레이어 모양이라 여기서 바꾸지 않아요(이미지 자리 · 크기 · 돌리기만)
+ */
+const pad = computed(() => (props.edit.key === 'strokes' ? strokePad(props.node.style, props.node.type) : 0))
+/** 창 안 좌표(0 ~ W) → 화면: 레이어 안 좌표를 pad 만큼 옮긴 것 */
+const M = computed(() => { const m = props.mat, p = pad.value; return p ? { ...m, e: m.e - (m.a + m.c) * p, f: m.f - (m.b + m.d) * p } : m })
+const paint = computed(() => imagePaintAt(props.node, props.edit.i, props.edit.key))
+const W = computed(() => props.node.w + pad.value * 2)
+const H = computed(() => props.node.h + pad.value * 2)
 const ar = computed(() => { const p = paint.value; return p?.iw && p.ih ? p.iw / p.ih : W.value / H.value })
 /** 이미지 자리(레이어 안 px) */
 const R = computed(() => {
@@ -41,15 +48,15 @@ function ipt(u: number, v: number, r = R.value, deg = rot.value) {
 }
 
 // --- 좌표 ---
-const pt = (x: number, y: number) => { const m = props.mat; return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f } }
+const pt = (x: number, y: number) => { const m = M.value; return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f } }
 /** 화면에서 끈 만큼 → 레이어 안 거리 */
 function toLocal(dx: number, dy: number) {
-  const m = props.mat
+  const m = M.value
   const det = m.a * m.d - m.b * m.c || 1
   return { x: (m.d * dx - m.c * dy) / det, y: (-m.b * dx + m.a * dy) / det }
 }
-const tf = computed(() => { const m = props.mat; return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})` })
-const zoomNow = computed(() => Math.hypot(props.mat.a, props.mat.b))
+const tf = computed(() => { const m = M.value; return `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})` })
+const zoomNow = computed(() => Math.hypot(M.value.a, M.value.b))
 const poly = (x: number, y: number, w: number, h: number) => [pt(x, y), pt(x + w, y), pt(x + w, y + h), pt(x, y + h)].map((p) => `${p.x},${p.y}`).join(' ')
 const imgPoly = computed(() => [ipt(0, 0), ipt(1, 0), ipt(1, 1), ipt(0, 1)].map((q) => pt(q.x, q.y)).map((p) => `${p.x},${p.y}`).join(' '))
 /** 흐린 이미지 가림 판(mask) 범위: 돌린 이미지 · 창을 모두 덮게 */
@@ -60,13 +67,28 @@ const maskBox = computed(() => {
 })
 const imgRot = computed(() => (rot.value ? `rotate(${rot.value} ${R.value.x + R.value.w / 2} ${R.value.y + R.value.h / 2})` : undefined))
 /** 레이어가 화면에서 돈 각도(커서 방향) */
-const nodeAngle = computed(() => (Math.atan2(props.mat.b, props.mat.a) * 180) / Math.PI)
+const nodeAngle = computed(() => (Math.atan2(M.value.b, M.value.a) * 180) / Math.PI)
 const winPoly = computed(() => poly(0, 0, W.value, H.value))
 /** 자르는 창 모양: 레이어 그대로(모서리 둥글기 + Corner smoothing) — 테두리 · 흐린 이미지의 구멍이 같은 모양 */
 const shapeD = computed(() => {
-  const r = radiiOf(props.node.style)
+  if (props.node.type === 'ellipse') return ellipsePath(W.value, H.value, 0)
+  const r = radiiOf(props.node.style).map((x) => (x > 0 ? x + pad.value : 0)) as [number, number, number, number]
   const sm = props.node.style.smoothing ?? 0
   return sm > 0 && r.some(Boolean) ? squirclePath(W.value, H.value, r, sm) : rectPath(W.value, H.value, r)
+})
+/**
+ * 선 이미지 자르기: 창 안이라도 선이 그려지는 자리(고리)에는 이미지를 그대로 그려요 — 화면 바깥으로 나간 선은 캔버스에서 잘려
+ * 흰 틈으로 보였어요(사용자 요청 2026-11-27). 고리 안쪽 = 선 안쪽 가장자리(레이어 상자에서 '두께 − pad' 만큼 안으로), 창 좌표로 pad 만큼 옮겨요
+ */
+const ringInnerD = computed(() => {
+  if (props.edit.key !== 'strokes') return null
+  const n = props.node
+  const sw = Math.max(n.style.strokeWidth ?? 0, ...(n.style.strokeSides ?? []))
+  const inset = sw - pad.value
+  if (n.type === 'ellipse') return ellipsePath(n.w, n.h, inset)
+  const r = radiiOf(n.style)
+  const sm = n.style.smoothing ?? 0
+  return sm > 0 && r.some(Boolean) ? squirclePath(n.w, n.h, r, sm, inset) : rectPath(n.w, n.h, r, inset)
 })
 const uid = `crop-${Math.random().toString(36).slice(2, 8)}`
 const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['se', 1, 1], ['sw', 0, 1]] as const
@@ -81,11 +103,12 @@ const imgRotHandles = computed(() => {
   })
 })
 /** 창 크기 손잡이(프레임 선택과 같은 모양): 모서리 네모 + 가장자리는 보이지 않는 잡는 띠. 돌리거나 뒤집은 레이어는 빼요 */
-const canResize = computed(() => !props.node.rotation && !props.node.flipX && !props.node.flipY)
+const canResize = computed(() => !pad.value && props.edit.key !== 'strokes' && !props.node.rotation && !props.node.flipX && !props.node.flipY)
 const winHandles = computed(() => (canResize.value ? CORNERS.map(([k, u, v]) => ({ k, ...pt(u * W.value, v * H.value) })) : []))
 const winEdges = computed(() => (canResize.value ? EDGES.map(([k, u0, v0, u1, v1]) => { const a = pt(u0 * W.value, v0 * H.value), b = pt(u1 * W.value, v1 * H.value); return { k, x1: a.x, y1: a.y, x2: b.x, y2: b.y } }) : []))
 /** 모서리 둥글기 손잡이(프레임 선택과 같아요): 모서리에서 안쪽으로 둥글기만큼(최소 화면 12px), 창이 작으면 숨겨요 */
 const radHandles = computed(() => {
+  if (props.edit.key === 'strokes') return []
   const z = zoomNow.value, w = W.value * z, h = H.value * z
   if (w < 40 || h < 40) return []
   const r = radiiOf(props.node.style)
@@ -151,7 +174,7 @@ function startImgRotate(e: PointerEvent) {
   const c = pt(R.value.x + R.value.w / 2, R.value.y + R.value.h / 2)
   const cx = (box?.left ?? 0) + c.x, cy = (box?.top ?? 0) + c.y
   const a0 = Math.atan2(e.clientY - cy, e.clientX - cx), r0 = rot.value
-  const sign = props.mat.a * props.mat.d - props.mat.b * props.mat.c < 0 ? -1 : 1
+  const sign = M.value.a * M.value.d - M.value.b * M.value.c < 0 ? -1 : 1
   rotating.value = true
   const move = (ev: PointerEvent) => {
     let deg = r0 + (sign * (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180) / Math.PI
@@ -283,7 +306,10 @@ function fitBar() {
   const right0 = r.right - shift.value, left0 = r.left - shift.value
   const lim = pop ? pop.getBoundingClientRect().left - 8 : Infinity
   const want = right0 > lim ? lim - right0 : 0
-  shift.value = Math.max(want, (box ? box.left + 8 : 0) - left0)
+  // 왼쪽 끝: 캔버스 왼쪽 · 떠 있는 왼쪽 패널 오른쪽 8px 안으로는 안 가요(패널 밑으로 숨지 않게)
+  const side = document.querySelector('.panel-left:not(.collapsed)')?.getBoundingClientRect()
+  const minLeft = Math.max(box ? box.left + 8 : 0, side ? side.right + 8 : 0)
+  shift.value = Math.max(want, minLeft - left0)
   if (!pop) shift.value = 0
 }
 onMounted(() => { window.addEventListener('keydown', onKey, true); window.addEventListener('pointerdown', onDown, true); timer = window.setInterval(fitBar, 150); fitBar() })
@@ -304,9 +330,15 @@ watch(() => [store.screenId.value, store.layerIds.value.join(','), paint.value?.
           <rect :x="maskBox.x" :y="maskBox.y" :width="maskBox.w" :height="maskBox.h" fill="#fff" />
           <path :d="shapeD" fill="#000" />
         </mask>
+        <!-- 선 이미지: 선 고리 자리(창 − 선 안쪽) -->
+        <mask v-if="ringInnerD" :id="uid + '-ring'" maskUnits="userSpaceOnUse" :x="maskBox.x" :y="maskBox.y" :width="maskBox.w" :height="maskBox.h">
+          <path :d="shapeD" fill="#fff" />
+          <path :d="ringInnerD" fill="#000" :transform="`translate(${pad} ${pad})`" />
+        </mask>
       </defs>
       <g :transform="tf">
         <g :mask="`url(#${uid})`"><image v-if="url" :href="url" :x="R.x" :y="R.y" :width="R.w" :height="R.h" preserveAspectRatio="none" opacity="0.4" :transform="imgRot" /></g>
+        <g v-if="ringInnerD" :mask="`url(#${uid}-ring)`"><image v-if="url" :href="url" :x="R.x" :y="R.y" :width="R.w" :height="R.h" preserveAspectRatio="none" :opacity="paint?.opacity ?? 1" :transform="imgRot" /></g>
       </g>
       <!-- 이미지 돌리기: 이미지 모서리 바로 바깥(레이어와 같아요 — ⇧ 15° 씩) -->
       <circle v-for="h in imgRotHandles" :key="'ir' + h.k" class="rot-hit crop-ui" :cx="h.x" :cy="h.y" r="9" :style="{ cursor: rotCursor(h.k, rot + nodeAngle) }" @pointerdown="startImgRotate" />
@@ -340,7 +372,7 @@ watch(() => [store.screenId.value, store.layerIds.value.join(','), paint.value?.
       <span class="cl">{{ tr('Crop') }}</span>
       <span class="sep" aria-hidden="true" />
       <input class="zoom" type="range" min="1" max="5" step="0.01" :value="zoom" :aria-label="tr('Image zoom')" :style="{ '--p': ((zoom - 1) / 4) * 100 + '%' }" @input="onZoom">
-      <EditorSelect variant="icon" :model-value="null" :options="ASPECTS" aria-label="Aspect ratio" @update:model-value="setAspect">
+      <EditorSelect v-if="edit.key !== 'strokes'" variant="icon" :model-value="null" :options="ASPECTS" aria-label="Aspect ratio" @update:model-value="setAspect">
         <!-- 비율: 겹친 두 상자 + ▾ 자리 -->
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" class="keep"><rect x="2.25" y="3.25" width="11.5" height="9.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M6.5 3.25V12.75M6.5 8H13.75" fill="none" stroke="currentColor" stroke-width="1.25" /></svg>
       </EditorSelect>

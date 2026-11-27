@@ -1,5 +1,5 @@
 import type { ImageCrop, LayerNode, LayerStyle, Paint } from '~/canvas/schema'
-import { coverCrop } from '~/canvas/paint'
+import { coverCrop, strokePad } from '~/canvas/paint'
 import type { useLayerStore } from '~/canvas/store'
 
 /**
@@ -15,8 +15,10 @@ type ImagePaint = Extract<Paint, { type: 'image' }>
 export interface ImageEdit {
   sid: string
   id: string
-  /** fills 안 자리 */
+  /** 칠 목록 안 자리 */
   i: number
+  /** 어느 칠 목록: 채우기(fills, 기본) · 선(strokes — 선 바깥 끝까지 넓힌 상자 기준, 사용자 요청 2026-11-27) */
+  key?: 'fills' | 'strokes'
   /** 처음 모습(Cancel 로 되돌려요) */
   before: Pick<LayerNode, 'x' | 'y' | 'w' | 'h'> & { style: LayerStyle }
   /** 칠 창을 열어 달라는 표시(두 번 눌러 들어왔을 때 — Fill 패널이 받아서 열고 지워요) */
@@ -47,16 +49,17 @@ export function cropFromFit(p: ImagePaint, nw: number, nh: number): ImageCrop {
   }
   return coverCrop(ar, nr)
 }
-export function imagePaintAt(n: LayerNode | undefined, i: number): ImagePaint | null {
-  const p = n?.style.fills?.[i]
+export function imagePaintAt(n: LayerNode | undefined, i: number, key: 'fills' | 'strokes' = 'fills'): ImagePaint | null {
+  const p = n?.style[key]?.[i]
   return p && p.type === 'image' ? p : null
 }
 /** 편집 중 칠 고치기(기록 없이 — hold 중) */
 export function patchImage(store: Store, e: ImageEdit, fn: (p: ImagePaint, n: LayerNode) => ImagePaint, geom?: Partial<Pick<LayerNode, 'x' | 'y' | 'w' | 'h'>>, stylePatch?: Partial<LayerStyle>) {
   store.update(e.sid, [e.id], (n) => {
-    const p = imagePaintAt(n, e.i)
+    const key = e.key ?? 'fills'
+    const p = imagePaintAt(n, e.i, key)
     if (!p) return {}
-    const style: LayerStyle = { ...n.style, ...stylePatch, fills: (n.style.fills ?? []).map((x, k) => (k === e.i ? fn(p, n) : x)) }
+    const style: LayerStyle = { ...n.style, ...stylePatch, [key]: (n.style[key] ?? []).map((x, k) => (k === e.i ? fn(p, n) : x)) }
     for (const k of Object.keys(stylePatch ?? {}) as (keyof LayerStyle)[]) if (style[k] === undefined) delete style[k]
     return { ...geom, style }
   })
@@ -65,24 +68,26 @@ export function patchImage(store: Store, e: ImageEdit, fn: (p: ImagePaint, n: La
 /**
  * 자르기 시작. i 를 안 주면 맨 위(보이는) 이미지 칠. 이미 다른 것을 자르는 중이면 그것부터 적용해요
  */
-export async function startCrop(store: Store, img: (src?: string) => string | undefined, sid: string, id: string, opts: { i?: number; open?: boolean } = {}): Promise<boolean> {
+export async function startCrop(store: Store, img: (src?: string) => string | undefined, sid: string, id: string, opts: { i?: number; open?: boolean; key?: 'fills' | 'strokes' } = {}): Promise<boolean> {
   const n0 = store.node(sid, id)
   if (!n0 || n0.locked) return false
-  const fills = n0.style.fills ?? []
+  const key = opts.key ?? 'fills'
+  const fills = n0.style[key] ?? []
   let i = opts.i ?? -1
   if (i < 0) for (let k = fills.length - 1; k >= 0; k--) { const f = fills[k]!; if (f.type === 'image' && f.visible !== false) { i = k; break } }
-  const p0 = imagePaintAt(n0, i)
+  const p0 = imagePaintAt(n0, i, key)
   if (!p0) return false
   if (state.value) endCrop(store, true)
   let { iw, ih } = p0
   if (!iw || !ih) { const s = await natural(img(p0.src)); if (s) { iw = s.w; ih = s.h } }
   const n = store.node(sid, id)
-  if (!n || !imagePaintAt(n, i)) return false
+  if (!n || !imagePaintAt(n, i, key)) return false
   const before = { x: n.x, y: n.y, w: n.w, h: n.h, style: JSON.parse(JSON.stringify(n.style)) as LayerStyle }
   store.hold(sid)
-  const e: ImageEdit = { sid, id, i, before, open: opts.open }
+  const e: ImageEdit = { sid, id, i, key, before, open: opts.open }
   state.value = e
-  patchImage(store, e, (p, nn) => { const q = { ...p, iw: iw ?? p.iw, ih: ih ?? p.ih }; return { ...q, fit: 'crop', crop: cropFromFit(q, nn.w, nn.h) } })
+  // 선 이미지는 선 바깥 끝까지 넓힌 상자 기준(LayerView 와 같아요)
+  patchImage(store, e, (p, nn) => { const q = { ...p, iw: iw ?? p.iw, ih: ih ?? p.ih }; const pad = key === 'strokes' ? strokePad(nn.style, nn.type) : 0; return { ...q, fit: 'crop', crop: cropFromFit(q, nn.w + pad * 2, nn.h + pad * 2) } })
   return true
 }
 /** 끝내기: apply = 적용(기록 한 번), 아니면 처음 모습으로 */

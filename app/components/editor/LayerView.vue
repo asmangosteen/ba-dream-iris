@@ -11,7 +11,7 @@ import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFancyStroke, hasFill, radiiOf, rectPath, strokePaints, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFancyStroke, hasFill, imagePlace, strokePad, type SvgPaintDef, radiiOf, rectPath, strokePaints, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -67,6 +67,9 @@ const strokes = computed(() => (n.value && boxy.value && (!smooth.value || n.val
  * 좌표는 레이어 px(userSpaceOnUse) — 높이 0 인 선(line)에도 그려져요
  */
 const sp = computed(() => (n.value ? strokePaints(n.value.style, color, imageSrc, (i) => mid('sp' + i)) : { refs: [], defs: [] }))
+/** 선 이미지가 놓이는 상자: 레이어 상자를 선 바깥 끝까지 넓힌 것(pad = 밖으로 나간 두께) — 자르기 편집(ImageCropOverlay)도 같은 상자 */
+const sbox = computed(() => { const v = n.value; const pad = v ? strokePad(v.style, v.type) : 0; return { pad, w: Math.max((v?.w ?? 0) + pad * 2, 1), h: Math.max((v?.h ?? 0) + pad * 2, 1) } })
+const imgPlace = (d: SvgPaintDef) => (d.kind === 'image' ? imagePlace(d.paint, sbox.value.w, sbox.value.h) : null)
 /** 상자 도형(점선 · smoothing 아님)에 그라디언트 · 이미지 선: 같은 모양 경로를 SVG 로 */
 const fancyBox = computed(() => {
   const v = n.value
@@ -105,11 +108,8 @@ const style = computed(() => {
   const filters = sq && v.type !== 'image' && !clipFrame ? e.filter.filter((x) => !x.startsWith('drop-shadow')) : e.filter // 이미지는 잘린 그림에 그대로 그림자가 따라가요
   if (filters.length) css.filter = filters.join(' ')
   if (e.backdrop && !sq) { css.backdropFilter = e.backdrop; css.WebkitBackdropFilter = e.backdrop }
-  if (clipsContent(v)) {
-    // 내용 자르기도 같은 squircle 모양으로(바깥 그림자가 없을 때 — 있으면 둥근 모서리로 자르고 그림자는 살려요)
-    if (sq && !smoothShadow.value) css.clipPath = `path('${sq.path}')`
-    else css.overflow = 'hidden'
-  }
+  // 선을 SVG 로 그리는 프레임(그라디언트 · 이미지 · 점선 · smoothing 선)은 레이어가 아니라 안쪽 층(.clipw)이 내용을 잘라요 — 선이 같이 잘리지 않게
+  if (clipsContent(v) && !clipWrap.value) Object.assign(css, clipCss.value)
   if (v.type === 'text') {
     Object.assign(css, {
       // color '' = 칠 없음(글자가 안 보여요)
@@ -236,6 +236,16 @@ const rotImgs = computed(() => {
     }),
   }
 })
+/** 내용 자르기 모양: 같은 squircle 모양으로(바깥 그림자가 없을 때 — 있으면 둥근 모서리로 자르고 그림자는 살려요) */
+const clipCss = computed<Record<string, string | undefined>>(() => {
+  const sq = smooth.value
+  return sq && !smoothShadow.value ? { clipPath: `path('${sq.path}')` } : { overflow: 'hidden' }
+})
+/**
+ * 내용을 자르는 프레임인데 선을 SVG 로 그려요(그라디언트 · 이미지 · 점선 · smoothing 선): 레이어 자체를 자르면 바깥 · 가운데 선이 잘려서,
+ * 자식들만 안쪽 층(.clipw)에서 잘라요(피그마와 같아요 — Clip content 는 내용만 자르고 선은 다 보여요)
+ */
+const clipWrap = computed(() => { const v = n.value; return !!v && isContainer(v) && clipsContent(v) && !!(fancyBox.value || smoothStroke.value || dashed.value) })
 /** 내용을 자르는 smoothing 프레임: 그림자는 레이어 자체 filter 가 그려요 */
 const clipsSmooth = computed(() => { const v = n.value; return !!v && !!smooth.value && clipsContent(v) })
 /** smoothing 그림자: 바탕 층 바깥에 모양을 따라(drop-shadow) */
@@ -564,7 +574,8 @@ function onKey(e: KeyboardEvent) {
       <input v-if="renamingSec" v-sel-all class="sec-in" :value="n.name" :aria-label="tr('Section name')" spellcheck="false" @pointerdown.stop @dblclick.stop @keydown.stop="secKey" @blur="secCommit">
       <template v-else>{{ n.name }}</template>
     </span>
-    <template v-if="isContainer(n) && n.type !== 'boolean'">
+    <!-- 자식 층: 평소엔 display: contents(없는 것과 같아요), 선을 SVG 로 그리는 자르기 프레임이면 여기서 잘라요(.clipw) -->
+    <div v-if="isContainer(n) && n.type !== 'boolean'" :class="clipWrap ? 'clipw' : 'kids'" :style="clipWrap ? { ...clipCss, borderRadius: radius } : undefined">
       <template v-if="mask">
         <LayerView v-for="c in mask.below" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
         <!-- 마스크: 그 위 형제들을 마스크 모양으로 잘라요(마스크 자체는 그리지 않아요) -->
@@ -574,7 +585,7 @@ function onKey(e: KeyboardEvent) {
       </template>
       <LayerView v-for="c in mask ? [] : n.children ?? []" :key="c" :doc="doc" :id="c" :screen-id="screenId" />
       <GridOverlay v-if="n.style.grids" :grids="n.style.grids" :w="n.w" :h="n.h" />
-    </template>
+    </div>
     <InstanceView v-else-if="n.type === 'instance'" :node="n" :screen-id="screenId" />
     <video v-else-if="n.type === 'image' && video" :src="imageSrc(n.src)" :style="imgStyle" autoplay muted loop playsinline disablepictureinpicture aria-hidden="true" />
     <img v-else-if="n.type === 'image'" :src="imageSrc(n.src)" alt="" draggable="false" :style="imgStyle">
@@ -642,8 +653,16 @@ function onKey(e: KeyboardEvent) {
           >
             <stop v-for="(st, k) in d.stops" :key="k" :offset="st.offset" :stop-color="st.color" :stop-opacity="st.opacity" />
           </radialGradient>
-          <pattern v-else :id="d.id" patternUnits="userSpaceOnUse" x="0" y="0" :width="Math.max(n.w, 1)" :height="Math.max(n.h, 1)">
-            <image :href="d.href" x="0" y="0" :width="Math.max(n.w, 1)" :height="Math.max(n.h, 1)" :opacity="d.opacity" :preserveAspectRatio="d.fit === 'fit' ? 'xMidYMid meet' : 'xMidYMid slice'" />
+          <!-- 이미지 선: 선 바깥 끝까지 넓힌 상자(sbox) 기준으로 채우기와 같은 자리(Fill · Fit · Crop + 돌리기 · Tile) -->
+          <pattern v-else-if="imgPlace(d)?.tile" :id="d.id" patternUnits="userSpaceOnUse" :x="-sbox.pad" :y="-sbox.pad" :width="imgPlace(d)!.w" :height="imgPlace(d)!.h">
+            <image :href="d.href" x="0" y="0" :width="imgPlace(d)!.w" :height="imgPlace(d)!.h" :opacity="d.opacity" preserveAspectRatio="none" />
+          </pattern>
+          <pattern v-else :id="d.id" patternUnits="userSpaceOnUse" :x="-sbox.pad" :y="-sbox.pad" :width="sbox.w" :height="sbox.h">
+            <image
+              v-if="imgPlace(d)" :href="d.href" :x="imgPlace(d)!.x" :y="imgPlace(d)!.y" :width="imgPlace(d)!.w" :height="imgPlace(d)!.h" :opacity="d.opacity" preserveAspectRatio="none"
+              :transform="imgPlace(d)!.rot ? `rotate(${imgPlace(d)!.rot} ${imgPlace(d)!.x + imgPlace(d)!.w / 2} ${imgPlace(d)!.y + imgPlace(d)!.h / 2})` : undefined"
+            />
+            <image v-else :href="d.href" x="0" y="0" :width="sbox.w" :height="sbox.h" :opacity="d.opacity" :preserveAspectRatio="d.fit === 'fit' ? 'xMidYMid meet' : 'xMidYMid slice'" />
           </pattern>
         </template>
       </defs>
@@ -673,6 +692,8 @@ function onKey(e: KeyboardEvent) {
 .txt.trunc { overflow: hidden; text-overflow: ellipsis; }
 .para { display: block; }
 .stk { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.kids { display: contents; }
+.clipw { position: absolute; inset: 0; }
 .sdefs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 /* Corner smoothing 바탕 · 그림자 층: 내용 뒤에 */
 .smw { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
