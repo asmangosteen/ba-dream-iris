@@ -348,7 +348,7 @@ const editing = ref(route.query.edit === '1')
  * 양 끝에 동그라미(화면 오른쪽 점 · 정책 줄 왼쪽 가장자리). 스크롤 · 패널 움직임을 따라가도록 고른 동안 매 프레임 자리를 다시 재요.
  * 한쪽 끝이 보이는 영역 밖(문서 · 캔버스 스크롤 밖)이면 그 선은 숨겨요
  */
-type LinkLine = { key: string; x1: number; y1: number; x2: number; y2: number }
+type LinkLine = { key: string; col: string; layer: string | null; x1: number; y1: number; x2: number; y2: number }
 const linkLines = ref<LinkLine[]>([])
 type LinePair = { col: string; req: string; layer: string | null }
 /** 연결 하나 → 선(요소에 연결됐으면 요소마다, 아니면 화면에서) */
@@ -391,7 +391,7 @@ function measureLines() {
     const [x1, y1] = nearestSide(src, x2, y2)
     if (x1 < cv.left || x1 > Math.min(cv.right, docLeft) || y1 < cv.top || y1 > cv.bottom) continue
     if (y2 < body.top || y2 > body.bottom) continue
-    out.push({ key: p.col + '|' + p.req + '|' + (p.layer ?? ''), x1, y1, x2, y2 })
+    out.push({ key: p.col + '|' + p.req + '|' + (p.layer ?? ''), col: p.col, layer: p.layer, x1, y1, x2, y2 })
   }
   const same = out.length === linkLines.value.length && out.every((l, i) => { const o = linkLines.value[i]!; return o.key === l.key && Math.abs(o.x1 - l.x1) < 0.5 && Math.abs(o.y1 - l.y1) < 0.5 && Math.abs(o.x2 - l.x2) < 0.5 && Math.abs(o.y2 - l.y2) < 0.5 })
   if (!same) linkLines.value = out
@@ -702,7 +702,8 @@ async function removeDoc() {
     <svg v-if="linkLines.length" class="drag-line" aria-hidden="true">
       <g v-for="l in linkLines" :key="l.key">
         <path :d="curve(l.x1, l.y1, l.x2, l.y2)" />
-        <circle class="end" :cx="l.x1" :cy="l.y1" r="5.25" />
+        <!-- 그 요소 · 화면에 마우스를 올려 동그라미 4개가 떠 있으면 겹쳐 진해 보이지 않게 선 쪽 동그라미는 빼요 -->
+        <circle v-if="!(hover && hover.col === l.col && hover.layer === l.layer)" class="end" :cx="l.x1" :cy="l.y1" r="5.25" />
         <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" />
       </g>
     </svg>
@@ -892,8 +893,10 @@ async function removeDoc() {
 .hov-box, .sel-box { position: absolute; z-index: 2; pointer-events: none; box-sizing: border-box; }
 .hov-box { outline: 1px solid var(--iris-peek); }
 .sel-box { outline: 1.5px solid var(--iris-peek); }
-.ldot { position: absolute; z-index: 3; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; padding: 0; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; transition: transform .12s, background-color .12s; }
+.ldot { position: absolute; z-index: 3; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; padding: 0; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; transition: transform .12s, background-color .12s; }
 .ldot:hover { transform: scale(1.25); background: var(--iris-peek); }
+/* 보이는 동그라미는 작게, 잡는 자리는 넉넉하게 */
+.ldot::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
 .ldot:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .drag-line { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20; pointer-events: none; overflow: visible; }
 .drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 1.5; stroke-dasharray: 5 4; }
