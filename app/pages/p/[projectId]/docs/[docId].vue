@@ -614,10 +614,12 @@ async function removeDoc() {
       />
 
       <p class="sr" role="status" aria-live="polite">{{ notice }}</p>
-      <Transition name="fade">
-        <p v-if="notice" class="sq toast" aria-hidden="true">{{ notice }}</p>
-      </Transition>
     </aside>
+
+    <!-- 알림: 편집기 캔버스 알림과 같은 규격(높이 40 · 검정 · 테두리 · 그림자) — 왼쪽 캔버스 아래 가운데 -->
+    <div :class="['toast-wrap', { wide: notesShown }]" aria-hidden="true">
+      <Transition name="fade"><p v-if="notice" class="sq toast">{{ notice }}</p></Transition>
+    </div>
 
     <AddDocModal v-model:open="addOpen" :project-id="projectId" />
   </div>
@@ -726,7 +728,10 @@ async function removeDoc() {
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 
-.toast { position: absolute; left: 50%; bottom: var(--ref-spacing-12); transform: translateX(-50%); margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-weight: 500; white-space: nowrap; filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); }
+/* 편집기(pages/p/[projectId]/index.vue)의 .toast 와 같은 모양 — 문서 패널을 뺀 캔버스 영역 아래 가운데 */
+.toast-wrap { position: absolute; left: 0; right: calc(600px + var(--iris-gap) * 2); bottom: 32px; z-index: 6; display: flex; justify-content: center; pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); font-size: 12px; line-height: 18px; }
+.toast-wrap.wide { right: calc(880px + var(--iris-gap) * 2); }
+.toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; margin: 0; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
