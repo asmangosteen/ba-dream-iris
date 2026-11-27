@@ -86,6 +86,23 @@ async function sendBoard(body: string, mentions: string[], attachments: string[]
   catch { emit('toast', tr("Couldn't post the comment. Try again")) } finally { busy.value = false }
 }
 const replying = ref<string | null>(null)
+
+/**
+ * 연 메모 바깥을 누르면 접어요(사용자 요청 2026-11-27).
+ * 떠 있는 창(이모지 · 멘션 · ⋯ 메뉴) · 확인 창 · 크게 보기가 열려 있으면 그 창만 닫히게 두고, 답글을 쓰던 중이면 접지 않아요
+ */
+function onOutside(e: PointerEvent) {
+  if (!active.value || props.part !== 'notes') return
+  const t = e.target as Element | null
+  if (!t?.closest) return
+  if (t.closest(`[data-note="${active.value}"]`)) return
+  if (document.querySelector('[data-cc], [data-ctv], .pop-overlay, .lb')) return
+  const card = document.querySelector(`[data-note="${active.value}"]`)
+  if ([...(card?.querySelectorAll('textarea') ?? [])].some((a) => (a as HTMLTextAreaElement).value.trim())) return
+  active.value = null
+}
+onMounted(() => window.addEventListener('pointerdown', onOutside, true))
+onBeforeUnmount(() => window.removeEventListener('pointerdown', onOutside, true))
 async function sendReply(root: CommentRow, body: string, mentions: string[], attachments: string[] = []) {
   if (busy.value) return
   busy.value = true
@@ -145,7 +162,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 
     <p v-if="!notes.length && !draft" class="tx-meta empty">{{ tr('Select text in the document and choose Comment to leave a note beside it') }}</p>
 
-    <div v-for="t in notes" :key="t.root.id" :class="['sq', 'card', { on: active === t.root.id, done: !!t.root.resolved_at }]">
+    <div v-for="t in notes" :key="t.root.id" :data-note="t.root.id" :class="['sq', 'card', { on: active === t.root.id, done: !!t.root.resolved_at }]">
       <div class="ch">
         <!-- 어디서 태그했는지: 장 · ID(굵게) — 누르면 문서의 그 글에 노란 밑줄 -->
         <button type="button" class="where" :aria-expanded="active === t.root.id" :title="quote(t.root.doc_anchor) || undefined" @click="pick(t)">{{ placeOf(t.root.doc_anchor) }}</button>
