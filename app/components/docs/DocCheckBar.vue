@@ -35,7 +35,6 @@ function where(w: FormatWarning) {
         <EditorIcon name="chevron_down" :size="14" :class="{ flip: open }" />
       </button>
       <div v-if="open" class="list">
-        <p class="tx-meta how">{{ tr('Warnings go away when you fix the document. Choose Edit, change the Markdown, then save.') }}</p>
         <button v-for="(w, i) in warns" :key="i" type="button" class="sq wrow" @click="emit('go', { block: w.block, row: w.row })">
           <span class="dot" aria-hidden="true" />
           <span class="wcol"><span>{{ text(w) }}</span><span class="tx-meta">{{ where(w) }}</span><span class="fix">{{ fix(w) }}</span></span>
@@ -58,15 +57,14 @@ function where(w: FormatWarning) {
 .warnbar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
 .flip { transform: rotate(180deg); }
-.list { display: flex; flex-direction: column; gap: 1px; padding: 0 var(--ref-spacing-04); }
+.list { display: flex; flex-direction: column; gap: 1px; padding: var(--ref-spacing-02) var(--ref-spacing-04) 0; }
 .wrow { display: flex; align-items: flex-start; gap: var(--ref-spacing-05); padding: var(--ref-spacing-04) var(--ref-spacing-05); border-radius: var(--ref-radius-04); text-align: left; color: var(--sys-color-neutral-800); }
 .wrow:hover { --sq-fill: #FFEEDC; }
 .wrow:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 .wcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.go { flex: none; color: #B44A0E; font-size: 14px; transition: transform .16s ease; }
+.go { flex: none; color: #E8A87C; font-size: 14px; transition: transform .16s ease; }
 .wrow:hover .go { transform: translateX(2px); }
-.how { margin: 0; padding: var(--ref-spacing-02) var(--ref-spacing-05) var(--ref-spacing-04); }
 .fix { margin-top: 2px; color: var(--sys-color-neutral-700); }
 .compact .warnbar { height: 28px; }
 </style>
