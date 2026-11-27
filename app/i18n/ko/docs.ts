@@ -276,4 +276,5 @@ export default {
   'Put {code} in the Policy column': '{code}을 \'정책\' 열에 넣기',
   'Fill in the Policy column': '\'정책\' 열 채우기',
   'Go to the row': '그 행으로',
+  'Notes {n}': '메모 {n}',
 } satisfies Record<string, string>

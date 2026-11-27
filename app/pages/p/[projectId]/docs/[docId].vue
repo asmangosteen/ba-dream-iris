@@ -168,6 +168,8 @@ const noteCount = computed(() => comments.docThreads(docId.value).filter((t) => 
 watch(noteCount, (n) => { if (n > 0 && !notesTouched) notesOpen.value = true }, { immediate: true })
 watch(docId, () => { notesTouched = false; notesOpen.value = noteCount.value > 0 })
 function toggleNotes() { notesTouched = true; notesOpen.value = !notesOpen.value }
+/** 메모 칸이 실제로 보이는지(고치기 · 기록 화면에서는 접어요) */
+const notesShown = computed(() => notesOpen.value && !editing.value && !histOpen.value && !!doc.value)
 function onComment(p: { quote: string; block: string | null; row: number | null; code: string | null }) {
   notesOpen.value = true
   activeNote.value = null
@@ -404,7 +406,7 @@ async function removeDoc() {
     </div>
 
     <!-- 캔버스(B안): 화면 표의 화면 칸 순서대로 + 칸 없이 연결된 화면 -->
-    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesOpen && !editing }]">
+    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown }]">
       <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
       <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
       <div class="frames">
@@ -452,7 +454,7 @@ async function removeDoc() {
     <span v-if="drag" class="sq drag-chip" :style="{ left: drag.x + 12 + 'px', top: drag.y + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
 
     <!-- 오른쪽: 문서 -->
-    <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesOpen && !editing && !histOpen }]">
+    <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesShown }]">
       <div class="doc-tabs">
         <nav class="seg tabs" :aria-label="tr('Choose a document')">
           <NuxtLink
@@ -472,6 +474,7 @@ async function removeDoc() {
         <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close document')" :title="tr('Close document')" @click="navigateTo(`/p/${projectId}`)" />
       </div>
 
+      <div class="doc-main">
       <!-- 떠 있는 얇은 스크롤 막대: 기본 스크롤바가 자리를 차지하지 않아 내용이 길어져도 폭이 그대로(사용자 요청 2026-11-27) -->
       <div v-ovscroll class="doc-body">
         <div v-if="docs.status.value === 'pending' && !docs.data.value?.length" class="loading">
@@ -494,8 +497,7 @@ async function removeDoc() {
           @saved="onSaved"
         />
         <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" @close="histOpen = false" @restore="restoreDoc" />
-        <div v-else class="read-cols">
-        <div class="read-main">
+        <div v-else class="read-main">
           <DocCheckBar :doc="doc" @go="goBlock" />
           <div v-if="goneReqs.length" class="sq gone" role="status">
             <span class="gone-col">
@@ -520,8 +522,8 @@ async function removeDoc() {
             @edit="startEdit"
           >
             <template #actions>
-              <button type="button" :class="['sq', 'hbtn', { on: notesOpen }]" :aria-pressed="notesOpen" :data-tip="notesOpen ? tr('Hide notes') : tr('Show notes beside the document')" @click="toggleNotes"><EditorIcon name="sidebar_expand" :size="14" />{{ tr('Notes') }}<span v-if="noteCount" class="hcount">{{ noteCount }}</span></button>
-              <button type="button" class="sq hbtn" @click="histOpen = true"><EditorIcon name="clock" :size="14" />{{ tr('History') }}</button>
+              <!-- Notes · Edit: 같은 디자인 시스템 테두리 버튼. 메모 칸이 열려 있으면 Notes 는 눌린 상태 -->
+              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="comment" :aria-pressed="notesOpen" :data-force-state="notesOpen ? 'pressed' : undefined" :data-tip="notesOpen ? tr('Hide notes') : tr('Show notes beside the document')" @click="toggleNotes">{{ noteCount ? tr('Notes {n}', { n: noteCount }) : tr('Notes') }}</Button>
               <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">{{ tr('Edit') }}</Button>
               <div ref="moreEl" class="more">
                 <IconButton
@@ -535,6 +537,7 @@ async function removeDoc() {
                   @keydown.esc="menuOpen = false"
                 />
                 <div v-if="menuOpen" class="sq menu" role="menu" @keydown.esc="menuOpen = false">
+                  <button type="button" role="menuitem" class="sq menu-item" @click="menuOpen = false; histOpen = true"><EditorIcon name="clock" :size="14" />{{ tr('History') }}</button>
                   <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><EditorIcon name="trashbin" :size="14" />{{ tr('Delete document') }}</button>
                 </div>
               </div>
@@ -542,9 +545,13 @@ async function removeDoc() {
           </DocReader>
           <DocNotes part="board" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @toast="say" />
         </div>
-        <!-- 문서 옆 메모(Word 노트처럼) -->
-        <DocNotes v-if="notesOpen" ref="notesRef" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" class="read-notes" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" />
+      </div>
+      <!-- 문서 옆 메모(Word 노트처럼): 스크롤 밖 열 — 문서와 사이에 위아래 긴 구분선, 열고 닫을 때 폭이 부드럽게 -->
+      <div :class="['notes-col', { open: notesShown }]" :aria-hidden="!notesShown || undefined" :inert="!notesShown || undefined">
+        <div v-ovscroll class="notes-in">
+          <DocNotes v-if="doc" ref="notesRef" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" @close="toggleNotes" />
         </div>
+      </div>
       </div>
 
       <!-- 확인 줄 -->
@@ -583,6 +590,7 @@ async function removeDoc() {
 .pill .tx-head { white-space: nowrap; }
 
 .canvas { position: absolute; inset: 0; overflow: auto; padding: 64px 632px 48px 48px; box-sizing: border-box; }
+.canvas { transition: padding-right .24s cubic-bezier(0.2, 0, 0, 1); }
 .canvas.wide { padding-right: 912px; }
 .hint { margin: 0 0 var(--ref-spacing-12); }
 .frames { display: flex; flex-wrap: wrap; gap: 32px 44px; }
@@ -595,7 +603,8 @@ async function removeDoc() {
 .frame-col.lit .frame-label { color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .frame-page { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); }
 /* 375 × 812 화면을 176 폭으로 줄인 틀 (썸네일 전까지 자리만) */
-.frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 2px; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
+/* 화면 틀 = 캔버스 프레임: 편집기 캔버스처럼 모서리 없이(캔버스는 squircle 예외) — 강조 테두리도 각지게 */
+.frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 0; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
 .frame-btn:hover .frame { outline-color: var(--ref-color-gray-900-20); }
 .frame-col.lit .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .frame-col.note .frame { outline: 2px solid #E8C14A; outline-offset: 2px; box-shadow: 0 0 0 6px rgb(232 193 74 / 22%); }
@@ -603,8 +612,11 @@ async function removeDoc() {
 .noframe b { font-weight: 600; }
 .frame-label .sid { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
 .npin { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 4px; border-radius: 8px 8px 8px 2px; font-size: 10px; font-weight: 600; color: #8A6100; --sq-fill: #FFF1C2; }
-.link-dot { position: absolute; right: -6px; top: 210px; width: 12px; height: 12px; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; opacity: 0; transition: opacity .12s, transform .12s; }
+/* 점 중심이 화면 테두리 선 위에 오게: 기본 선(1px · 바깥 0) 가운데 0.5px, 고른 화면 선(1.5px · 바깥 2px) 가운데 2.75px */
+.link-dot { position: absolute; right: -6.5px; top: 210px; width: 12px; height: 12px; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; opacity: 0; transition: opacity .12s, transform .12s; }
 .frame-col:hover .link-dot, .link-dot:focus-visible { opacity: 1; }
+.frame-col.lit .link-dot { right: -8.75px; }
+.frame-col.note .link-dot { right: -9px; }
 .link-dot:hover { transform: scale(1.25); background: var(--iris-peek); }
 .drag-line { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20; pointer-events: none; overflow: visible; }
 .drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 2; stroke-dasharray: 6 4; }
@@ -614,10 +626,18 @@ async function removeDoc() {
 .split :deep(.drop-on) td:first-child { box-shadow: inset 2px 0 0 var(--iris-peek); }
 .split :deep(.flash) { animation: flash 1.4s ease; }
 @keyframes flash { 0%, 40% { background: #FFF1C2; } 100% { background: transparent; } }
+/* 메모 칸 열고 닫기: 사이드바와 같은 0.24초 곡선으로 패널 폭과 메모 열 폭이 같이 바뀌어요(문서 폭은 그대로) */
+.doc { transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
 .doc.wide { width: 880px; }
-.read-cols { display: flex; gap: var(--ref-spacing-10); align-items: flex-start; }
+.doc-main { flex: 1; min-height: 0; display: flex; }
+.doc-main > .doc-body { flex: 1; min-width: 0; }
+.notes-col { position: relative; flex: none; width: 0; overflow: hidden; display: flex; transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
+.notes-col.open { width: 280px; }
+/* 위아래 긴 구분선: 맨 위 층에 따로 그려서 메모 머리 막대(흰 바탕)가 덮지 않게 */
+.notes-col::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--iris-line); z-index: 2; pointer-events: none; }
+.notes-in { --notes-pad-t: var(--ref-spacing-10); --notes-pad-x: var(--ref-spacing-10); width: 280px; flex: none; overflow: auto; box-sizing: border-box; padding: var(--notes-pad-t) var(--notes-pad-x) var(--ref-spacing-08); margin-bottom: var(--ref-spacing-12); }
+@media (prefers-reduced-motion: reduce) { .doc, .notes-col, .canvas { transition: none; } }
 .read-main { flex: 1; min-width: 0; }
-.read-notes { width: 260px; flex: none; position: sticky; top: 0; padding-left: var(--ref-spacing-10); box-shadow: -1px 0 0 var(--iris-line); }
 .hbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); font-size: 12px; color: var(--sys-color-neutral-700); white-space: nowrap; }
 .hbtn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .hbtn.on { color: #8A6100; --sq-fill: #FFF6DA; }
@@ -659,7 +679,7 @@ async function removeDoc() {
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
 /* 확인 줄이 뜨면 아래 여백 자리를 확인 줄이 써요 */
-.doc-body + .confirm { margin-top: calc(-1 * var(--ref-spacing-12)); }
+.doc-main + .confirm { margin-top: calc(-1 * var(--ref-spacing-12)); }
 .confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }
 .confirm-t, .confirm-col { flex: 1; min-width: 0; }
 .confirm-col { display: flex; flex-direction: column; }

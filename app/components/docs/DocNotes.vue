@@ -20,7 +20,7 @@ const props = defineProps<{
   links: LinkRow[]
   screens: ProjectScreen[]
 }>()
-const emit = defineEmits<{ 'pick-req': [id: string]; go: [anchor: DocAnchor]; toast: [text: string] }>()
+const emit = defineEmits<{ 'pick-req': [id: string]; go: [anchor: DocAnchor]; toast: [text: string]; close: [] }>()
 /** 고른 메모(스레드 id) — 부모가 캔버스 강조에 써요 */
 const active = defineModel<string | null>('active', { default: null })
 /** 새 메모를 쓸 자리(문서에서 글을 고르고 [Comment]) */
@@ -123,6 +123,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
       <span class="tx-meta">{{ notes.length }}</span>
       <span class="f1" />
       <button v-if="resolvedCount" type="button" class="sq tbtn" :aria-pressed="showResolved" @click="showResolved = !showResolved">{{ showResolved ? tr('Hide resolved') : tr('Resolved {n}', { n: resolvedCount }) }}</button>
+      <button type="button" class="sq xbtn" :aria-label="tr('Hide notes')" :data-tip="tr('Hide notes')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
     </div>
 
     <!-- 새 메모 -->
@@ -199,7 +200,13 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 
 <style scoped>
 .notes { display: flex; flex-direction: column; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.nh { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
+.nh { display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 28px; }
+/* 메모 칸 머리: 수정 기록 머리와 같은 위 막대(높이 44 · 아래 선 · 스크롤해도 위에) — 칸 안쪽 여백(--notes-pad-*)만큼 바깥으로 */
+.notes > .nh { position: sticky; top: calc(-1 * var(--notes-pad-t, 16px)); z-index: 1; min-height: 44px; box-sizing: border-box; margin: calc(-1 * var(--notes-pad-t, 16px)) calc(-1 * var(--notes-pad-x, 16px)) var(--ref-spacing-04); padding: var(--ref-spacing-06) calc(var(--notes-pad-x, 16px) - 4px) var(--ref-spacing-06) var(--notes-pad-x, 16px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+/* 닫기(X): 수정 기록 머리의 X 와 같은 28 버튼 */
+.xbtn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
+.xbtn:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.xbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
 .empty { margin: 0; }
 .tbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; color: var(--sys-color-neutral-600); }
@@ -231,7 +238,8 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .sid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
 
 /* 게시판: 새 글 줄(내 아바타 + 입력칸) 아래로 글마다 구분선, 글 사이 16 */
-.board { display: flex; flex-direction: column; gap: var(--ref-spacing-08); margin-top: var(--ref-spacing-14); padding-top: var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+/* 게시판 위 구분선: 문서 패널 폭 끝까지(안쪽 여백만큼 바깥으로 넓히고 다시 안쪽 여백) */
+.board { display: flex; flex-direction: column; gap: var(--ref-spacing-08); margin: var(--ref-spacing-14) calc(-1 * var(--doc-pad-x, 24px)) 0; padding: var(--ref-spacing-10) var(--doc-pad-x, 24px) 0; box-shadow: 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .post { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-08); box-shadow: 0 -1px 0 var(--iris-line); }
 .rbtn { align-self: flex-start; margin-left: 28px; } /* 아이콘이 글자 시작선(32)에 오게: 버튼 안쪽 여백 4 만큼 덜 */
 </style>
