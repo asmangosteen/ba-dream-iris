@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
+import type { Paint } from '~/canvas/schema'
 import { DEFAULT_STYLE, frameCss, frameDashStroke, frameSmoothLayers, frameStroke, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
 import { ellipsePath, radiiOf, rectPath, vectorPath } from '~/canvas/paint'
@@ -12,6 +13,8 @@ import LayerView from '~/components/editor/LayerView.vue'
 import { fmtNum } from '~/canvas/num'
 import { useImageSrc } from '~/canvas/images'
 import ImageCropOverlay from '~/components/editor/ImageCropOverlay.vue'
+import GradientHandles from '~/components/editor/GradientHandles.vue'
+import { useGradEdit } from '~/composables/useGradEdit'
 import { rotCursor } from '~/canvas/cursors'
 import { useImageEdit } from '~/composables/useImageEdit'
 import { instEdit, instTick, readInstanceTree, subAt, subHover, subRect, subSel, type SubNode } from '~/composables/useInstanceTree'
@@ -232,6 +235,22 @@ const cropView = computed(() => {
   const m = worldMat(s, e.id), z = vp.value.zoom
   return { e, n, mat: { a: m.a * z, b: m.b * z, c: m.c * z, d: m.d * z, e: m.e * z + vp.value.x, f: m.f * z + vp.value.y } }
 })
+/** 칠 창에서 고치는 그라디언트: 레이어 위에 그라디언트 점(GradientHandles) — 레이어 안 px → 화면 좌표 행렬 */
+const gradEdit = useGradEdit()
+const gradView = computed(() => {
+  void tick.value
+  void vp.value
+  const g = gradEdit.value
+  if (!g || vedit.value || cropView.value) return null
+  const s = props.screens.find((v) => v.id === g.sid)
+  const id = g.ids[0]
+  const n = id ? store.node(g.sid, id) : null
+  if (!s || !id || !n) return null
+  const p = ((n.style[g.key] ?? []) as Paint[])[g.index]
+  if (!p || (p.type !== 'linear' && p.type !== 'radial' && p.type !== 'angular')) return null
+  const m = worldMat(s, id), z = vp.value.zoom
+  return { g, p, w: n.w, h: n.h, mat: { a: m.a * z, b: m.b * z, c: m.c * z, d: m.d * z, e: m.e * z + vp.value.x, f: m.f * z + vp.value.y } }
+})
 /** 화면 바로 아래 마스크(하나만 골라 Use as mask): 그 위 레이어들을 마스크 모양으로 가려요(LayerView 의 프레임 안 마스크와 같아요) */
 function rootMask(sid: string) {
   const d = store.doc(sid)
@@ -382,7 +401,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         :rel="s.figma_url ? 'noopener noreferrer' : undefined"
         tabindex="-1"
         :title="s.figma_url ? tr('Linked from Figma · Open in Figma') : tr('Linked from Figma')"
-        :style="{ left: `calc(${box(s).left} + ${box(s).width})`, top: `calc(${box(s).top} - 20px)` }"
+        :style="frameTags(s)?.tag ?? { left: `calc(${box(s).left} + ${box(s).width})`, top: `calc(${box(s).top} - 20px)` }"
         @pointerdown.stop
       >
         <!-- 피그마 표시 7 × 10.5(로고 비율 2:3) --><svg width="7" height="10.5" viewBox="0 0 38 57" aria-hidden="true"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1ABCFE" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0ACF83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#FF7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#F24E1E" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#A259FF" /></svg>
@@ -403,8 +422,8 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
         <div v-for="(l, i) in cmdMarks.lines" :key="'cl' + i" class="cmd-ul" :class="{ comp: cmdMarks.comp }" :style="l" />
       </template>
       <div v-for="(b, i) in peekBoxes" :key="'pk' + i" class="peek" :style="b"><span class="peek-tag num">{{ peek?.label }}</span></div>
-      <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? box(screens.find((s) => s.id === id)!) : { display: 'none' }" />
-      <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="box(m)" />
+      <div v-for="id in highlight ?? []" :key="'h' + id" class="hl" :style="screens.find((s) => s.id === id) ? { ...box(screens.find((s) => s.id === id)!), transform: scrRot(screens.find((s) => s.id === id)!) ? `rotate(${scrRot(screens.find((s) => s.id === id)!)}deg)` : undefined } : { display: 'none' }" />
+      <div v-for="m in multiBoxes" :key="'m' + m.id" class="sel" :style="scrRot(m) ? { ...box(m), transform: `rotate(${scrRot(m)}deg)` } : box(m)" />
       <div v-if="selFrame && !multi.length && !selBoxes.length" class="sel" :style="{ ...box(selFrame), transform: scrRot(selFrame) ? `rotate(${scrRot(selFrame)}deg)` : undefined }">
         <template v-if="!selBoxes.length">
           <!-- 모서리 바깥: 돌리기(레이어와 같아요 — ⇧ 15° 씩) -->
@@ -434,6 +453,7 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
       <!-- 점 편집 중에는 상자 · 손잡이 · 크기 표시를 숨겨요(피그마와 같아요) -->
       <div v-if="subBox" class="hover-ol comp" :style="subBox" />
       <ImageCropOverlay v-if="cropView" :edit="cropView.e" :node="cropView.n" :mat="cropView.mat" />
+      <GradientHandles v-if="gradView" :edit="gradView.g" :paint="gradView.p" :w="gradView.w" :h="gradView.h" :mat="gradView.mat" />
       <!-- 인스턴스 안 하위 줄: 선택 상자 · 크기 · 글자 밑줄, 마우스 올린 하위 줄(보라) -->
       <template v-if="subMarks">
         <div v-if="subMarks.sel" class="sel comp" :style="subMarks.sel" />

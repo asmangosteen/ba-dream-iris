@@ -11,6 +11,7 @@ import PaintPopover from '~/components/editor/PaintPopover.vue'
 import { useTextRange } from '~/composables/useTextRange'
 import { rangeValues } from '~/canvas/textRuns'
 import { startCrop, useImageEdit } from '~/composables/useImageEdit'
+import { useGradEdit } from '~/composables/useGradEdit'
 
 /**
  * Fill · Stroke 칠 목록(피그마와 같아요: 위에 있는 칠이 위에 그려져요).
@@ -49,7 +50,8 @@ const runsMixed = computed(() => props.kind === 'text' && !rng.value && nodes.va
 const mixed = computed(() => (rng.value ? rng.value.values.color === 'Mixed' : runsMixed.value) || styles.value.some((s) => JSON.stringify([s[base.value], s[extraKey.value]]) !== JSON.stringify([firstStyle.value?.[base.value], firstStyle.value?.[extraKey.value]])))
 /** 줄: 위(맨 위 칠)부터. -1 은 바탕 칠 */
 const rows = computed(() => (mixed.value ? [] : [...extras.value.map((_, i) => i).reverse(), ...(baseVal.value ? [-1] : [])]))
-const types = computed<Paint['type'][]>(() => (props.kind === 'stroke' ? ['solid'] : ['solid', 'linear', 'radial', 'angular', 'image']))
+/** 칠 종류: 채우기 · 선 모두 단색 · 그라디언트 · 이미지(피그마와 같아요 — 사용자 요청 2026-11-27). 화면(맨 위 프레임) 선은 아직 단색만 */
+const types = computed<Paint['type'][]>(() => (props.kind === 'stroke' && props.frame ? ['solid'] : ['solid', 'linear', 'radial', 'angular', 'image']))
 const TYPE_NAME: Record<Paint['type'], string> = { solid: 'Solid', linear: 'Linear', radial: 'Radial', angular: 'Angular', image: 'Image' }
 
 function patchAll(fn: (s: LayerStyle) => Partial<LayerStyle>, vars?: Record<string, string | null>) {
@@ -236,6 +238,16 @@ function onPopUpdate(p: Paint) {
   if (open.value < 0) { if (p.type === 'solid') setBase(withAlpha(p.color, p.opacity ?? 1)); return }
   setPaint(open.value, p)
 }
+/** 그라디언트 칠 창이 열려 있으면 캔버스에 그라디언트 점을 보여요(GradientHandles) — 닫거나 다른 칠로 바뀌면 지워요 */
+const gradEdit = useGradEdit()
+const mineGrad = () => !!gradEdit.value && gradEdit.value.sid === props.sid && gradEdit.value.key === extraKey.value && gradEdit.value.ids.join() === props.ids.join()
+watch(() => [open.value, popPaint.value?.type, props.sid, props.ids.join()], () => {
+  const p = popPaint.value
+  const grad = !!p && (p.type === 'linear' || p.type === 'radial' || p.type === 'angular')
+  if (open.value !== null && open.value >= 0 && grad && !props.frame && props.kind !== 'text') gradEdit.value = { sid: props.sid, ids: [...props.ids], key: extraKey.value, index: open.value }
+  else if (mineGrad()) gradEdit.value = null
+}, { immediate: true })
+onBeforeUnmount(() => { if (mineGrad()) gradEdit.value = null })
 /** 종류를 바꿨다 돌아와도 그 칠의 이미지는 남아요(피그마와 같아요): 레이어 · 칠 자리마다 마지막 이미지 칠을 기억 */
 const lastImage = new Map<string, Paint>()
 const memKey = (i: number) => `${props.frame ? frameIds.value.join(',') : props.sid + ':' + props.ids.join(',')}:${props.kind}:${i}`

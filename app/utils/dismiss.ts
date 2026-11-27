@@ -32,6 +32,8 @@ export function dismissPress(e: Event): boolean {
   const leaves = layers.filter((l) => !layers.some((o) => o !== l && l.contains(o)))
   if (leaves.some((l) => l.contains(t))) return false
   if (t.closest('[aria-expanded="true"]')) return false
+  // 칠 창이 열린 채 캔버스 위 그라디언트 점(.gh)을 끄는 건 그 창의 일부 — 막지 않아요(피그마와 같아요)
+  if (t.closest('.gh')) return false
   // 가운데 팝업 자체만 열려 있으면(안에 열린 메뉴 없음) 팝업 안 누름은 평소대로 — 바깥(어두운 바탕)은 팝업이 스스로 닫아요
   return true
 }

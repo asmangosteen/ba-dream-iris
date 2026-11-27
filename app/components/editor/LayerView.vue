@@ -11,7 +11,7 @@ import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFill, radiiOf, rectPath, strokeColors, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFancyStroke, hasFill, radiiOf, rectPath, strokePaints, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -60,8 +60,22 @@ const smooth = computed(() => {
   if (!(sm > 0) || !r.some(Boolean)) return null
   return { sm, r, path: squirclePath(v.w, v.h, r, sm) }
 })
-/** 상자 선(box-shadow). 변마다 두께는 smoothing 모양이어도 이걸로(변마다 그은 선) */
-const strokes = computed(() => (n.value && boxy.value && (!smooth.value || n.value.style.strokeSides) ? strokeShadows(n.value.style, n.value.type, color) : { outer: [], inner: [] }))
+/** 상자 선(box-shadow). 변마다 두께는 smoothing 모양이어도 이걸로(변마다 그은 선). 그라디언트 · 이미지 선이 있으면 SVG(fancyBox)로 */
+const strokes = computed(() => (n.value && boxy.value && (!smooth.value || n.value.style.strokeSides) && !(hasFancyStroke(n.value.style) && !n.value.style.strokeSides) ? strokeShadows(n.value.style, n.value.type, color) : { outer: [], inner: [] }))
+/**
+ * 선 칠 전부(맨 아래부터): 단색은 색, 그라디언트 · 이미지는 url(#…) — 정의(defs)는 아래 숨은 SVG 에(피그마처럼 선도 그라디언트 · 이미지).
+ * 좌표는 레이어 px(userSpaceOnUse) — 높이 0 인 선(line)에도 그려져요
+ */
+const sp = computed(() => (n.value ? strokePaints(n.value.style, color, imageSrc, (i) => mid('sp' + i)) : { refs: [], defs: [] }))
+/** 상자 도형(점선 · smoothing 아님)에 그라디언트 · 이미지 선: 같은 모양 경로를 SVG 로 */
+const fancyBox = computed(() => {
+  const v = n.value
+  if (!v || !boxy.value || smooth.value || v.style.dash || v.style.strokeSides || !hasFancyStroke(v.style)) return null
+  const w = v.style.strokeWidth ?? 0
+  const align = v.style.strokeAlign ?? defaultAlign(v.type)
+  const off = align === 'inside' ? w / 2 : align === 'outside' ? -w / 2 : 0
+  return { d: v.type === 'ellipse' ? ellipsePath(v.w, v.h, off) : rectPath(v.w, v.h, radiiOf(v.style), off), w }
+})
 const fx = computed(() => (n.value ? effectCss(n.value.style.effects, color, boxy.value) : null))
 
 const style = computed(() => {
@@ -167,7 +181,7 @@ const dashed = computed(() => {
   const w = v.style.strokeWidth
   const align = v.style.strokeAlign ?? defaultAlign(v.type)
   const off = (sw: number) => (align === 'inside' ? sw / 2 : align === 'outside' ? -sw / 2 : 0)
-  const cap = v.style.cap ?? 'butt', join = v.style.join ?? 'miter', colors = strokeColors(v.style, color).reverse()
+  const cap = v.style.cap ?? 'butt', join = v.style.join ?? 'miter', colors = sp.value.refs
   // 변마다 두께(Top · Bottom · Left · Right · Custom): 변마다 따로 그은 점선
   const sides = v.style.strokeSides
   if (sides && v.type !== 'ellipse') {
@@ -188,12 +202,12 @@ const smoothStroke = computed(() => {
   const v = n.value
   const sq = smooth.value
   if (!v || !sq || v.style.dash || v.style.strokeSides || !v.style.strokeWidth) return null
-  const colors = strokeColors(v.style, color)
+  const colors = sp.value.refs
   if (!colors.length) return null
   const w = v.style.strokeWidth
   const align = v.style.strokeAlign ?? defaultAlign(v.type)
   const inset = align === 'inside' ? w / 2 : align === 'outside' ? -w / 2 : 0
-  return { d: squirclePath(v.w, v.h, sq.r, sq.sm, inset), w, colors: colors.reverse() }
+  return { d: squirclePath(v.w, v.h, sq.r, sq.sm, inset), w, colors }
 })
 /** smoothing 바탕 층: 칠 + 안쪽 그림자 + 배경 흐림, 모양대로 자르기 */
 const smoothBg = computed(() => {
@@ -240,11 +254,11 @@ const vec = computed(() => {
   const closed = v.type === 'boolean' || v.type === 'polygon' || v.type === 'star' || v.type === 'ellipse' || !!v.closed || (v.type === 'vector' && !!v.vnet?.some((p) => p.closed))
   const w = s.strokeWidth ?? 0
   const align = closed ? (s.strokeAlign ?? defaultAlign(v.type)) : 'center'
-  const cols = strokeColors(s, color).reverse() // 아래부터 그려요
+  const cols = sp.value.refs // 아래부터 그려요(그라디언트 · 이미지는 url(#…))
   const size = Math.max(8, w * 4)
   return {
     d, closed, w, align, cols, size,
-    fill: closed && hasFill(s) ? { clipPath: `path(${v.evenodd || v.type === 'ellipse' ? 'evenodd, ' : ''}'${d}')`, ...backgroundCss(s, color, imageSrc) } : null,
+    fill: closed && hasFill(s) ? { clipPath: `path(${v.evenodd || v.type === 'ellipse' ? 'evenodd, ' : ''}'${d}')`, ...backgroundCss(s, color, imageSrc, { w: v.w, h: v.h }) } : null,
     start: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowStart && s.arrowStart !== 'none' ? s.arrowStart : null,
     end: (v.type === 'line' || v.type === 'path' || (v.type === 'vector' && !closed)) && s.arrowEnd && s.arrowEnd !== 'none' ? s.arrowEnd : null,
     dash: s.dash ? s.dash.join(' ') : undefined,
@@ -615,6 +629,28 @@ function onKey(e: KeyboardEvent) {
       </svg>
     </template>
     <i v-if="strokes.inner.length" class="stk" :style="{ boxShadow: strokes.inner.join(', '), borderRadius: radius }" />
+    <!-- 선의 그라디언트 · 이미지 정의(레이어 px 좌표) -->
+    <svg v-if="sp.defs.length" class="sdefs" width="0" height="0" aria-hidden="true">
+      <defs>
+        <template v-for="d in sp.defs" :key="d.id">
+          <linearGradient v-if="d.kind === 'linear'" :id="d.id" gradientUnits="userSpaceOnUse" :x1="d.x1 * n.w" :y1="d.y1 * n.h" :x2="d.x2 * n.w" :y2="d.y2 * n.h">
+            <stop v-for="(st, k) in d.stops" :key="k" :offset="st.offset" :stop-color="st.color" :stop-opacity="st.opacity" />
+          </linearGradient>
+          <radialGradient
+            v-else-if="d.kind === 'radial'" :id="d.id" gradientUnits="userSpaceOnUse" :cx="d.cx * n.w" :cy="d.cy * n.h" :r="Math.max(d.r * n.w, 0.01)"
+            :gradientTransform="n.w ? `translate(${d.cx * n.w} ${d.cy * n.h}) scale(1 ${n.h / n.w}) translate(${-d.cx * n.w} ${-d.cy * n.h})` : undefined"
+          >
+            <stop v-for="(st, k) in d.stops" :key="k" :offset="st.offset" :stop-color="st.color" :stop-opacity="st.opacity" />
+          </radialGradient>
+          <pattern v-else :id="d.id" patternUnits="userSpaceOnUse" x="0" y="0" :width="Math.max(n.w, 1)" :height="Math.max(n.h, 1)">
+            <image :href="d.href" x="0" y="0" :width="Math.max(n.w, 1)" :height="Math.max(n.h, 1)" :opacity="d.opacity" :preserveAspectRatio="d.fit === 'fit' ? 'xMidYMid meet' : 'xMidYMid slice'" />
+          </pattern>
+        </template>
+      </defs>
+    </svg>
+    <svg v-if="fancyBox" class="dash" :width="n.w" :height="n.h" overflow="visible" aria-hidden="true">
+      <path v-for="(c, i) in sp.refs" :key="i" :d="fancyBox.d" fill="none" :stroke="c" :stroke-width="fancyBox.w" />
+    </svg>
     <svg v-if="smoothStroke" class="dash" :width="n.w" :height="n.h" overflow="visible" aria-hidden="true">
       <path v-for="(c, i) in smoothStroke.colors" :key="i" :d="smoothStroke.d" fill="none" :stroke="c" :stroke-width="smoothStroke.w" />
     </svg>
@@ -637,6 +673,7 @@ function onKey(e: KeyboardEvent) {
 .txt.trunc { overflow: hidden; text-overflow: ellipsis; }
 .para { display: block; }
 .stk { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.sdefs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 /* Corner smoothing 바탕 · 그림자 층: 내용 뒤에 */
 .smw { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 /* 돌린 Crop 이미지: 레이어 모양대로 잘라요(둥근 모서리는 border-radius, smoothing 은 clip-path) */

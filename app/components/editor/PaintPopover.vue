@@ -7,7 +7,7 @@ const OPEN_STACK: symbol[] = []
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { GradStop, LayerStyle, Paint } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { paintLayer } from '~/canvas/paint'
+import { gradHandles, paintLayer } from '~/canvas/paint'
 import { useImageSrc, prepareImage } from '~/canvas/images'
 import { fromRgba, hexOf, alphaOf, normHex, toRgba, withAlpha } from '~/canvas/color'
 import { parseColor, useTokenCatalog, type CatalogToken } from '~/canvas/tokens'
@@ -74,7 +74,8 @@ function onDoc(e: PointerEvent) {
   const t = e.target as Node | null
   if (!t || el.value?.contains(t) || props.anchor?.contains(t)) return
   // 위에 겹친 칠 창 · 떠 있는 메뉴(토큰 목록 · 드롭다운) 안을 누른 것은 무시
-  if ((t as HTMLElement).closest?.('.tp, .esel-m')) return
+  // 캔버스 위 그라디언트 점(.gh)을 끄는 것도 칠 창을 닫지 않아요(피그마와 같아요)
+  if ((t as HTMLElement).closest?.('.tp, .esel-m, .gh')) return
   const pop = (t as HTMLElement).closest?.('.paint-pop')
   if (pop && OPEN_STACK.indexOf(me) < OPEN_STACK.length - 1) return
   emit('close')
@@ -229,8 +230,15 @@ function onStopAlpha(k: number, e: Event) {
   if (!Number.isFinite(a)) { input.value = String(Math.round(alphaOf(store.color(cur) ?? cur) * 100)); return }
   setStop(k, { color: withAlpha(hexOf(store.color(cur) ?? cur), Math.min(100, Math.max(0, a)) / 100) })
 }
-const angle = computed(() => (isGrad(props.paint) ? props.paint.angle ?? (props.paint.type === 'linear' ? 180 : 0) : 0))
-function setAngle(v: number) { if (isGrad(props.paint)) emit('update', { ...props.paint, angle: ((Math.round(v) % 360) + 360) % 360 }) }
+/** 90° 돌리기: 캔버스 그라디언트 점을 돌려요 — 선형은 두 점의 가운데를 축으로, 원형 · 각도형은 가운데 점을 축으로(시계 방향) */
+function rotate90() {
+  if (!isGrad(props.paint)) return
+  const { from, to } = gradHandles(props.paint)
+  const c: [number, number] = props.paint.type === 'linear' ? [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2] : from
+  const rot = (p: [number, number]): [number, number] => [r4(c[0] - (p[1] - c[1])), r4(c[1] + (p[0] - c[0]))]
+  emit('update', { ...props.paint, from: rot(from), to: rot(to), angle: undefined })
+}
+const r4 = (v: number) => Math.round(v * 10000) / 10000
 /** 방향 뒤집기: 지점 위치를 거꾸로 */
 function flip() { setStops(stops.value.map((s) => ({ ...s, pos: Math.round((1 - s.pos) * 100) / 100 }))) }
 
@@ -404,13 +412,10 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
             <template v-else-if="isGrad(paint)">
               <div class="gr-tools">
                 <EditorSelect class="gr-kind" :model-value="paint.type" :options="gradKinds" ariaLabel="Gradient type" @update:model-value="(v) => emit('type', v as Paint['type'])" />
-                <label v-if="paint.type !== 'radial'" class="sq fld ang" :data-tip="tr('Angle')">
-                  <EditorIcon name="angle" />
-                  <input :key="'g' + angle" :value="angle + '°'" inputmode="numeric" :aria-label="tr('Angle')" @change="setAngle(Number(($event.target as HTMLInputElement).value.replace('°', '')) || 0)" @keydown="blur" @focus="sel">
-                </label>
+                <!-- 각도 칸은 없어요: 방향 · 길이는 캔버스 위 그라디언트 점을 끌어서(피그마와 같아요 — 사용자 요청 2026-11-27) -->
                 <span class="grow" />
                 <button class="ib s24" :aria-label="tr('Flip gradient')" :data-tip="tr('Flip gradient')" @click="flip"><EditorIcon name="flip_gradient" /></button>
-                <button v-if="paint.type !== 'radial'" class="ib s24" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="setAngle(angle + 90)"><EditorIcon name="rotate_90" /></button>
+                <button class="ib s24" :aria-label="tr('Rotate 90°')" :data-tip="tr('Rotate 90°')" @click="rotate90"><EditorIcon name="rotate_90" /></button>
               </div>
               <!-- 막대: 지점 핀은 막대 위에(피그마와 같아요), 고른 핀은 파랗게. 막대를 누르면 그 자리에 지점 더하기 -->
               <div ref="bar" class="gr-bar" :title="tr('Click to add a color stop')" @pointerdown="onBar($event)">

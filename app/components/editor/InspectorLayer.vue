@@ -76,12 +76,26 @@ function sized(n: LayerNode, key: 'w' | 'h', v: number): Partial<LayerNode> {
   if (n.type === 'text' && patch.w !== undefined) n.style.autoWidth = false
   return patch
 }
+/**
+ * 위치 X · Y(피그마와 같아요): 돌린 레이어는 '돌린 뒤의 왼쪽 위 꼭짓점'(레이어 원점) 자리 — 그래서 소수점이 생겨요.
+ * 저장은 그대로(돌리기 전 상자 왼쪽 위, 가운데 기준 회전) — 보여 줄 때 · 넣을 때만 그 차이(off)를 더하고 빼요
+ */
+function originOff(n: LayerNode, key: 'x' | 'y'): number {
+  const r = ((n.rotation ?? 0) * Math.PI) / 180
+  if (!r) return 0
+  const w = dim(n, 'w'), h = dim(n, 'h')
+  // 가운데 기준으로 (-w/2, -h/2) 를 돌린 자리 − 돌리기 전 자리
+  const ox = (-w / 2) * Math.cos(r) - (-h / 2) * Math.sin(r) + w / 2
+  const oy = (-w / 2) * Math.sin(r) + (-h / 2) * Math.cos(r) + h / 2
+  return key === 'x' ? ox : oy
+}
+const posOf = (n: LayerNode, key: 'x' | 'y') => n[key] + originOff(n, key)
 function setNum(key: 'x' | 'y' | 'w' | 'h', e: Event) {
   const input = e.target as HTMLInputElement
   const v = Number(input.value)
-  if (!input.value.trim() || !Number.isFinite(v)) { input.value = showG(same((n) => (key === 'w' || key === 'h' ? dim(n, key) : n[key]))); return }
+  if (!input.value.trim() || !Number.isFinite(v)) { input.value = showG(same((n) => (key === 'w' || key === 'h' ? dim(n, key) : posOf(n, key)))); return }
   if (key === 'w' || key === 'h') store.sizeTo(sid.value, ids.value, (n) => ({ ...sized(n, key, v), ...(key === 'w' ? (n.sizeH && n.sizeH !== 'fixed' ? { sizeH: 'fixed' as const } : {}) : (n.sizeV && n.sizeV !== 'fixed' ? { sizeV: 'fixed' as const } : {})) }))
-  else store.update(sid.value, ids.value, { [key]: Math.max(-1e6, Math.round(v * 100) / 100) })
+  else store.update(sid.value, ids.value, (n) => ({ [key]: Math.max(-1e6, Math.round((v - originOff(n, key)) * 100) / 100) }))
 }
 /** 화면에 그려진 크기: 글자는 내용에 맞춰 늘고 줄어서(Hug · Auto width) 캔버스처럼 DOM 에서 재요(EditorCanvas layerSize 와 같아요) */
 const measureTick = ref(0)
@@ -761,8 +775,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <ArrangeControls :count="nodes.length" :gap="gap" :axis="axis" @op="onArrange" />
       <div class="ig-l"><span>{{ tr('Position') }}</span></div>
       <div class="ig">
-        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>X</span><input :value="showG(same((n) => n.x))" :placeholder="same((n) => n.x) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"></label>
-        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>Y</span><input :value="showG(same((n) => n.y))" :placeholder="same((n) => n.y) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"></label>
+        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>X</span><input :value="showG(same((n) => posOf(n, 'x')))" :placeholder="same((n) => posOf(n, 'x')) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="X" @change="setNum('x', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ x: n.x + d })))"></label>
+        <label :class="['sq', 'fld', { lo: flowOwned }]"><span>Y</span><input :value="showG(same((n) => posOf(n, 'y')))" :placeholder="same((n) => posOf(n, 'y')) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" aria-label="Y" @change="setNum('y', $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, store.topIds(sid, ids), (n) => ({ y: n.y + d })))"></label>
         <button v-if="showConstraints" :class="['ib', 's24', 'tog', { on: consShown }]" :aria-pressed="consShown" :aria-label="consShown ? tr('Hide constraints') : tr('Show constraints')" :title="consShown ? tr('Hide constraints') : tr('Show constraints')" @click="setConsShown(!consShown)"><EditorIcon name="constraints" /></button>
         <span v-else />
       </div>

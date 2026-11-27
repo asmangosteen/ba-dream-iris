@@ -339,7 +339,7 @@ export function useDragStart(canvas: Ctx) {
   function startScreenRotate(e: PointerEvent) {
     if (e.button !== 0) return
     const f = selFrame.value
-    if (!f || !el.value || !isNative(f)) return
+    if (!f || !el.value) return // 피그마에서 가져온 화면도 돌려요
     try { el.value.setPointerCapture?.(e.pointerId) } catch { /* 이미 끝난 포인터 */ }
     const r = el.value.getBoundingClientRect()
     const cx = r.left + (f.x + f.width / 2) * vp.value.zoom + vp.value.x, cy = r.top + (f.y + f.height / 2) * vp.value.zoom + vp.value.y

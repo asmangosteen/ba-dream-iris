@@ -20,7 +20,7 @@ export interface VPath { pts: VPoint[]; closed?: boolean }
 /** 칠(채우기 · 선 색). solid 는 한 색, linear · radial 은 그라디언트, image 는 이미지 채우기 (v5) */
 export type Paint =
   | { type: 'solid'; color: string; opacity?: number; visible?: boolean; token?: string }
-  | { type: 'linear' | 'radial' | 'angular'; stops: GradStop[]; angle?: number; opacity?: number; visible?: boolean }
+  | { type: 'linear' | 'radial' | 'angular'; stops: GradStop[]; angle?: number; opacity?: number; visible?: boolean; /** 캔버스 위 그라디언트 점(레이어 상자 기준 0~1, 피그마와 같아요): 선형 = 시작 → 끝, 원형 · 각도 = 가운데 → 가장자리 */ from?: [number, number]; to?: [number, number] }
   | { type: 'image'; src: string; fit?: ImageFit; opacity?: number; visible?: boolean; crop?: ImageCrop; iw?: number; ih?: number; scale?: number; rotation?: number }
 export type ImageFit = 'fill' | 'fit' | 'crop' | 'tile'
 /**

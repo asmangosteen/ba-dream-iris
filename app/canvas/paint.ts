@@ -1,4 +1,4 @@
-import type { Effect, LayerStyle, LayerType, Paint, VPath } from './schema'
+import type { Effect, ImageFit, LayerStyle, LayerType, Paint, VPath } from './schema'
 /** 별 안쪽 반지름 기본 비율 — 피그마 기본값 38.2% */
 export const STAR_INNER = 0.382
 
@@ -24,11 +24,7 @@ export function paintLayer(p: Paint, color: ColorFn, img: ImgFn, box?: { w: numb
     const c = alpha(color(p.color) ?? p.color, p.opacity)
     return { image: `linear-gradient(${c}, ${c})`, size: 'auto', position: '0 0', repeat: 'no-repeat' }
   }
-  if (p.type === 'linear' || p.type === 'radial' || p.type === 'angular') {
-    const stops = [...p.stops].sort((a, b) => a.pos - b.pos).map((s) => `${alpha(color(s.color) ?? s.color, p.opacity)} ${Math.round(s.pos * 1000) / 10}%`).join(', ')
-    const image = p.type === 'linear' ? `linear-gradient(${p.angle ?? 180}deg, ${stops})` : p.type === 'radial' ? `radial-gradient(farthest-side, ${stops})` : `conic-gradient(from ${p.angle ?? 0}deg, ${stops})`
-    return { image, size: 'auto', position: '0 0', repeat: 'no-repeat' }
-  }
+  if (p.type === 'linear' || p.type === 'radial' || p.type === 'angular') return { image: gradientCss(p, color, box), size: 'auto', position: '0 0', repeat: 'no-repeat' }
   if (p.type !== 'image') return null
   const url = img(p.src)
   if (!url) return null
@@ -46,6 +42,82 @@ export function paintLayer(p: Paint, color: ColorFn, img: ImgFn, box?: { w: numb
   return { image, size: fit === 'fit' ? 'contain' : 'cover', position: 'center', repeat: 'no-repeat' }
 }
 const r4 = (v: number) => Math.round(v * 10000) / 10000
+type Grad = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>
+/**
+ * 그라디언트 점(레이어 상자 기준 0~1). 저장된 점이 없으면 예전 각도(angle)로 — 선형은 각도 방향으로 상자를 가로지르고(위 → 아래가 180°),
+ * 원형은 가운데 → 아래 가장자리, 각도형은 가운데 → 각도 방향
+ */
+export function gradHandles(p: Grad): { from: [number, number]; to: [number, number] } {
+  if (p.from && p.to) return { from: p.from, to: p.to }
+  const a = ((p.angle ?? (p.type === 'linear' ? 180 : 0)) * Math.PI) / 180
+  const ux = Math.sin(a), uy = -Math.cos(a)
+  if (p.type === 'linear') return { from: [0.5 - ux / 2, 0.5 - uy / 2], to: [0.5 + ux / 2, 0.5 + uy / 2] }
+  if (p.type === 'radial') return { from: [0.5, 0.5], to: [0.5, 1] }
+  return { from: [0.5, 0.5], to: [0.5 + ux / 2, 0.5 + uy / 2] }
+}
+/** 그라디언트 → CSS(box: 상자 px — 선형 점 자리를 정확히 옮기려고. 없으면 정사각형으로 봐요) */
+export function gradientCss(p: Grad, color: ColorFn, box?: { w: number; h: number }): string {
+  const sorted = [...p.stops].sort((a, b) => a.pos - b.pos)
+  const w = box?.w || 1, h = box?.h || 1
+  const { from, to } = gradHandles(p)
+  const col = (c: string) => alpha(color(c) ?? c, p.opacity)
+  if (p.type === 'linear') {
+    const dx = (to[0] - from[0]) * w, dy = (to[1] - from[1]) * h
+    const len = Math.hypot(dx, dy) || 1
+    const ux = dx / len, uy = dy / len
+    const deg = (Math.atan2(ux, -uy) * 180) / Math.PI
+    // CSS 선형 그라디언트 선: 상자 가운데를 지나고 길이 = |w·sinθ| + |h·cosθ| → 점을 그 선 위 비율로
+    const L = Math.abs(w * ux) + Math.abs(h * uy) || 1
+    const t = (pt: [number, number]) => (((pt[0] - 0.5) * w * ux + (pt[1] - 0.5) * h * uy) / L) + 0.5
+    const t0 = t(from), t1 = t(to)
+    const stops = sorted.map((s) => `${col(s.color)} ${r4((t0 + s.pos * (t1 - t0)) * 100)}%`).join(', ')
+    return `linear-gradient(${r4(deg)}deg, ${stops})`
+  }
+  const stops = sorted.map((s) => `${col(s.color)} ${r4(s.pos * 100)}%`).join(', ')
+  const at = `at ${r4(from[0] * 100)}% ${r4(from[1] * 100)}%`
+  if (p.type === 'radial') {
+    const d = Math.hypot(to[0] - from[0], to[1] - from[1])
+    return `radial-gradient(${r4(d * 100)}% ${r4(d * 100)}% ${at}, ${stops})`
+  }
+  const deg = (Math.atan2((to[0] - from[0]) * w, -(to[1] - from[1]) * h) * 180) / Math.PI
+  return `conic-gradient(from ${r4(deg)}deg ${at}, ${stops})`
+}
+/**
+ * 선(Stroke)의 그라디언트 · 이미지 칠 → SVG 정의(그 레이어 SVG 안 <defs>). objectBoundingBox 라 상자 비율 그대로(피그마와 같아요).
+ * 각도형(angular)은 SVG 에 없어서 첫 색으로 그려요
+ */
+export type SvgPaintDef =
+  | { kind: 'linear'; id: string; x1: number; y1: number; x2: number; y2: number; stops: { offset: number; color: string; opacity: number }[] }
+  | { kind: 'radial'; id: string; cx: number; cy: number; r: number; stops: { offset: number; color: string; opacity: number }[] }
+  | { kind: 'image'; id: string; href: string; opacity: number; fit: ImageFit }
+export function svgPaint(p: Paint, id: string, color: ColorFn, img: ImgFn): { ref: string; def: SvgPaintDef | null } | null {
+  if (p.type === 'solid') return { ref: alpha(color(p.color) ?? p.color, p.opacity), def: null }
+  if (p.type === 'image') {
+    const href = img(p.src)
+    return href ? { ref: `url(#${id})`, def: { kind: 'image', id, href, opacity: p.opacity ?? 1, fit: p.fit ?? 'fill' } } : null
+  }
+  const stops = [...p.stops].sort((a, b) => a.pos - b.pos).map((s) => ({ offset: s.pos, color: color(s.color) ?? s.color, opacity: p.opacity ?? 1 }))
+  if (p.type === 'angular') return { ref: alpha(stops[0]?.color ?? '#000000', p.opacity), def: null }
+  const { from, to } = gradHandles(p)
+  if (p.type === 'linear') return { ref: `url(#${id})`, def: { kind: 'linear', id, x1: from[0], y1: from[1], x2: to[0], y2: to[1], stops } }
+  return { ref: `url(#${id})`, def: { kind: 'radial', id, cx: from[0], cy: from[1], r: Math.hypot(to[0] - from[0], to[1] - from[1]), stops } }
+}
+/** 선 칠 전부(맨 아래부터): 단색은 색, 그라디언트 · 이미지는 url(#…) — defs 는 그 레이어 SVG 에 넣어요 */
+export function strokePaints(s: LayerStyle, color: ColorFn, img: ImgFn, idOf: (i: number) => string): { refs: string[]; defs: SvgPaintDef[] } {
+  const refs: string[] = [], defs: SvgPaintDef[] = []
+  if (!s.strokeWidth) return { refs, defs }
+  if (s.stroke) refs.push(color(s.stroke) ?? s.stroke)
+  ;(s.strokes ?? []).forEach((p, i) => {
+    if (!on(p)) return
+    const r = svgPaint(p, idOf(i), color, img)
+    if (!r) return
+    refs.push(r.ref)
+    if (r.def) defs.push(r.def)
+  })
+  return { refs, defs }
+}
+/** 선에 그라디언트 · 이미지 칠이 있나(상자 도형은 그땐 SVG 로 그려요) */
+export const hasFancyStroke = (s: LayerStyle) => !!s.strokeWidth && (s.strokes ?? []).some((p) => on(p) && p.type !== 'solid')
 
 /** 이미지 칠의 '덮기(Fill)' 자리 = 자르기 시작점(이미지 원래 비율 ar = 폭 / 높이, 레이어 비율 nr) */
 export function coverCrop(ar: number, nr: number): { x: number; y: number; w: number; h: number } {
@@ -83,6 +155,7 @@ export const hasFill = (s: LayerStyle) => !!s.fill || (s.fills ?? []).some(on)
 /** 선 색들(맨 위가 먼저). 이미지 · 그라디언트 선은 첫 색으로 */
 export function strokeColors(s: LayerStyle, color: ColorFn): string[] {
   if (!s.strokeWidth) return []
+  // 화면(맨 위 프레임) 선 등 box-shadow 로 그리는 곳: 그라디언트는 첫 색으로(레이어는 strokePaints 로 SVG 에서 제대로 그려요)
   const extra = (s.strokes ?? []).filter(on).map((p) => (p.type === 'solid' ? alpha(color(p.color) ?? p.color, p.opacity) : p.type === 'image' ? '' : color(p.stops[0]?.color) ?? '')).filter(Boolean).reverse()
   return [...extra, ...(s.stroke ? [color(s.stroke) ?? s.stroke] : [])]
 }

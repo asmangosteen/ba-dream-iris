@@ -66,17 +66,19 @@ export function useCanvasGeom(canvas: Ctx) {
     const W = odd ? g.h : g.w, H = odd ? g.w : g.h
     const t = (eff * Math.PI) / 180, cos = Math.cos(t), sin = Math.sin(t)
     const at = (u: number, v: number) => ({ x: (g.cx + u * cos - v * sin) * vp.value.zoom + vp.value.x, y: (g.cy + u * sin + v * cos) * vp.value.zoom + vp.value.y })
-    const tl = at(-W / 2, -H / 2), bc = at(0, H / 2)
+    const tl = at(-W / 2, -H / 2), bc = at(0, H / 2), tr = at(W / 2, -H / 2)
     return {
       label: { left: tl.x + 'px', top: tl.y - 20 + 'px', transform: eff ? `rotate(${eff}deg)` : undefined, transformOrigin: '0 20px' },
+      /** 피그마 표시: 같은 위 변의 오른쪽 끝(이름표와 같은 줄) */
+      tag: { left: tr.x + 'px', top: tr.y - 20 + 'px', transform: `rotate(${eff}deg) translateX(-100%)`, transformOrigin: '0 20px' },
       size: { left: bc.x + 'px', top: bc.y + 'px', marginTop: '0', transformOrigin: '0 0', transform: `rotate(${eff}deg) translate(-50%, 8px)` },
     }
   }
-  /** 화면(맨 위 프레임) 회전(도) — Iris 화면만 */
-  const scrRot = (s: { id: string; source?: string }) => (s.source === 'native' && !isPageCanvas(s.id) ? store.doc(s.id).frame?.rotation ?? 0 : 0)
+  /** 화면(맨 위 프레임) 회전(도) — Iris 화면 · 피그마에서 가져온 화면 모두(사용자 요청 2026-11-27) */
+  const scrRot = (s: { id: string; source?: string }) => (!isPageCanvas(s.id) ? store.doc(s.id).frame?.rotation ?? 0 : 0)
   /** 화면 안쪽 좌표 → 캔버스 좌표(돌린 화면은 가운데 기준으로 돌려요) */
-  /** 화면 뒤집기(Iris 화면만) */
-  const scrFlip = (s: { id: string; source?: string }) => { const f = s.source === 'native' && !isPageCanvas(s.id) ? store.doc(s.id).frame : undefined; return { x: !!f?.flipX, y: !!f?.flipY } }
+  /** 화면 뒤집기(Iris · 피그마 화면 모두) */
+  const scrFlip = (s: { id: string; source?: string }) => { const f = !isPageCanvas(s.id) ? store.doc(s.id).frame : undefined; return { x: !!f?.flipX, y: !!f?.flipY } }
   /** 화면 모양 변환(CSS): 돌리기 · 뒤집기, 가운데 기준 */
   const scrTf = (s: ScreenRow) => { const r = scrRot(s), f = scrFlip(s); const t = [r ? `rotate(${r}deg)` : '', f.x ? 'scaleX(-1)' : '', f.y ? 'scaleY(-1)' : ''].filter(Boolean).join(' '); return t || undefined }
   const screenMat = (s: ScreenRow): Mat => { const r = scrRot(s), f = scrFlip(s); return r || f.x || f.y ? localMatrix({ x: s.x, y: s.y, rotation: r, flipX: f.x, flipY: f.y }, s.width, s.height) : translate(s.x, s.y) }
@@ -222,7 +224,7 @@ export function useCanvasGeom(canvas: Ctx) {
       if (!s) continue
       const gs = it.ids.map((id) => layerGeom(s, id)).filter((g): g is NonNullable<typeof g> => !!g)
       if (gs.length) for (const g of gs) out.push(rbox(g))
-      else out.push(box(s))
+      else { const r = scrRot(s); out.push(r ? { ...box(s), transform: `rotate(${r}deg)` } : box(s)) } // 돌린 화면은 강조도 같이 돌려요
     }
     return out
   })

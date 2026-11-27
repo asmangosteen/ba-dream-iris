@@ -16,7 +16,7 @@ type Ctx = CanvasBase & CanvasGeom & CanvasViewport & CanvasPick
 export function useCanvasHover(canvas: Ctx) {
   const {
     props, store, el, tool, vp, multi, dragRef, draft, marqueeOn, guides, isCanvas, canvasDoc, rectOf, box, layerGeom, layerWorld,
-    tick, selScreen, multiBoxes, single, rbox, rotating, moving, diveBoolean, pickLayer,
+    tick, selScreen, multiBoxes, single, rbox, rotating, moving, diveBoolean, pickLayer, scrRot,
   } = canvas
   // ---------------------------------------------------------------------------
   // 스마트 가이드(끄는 동안) · 간격 측정(⌥ 호버)
@@ -184,7 +184,9 @@ export function useCanvasHover(canvas: Ctx) {
     if (!h.id) {
       // 화면(프레임): 이미 고른 화면이면 선택 상자가 있으니 생략
       if (isCanvas(s) || (store.screenId.value === s.id && !store.layerIds.value.length) || multi.value.includes(s.id)) return null
-      return { frame: s.id, comp: false, style: box(s) }
+      // 돌린 화면은 테두리도 같이 돌려요(가운데 기준 — 화면과 같아요)
+      const r = scrRot(s)
+      return { frame: s.id, comp: false, style: r ? { ...box(s), transform: `rotate(${r}deg)` } : box(s) }
     }
     if (store.screenId.value === s.id && store.layerIds.value.includes(h.id)) return null
     const n = store.node(s.id, h.id)

@@ -29,7 +29,20 @@ const isMulti = computed(() => all.value.length > 1)
 const ids = computed(() => all.value.map((s) => s.id))
 /** 위치 · 크기: 모두 같으면 그 값, 다르면 null(Mixed) */
 /** 소수는 둘째 자리까지(픽셀에 맞추기를 끄면 소수로 움직여요) */
-const same = (key: 'x' | 'y' | 'width' | 'height') => { const v = all.value.map((s) => Math.round(s[key] * 100) / 100); return v.every((x) => x === v[0]) ? v[0]! : null }
+/**
+ * 돌린 화면의 X · Y(피그마와 같아요 — 레이어와 같은 규칙): '돌린 뒤의 왼쪽 위 꼭짓점' 자리라 소수점이 생겨요.
+ * 저장은 그대로(돌리기 전 왼쪽 위, 가운데 기준 회전) — 보여 줄 때 · 넣을 때만 그 차이를 더하고 빼요
+ */
+function originOff(s: ScreenRow, key: 'x' | 'y'): number {
+  const r = ((store.doc(s.id).frame?.rotation ?? 0) * Math.PI) / 180
+  if (!r) return 0
+  const w = s.width, h = s.height
+  return key === 'x' ? (-w / 2) * Math.cos(r) + (h / 2) * Math.sin(r) + w / 2 : (-w / 2) * Math.sin(r) - (h / 2) * Math.cos(r) + h / 2
+}
+const valOf = (s: ScreenRow, key: 'x' | 'y' | 'width' | 'height') => (key === 'x' || key === 'y' ? s[key] + originOff(s, key) : s[key])
+const same = (key: 'x' | 'y' | 'width' | 'height') => { const v = all.value.map((s) => Math.round(valOf(s, key) * 100) / 100); return v.every((x) => x === v[0]) ? v[0]! : null }
+/** 보이는 X · Y(돌린 꼭짓점) → 저장 값 */
+const toStored = (key: 'x' | 'y' | 'width' | 'height', v: number) => (key === 'x' || key === 'y' ? Math.round((v - originOff(props.screen, key)) * 100) / 100 : v)
 // 여러 프레임 정렬 · 균등 분배 · 간격(Alignment)
 const rects = computed<Rect[]>(() => all.value.map((s) => ({ x: s.x, y: s.y, w: s.width, h: s.height })))
 const axis = computed(() => guessAxis(rects.value))
@@ -49,7 +62,7 @@ function num(key: 'x' | 'y' | 'width' | 'height', e: Event) {
     emit('update', key === 'width' ? { width: r, height: Math.max(1, Math.round(s.height * k * 100) / 100) } : { height: r, width: Math.max(1, Math.round(s.width * k * 100) / 100) })
     return
   }
-  emit('update', { [key]: r })
+  emit('update', { [key]: toStored(key, r) })
 }
 /**
  * 크기(W · H) 변수(간격 토큰). 위치(X · Y)는 토큰을 쓰지 않아요. 고르면 값을 넣고 연결(frame.vars 의 x · y · w · h), 숫자를 치면 연결이 풀려요.
@@ -89,7 +102,7 @@ function step(key: 'x' | 'y' | 'width' | 'height', e: KeyboardEvent) {
     emit('update', key === 'width' ? { width: v, height: Math.max(1, Math.round(s.height * k * 100) / 100) } : { height: v, width: Math.max(1, Math.round(s.width * k * 100) / 100) })
     return
   }
-  emit('update', { [key]: v })
+  emit('update', { [key]: toStored(key, v) })
 }
 // --- 화면 모양: 레이어와 같은 방식(토큰 연결 포함). 기본은 흰 바탕 · 선 없음 · 모서리 0 ---
 const store = useLayerStore()
@@ -193,7 +206,6 @@ watch(() => ids.value.join(), () => { strokeOpen.value = false })
 /** 프레임마다 다른 값으로 고치기(실행취소 한 번) */
 const fEach = (fn: (l: LayerStyle) => Partial<LayerStyle>) => store.batch(() => { for (const id of ids.value) store.frameStyle(id, fn(store.doc(id).frame ?? {})) })
 /** 화면 회전(피그마 Rotation): Iris 화면만, 여러 개면 같은 값일 때만 숫자 */
-const allNative = computed(() => all.value.every((s) => s.source === 'native'))
 const rotNow = computed(() => { const v = looks.value.map((l) => Math.round((l.rotation ?? 0) * 10) / 10); return v.every((x) => x === v[0]) ? v[0]! : null })
 const setRot = (v: number) => fEach(() => ({ rotation: normAngle(v) || undefined }))
 function onRot(e: Event) {
@@ -306,7 +318,8 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         <span />
       </div>
       <!-- Rotation(피그마와 같아요): 화면 가운데 기준, 캔버스 모서리 바깥을 끌어도 돌아가요(⇧ 15° 씩) -->
-      <template v-if="allNative">
+      <!-- 피그마에서 가져온 화면도 돌리고 뒤집어요(사용자 요청 2026-11-27) -->
+      <template v-if="all.length">
         <div class="ig-l"><span>{{ tr('Rotation') }}</span></div>
         <div class="ig">
           <label class="sq fld u" :title="tr('Rotation')"><EditorIcon name="rotation" /><input :key="'r' + rotNow" :value="rotNow ?? ''" :placeholder="rotNow === null ? tr('Mixed') : ''" inputmode="decimal" :aria-label="tr('Rotation')" @change="onRot" @keydown="rotKey"><span v-if="rotNow !== null" class="unit">°</span></label>
