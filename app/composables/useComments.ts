@@ -127,11 +127,12 @@ export function useComments(projectId: string) {
    * 문서 댓글(3단계 B안): 자리(블록 · 표 행 · 고른 글)가 있으면 문서 옆 메모, 없으면 아래 게시판.
    * 정책이 연결된 화면이 있으면 그 화면 위에도 같은 스레드가 핀으로 보여요(screenId · x · y)
    */
-  async function createDoc(docId: string, anchor: CommentRow['doc_anchor'], body: string, mentions: string[], pin: { screenId: string; pageId: string | null; x: number; y: number } | null = null) {
-    const base = { project_id: projectId, document_id: docId, doc_anchor: anchor ?? null, page_id: pin?.pageId ?? null, screen_id: pin?.screenId ?? null, x: pin?.x ?? null, y: pin?.y ?? null, body, mentions }
+  async function createDoc(docId: string, anchor: CommentRow['doc_anchor'], body: string, mentions: string[], pin: { screenId: string; pageId: string | null; x: number; y: number } | null = null, attachments: string[] = []) {
+    // 이미지만 붙여도 남아요(글이 비어도 — DB 규칙: 글 또는 이미지 하나 이상)
+    const base = { project_id: projectId, document_id: docId, doc_anchor: anchor ?? null, page_id: pin?.pageId ?? null, screen_id: pin?.screenId ?? null, x: pin?.x ?? null, y: pin?.y ?? null, body, mentions, ...(attachments.length ? { attachments } : {}) }
     if (preview) {
       const no = Math.max(0, ...(list.data.value ?? []).map((c) => c.no ?? 0)) + 1
-      const row: CommentRow = { id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: null, no, author_id: 'preview-me', attachments: [], resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null, ...base }
+      const row: CommentRow = { id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: null, no, author_id: 'preview-me', attachments, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null, ...base }
       put(row)
       return row
     }

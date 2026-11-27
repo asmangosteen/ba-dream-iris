@@ -366,6 +366,8 @@ function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachmen
           </div>
           <div v-if="imgCount(c)" class="imgs">
             <button v-for="(src, i) in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(c, i)"><img :src="resolveSrc(src)" alt=""></button>
+            <!-- 글 없이 이미지만 있으면 😊 는 이미지 줄 끝에 -->
+            <button v-if="!c.body && !reactionsOf(c).length" type="button" :class="['sq', 'pop-x', 'rx-add', 'rx-hover', 'rx-img', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
           </div>
           <!-- 반응 줄: [이모지 수] … + 😊 -->
           <div v-if="reactionsOf(c).length" class="rx-row">
@@ -467,6 +469,7 @@ function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachmen
 .rx.me:hover { --sq-fill: color-mix(in srgb, var(--sys-color-brand-primary-default) 16%, transparent); }
 .rx-e { font-size: 16px; line-height: 1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
 .rx-pick { position: absolute; z-index: 8; }
+.rx-img { margin-top: 0; margin-left: auto; align-self: flex-start; }
 .imgs { padding-left: 32px; display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .img { display: block; width: 64px; height: 64px; flex: none; padding: 0; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }
 .img img { display: block; width: 100%; height: 100%; object-fit: cover; }

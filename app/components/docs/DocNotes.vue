@@ -66,7 +66,7 @@ const myId = computed(() => comments.myId.value)
 const canModerate = computed(() => access.role.value === 'owner' || access.role.value === 'deputy')
 const me = computed(() => who(myId.value ?? ''))
 /** 새 메모 남기기: 정책에 연결된 화면이 있으면 그 화면 왼쪽 위에도 핀으로 */
-async function sendNote(body: string, mentions: string[]) {
+async function sendNote(body: string, mentions: string[], attachments: string[] = []) {
   const at = draft.value
   if (!at || busy.value) return
   busy.value = true
@@ -74,15 +74,15 @@ async function sendNote(body: string, mentions: string[]) {
     const r = at.code ? reqByCode.value.get(at.code.toUpperCase()) : null
     const sid = r ? props.links.find((l) => l.requirement_id === r.id)?.screen_id ?? null : null
     const pageId = sid ? props.screens.find((s) => s.id === sid)?.page_id ?? null : null
-    const row = await comments.createDoc(props.doc.id, at, body, mentions, sid ? { screenId: sid, pageId, x: 16, y: 16 } : null)
+    const row = await comments.createDoc(props.doc.id, at, body, mentions, sid ? { screenId: sid, pageId, x: 16, y: 16 } : null, attachments)
     draft.value = null
     active.value = row.id
   } catch { emit('toast', tr("Couldn't post the comment. Try again")) } finally { busy.value = false }
 }
-async function sendBoard(body: string, mentions: string[]) {
+async function sendBoard(body: string, mentions: string[], attachments: string[] = []) {
   if (busy.value) return
   busy.value = true
-  try { await comments.createDoc(props.doc.id, null, body, mentions) }
+  try { await comments.createDoc(props.doc.id, null, body, mentions, null, attachments) }
   catch { emit('toast', tr("Couldn't post the comment. Try again")) } finally { busy.value = false }
 }
 const replying = ref<string | null>(null)
@@ -133,7 +133,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
       </span>
       <div class="newrow">
         <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
-        <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[]) => sendNote(b, m)" @cancel="draft = null" />
+        <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[], a: string[]) => sendNote(b, m, a)" @cancel="draft = null" />
       </div>
     </div>
 
@@ -152,7 +152,8 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
       <!-- 접힌 메모: 첫 글 미리보기 -->
       <button v-if="active !== t.root.id" type="button" class="peek" @click="pick(t)">
         <span class="mh"><MemberAvatar :name="who(t.root.author_id).name" :src="who(t.root.author_id).avatar" :size="24" /><b>{{ who(t.root.author_id).name }}</b><span class="tx-meta">{{ relativeTime(t.root.created_at) }}</span></span>
-        <span class="pt">{{ t.root.body }}</span>
+        <span v-if="t.root.body" class="pt">{{ t.root.body }}</span>
+        <span v-else-if="t.root.attachments?.length" class="pt tx-meta">{{ t.root.attachments.length === 1 ? tr('1 image') : tr('{n} images', { n: t.root.attachments.length }) }}</span>
         <span v-if="t.replies.length" class="tx-meta rc">{{ t.replies.length === 1 ? tr('1 reply') : tr('{n} replies', { n: t.replies.length }) }}</span>
       </button>
       <!-- 연 메모: 캔버스 코멘트 창과 같은 스레드 -->
@@ -169,7 +170,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
     <div class="nh"><span class="tx-head">{{ tr('Comments') }}</span><span class="tx-meta">{{ board.length === 1 ? tr('1 on the whole document') : tr('{n} on the whole document', { n: board.length }) }}</span></div>
     <div class="newrow">
       <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
-      <CommentComposer :people="people" placeholder="Add a comment" :busy="busy" class="grow" @send="(b: string, m: string[]) => sendBoard(b, m)" />
+      <CommentComposer :people="people" placeholder="Add a comment" :busy="busy" class="grow" @send="(b: string, m: string[], a: string[]) => sendBoard(b, m, a)" />
     </div>
     <div v-for="t in board" :key="t.root.id" class="post">
       <CommentThreadView

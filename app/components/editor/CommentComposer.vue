@@ -181,6 +181,8 @@ function grow() { const el = ta.value; if (!el) return; el.style.height = 'auto'
 
 /** 도구 막대: 치기 시작하거나 누르면 열려요(답글 칸은 처음엔 한 줄) */
 const focused = ref(false)
+/** 입력 중: 쓴 글 · 붙인 이미지가 있거나 이모지 창이 열림(누름은 :focus-within) */
+const active = computed(() => !!text.value || atts.value.length > 0 || emojiOpen.value)
 const expanded = computed(() => !props.compact || !!text.value || atts.value.length > 0 || emojiOpen.value)
 // 한 줄 ↔ 펼침이 바뀌면 입력칸 높이를 다시 재요(다 지워서 한 줄로 돌아올 때 펼친 높이가 남아 상자가 커지던 것)
 watch(expanded, () => nextTick(grow))
@@ -189,7 +191,7 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 </script>
 
 <template>
-  <div ref="root" :class="['cc', { open: expanded, shake: shaking }]" @focusin="focused = true" @focusout="onFocusOut">
+  <div ref="root" :class="['cc', { open: expanded, typing: active, shake: shaking }]" @focusin="focused = true" @focusout="onFocusOut">
     <div class="sq box" @click.self="ta?.focus()">
       <div class="inw" @click="ta?.focus()">
         <div ref="mirror" class="ta mirror" aria-hidden="true"><template v-for="(x, i) in parts" :key="i"><span v-if="x.m" class="at">{{ x.t }}</span><template v-else>{{ x.t }}</template></template>&#8203;</div>
@@ -242,7 +244,8 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 /* 한 줄 상자: 핀과 같은 높이 36 · 알약 모양 */
 .cc:not(.open) .box { --sq-fill: var(--sys-color-neutral-100); }
 .box:hover { --sq-line: var(--ref-color-gray-900-20); }
-.box:focus-within, .cc.open .box { --sq-line: var(--sys-color-brand-primary-default); }
+/* 파란 테두리: 입력 중일 때만(누름 · 쓴 글 · 이미지 · 이모지 창). 늘 펼쳐 둔 입력칸(게시판)도 가만히 있을 땐 회색 — 사용자 요청 2026-11-27 */
+.box:focus-within, .cc.typing .box { --sq-line: var(--sys-color-brand-primary-default); }
 .inw { position: relative; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 8px var(--ref-spacing-08); }
 .cc:not(.open) .inw { height: 36px; box-sizing: border-box; padding: 0 4px 0 var(--ref-spacing-08); }
 .ta { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: none; padding: 0; font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-neutral-800); min-height: 18px; max-height: 120px; }

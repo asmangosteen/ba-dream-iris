@@ -191,6 +191,8 @@ button:active{cursor:grabbing}
    ============================================================ */
 .seg-item,.nav-item,.menu-item,.ib,.rail-btn,.act,.dd,.hov{transition:background-color .12s ease,color .12s ease,box-shadow .12s ease}
 .sq::before,.ib::before,.seg-item::before,.rail-btn::before,.menu-item::before,.act::before,.dd::before{transition:background-color .12s ease}
+/* 테두리(::after 안쪽 선) 색도 칠과 함께 부드럽게 — 호버 · 누름 · 입력 중 테두리가 뚝 바뀌지 않게(사용자 요청 2026-11-27) */
+.sq::after,.ib::after,.seg-item::after,.rail-btn::after,.menu-item::after,.act::after,.dd::after{transition:box-shadow .16s ease}
 .seg-item:active,.nav-item:active,.menu-item:active,.ib:active,.rail-btn:not(.on):active{--sq-overlay:var(--interaction-light-gray-pressed)}
 /* 탭 · 세그먼트 · 버튼 묶음은 누름 회색을 안 칠해요 — 누르는 순간 새 칸에 회색이 먼저 생겼다가 고른 칸이 이전 자리에서 미끄러져 와서 '튀어' 보였어요(디자인 시스템 세그먼트도 누름 색 없음) */
 :is(.seg>.seg-item,.seg>.seg-b,.grp>.ib,.pp-tabs>.pp-tab,.pp-types>.pp-type,.td-tabs>.td-tab):active{--sq-overlay:transparent}
@@ -205,7 +207,8 @@ html:not(.kbd-nav) :is(.cs-track,.bar):focus-visible{box-shadow:none!important}
 @media (prefers-reduced-motion: reduce){*{transition-duration:0s!important}}
 /* 편집기: 피그마 UI3 처럼 호버 · 눌림 · 선택 색은 바로 바뀌어요(0s). 접기 · 토글 손잡이 · 화살표 회전 같은 움직임은 그대로 */
 .editor :is(.seg-item,.nav-item,.menu-item,.ib,.rail-btn,.act,.dd,.hov,.mini,.more,.chev),
-.editor :is(.sq,.ib,.seg-item,.rail-btn,.menu-item,.act,.dd)::before{transition-duration:0s}
+.editor :is(.sq,.ib,.seg-item,.rail-btn,.menu-item,.act,.dd)::before,
+.editor :is(.sq,.ib,.seg-item,.rail-btn,.menu-item,.act,.dd)::after{transition-duration:0s}
 
 /* 편집기 드롭다운 메뉴 — 피그마 메뉴 규격(§7.1)을 Iris 흰 메뉴로: 안쪽 4 · 행 28 · 좌우 8 · 묶음 구분선 8
    고르는 목록(.on 이 있는 메뉴)은 피그마처럼 왼쪽 ✓ 칸. 고른 행은 채우지 않고 ✓ + 굵기 500, 호버는 회색 */
