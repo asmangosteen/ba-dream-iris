@@ -505,12 +505,30 @@ watch(() => (following.value ? room.cursors[following.value] : null), (c) => {
 }, { deep: true })
 watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y !== followVp.y || v.zoom !== followVp.zoom)) following.value = null })
 watch(following, (k) => { followVp = null; if (!k) followBySpot.value = false })
-// 커서 채팅(피그마 '/'): 캔버스 위에서 / 를 누르면 내 커서 옆 말풍선에 쳐요. 치는 대로 다른 사람에게 보이고, Enter 면 보낸 채로 비우고, Esc 면 닫아요
+// 커서 채팅(피그마 '/'): 캔버스 위에서 / 를 누르면 내 커서 옆 말풍선에 쳐요. 치는 대로 다른 사람에게 보여요.
+// 말풍선은 글자만큼 늘고 줄어요(줄이 넘치면 높이도). 5초 동안 안 치면 스르륵 사라지고, 다시 치면 이어서 써요.
+// Enter = 보낸 글을 그대로 두고 다음 글자부터 새 글, Esc · 다른 곳 누르기 = 닫기
+const CHAT_IDLE = 5000
 let lastPt: { x: number; y: number } | null = null
 const chatOpen = ref(false)
 const chatText = ref('')
+/** 한 번이라도 쳤나 — 그 뒤로는 비어도 'Say something' 대신 작은 네모 칸 */
+const chatTyped = ref(false)
+/** 5초 동안 안 쳐서 사라지는 중(투명) */
+const chatFading = ref(false)
 const chatPt = ref<{ x: number; y: number }>({ x: 0, y: 0 })
-const chatEl = ref<HTMLInputElement | null>(null)
+const chatEl = ref<HTMLTextAreaElement | null>(null)
+let chatIdleT: ReturnType<typeof setTimeout> | null = null
+let chatClearT: ReturnType<typeof setTimeout> | null = null
+function chatTimers() {
+  if (chatIdleT) clearTimeout(chatIdleT)
+  if (chatClearT) clearTimeout(chatClearT)
+  chatIdleT = setTimeout(() => {
+    chatFading.value = true
+    // 다 사라지면 글을 비워요(다른 사람 화면에서도 같은 때 사라져요). 칸은 열린 채 — 다시 치면 이어서
+    chatClearT = setTimeout(() => { chatText.value = ''; if (chatEl.value) chatEl.value.value = '' }, 500)
+  }, CHAT_IDLE)
+}
 function openChat() {
   const el = canvasEl()
   if (!el) return
@@ -518,19 +536,36 @@ function openChat() {
   const p = lastPt && lastPt.x >= r.left && lastPt.x <= r.right && lastPt.y >= r.top && lastPt.y <= r.bottom ? lastPt : { x: r.left + r.width / 2, y: r.top + r.height / 2 }
   chatPt.value = p
   chatText.value = ''
+  chatTyped.value = false
+  chatFading.value = false
   chatOpen.value = true
+  chatTimers()
   nextTick(() => chatEl.value?.focus())
 }
 function closeChat(clear = true) {
   if (clear) room.sendChat('')
+  if (chatIdleT) clearTimeout(chatIdleT)
+  if (chatClearT) clearTimeout(chatClearT)
   chatOpen.value = false
   chatText.value = ''
 }
-function onChatInput() { room.sendChat(chatText.value) }
+/** v-model 대신 input 으로 읽어요 — 한글을 조합하는 중에도 폭 · 보내기가 바로 따라오게 */
+function onChatInput(e: Event) {
+  chatText.value = (e.target as HTMLTextAreaElement).value
+  chatTyped.value = true
+  chatFading.value = false
+  room.sendChat(chatText.value)
+  chatTimers()
+}
 function onChatKey(e: KeyboardEvent) {
   if (e.isComposing) return
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeChat(); return }
-  if (e.key === 'Enter') { e.preventDefault(); if (!chatText.value.trim()) closeChat(); else chatText.value = '' } // 보낸 글은 다른 사람 화면에 잠깐 남아요
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    if (!chatText.value.trim()) { closeChat(); return }
+    chatEl.value?.select() // 보낸 글은 그대로 보이고, 다음 글자를 치면 새 글로 바뀌어요
+    chatTimers()
+  }
 }
 function onSlashKey(e: KeyboardEvent) {
   if (e.code !== 'Slash' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || chatOpen.value || commentMode.value) return
@@ -1924,8 +1959,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <img ref="cmCursor" class="cm-cursor" src="/cursors/comment@2x.png" width="20" height="20" alt="" aria-hidden="true" draggable="false">
     <div v-if="commentMode && !followPeer && !room.spot.value && !spotPrompt" class="sq cm-band" role="status"><EditorIcon name="comment" :size="16" />{{ tr('Click anywhere to comment') }}<span class="dimt">{{ tr('Esc to exit') }}</span></div>
  <!-- 커서 채팅: 내 커서 옆(내 색) -->
-    <div v-if="chatOpen" class="sq cchat" :style="{ left: chatPt.x + 14 + 'px', top: chatPt.y + 16 + 'px', '--c': room.myColor.value }">
-      <input ref="chatEl" v-model="chatText" class="cchat-in" maxlength="120" :placeholder="tr('Say something')" :aria-label="tr('Cursor chat')" :size="Math.max(12, chatText.length + 1)" @input="onChatInput" @keydown="onChatKey" @blur="closeChat(false)">
+    <div v-if="chatOpen" :class="['sq', 'cchat', { empty: !chatText && chatTyped, fading: chatFading }]" :style="{ left: chatPt.x + 14 + 'px', top: chatPt.y + 16 + 'px', '--c': room.myColor.value }">
+      <div class="cchat-grow" :data-value="chatText || (chatTyped ? '' : tr('Say something'))">
+        <textarea ref="chatEl" rows="1" cols="1" class="cchat-in" :value="chatText" maxlength="120" :placeholder="chatTyped ? '' : tr('Say something')" :aria-label="tr('Cursor chat')" @input="onChatInput" @keydown="onChatKey" @blur="closeChat()" />
+      </div>
     </div>
     <div v-if="followPeer" class="follow-ring" :style="{ '--c': followPeer.color }" aria-hidden="true" />
     <!-- Spotlight 중인 나(피그마와 같아요): 편집기 테두리를 내 색으로 -->
@@ -2296,9 +2333,19 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .fb-stop:hover { --sq-fill: rgb(255 255 255 / 28%); }
 .fb-stop:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 1px; }
 /* 코멘트 모드 안내: 위 가운데 — 따라가는 중 · Spotlight 띠가 뜨면 그동안 숨겨요(겹치지 않게 — 사용자 요청 2026-11-27) */
-.cchat { position: fixed; z-index: 45; max-width: 280px; padding: 5px 10px 6px; border-radius: var(--ref-radius-05); --sq-fill: var(--c); filter: drop-shadow(0 1px 2px rgb(3 9 26 / 24%)) drop-shadow(0 2px 6px rgb(3 9 26 / 12%)); pointer-events: auto; }
-.cchat-in { display: block; max-width: 260px; border: 0; outline: 0; background: none; padding: 0; font: inherit; font-size: 13px; line-height: 18px; font-weight: 500; color: #FFFFFF; }
+.cchat { position: fixed; z-index: 45; box-sizing: border-box; padding: 5px 10px; border-radius: var(--ref-radius-05); --sq-fill: var(--c); filter: drop-shadow(0 1px 2px rgb(3 9 26 / 24%)) drop-shadow(0 2px 6px rgb(3 9 26 / 12%)); pointer-events: auto; transition: opacity .5s ease; }
+/* 다 지운 뒤: 작은 네모(28×28) — 커서는 그대로 깜빡여요 */
+.cchat.empty { min-width: 28px; text-align: center; }
+.cchat.empty .cchat-grow { min-width: 8px; }
+.cchat.fading { opacity: 0; }
+/* 글자만큼 늘고 줄어요: 보이지 않는 같은 글자(::after)가 칸 크기를 정하고, 입력칸은 그 위에 겹쳐요(최대 240, 넘치면 줄바꿈 · 높이도) */
+.cchat-grow { position: relative; display: inline-block; max-width: 240px; vertical-align: top; }
+.cchat-grow::after { content: attr(data-value) ' '; display: block; visibility: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cchat-grow::after, .cchat-in { font: inherit; font-size: 13px; line-height: 18px; font-weight: 500; letter-spacing: 0; padding: 0; margin: 0; }
+/* 입력칸은 위에 겹치기만(크기에 끼어들지 않게 — 입력칸 기본 폭 때문에 빈 칸이 넓어지던 것) */
+.cchat-in { position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0; resize: none; overflow: hidden; border: 0; outline: 0; background: none; color: #FFFFFF; caret-color: #FFFFFF; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cchat-in::placeholder { color: rgb(255 255 255 / 70%); }
+@media (prefers-reduced-motion: reduce) { .cchat { transition: none; } }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }

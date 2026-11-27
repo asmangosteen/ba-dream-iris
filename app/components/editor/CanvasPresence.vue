@@ -9,7 +9,7 @@ import type { Viewport } from '~/components/editor/canvas/types'
  */
 const props = defineProps<{
   vp: Viewport
-  cursors: { peer: Peer; cur: PeerCursor; chat?: string }[]
+  cursors: { peer: Peer; cur: PeerCursor; chat?: string; chatFading?: boolean }[]
   peers: Peer[]
   pageId: string | null
   screens: { id: string; x: number; y: number; width: number; height: number }[]
@@ -38,7 +38,7 @@ const marks = computed(() => {
     </div>
     <div v-for="c in cursors" :key="c.peer.key" class="cur" :style="{ transform: `translate(${sx(c.cur.x)}px, ${sy(c.cur.y)}px)`, '--c': c.peer.color }">
       <svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 1.5l13 6.2-5.6 1.6-2 5.4z" :fill="c.peer.color" stroke="#FFFFFF" stroke-width="1.2" stroke-linejoin="round" /></svg>
-      <span v-if="c.chat" class="sq chat"><span class="who">{{ c.peer.name }}</span>{{ c.chat }}</span>
+      <span v-if="c.chat" :class="['sq', 'chat', { fading: c.chatFading }]"><span class="who">{{ c.peer.name }}</span>{{ c.chat }}</span>
       <span v-else class="sq name">{{ c.peer.name }}</span>
     </div>
   </div>
@@ -56,6 +56,8 @@ const marks = computed(() => {
 .name { margin: 14px 0 0 -2px; height: 20px; padding: 0 6px; border-radius: var(--ref-radius-03); --sq-fill: var(--c); color: #FFFFFF; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; }
 /* 커서 채팅 말풍선: 이름표와 같은 자리 · 같은 색, 글이 길면 줄바꿈(최대 240) */
 .chat { margin: 14px 0 0 -2px; max-width: 240px; padding: 5px 10px 6px; border-radius: var(--ref-radius-05); --sq-fill: var(--c); color: #FFFFFF; font-size: 13px; line-height: 18px; font-weight: 500; white-space: pre-wrap; overflow-wrap: anywhere; display: flex; flex-direction: column; }
+.chat { transition: opacity .5s ease; }
+.chat.fading { opacity: 0; }
 .chat .who { font-size: 10px; line-height: 14px; font-weight: 600; opacity: .75; }
 @media (prefers-reduced-motion: reduce) { .cur { transition: none; } }
 </style>

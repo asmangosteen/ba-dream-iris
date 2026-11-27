@@ -28,6 +28,8 @@ export interface PeerCursor { x: number; y: number; pageId: string | null; at: n
 export interface PeerChat { text: string; at: number }
 /** 커서 채팅이 멈춘 뒤 보이는 시간 */
 export const CHAT_LINGER = 5000
+/** 스르륵 사라지는 시간 */
+export const CHAT_FADE = 500
 
 /** 사람마다 정해진 색(커서 · 이름표 · 고른 화면 테두리 · 접속자 테두리) — 흰 글자와 대비 4.5:1 이상 */
 const COLORS = ['#E2601B', '#7C4DDB', '#1E8A5C', '#D1356F', '#0F7E96', '#A46A00', '#4F63E0', '#B04BB8']
@@ -146,7 +148,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
       const p = payload as { key?: string; text?: string }
       if (!p?.key || p.key === myKey()) return
       if (p.text) chats[p.key] = { text: String(p.text).slice(0, 120), at: Date.now() }
-      else delete chats[p.key]
+      else if (chats[p.key]) chats[p.key]!.at = Math.min(chats[p.key]!.at, Date.now() - CHAT_LINGER) // 닫으면 바로 스르륵
     })
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') { ready = true; track() } })
   })
@@ -168,13 +170,13 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   /** 같은 페이지 · 10초 안에 움직인 커서만 */
   const now = ref(Date.now())
   let tick: ReturnType<typeof setInterval> | undefined
-  onMounted(() => { tick = setInterval(() => (now.value = Date.now()), 500) })
+  onMounted(() => { tick = setInterval(() => (now.value = Date.now()), 250) })
   onBeforeUnmount(() => clearInterval(tick))
   const liveCursors = computed(() => peers.value
     .filter((p) => p.doing !== 'away')
     .map((p) => ({ peer: p, cur: cursors[p.key] }))
     .filter((x): x is { peer: Peer; cur: PeerCursor } => !!x.cur && x.cur.pageId === opts.pageId.value && now.value - x.cur.at < 10_000)
-    .map((x) => { const c = chats[x.peer.key]; return { ...x, chat: c && now.value - c.at < CHAT_LINGER ? c.text : '' } }))
+    .map((x) => { const c = chats[x.peer.key]; const age = c ? now.value - c.at : Infinity; return { ...x, chat: age < CHAT_LINGER + CHAT_FADE ? c!.text : '', chatFading: age >= CHAT_LINGER } }))
 
   /** 같은 사람이 탭 여러 개면 하나로(목록 · 아바타 묶음) */
   const people = computed(() => {
