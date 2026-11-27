@@ -635,7 +635,7 @@ async function removeDoc() {
             ref="reader"
             :doc="doc"
             :reqs="docReqs"
-            :highlight="activeReq ?? noteReqId"
+            :highlight="activeScreen ? noteReqId : (activeReq ?? noteReqId)"
             :note-mark="noteThread?.root.doc_anchor ?? null"
             :linked="links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))] : null"
             @pick-req="pickReq"
@@ -740,13 +740,14 @@ async function removeDoc() {
 .frame-btn:focus-visible .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .frame-col.dim { opacity: .55; }
 .frame-label { display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
-.frame-col.lit .frame-label { color: var(--sys-color-brand-primary-default); font-weight: 500; }
+.frame-col.lit .frame-label { color: var(--iris-peek); font-weight: 500; }
 .frame-page { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); }
 /* 375 × 812 화면을 176 폭으로 줄인 틀 (썸네일 전까지 자리만) */
 /* 화면 틀 = 캔버스 프레임: 편집기 캔버스처럼 모서리 없이(캔버스는 squircle 예외) — 강조 테두리도 각지게 */
 .frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 0; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
 .frame-btn:hover .frame { outline-color: var(--ref-color-gray-900-20); }
-.frame-col.lit .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+/* 고른 화면 테두리는 연결 선과 같은 청색(사용자 요청 2026-11-27) */
+.frame-col.lit .frame { outline: 1.5px solid var(--iris-peek); outline-offset: 2px; }
 .frame-col.note .frame { outline: 2px solid #E8C14A; outline-offset: 2px; box-shadow: 0 0 0 6px rgb(232 193 74 / 22%); }
 .noframe { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10); text-align: center; background: transparent; box-shadow: none; outline: 1.5px dashed var(--iris-line-strong); font-size: 12px; color: var(--sys-color-neutral-700); }
 .noframe b { font-weight: 600; }
