@@ -636,7 +636,8 @@ async function removeDoc() {
 .tab { max-width: 168px; }
 .dicon { flex: none; display: inline-flex; }
 /* 안쪽 여백: 위 16 · 좌우 24 · 아래 32(예전 32 · 40 · 48 이 너무 넓다는 요청 2026-11-27). 편집 위 막대도 이 값을 따라요 */
-.doc-body { --doc-pad-t: var(--ref-spacing-10); --doc-pad-x: var(--ref-spacing-12); flex: 1; min-height: 0; overflow: auto; padding: var(--doc-pad-t) var(--doc-pad-x) var(--ref-spacing-14); }
+/* 아래도 좌우 여백(24)만큼 비워 두고 스크롤 영역은 그 위에서 끝나요 — 내용이 패널 바닥까지 흘러 보이지 않게(사용자 요청 2026-11-27) */
+.doc-body { --doc-pad-t: var(--ref-spacing-10); --doc-pad-x: var(--ref-spacing-12); flex: 1; min-height: 0; overflow: auto; padding: var(--doc-pad-t) var(--doc-pad-x) var(--ref-spacing-08); margin-bottom: var(--doc-pad-x); }
 .loading { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .missing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
 .missing p { margin: 0 0 var(--ref-spacing-04); }
@@ -656,6 +657,8 @@ async function removeDoc() {
 .code:hover, .code[aria-pressed='true'] { --sq-fill: var(--sys-color-brand-primary-lighter); }
 .code:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 
+/* 확인 줄이 뜨면 아래 여백 자리를 확인 줄이 써요 */
+.doc-body + .confirm { margin-top: calc(-1 * var(--ref-spacing-12)); }
 .confirm { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); background: var(--sys-color-common-white-emphasis); }
 .confirm-t, .confirm-col { flex: 1; min-width: 0; }
 .confirm-col { display: flex; flex-direction: column; }

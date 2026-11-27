@@ -2,6 +2,7 @@
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import CommentComposer, { type MentionPerson } from '~/components/editor/CommentComposer.vue'
 import EmojiPicker from '~/components/editor/EmojiPicker.vue'
+import ImageLightbox from '~/components/app/ImageLightbox.vue'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import type { Thread, CommentRow, CommentArea } from '~/composables/useComments'
 import type { Viewport } from '~/components/editor/canvas/types'
@@ -279,8 +280,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown, tru
 /** 코멘트 핀: 오른쪽 위는 원, 왼쪽 아래(가리키는 끝)는 곡률 없이 뾰족하게 */
 const PIN = 'M14 0C21.732 0 28 6.268 28 14C28 23 22 28 12 28H0V16C0 6 5 0 14 0Z'
 const canDelete = (c: CommentRow) => c.author_id === props.myId || props.canModerate
-/** 붙인 이미지 크게 보기: 새 탭으로 */
-function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(u, '_blank', 'noopener') }
+/** 붙인 이미지 크게 보기(공용 ImageLightbox) — 썸네일은 작은 1:1(사용자 요청 2026-11-27) */
+const lb = ref<{ images: string[]; index: number | null }>({ images: [], index: null })
+function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachments ?? []).map((x) => resolveSrc(x) ?? '').filter(Boolean), index: i } }
 </script>
 
 <template>
@@ -363,7 +365,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
             <button v-if="!reactionsOf(c).length" type="button" :class="['sq', 'pop-x', 'rx-add', 'rx-hover', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
           </div>
           <div v-if="imgCount(c)" class="imgs">
-            <button v-for="src in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(src)"><img :src="resolveSrc(src)" alt=""></button>
+            <button v-for="(src, i) in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(c, i)"><img :src="resolveSrc(src)" alt=""></button>
           </div>
           <!-- 반응 줄: [이모지 수] … + 😊 -->
           <div v-if="reactionsOf(c).length" class="rx-row">
@@ -380,6 +382,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
         <button v-if="canEditMsg(msgMenuAt.c)" type="button" role="menuitem" class="sq menu-item" @click="editingId = msgMenuAt!.c.id; msgMenu = null">{{ tr('Edit') }}</button>
         <button v-if="canDeleteMsg(msgMenuAt.c, 1 + open.replies.length)" type="button" role="menuitem" class="sq menu-item danger" @click="deleteMsg(msgMenuAt!.c)">{{ tr('Delete') }}</button>
       </div>
+      <ImageLightbox v-model:index="lb.index" :images="lb.images" />
       <EmojiPicker v-if="rx" class="rx-pick" :style="{ left: rx.left + 'px', top: rx.top + 'px' }" @pick="pickReaction" @close="rx = null" />
       <div class="foot">
         <MemberAvatar :name="me?.name ?? '?'" :src="me?.avatar" :size="24" class="fa" />
@@ -464,9 +467,11 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 .rx.me:hover { --sq-fill: color-mix(in srgb, var(--sys-color-brand-primary-default) 16%, transparent); }
 .rx-e { font-size: 16px; line-height: 1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
 .rx-pick { position: absolute; z-index: 8; }
-.imgs { padding-left: 32px; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.img { display: block; width: 100%; padding: 0; border-radius: var(--ref-radius-05); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }
-.img img { display: block; width: 100%; max-height: 240px; object-fit: cover; }
+.imgs { padding-left: 32px; display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
+.img { display: block; width: 64px; height: 64px; flex: none; padding: 0; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }
+.img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.img:hover img { opacity: .9; }
+.img:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 /* 아래 답글 줄: 내 아바타 + 한 줄 입력칸 */
 .foot { flex: none; display: flex; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-10); }
 /* 내 프로필: 늘 위에 고정 — 한 줄 입력칸(36)의 가운데 높이(위 6). 입력칸이 펼쳐져도 그 자리 그대로 */

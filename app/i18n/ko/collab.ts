@@ -125,4 +125,6 @@ export default {
   'Posted as a pin — area comments need a database update': '점 코멘트로 남겼어요 — 영역 코멘트는 데이터베이스 업데이트가 필요해요',
   'Say something': '하고 싶은 말',
   'Cursor chat': '커서 채팅',
+  'Previous image': '이전 이미지',
+  'Next image': '다음 이미지',
 }

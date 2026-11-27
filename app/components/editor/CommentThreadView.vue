@@ -5,6 +5,7 @@ import CommentComposer from '~/components/editor/CommentComposer.vue'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EmojiPicker from '~/components/editor/EmojiPicker.vue'
+import ImageLightbox from '~/components/app/ImageLightbox.vue'
 import { useImageSrc } from '~/canvas/images'
 
 /**
@@ -88,7 +89,9 @@ function onDocDown(e: PointerEvent) {
 onMounted(() => document.addEventListener('pointerdown', onDocDown, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown, true))
 const imgCount = (c: CommentRow) => c.attachments?.length ?? 0
-function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(u, '_blank', 'noopener') }
+/** 붙인 이미지 크게 보기(공용 ImageLightbox) — 썸네일은 작은 1:1(사용자 요청 2026-11-27) */
+const lb = ref<{ images: string[]; index: number | null }>({ images: [], index: null })
+function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachments ?? []).map((x) => resolveSrc(x) ?? '').filter(Boolean), index: i } }
 </script>
 
 <template>
@@ -106,7 +109,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
         <button v-if="!reactionsOf(c).length" type="button" :class="['sq', 'pop-x', 'rx-add', 'rx-hover', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
       </div>
       <div v-if="imgCount(c)" class="imgs">
-        <button v-for="src in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(src)"><img :src="resolveSrc(src)" alt=""></button>
+        <button v-for="(src, i) in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(c, i)"><img :src="resolveSrc(src)" alt=""></button>
       </div>
       <div v-if="reactionsOf(c).length" class="rx-row">
         <button
@@ -120,7 +123,8 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
       <button v-if="canEditMsg(msgMenu.c)" type="button" role="menuitem" class="sq menu-item" @click="editingId = msgMenu!.c.id; msgMenu = null">{{ tr('Edit') }}</button>
       <button v-if="canDeleteMsg(msgMenu.c)" type="button" role="menuitem" class="sq menu-item danger" @click="deleteMsg(msgMenu!.c)">{{ msgMenu.c.id === thread.root.id ? tr('Delete thread') : tr('Delete') }}</button>
     </div>
-    <EmojiPicker v-if="rx" class="rx-pick" :style="{ left: rx.left + 'px', top: rx.top + 'px' }" @pick="pickReaction" @close="rx = null" />
+    <ImageLightbox v-model:index="lb.index" :images="lb.images" />
+      <EmojiPicker v-if="rx" class="rx-pick" :style="{ left: rx.left + 'px', top: rx.top + 'px' }" @pick="pickReaction" @close="rx = null" />
     <div v-if="reply" class="foot">
       <MemberAvatar :name="me?.name ?? '?'" :src="me?.avatar" :size="24" class="fa" />
       <CommentComposer :key="thread.root.id" compact :autofocus="autofocus" :busy="busy" :people="people" placeholder="Reply" class="grow" @send="(b, m, a) => emit('reply', thread.root, b, m, a)" @cancel="emit('cancel')" />
@@ -156,9 +160,11 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 .rx.me { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); color: var(--sys-color-brand-primary-default); }
 .rx-e { font-size: 16px; line-height: 1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
 .rx-pick { position: absolute; z-index: 8; }
-.imgs { padding-left: 32px; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.img { display: block; width: 100%; padding: 0; border-radius: var(--ref-radius-05); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }
-.img img { display: block; width: 100%; max-height: 240px; object-fit: cover; }
+.imgs { padding-left: 32px; display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
+.img { display: block; width: 64px; height: 64px; flex: none; padding: 0; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }
+.img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.img:hover img { opacity: .9; }
+.img:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 /* 답글 줄: 내 아바타 + 한 줄 입력칸(36) — 아바타는 입력칸 가운데 높이 */
 .foot { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-02); }
 .fa { flex: none; margin-top: 6px; }

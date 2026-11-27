@@ -2,6 +2,7 @@
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EmojiPicker from '~/components/editor/EmojiPicker.vue'
+import ImageLightbox from '~/components/app/ImageLightbox.vue'
 import { Button } from '@ba-dream/design-system'
 import { mentionIds } from '~/composables/useComments'
 import { MediaTooLargeError, prepareImage, useImageSrc } from '~/canvas/images'
@@ -79,6 +80,28 @@ function startMention() {
 
 // --- 이모지 ---
 const emojiOpen = ref(false)
+/**
+ * 떠 있는 목록이 잘리지 않게(사용자 요청 2026-11-27): 열 때 입력칸을 감싼 스크롤 · 잘림 영역(없으면 창)에서
+ * 아래 · 위 남은 공간을 재서, 멘션 목록은 아래가 모자라면 위로, 이모지 창은 위가 모자라면 아래로 열어요
+ */
+const mentionUp = ref(false)
+const emojiDown = ref(false)
+function clipBox(el: HTMLElement): { top: number; bottom: number } {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p)
+    if (/(auto|scroll|hidden|clip)/.test(o.overflowY)) { const r = p.getBoundingClientRect(); return { top: Math.max(r.top, 0), bottom: Math.min(r.bottom, window.innerHeight) } }
+  }
+  return { top: 0, bottom: window.innerHeight }
+}
+function room(): { above: number; below: number } {
+  const el = root.value
+  if (!el) return { above: 9999, below: 9999 }
+  const r = el.getBoundingClientRect(), c = clipBox(el)
+  return { above: r.top - c.top, below: c.bottom - r.bottom }
+}
+// 멘션 목록(줄 32 × 사람 수 + 위아래 8) · 이모지 창(약 340)
+watch(() => matches.value.length, (n) => { if (!n) return; const need = Math.min(n * 32 + 12, 280); const { above, below } = room(); mentionUp.value = below < need && above > below })
+watch(emojiOpen, (v) => { if (!v) return; const { above, below } = room(); emojiDown.value = above < 344 && below > above })
 function onEmoji(e: string) { emojiOpen.value = false; insert(e) }
 /** 바깥을 누르면 이모지 창을 닫아요 */
 function onDocDown(e: PointerEvent) {
@@ -115,6 +138,8 @@ function onPaste(e: ClipboardEvent) {
   e.preventDefault()
   addFiles(files)
 }
+/** 붙인 이미지 크게 보기 */
+const lbIndex = ref<number | null>(null)
 const removeAtt = (i: number) => { atts.value = atts.value.filter((_, j) => j !== i) }
 
 // 쓰던 게 있는지 알려요(바깥을 눌렀을 때 바로 닫지 않고 한 번 알려 주려고)
@@ -177,10 +202,11 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
       </div>
       <div v-if="atts.length" class="atts">
         <span v-for="(a, i) in atts" :key="a.src" class="sq att">
-          <img :src="resolveSrc(a.src)" alt="">
+          <button type="button" class="att-open" :aria-label="tr('Open image')" @click="lbIndex = i"><img :src="resolveSrc(a.src)" alt=""></button>
           <button type="button" class="sq att-x" :aria-label="tr('Remove image')" @click="removeAtt(i)"><EditorIcon name="close" :size="12" /></button>
         </span>
       </div>
+      <ImageLightbox v-model:index="lbIndex" :images="atts.map((x) => resolveSrc(x.src) ?? '').filter(Boolean)" />
       <p v-if="err" class="err" role="alert">{{ err }}</p>
       <div v-if="expanded" class="tools">
         <button type="button" :class="['sq', 'tl', { on: emojiOpen }]" :aria-label="tr('Add emoji')" :data-tip="tr('Add emoji')" :aria-expanded="emojiOpen" @mousedown.prevent @click="emojiOpen = !emojiOpen; q = null"><EditorIcon name="emoji" :size="16" /></button>
@@ -195,12 +221,12 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
       </div>
       <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
     </div>
-    <div v-if="matches.length" :id="`${uid}-m`" :class="['sq', 'menu', 'mm', { up }]" role="listbox" :aria-label="tr('Mention someone')">
+    <div v-if="matches.length" :id="`${uid}-m`" :class="['sq', 'menu', 'mm', { up: up || mentionUp }]" role="listbox" :aria-label="tr('Mention someone')">
       <button v-for="(p, i) in matches" :key="p.id" type="button" role="option" :aria-selected="i === pick" :class="['sq', 'menu-item', { on: i === pick }]" @mousedown.prevent="choose(p)">
         <MemberAvatar :name="p.name" :src="p.avatar" :size="20" /><span class="f1">{{ p.name }}</span><span v-if="p.role" class="tx-meta">{{ tr(p.role) }}</span>
       </button>
     </div>
-    <EmojiPicker v-if="emojiOpen" class="emo" @pick="onEmoji" @close="emojiOpen = false; ta?.focus()" />
+    <EmojiPicker v-if="emojiOpen" :class="['emo', { down: emojiDown }]" @pick="onEmoji" @close="emojiOpen = false; ta?.focus()" />
   </div>
 </template>
 
@@ -232,6 +258,7 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 /* 붙인 이미지: 64 네모, 오른쪽 위 ✕ */
 .atts { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-07) var(--ref-spacing-05); }
 .att { position: relative; width: 64px; height: 64px; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: default; }
+.att-open { display: block; width: 100%; height: 100%; padding: 0; cursor: zoom-in; }
 .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .att-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; --sq-fill: rgb(3 9 26 / 60%); color: #FFFFFF; opacity: 0; transition: opacity .12s ease; }
 .att:hover .att-x, .att-x:focus-visible { opacity: 1; }
@@ -256,5 +283,6 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 /* 멘션 줄: 아바타(20)보다 위아래 여유 있게 32 — 공용 검은 메뉴는 줄 높이 24 를 !important 로 정해요 */
 .mm .menu-item { height: 32px !important; min-height: 32px; }
 .emo { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 6; }
+.emo.down { bottom: auto; top: calc(100% + 4px); }
 .sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 </style>
