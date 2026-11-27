@@ -52,10 +52,10 @@ input,textarea{font:inherit;color:inherit}
 .sq::after,.ib::after,.fld::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after,.act::after,.field::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line);z-index:1}
 [data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
 [data-sq]::before{clip-path:var(--sq-path)}
-/* 선: 바깥 squircle 로 자른 안쪽 그림자(inset). 예전엔 선 색 판을 고리(--sq-ring)로 오려냈는데, 브라우저가 가끔 오려내기를 놓치면
-   판 전체가 회색 · 검은 사각형으로 깜빡였어요(사용자 요청 2026-11-27). 지금은 오려내기가 빠져도 둥근 선만 보여요.
-   ::after 는 1px 넓으니(inset -1) 두께 + 1px 로 그리고, 바깥 1px 은 --sq-path 에 잘려요 */
-[data-sq]::after{border-radius:calc(var(--sq-r,0px) + 1px)!important;background:none;box-shadow:inset 0 0 0 calc(var(--sq-line-w) + 1px) var(--sq-line)!important;clip-path:var(--sq-path)}
+/* 선: 넓은 안쪽 그림자(inset, 두께 + 4px)를 정확한 squircle 고리(--sq-ring)로 잘라요 — 모서리까지 고른 두께(사용자 요청 2026-11-27).
+   예전처럼 선 색 판을 고리로 오려내면 브라우저가 가끔 오려내기를 놓칠 때 판 전체가 회색 · 검은 사각형으로 깜빡였고,
+   둥근 안쪽 그림자를 바깥 모양으로만 자르면 squircle 모서리에서 선이 끊기거나 굵어 보였어요. 지금은 오려내기가 빠져도 조금 굵은 선만 보여요 */
+[data-sq]::after{border-radius:calc(var(--sq-r,0px) + 1px)!important;background:none;box-shadow:inset 0 0 0 calc(var(--sq-line-w) + 4px) var(--sq-line)!important;clip-path:var(--sq-ring)}
 .sq-clip[data-sq]{clip-path:var(--sq-clip)}
 /* .sqc: 선 없이 배경 · 그림만 있는 요소(견본 · 썸네일 · 입력칸 · 작은 칩)는 요소 자체를 squircle 로 잘라요. 바깥 그림자 · 테두리가 있으면 .sq + --sq-fill · --sq-line 으로 */
 [data-sqc]{clip-path:var(--sq-clip)}

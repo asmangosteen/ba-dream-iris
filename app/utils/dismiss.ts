@@ -10,7 +10,8 @@
  * 상시 화면(변수 화면 등)도 세지 않아요.
  */
 /** 창: 대화 상자 · 메뉴 · 떠 있는 목록(.menu). 창 안에 늘 붙어 있는 목록(검색 결과 · 아이콘 칸 등, .menu 가 아닌 listbox)은 따로 세지 않아요 */
-const LAYERS = '[role="dialog"],[role="menu"],.menu[role="listbox"]'
+/** 토큰(변수) 목록 창(.menu.tp)도 창 — 안 세면 설정 창 위에서 연 목록의 X · 줄 누르기가 '바깥 누르기'로 삼켜졌어요 */
+const LAYERS = '[role="dialog"],[role="menu"],.menu[role="listbox"],.menu.tp'
 const SKIP = '.vars, .cl .nw, .cl .pop.th, .gate'
 
 const shown = (el: Element) => el.getClientRects().length > 0
