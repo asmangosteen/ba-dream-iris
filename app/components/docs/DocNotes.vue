@@ -95,7 +95,8 @@ function onOutside(e: PointerEvent) {
   if (!active.value || props.part !== 'notes') return
   const t = e.target as Element | null
   if (!t?.closest) return
-  if (t.closest(`[data-note="${active.value}"]`)) return
+  // 다른 메모를 누르면 여기서 접지 않고 그 메모의 pick 이 바로 바꿔 펼쳐요(먼저 접으면 카드가 줄어 누른 자리가 밀려서 안 열림)
+  if (t.closest('[data-note]')) return
   if (document.querySelector('[data-cc], [data-ctv], .pop-overlay, .lb')) return
   const card = document.querySelector(`[data-note="${active.value}"]`)
   if ([...(card?.querySelectorAll('textarea') ?? [])].some((a) => (a as HTMLTextAreaElement).value.trim())) return
