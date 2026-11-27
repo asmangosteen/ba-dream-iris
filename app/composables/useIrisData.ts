@@ -201,7 +201,7 @@ const PREVIEW_SLOTS: Omit<SlotRow, 'project_id'>[] = MALL.slots.map((x) => ({ id
 
 const l = (screen_id: string, requirement_id: string, status: LinkStatus, note: string | null = null): LinkRow => ({ screen_id, requirement_id, status, note })
 const PREVIEW_LINKS: LinkRow[] = [
-  { ...l('sc-4', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-4', 'mp-P-PLN-02', 'unchecked'), origin: 'doc_table' }, { ...l('sc-5', 'mp-P-DOC-01', 'unchecked'), origin: 'doc_table' },
+  { ...l('sc-4', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-4', 'mp-P-PLN-02', 'unchecked'), origin: 'doc_table', layer_ids: ['p4b'] }, { ...l('sc-5', 'mp-P-DOC-01', 'unchecked'), origin: 'doc_table' },
   l('sc-1', 'r1', 'reflected'), l('sc-1', 'r2', 'partial', '금액은 있고 결제일이 빠졌어요'), l('sc-1', 'r3', 'missing'),
   l('sc-2', 'r4', 'reflected'), l('sc-2', 'r5', 'reflected'), l('sc-2', 'r6', 'missing', '버튼이 스크롤과 같이 움직여요'),
   l('sc-3', 'r7', 'partial'),

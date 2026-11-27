@@ -9,6 +9,8 @@ import DocHistory from '~/components/docs/DocHistory.vue'
 import type { DocBlock, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
+import ScreenThumb from '~/components/editor/ScreenThumb.vue'
+import { migrate } from '~/canvas/schema'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
 const route = useRoute()
@@ -35,7 +37,9 @@ useHead({ title: computed(() => (doc.value ? `${doc.value.title} · Iris` : 'Iri
 // 선택 상태 --------------------------------------------------------------
 const activeReq = ref<string | null>(null)
 const activeScreen = ref<string | null>(null)
-watch(docId, () => { activeReq.value = null; activeScreen.value = null; editing.value = false; dirty.value = false; gone.value = []; closeBars() })
+/** 고른 요소(화면 안 레이어) — 그 요소에 연결된 정책들로 선을 그어요 */
+const activeLayer = ref<{ screen: string; layer: string } | null>(null)
+watch(docId, () => { activeReq.value = null; activeScreen.value = null; activeLayer.value = null; editing.value = false; dirty.value = false; gone.value = []; closeBars() })
 /** 편집기로 돌아가기: 왼쪽 Docs 탭에 이 문서를 연 채로, 고른 REQ 도 그대로(사용자 요청 2026-11-26) */
 const backHref = computed(() => ({ path: `/p/${projectId}`, query: { doc: docId.value, ...(activeReq.value ? { req: activeReq.value } : {}) } }))
 // 편집기에서 '넓게 보기'로 왔으면(?req=) 고르던 REQ 를 그대로
@@ -80,25 +84,27 @@ const noteReqId = computed(() => { const c = noteThread.value?.root.doc_anchor?.
 const pinCount = (screenId: string) => comments.docThreads(docId.value).filter((t) => t.root.screen_id === screenId && !t.root.resolved_at).length
 const activeCol = ref<string | null>(null)
 function isLit(c: Col) {
-  if (c.screen && (activeLinks.value.has(c.screen.id) || activeScreen.value === c.screen.id || noteScreens.value.has(c.screen.id))) return true
+  if (c.screen && (activeLinks.value.has(c.screen.id) || activeScreen.value === c.screen.id || activeLayer.value?.screen === c.screen.id || noteScreens.value.has(c.screen.id))) return true
   if (activeCol.value === c.key) return true
   return !!activeCode.value && !!c.slot?.policy_codes.includes(activeCode.value)
 }
 const isNoteLit = (c: Col) => !!c.screen && noteScreens.value.has(c.screen.id)
-const isDim = (c: Col) => (!!activeReq.value || !!activeScreen.value || !!activeCol.value || !!activeNote.value) && !isLit(c)
-watch(activeNote, (v) => { if (v) { activeReq.value = null; activeScreen.value = null; activeCol.value = null } })
+const isDim = (c: Col) => (!!activeReq.value || !!activeScreen.value || !!activeLayer.value || !!activeCol.value || !!activeNote.value) && !isLit(c)
+watch(activeNote, (v) => { if (v) { activeReq.value = null; activeScreen.value = null; activeLayer.value = null; activeCol.value = null } })
 /** 문서에서 화면 ID(C-05)를 누르면 그 화면 칸으로 */
 function pickSlot(code: string) {
   const c = frames.value.find((x) => x.slot?.code === code)
   if (!c) { say(tr('{code} isn’t a screen slot in this document', { code })); return }
   activeReq.value = null
   activeScreen.value = null
+  activeLayer.value = null
   activeNote.value = null
   activeCol.value = c.key
   nextTick(() => canvas.value?.querySelector(`[data-col="${c.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }))
 }
 function pickCol(c: Col) {
   activeCol.value = null
+  activeLayer.value = null
   activeNote.value = null
   if (c.screen) return pickScreen(c.screen.id)
   activeScreen.value = null
@@ -111,14 +117,14 @@ function pickCol(c: Col) {
 
 // 끌어서 연결(새 1): 화면 오른쪽 가장자리 점을 끌어 문서의 정책 줄에 놓으면 연결 --------------
 /** x · y = 놓을 끝(정책 줄 위면 그 줄 왼쪽 가장자리에 붙어요), cx · cy = 커서 */
-const drag = ref<{ screen: ProjectScreen; x0: number; y0: number; x: number; y: number; cx: number; cy: number; over: ReqRow | null } | null>(null)
+const drag = ref<{ screen: ProjectScreen; layer: string | null; x0: number; y0: number; x: number; y: number; cx: number; cy: number; over: ReqRow | null } | null>(null)
 let dropEl: Element | null = null
-function startLinkDrag(c: Col, e: PointerEvent) {
+function startLinkDrag(c: Col, e: PointerEvent, layer: string | null = null) {
   if (!c.screen) return
   e.preventDefault()
   e.stopPropagation()
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  drag.value = { screen: c.screen, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, over: null }
+  drag.value = { screen: c.screen, layer, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, over: null }
   window.addEventListener('pointermove', onLinkMove)
   window.addEventListener('pointerup', onLinkUp, { once: true })
   window.addEventListener('keydown', onLinkKey)
@@ -154,12 +160,17 @@ async function onLinkUp() {
   const req = d?.over
   endLinkDrag()
   if (!d || !req) return
-  if (docLinks.value.some((l) => l.screen_id === d.screen.id && l.requirement_id === req.id)) { say(tr('{code} is already linked to {name}', { code: req.code, name: d.screen.name })); return }
+  // 요소(레이어)에서 끌었으면 그 요소만 연결(layer_ids) — 화면에서 끌었으면 화면 전체
+  const name = d.layer ? `${d.screen.name} · ${layerName(d.screen.id, d.layer)}` : d.screen.name
+  const ex = docLinks.value.find((l) => l.screen_id === d.screen.id && l.requirement_id === req.id)
+  if (ex && (d.layer ? (ex.layer_ids ?? []).includes(d.layer) : true)) { say(tr('{code} is already linked to {name}', { code: req.code, name })); return }
   try {
-    await linkMany([{ screen_id: d.screen.id, requirement_id: req.id }], links.data.value ?? [])
+    await linkMany([{ screen_id: d.screen.id, requirement_id: req.id, ...(d.layer ? { layer_ids: [d.layer] } : {}) }], links.data.value ?? [])
     await links.refresh()
+    activeScreen.value = null
+    activeLayer.value = null
     activeReq.value = req.id
-    say(tr('Linked {code} to {name}', { code: req.code, name: d.screen.name }))
+    say(tr('Linked {code} to {name}', { code: req.code, name }))
   } catch { say(tr("Couldn't link. Try again")) }
 }
 onBeforeUnmount(endLinkDrag)
@@ -265,6 +276,7 @@ const canvas = ref<HTMLElement | null>(null)
 
 function pickReq(id: string) {
   activeScreen.value = null
+  activeLayer.value = null
   activeReq.value = activeReq.value === id ? null : id
   if (!activeReq.value) return
   nextTick(() => {
@@ -278,6 +290,7 @@ function pickScreen(id: string) {
   // 화면을 누르면 그 화면과 연결된 첫 요구사항으로 문서를 옮깁니다
   const first = docReqs.value.find((r) => docLinks.value.some((l) => l.screen_id === id && l.requirement_id === r.id))
   activeScreen.value = id
+  activeLayer.value = null
   activeReq.value = first?.id ?? null
   if (first) nextTick(() => reader.value?.scrollToReq(first.id))
 }
@@ -337,14 +350,21 @@ const editing = ref(route.query.edit === '1')
  */
 type LinkLine = { key: string; x1: number; y1: number; x2: number; y2: number }
 const linkLines = ref<LinkLine[]>([])
-const linePairs = computed<{ col: string; req: string }[]>(() => {
+type LinePair = { col: string; req: string; layer: string | null }
+/** 연결 하나 → 선(요소에 연결됐으면 요소마다, 아니면 화면에서) */
+const pairsOf = (col: string, l: LinkRow): LinePair[] => (l.layer_ids?.length ? l.layer_ids.map((layer) => ({ col, req: l.requirement_id, layer })) : [{ col, req: l.requirement_id, layer: null }])
+const linePairs = computed<LinePair[]>(() => {
   if (drag.value || editing.value || activeNote.value) return []
-  const out: { col: string; req: string }[] = []
-  if (activeScreen.value) {
+  const out: LinePair[] = []
+  const al = activeLayer.value
+  if (al) {
+    const c = frames.value.find((x) => x.screen?.id === al.screen)
+    if (c) for (const l of docLinks.value) if (l.screen_id === al.screen && l.layer_ids?.includes(al.layer)) out.push({ col: c.key, req: l.requirement_id, layer: al.layer })
+  } else if (activeScreen.value) {
     const c = frames.value.find((x) => x.screen?.id === activeScreen.value)
-    if (c) for (const l of docLinks.value) if (l.screen_id === activeScreen.value) out.push({ col: c.key, req: l.requirement_id })
+    if (c) for (const l of docLinks.value) if (l.screen_id === activeScreen.value) out.push(...pairsOf(c.key, l))
   } else if (activeReq.value) {
-    for (const c of frames.value) if (c.screen && activeLinks.value.has(c.screen.id)) out.push({ col: c.key, req: activeReq.value })
+    for (const c of frames.value) { const l = c.screen ? activeLinks.value.get(c.screen.id) : null; if (l) out.push(...pairsOf(c.key, l)) }
   }
   return out
 })
@@ -359,13 +379,16 @@ function measureLines() {
   const root = reader.value?.root as HTMLElement | null | undefined
   const out: LinkLine[] = []
   for (const p of pairs) {
-    const dot = canvas.value?.querySelector(`[data-col="${p.col}"] .link-dot`)?.getBoundingClientRect()
+    // 선은 요소(없으면 화면) 상하좌우 가운데 점 가운데 정책 줄에 가장 가까운 점에서 나가요
+    const col = canvas.value?.querySelector(`[data-col="${p.col}"]`)
+    const src = ((p.layer ? col?.querySelector(`.sthumb [data-layer="${p.layer}"]`) : null) ?? col?.querySelector('.frame'))?.getBoundingClientRect()
     const row = root?.querySelector(`[data-reqs~="${p.req}"]`)?.getBoundingClientRect()
-    if (!dot || !row || !cv || !body) continue
-    const x1 = dot.left + dot.width / 2, y1 = dot.top + dot.height / 2, x2 = row.left, y2 = row.top + row.height / 2
+    if (!src || !row || !cv || !body) continue
+    const x2 = row.left, y2 = row.top + row.height / 2
+    const [x1, y1] = nearestSide(src, x2, y2)
     if (x1 < cv.left || x1 > Math.min(cv.right, docLeft) || y1 < cv.top || y1 > cv.bottom) continue
     if (y2 < body.top || y2 > body.bottom) continue
-    out.push({ key: p.col + '|' + p.req, x1, y1, x2, y2 })
+    out.push({ key: p.col + '|' + p.req + '|' + (p.layer ?? ''), x1, y1, x2, y2 })
   }
   const same = out.length === linkLines.value.length && out.every((l, i) => { const o = linkLines.value[i]!; return o.key === l.key && Math.abs(o.x1 - l.x1) < 0.5 && Math.abs(o.y1 - l.y1) < 0.5 && Math.abs(o.x2 - l.x2) < 0.5 && Math.abs(o.y2 - l.y2) < 0.5 })
   if (!same) linkLines.value = out
@@ -381,6 +404,95 @@ watch(linePairs, (p) => {
 // 처음 열 때 이미 고른 정책(?req=)이 있으면 바로 그려요 — watch immediate 는 아래쪽에 선언된 editing 을 너무 일찍 읽어서 onMounted 로
 onMounted(() => { if (linePairs.value.length) lineRaf = requestAnimationFrame(measureLines) })
 onBeforeUnmount(() => cancelAnimationFrame(lineRaf))
+/** 상자의 상하좌우 가운데 점 가운데 (x, y) 에 가장 가까운 점 */
+function nearestSide(r: DOMRect, x: number, y: number): [number, number] {
+  const pts: [number, number][] = [[r.left + r.width / 2, r.top], [r.right, r.top + r.height / 2], [r.left + r.width / 2, r.bottom], [r.left, r.top + r.height / 2]]
+  return pts.reduce((a, b) => (Math.hypot(b[0] - x, b[1] - y) < Math.hypot(a[0] - x, a[1] - y) ? b : a))
+}
+
+/**
+ * 실제 화면 그리기 + 요소 단위 연결(사용자 요청 2026-11-27): 화면 칸에 편집기와 같은 축소 화면(ScreenThumb)을 그리고,
+ * 요소(도형 · 프레임 · 글 무엇이든)나 화면에 마우스를 올리면 그 상하좌우 가운데에 동그라미 4개 — 끌어서 정책 줄에 놓으면 그 요소만 연결돼요.
+ * 요소를 지우고 새로 그렸으면 새 요소를 다시 연결하면 돼요
+ */
+type ArtScreen = { id: string; source: 'figma' | 'native'; width: number; height: number; thumbnail_path: string | null; layers: unknown }
+const artIds = computed(() => frames.value.flatMap((c) => (c.screen ? [c.screen.id] : [])).sort().join(','))
+const art = useAsyncData(`split-art-${projectId}`, async () => {
+  const ids = artIds.value ? artIds.value.split(',') : []
+  if (!ids.length) return {} as Record<string, ArtScreen>
+  if (preview) {
+    return Object.fromEntries(Object.values(PREVIEW_SCREENS).flat().filter((x) => ids.includes(x.id)).map((x) => [x.id, { id: x.id, source: x.source, width: x.width, height: x.height, thumbnail_path: x.thumbnail_path ?? null, layers: x.layers ?? null }])) as Record<string, ArtScreen>
+  }
+  const { data, error } = await supabase.from('screens').select('id, source, width, height, thumbnail_path, layers').in('id', ids)
+  if (error) throw error
+  return Object.fromEntries(((data ?? []) as ArtScreen[]).map((x) => [x.id, x])) as Record<string, ArtScreen>
+}, { server: false, watch: [artIds], default: () => ({}) as Record<string, ArtScreen> })
+const artDocs = computed(() => new Map(Object.values(art.data.value ?? {}).map((x) => [x.id, migrate(x.layers)])))
+/** 그릴 게 있는 화면: Iris 화면은 레이어가 있을 때, 피그마 화면은 썸네일이 있을 때 */
+function artOf(screenId: string): ArtScreen | null {
+  const a = art.data.value?.[screenId]
+  if (!a) return null
+  if (a.source === 'figma') return a.thumbnail_path ? a : null
+  return (artDocs.value.get(screenId)?.rootIds.length ?? 0) > 0 ? a : null
+}
+const layerName = (screenId: string, layerId: string) => artDocs.value.get(screenId)?.nodes[layerId]?.name ?? tr('Layer')
+
+type Box = { col: string; layer: string | null; x: number; y: number; w: number; h: number }
+const hover = ref<Box | null>(null)
+const selBox = ref<Box | null>(null)
+const SIDES = ['top', 'right', 'bottom', 'left'] as const
+/** 칸 안 상자 → 동그라미 자리(상하좌우 가운데) */
+function dotAt(b: Box, side: (typeof SIDES)[number]) {
+  const x = side === 'left' ? b.x : side === 'right' ? b.x + b.w : b.x + b.w / 2
+  const y = side === 'top' ? b.y : side === 'bottom' ? b.y + b.h : b.y + b.h / 2
+  return { left: x + 'px', top: y + 'px' }
+}
+const boxStyle = (b: Box) => ({ left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' })
+/** 커서 아래 가장 안쪽 요소(축소 화면은 누르기가 꺼져 있어서 자리로 찾아요) */
+function layerAt(col: HTMLElement, x: number, y: number): HTMLElement | null {
+  let best: HTMLElement | null = null, depth = -1
+  col.querySelectorAll<HTMLElement>('.sthumb [data-layer]').forEach((el) => {
+    const r = el.getBoundingClientRect()
+    if (!r.width || !r.height || x < r.left || x > r.right || y < r.top || y > r.bottom) return
+    let d = 0
+    for (let p = el.parentElement; p && p !== col; p = p.parentElement) d++
+    if (d >= depth) { best = el; depth = d }
+  })
+  return best
+}
+function onFrameHover(c: Col, e: PointerEvent) {
+  if (!c.screen || editing.value || drag.value) return
+  if ((e.target as Element | null)?.closest?.('.ldot')) return
+  const col = e.currentTarget as HTMLElement
+  const frame = col.querySelector('.frame')
+  if (!frame) return
+  const fr = frame.getBoundingClientRect()
+  const inside = e.clientX >= fr.left && e.clientX <= fr.right && e.clientY >= fr.top && e.clientY <= fr.bottom
+  const el = inside ? layerAt(col, e.clientX, e.clientY) : null
+  const r = (el ?? frame).getBoundingClientRect(), cr = col.getBoundingClientRect()
+  const b: Box = { col: c.key, layer: el?.getAttribute('data-layer') ?? null, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height }
+  const o = hover.value
+  if (!o || o.col !== b.col || o.layer !== b.layer || Math.abs(o.x - b.x) > 0.5 || Math.abs(o.y - b.y) > 0.5 || Math.abs(o.w - b.w) > 0.5) hover.value = b
+}
+/** 화면 칸 누르기: 요소 위면 그 요소를, 아니면 화면을 골라요 */
+function onFrameClick(c: Col) {
+  const h = hover.value
+  if (c.screen && h && h.col === c.key && h.layer) {
+    const same = activeLayer.value?.screen === c.screen.id && activeLayer.value.layer === h.layer
+    activeNote.value = null
+    activeCol.value = null
+    activeScreen.value = null
+    activeReq.value = null
+    activeLayer.value = same ? null : { screen: c.screen.id, layer: h.layer }
+    selBox.value = same ? null : { ...h }
+    const first = same ? null : docLinks.value.find((l) => l.screen_id === c.screen!.id && l.layer_ids?.includes(h.layer!))
+    if (first) nextTick(() => reader.value?.scrollToReq(first.requirement_id))
+    return
+  }
+  pickCol(c)
+}
+watch(activeLayer, (v) => { if (!v) selBox.value = null })
+
 const curve = (x1: number, y1: number, x2: number, y2: number) => `M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`
 const dirty = ref(false)
 /** 문서에서 사라진 요구사항 번호(지우지 않고 알려만 줍니다) */
@@ -526,16 +638,21 @@ async function removeDoc() {
           v-for="c in frames"
           :key="c.key"
           :data-col="c.key"
+          @pointermove="onFrameHover(c, $event)"
+          @pointerleave="hover = null"
           :class="['frame-col', { lit: isLit(c), note: isNoteLit(c), dim: isDim(c), empty: !c.screen }]"
         >
-          <button type="button" class="frame-btn" :aria-pressed="isLit(c)" :aria-label="c.screen ? tr('{name} · Policies: {n}', { name: c.name, n: reqCount(c.screen.id) }) : tr('{code} {name} · No design yet', { code: c.code ?? '', name: c.name })" @click="pickCol(c)">
+          <button type="button" class="frame-btn" :aria-pressed="isLit(c)" :aria-label="c.screen ? tr('{name} · Policies: {n}', { name: c.name, n: reqCount(c.screen.id) }) : tr('{code} {name} · No design yet', { code: c.code ?? '', name: c.name })" @click="onFrameClick(c)">
             <span class="frame-label">
               <span v-if="c.code" class="sq sid num">{{ c.code }}</span>
               <span class="ellipsis">{{ c.name }}</span>
               <StatusIcon v-if="c.screen && activeLinks.get(c.screen.id)" :status="activeLinks.get(c.screen.id)!.status" :size="10" />
               <span v-if="c.screen && pinCount(c.screen.id)" class="sq npin num" :title="tr('Notes')">{{ pinCount(c.screen.id) }}</span>
             </span>
-            <span v-if="c.screen" class="frame" aria-hidden="true">
+            <span v-if="c.screen && artOf(c.screen.id)" class="frame art" aria-hidden="true">
+              <ScreenThumb :screen="artOf(c.screen.id)!" />
+            </span>
+            <span v-else-if="c.screen" class="frame" aria-hidden="true">
               <span class="f-status" />
               <span class="f-title">{{ c.name }}</span>
               <span class="f-body">
@@ -552,8 +669,18 @@ async function removeDoc() {
             </span>
             <span class="frame-page">{{ c.page || (c.slot?.states.length ? tr('States: {list}', { list: c.slot.states.join(', ') }) : '') }}</span>
           </button>
-          <!-- 끌어서 연결 점 -->
-          <button v-if="c.screen && !editing" type="button" class="link-dot" :aria-label="tr('Drag onto a policy row to link {name}', { name: c.name })" :title="tr('Drag onto a policy row to link')" @pointerdown="startLinkDrag(c, $event)" />
+          <!-- 고른 요소 테두리 -->
+          <span v-if="selBox && selBox.col === c.key" class="sel-box" :style="boxStyle(selBox)" aria-hidden="true" />
+          <!-- 끌어서 연결: 올린 요소(없으면 화면) 상하좌우 가운데 동그라미 4개 -->
+          <template v-if="c.screen && !editing && hover && hover.col === c.key">
+            <span v-if="hover.layer" class="hov-box" :style="boxStyle(hover)" aria-hidden="true" />
+            <button
+              v-for="sd in SIDES" :key="sd" type="button" class="ldot" :style="dotAt(hover, sd)"
+              :aria-label="tr('Drag onto a policy row to link {name}', { name: hover.layer ? layerName(c.screen.id, hover.layer) : c.name })"
+              :title="tr('Drag onto a policy row to link')"
+              @pointerdown="startLinkDrag(c, $event, hover.layer)"
+            />
+          </template>
         </div>
       </div>
     </main>
@@ -754,11 +881,14 @@ async function removeDoc() {
 .frame-label .sid { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
 .npin { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 4px; border-radius: 8px 8px 8px 2px; font-size: 10px; font-weight: 600; color: #8A6100; --sq-fill: #FFF1C2; }
 /* 점 중심이 화면 테두리 선 위에 오게: 기본 선(1px · 바깥 0) 가운데 0.5px, 고른 화면 선(1.5px · 바깥 2px) 가운데 2.75px */
-.link-dot { position: absolute; right: -6.5px; top: 210px; width: 12px; height: 12px; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; opacity: 0; transition: opacity .12s, transform .12s; }
-.frame-col:hover .link-dot, .link-dot:focus-visible { opacity: 1; }
-.frame-col.lit .link-dot { right: -8.75px; }
-.frame-col.note .link-dot { right: -9px; }
-.link-dot:hover { transform: scale(1.25); background: var(--iris-peek); }
+.frame.art { background: var(--iris-paper); }
+/* 요소 위 · 고른 요소 테두리, 상하좌우 동그라미(연결 선 끝 동그라미와 같은 모양) */
+.hov-box, .sel-box { position: absolute; z-index: 2; pointer-events: none; box-sizing: border-box; }
+.hov-box { outline: 1px solid var(--iris-peek); }
+.sel-box { outline: 1.5px solid var(--iris-peek); }
+.ldot { position: absolute; z-index: 3; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; padding: 0; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; transition: transform .12s, background-color .12s; }
+.ldot:hover { transform: scale(1.25); background: var(--iris-peek); }
+.ldot:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .drag-line { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20; pointer-events: none; overflow: visible; }
 .drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .drag-line circle { fill: var(--iris-peek); }

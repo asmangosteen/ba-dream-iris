@@ -50,8 +50,29 @@ const homeLayers = {
   },
 }
 
+/** 예시 '요금제 선택' 화면(착한구독 상세 기획서 C-04) — 문서 함께 보기에서 요소 단위 연결을 확인하려고 요소를 넣어 둬요 */
+const planLayers = {
+  schemaVersion: 1,
+  rootIds: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+  nodes: {
+    p1: L('p1', 'text', '제목', null, 20, 64, 300, 32, { color: '#202837', fontSize: 22, fontWeight: 700, lineHeight: 32, autoWidth: true }, { text: '요금제를 골라 주세요' }),
+    p2: L('p2', 'rect', '기간 탭', null, 20, 112, 350, 44, { fill: '#F1F2F3', radius: 12 }),
+    p3: L('p3', 'frame', '12개월 카드', null, 20, 176, 350, 120, { fill: '#FFFFFF', radius: 16, stroke: '#E4E6E8', strokeWidth: 1 }, { children: ['p3t', 'p3p'] }),
+    p3t: L('p3t', 'text', '기간', 'p3', 20, 20, 200, 24, { color: '#202837', fontSize: 16, fontWeight: 600, lineHeight: 24, autoWidth: true }, { text: '12개월' }),
+    p3p: L('p3p', 'text', '월 구독료', 'p3', 20, 52, 200, 28, { color: '#202837', fontSize: 20, fontWeight: 700, lineHeight: 28, autoWidth: true }, { text: '월 109,000원' }),
+    p4: L('p4', 'frame', '24개월 카드', null, 20, 312, 350, 120, { fill: '#F3F8FE', radius: 16, stroke: '#2C7BE2', strokeWidth: 1.5 }, { children: ['p4t', 'p4p', 'p4b'] }),
+    p4t: L('p4t', 'text', '기간', 'p4', 20, 20, 200, 24, { color: '#202837', fontSize: 16, fontWeight: 600, lineHeight: 24, autoWidth: true }, { text: '24개월' }),
+    p4p: L('p4p', 'text', '월 구독료', 'p4', 20, 52, 200, 28, { color: '#202837', fontSize: 20, fontWeight: 700, lineHeight: 28, autoWidth: true }, { text: '월 89,000원' }),
+    p4b: L('p4b', 'rect', '가장 많이 선택 배지', 'p4', 238, 18, 92, 26, { fill: '#2C7BE2', radius: 13 }),
+    p5: L('p5', 'frame', '36개월 카드', null, 20, 448, 350, 120, { fill: '#FFFFFF', radius: 16, stroke: '#E4E6E8', strokeWidth: 1 }, { children: ['p5t', 'p5p'] }),
+    p5t: L('p5t', 'text', '기간', 'p5', 20, 20, 200, 24, { color: '#202837', fontSize: 16, fontWeight: 600, lineHeight: 24, autoWidth: true }, { text: '36개월' }),
+    p5p: L('p5p', 'text', '월 구독료', 'p5', 20, 52, 200, 28, { color: '#202837', fontSize: 20, fontWeight: 700, lineHeight: 28, autoWidth: true }, { text: '월 79,000원' }),
+    p6: L('p6', 'rect', '다음 버튼', null, 20, 764, 350, 56, { fill: '#2C7BE2', radius: 14 }),
+  },
+}
+
 export const PREVIEW_SCREENS: Record<string, ScreenRow[]> = {
   'pg-1': [{ ...frame('sc-1', '홈', 0, 'approved'), layers: homeLayers }, frame('sc-2', '내 차고', 1, 'review'), frame('sc-3', '차량 상세', 2)],
-  'pg-2': [frame('sc-4', '요금제 선택', 0, 'review'), frame('sc-5', '서류 제출', 1), frame('sc-6', '신청 완료', 2)],
+  'pg-2': [{ ...frame('sc-4', '요금제 선택', 0, 'review'), layers: planLayers }, frame('sc-5', '서류 제출', 1), frame('sc-6', '신청 완료', 2)],
   'pg-3': [frame('sc-7', '마이', 0, 'approved'), frame('sc-8', '설정', 1)],
 }
