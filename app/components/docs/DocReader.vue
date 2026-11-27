@@ -34,7 +34,9 @@ const props = withDefaults(defineProps<{
   compact?: boolean
   /** 화면이 하나라도 연결된 요구사항 id — 없는 것(프레임을 지워 연결이 끊긴 것 등)은 번호를 빨갛게. 안 주면 색 구분 안 함 */
   linked?: string[] | null
-}>(), { highlight: null, compact: false, linked: null })
+  /** 직접 만든 정책(문서 표 밖)에 지우기 버튼 보이기 */
+  removable?: boolean
+}>(), { highlight: null, compact: false, linked: null, removable: false })
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
@@ -45,6 +47,8 @@ const emit = defineEmits<{
   'create-req': [payload: { text: string; block: string | null }]
   /** 고른 글에 메모 남기기(문서 옆 댓글) — 표 행이면 그 행 · 정책 ID 도 */
   comment: [payload: { quote: string; block: string | null; row: number | null; code: string | null }]
+  /** 직접 만든 정책 지우기(확인은 부모가) */
+  'remove-req': [req: ReqRow]
   /** 빈 문서에서 "내용 쓰기"를 눌렀을 때(넓은 화면 전용, compact 는 고치기 링크로 갑니다) */
   edit: []
 }>()
@@ -243,7 +247,7 @@ defineExpose({ scrollToReq, root })
 // 글을 고르면 "요구사항으로 만들기" 띄우기
 // ---------------------------------------------------------------------------
 const article = ref<HTMLElement | null>(null)
-const tool = ref<{ x: number; y: number; text: string; block: string | null; row: number | null; code: string | null } | null>(null)
+const tool = ref<{ x: number; y: number; below: boolean; text: string; block: string | null; row: number | null; code: string | null } | null>(null)
 function hideTool() { tool.value = null }
 function onSelectEnd() {
   const sel = window.getSelection()
@@ -263,7 +267,11 @@ function onSelectEnd() {
   const rect = range.getBoundingClientRect()
   const box = el.getBoundingClientRect()
   const x = Math.min(Math.max(rect.left + rect.width / 2 - box.left, 70), Math.max(box.width - 70, 70))
-  tool.value = { x, y: rect.top - box.top - 6, text: picked.slice(0, 500), block, row, code }
+  // 위 공간(스크롤 영역 위 끝까지)이 모자라면 고른 글 아래에 띄워요 — 패널 위에 가려지지 않게(사용자 요청 2026-11-27)
+  let clipTop = 0
+  for (let p = el.parentElement; p; p = p.parentElement) { if (/(auto|scroll|hidden)/.test(getComputedStyle(p).overflowY)) { clipTop = p.getBoundingClientRect().top; break } }
+  const below = rect.top - clipTop < 48
+  tool.value = { x, y: below ? rect.bottom - box.top + 6 : rect.top - box.top - 6, below, text: picked.slice(0, 500), block, row, code }
 }
 function onSelectionChange() {
   if (!tool.value) return
@@ -383,7 +391,10 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         @click="pickBlock(b, $event)"
       >
         <span v-if="headerReqs(b).length" class="codes">
-          <button v-for="r in headerReqs(b)" :key="r.id" type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? tr('Not drawn in any frame') : undefined" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
+          <template v-for="r in headerReqs(b)" :key="r.id">
+            <button type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? tr('Not drawn in any frame') : undefined" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
+            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete policy {code}', { code: r.code })" :data-tip="tr('Delete policy')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="12" /></button>
+          </template>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
           <template v-for="(s, i) in segments(b.text)" :key="i">
@@ -394,9 +405,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </div>
       </template>
 
-      <div v-if="tool" class="sq tool" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
+      <div v-if="tool" :class="['sq', 'tool', { below: tool.below }]" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
         <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create policy') }}</button>
-        <button v-if="!compact" type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Comment') }}</button>
+        <button v-if="!compact" type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Add a note') }}</button>
       </div>
     </article>
 
@@ -441,7 +452,11 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .blk.marked.li > p { padding-left: 0; }
 .blk p, .blk h3 { margin: 0; }
 .compact .blk.marked { padding: var(--ref-spacing-06) var(--ref-spacing-07); }
-.codes { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
+.codes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-04); }
+/* 직접 만든 정책 지우기: 카드에 마우스를 올렸을 때만 */
+.rm { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; }
+.blk:hover .rm, .rm:focus-visible { opacity: 1; }
+.rm:hover { color: var(--sys-color-theme-error-default); --sq-fill: var(--sys-color-neutral-100); }
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); text-align: inherit; }
 .code:hover, .code[aria-pressed='true'] { --sq-fill: var(--iris-peek-bg-strong); }
 .code:focus-visible { outline: 2px solid var(--iris-peek); outline-offset: 1px; }
@@ -494,6 +509,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .mark.legal { color: #7C3AAE; --sq-fill: #F4ECFB; }
 .mark.dev_check { color: #1F63BD; --sq-fill: #EEF5FD; }
 
+.tool.below { transform: translate(-50%, 0); }
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
 .tool-btn:hover { --sq-fill: rgb(253 253 253 / 12%); }

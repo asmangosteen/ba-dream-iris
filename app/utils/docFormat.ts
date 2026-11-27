@@ -133,19 +133,21 @@ export const policyArea = (code: string) => code.match(POLICY_ONE)?.[1] ?? null
 // ---------------------------------------------------------------------------
 // 표기(PRD/11 4장)
 // ---------------------------------------------------------------------------
-export type Mark = 'default' | 'pending' | 'dev_check' | 'legal'
-export const MARK_LABEL: Record<Mark, string> = { default: 'Default', pending: 'Pending decision', dev_check: 'Dev check', legal: 'Legal check' }
-export const MARK_ICON: Record<Mark, string> = { default: '〔〕', pending: '⏸', dev_check: '📌', legal: '⚖️' }
+export type Mark = 'default' | 'pending' | 'dev_check' | 'legal' | 'no_screen'
+export const MARK_LABEL: Record<Mark, string> = { default: 'Default', pending: 'Pending decision', dev_check: 'Dev check', legal: 'Legal check', no_screen: 'No screen' }
+export const MARK_ICON: Record<Mark, string> = { default: '〔〕', pending: '⏸', dev_check: '📌', legal: '⚖️', no_screen: '〔〕' }
 export function marksIn(t: string): Mark[] {
   const out: Mark[] = []
   if (/〔\s*기본값\s*〕|\[\s*기본값\s*\]|〔\s*default\s*〕/i.test(t)) out.push('default')
   if (t.includes('⏸')) out.push('pending')
   if (t.includes('📌')) out.push('dev_check')
   if (t.includes('⚖')) out.push('legal')
+  // 화면이 없는 정책(법무 고지 · 서버 규칙 등): 경고에서 빼고 반영률에서도 빼요
+  if (/〔\s*화면\s*없음\s*〕|\[\s*화면\s*없음\s*\]|〔\s*no\s*screen\s*〕/i.test(t)) out.push('no_screen')
   return out
 }
 /** 정책 이름에서 표기 기호는 빼요(배지로 따로 보여 줘요) */
-const stripMarks = (t: string) => t.replace(/〔[^〕]*〕|⏸️?|📌|⚖️?|✅/g, '').replace(/\s{2,}/g, ' ').trim()
+const stripMarks = (t: string) => t.replace(/〔[^〕]*〕|\[\s*화면\s*없음\s*\]|⏸️?|📌|⚖️?|✅/g, '').replace(/\s{2,}/g, ' ').trim()
 
 // ---------------------------------------------------------------------------
 // 양식 검사
@@ -262,7 +264,7 @@ export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): Format
     }
   }
   // 화면 표가 있는 문서에서만 '화면 없는 정책'을 알려요
-  if (screenTable) for (const p of res.policies) if (!used.has(p.code)) res.warnings.push({ kind: 'no_screen', code: p.code, block: p.block, row: p.row })
+  if (screenTable) for (const p of res.policies) if (!used.has(p.code) && !p.marks.includes('no_screen')) res.warnings.push({ kind: 'no_screen', code: p.code, block: p.block, row: p.row })
   res.format = policyTable && screenTable ? 'iris' : policyTable || screenTable || res.policies.length ? 'partial' : 'none'
   return res
 }
@@ -280,6 +282,18 @@ export function warningText(w: FormatWarning): { key: string; vars: Record<strin
       : { key: '{code} has nothing in the Policy column', vars: { code: w.code } }
     case 'no_screen': return { key: '{code} has no screen', vars: { code: w.code } }
     case 'duplicate': return { key: '{code} appears more than once', vars: { code: w.code } }
+  }
+}
+
+/** 경고를 없애는 방법(영어 원문 열쇠 + 끼울 값) — 문서를 [Edit] 로 고쳐서 없애요 */
+export function warningFix(w: FormatWarning): { key: string; vars: Record<string, string> } {
+  switch (w.kind) {
+    case 'missing_policy': return { key: 'Add a {code} row to the policy table, or fix the ID in {other}', vars: { code: w.code, other: w.other ?? '' } }
+    case 'empty_policy_col': return w.other
+      ? { key: 'Write {other} in the Policy column of {code}', vars: { code: w.code, other: w.other } }
+      : { key: 'Write the policy IDs this screen follows in the Policy column of {code}', vars: { code: w.code } }
+    case 'no_screen': return { key: 'Add {code} to a screen’s Policy column — or if it has no screen, write 〔화면 없음〕 after the policy name', vars: { code: w.code } }
+    case 'duplicate': return { key: 'Give one of the {code} rows a new number', vars: { code: w.code } }
   }
 }
 

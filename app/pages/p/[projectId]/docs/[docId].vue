@@ -21,7 +21,7 @@ const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const screens = useProjectScreens(projectId)
 const slots = useScreenSlots(projectId)
-const { addRequirement, linkMany, syncDocFormat, addHistory } = useIrisMutations()
+const { addRequirement, removeRequirement, linkMany, syncDocFormat, addHistory } = useIrisMutations()
 const comments = useComments(projectId)
 
 const projectName = computed(() => projects.value?.find((p) => p.id === projectId)?.name ?? '')
@@ -209,6 +209,20 @@ function revealTab(smooth = true) {
 watch(docId, () => revealTab())
 watch(() => docs.data.value?.length, () => revealTab(false))
 onMounted(() => revealTab(false))
+/** 직접 만든 정책(#12) 지우기 — 문서 표에서 읽은 정책은 문서에서 그 행을 지우면 '문서에서 빠짐'으로 남아요 */
+const confirmReq = ref<ReqRow | null>(null)
+const removingReq = ref(false)
+async function doRemoveReq() {
+  const r = confirmReq.value
+  if (!r || removingReq.value) return
+  removingReq.value = true
+  try {
+    await removeRequirement(r.id)
+    if (activeReq.value === r.id) activeReq.value = null
+    await refreshNuxtData([`reqs-${projectId}`, `links-${projectId}`])
+    say(tr('Deleted {code}', { code: r.code }))
+  } catch { say(tr("Couldn't delete. Try again")) } finally { removingReq.value = false; confirmReq.value = null }
+}
 const histOpen = ref(false)
 watch(docId, () => { histOpen.value = false; activeNote.value = null; noteDraft.value = null; activeCol.value = null })
 /** 기록에서 [이 버전으로 되돌리기]: 그때 글로 저장하고, 되돌린 것도 기록으로 남겨요 */
@@ -517,7 +531,7 @@ async function removeDoc() {
         />
         <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" @close="histOpen = false" @restore="restoreDoc" />
         <div v-else class="read-main">
-          <DocCheckBar :doc="doc" @go="goBlock" />
+          <DocCheckBar :doc="doc" @go="goBlock" @edit="startEdit" />
           <div v-if="goneReqs.length" class="sq gone" role="status">
             <span class="gone-col">
               <span class="tx-body gone-t">
@@ -538,6 +552,8 @@ async function removeDoc() {
             @pick-slot="pickSlot"
             @create-req="createReq"
             @comment="onComment"
+            removable
+            @remove-req="(r: ReqRow) => (confirmReq = r)"
             @edit="startEdit"
           >
             <template #actions>
@@ -575,7 +591,14 @@ async function removeDoc() {
 
       <!-- 확인: 공용 확인 팝업(AppConfirm · 프로필 편집 창 양식) — 아래 줄로 띄우지 않아요(사용자 요청 2026-11-27) -->
       <AppConfirm
-        v-if="bar === 'leave'"
+        v-if="confirmReq"
+        :title="tr('Delete policy {code}?', { code: confirmReq.code })"
+        :desc="tr('Its screen links are deleted too. This can’t be undone.')"
+        :actions="[{ label: tr('Cancel'), onClick: () => (confirmReq = null) }, { label: tr('Delete'), kind: 'destructed', loading: removingReq, onClick: doRemoveReq }]"
+        @close="confirmReq = null"
+      />
+      <AppConfirm
+        v-else-if="bar === 'leave'"
         :title="tr('Discard unsaved changes?')"
         :desc="tr('You have unsaved changes. Discard them and leave?')"
         :actions="[{ label: tr('Keep editing'), onClick: closeBars }, { label: tr('Discard'), kind: 'destructed', onClick: discard }]"

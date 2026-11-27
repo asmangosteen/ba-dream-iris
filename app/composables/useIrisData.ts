@@ -459,6 +459,18 @@ export function useIrisMutations() {
     return data.id as string
   }
 
+  /** 정책 지우기(직접 만든 것 — 문서 표에서 읽은 정책은 문서에서 행을 지워요). 화면 연결도 같이 지워져요 */
+  async function removeRequirement(id: string) {
+    if (preview) {
+      const st = previewStore()
+      st.reqs.value = st.reqs.value.filter((x) => x.id !== id)
+      st.links.value = st.links.value.filter((l) => l.requirement_id !== id)
+      return
+    }
+    const { error } = await supabase.from('requirements').delete().eq('id', id)
+    if (error) throw error
+  }
+
   async function addComponent(row: Omit<ComponentRow, 'id'>) {
     if (preview) { previewStore().components.value.push({ ...row, id: uid() }); return }
     const { data: ws } = await supabase.from('workspaces').select('id').limit(1).single()
@@ -518,7 +530,7 @@ export function useIrisMutations() {
     const inserts: Record<string, unknown>[] = []
     const updates: [string, Record<string, unknown>][] = []
     for (const p of r.policies) {
-      const fields = { title: p.title.slice(0, 200), body: p.body || null, area: p.area, marks: p.marks, anchor: { block: p.block, row: p.row }, removed_at: null }
+      const fields = { title: p.title.slice(0, 200), body: p.body || null, area: p.area, marks: p.marks, has_screen: !p.marks.includes('no_screen'), anchor: { block: p.block, row: p.row }, removed_at: null }
       const ex = byCode.get(p.code)
       if (!ex) { inserts.push({ ...fields, project_id: projectId, document_id: docId, code: p.code, origin: 'doc_table' }); out.added.push(p.code) }
       else if (!same(ex.title, fields.title) || !same(ex.body, fields.body) || !same(ex.area, fields.area) || !same(ex.marks ?? [], fields.marks) || !same(ex.anchor, fields.anchor) || ex.removed_at) updates.push([ex.id, fields])
@@ -621,7 +633,7 @@ export function useIrisMutations() {
     if (error) throw error
   }
 
-  return { setLink, removeLink, addDocument, addRequirement, addComponent, addTokens, linkMany, unlinkMany, setScreenSlot, syncDocFormat, addHistory }
+  return { setLink, removeLink, addDocument, addRequirement, removeRequirement, addComponent, addTokens, linkMany, unlinkMany, setScreenSlot, syncDocFormat, addHistory }
 }
 
 // ---------------------------------------------------------------------------

@@ -230,6 +230,8 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .mh b { font-weight: 600; white-space: nowrap; }
 .pt { padding-left: 32px; color: var(--sys-color-neutral-800); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .rc { padding-left: 32px; }
+/* 노트(문서 옆 메모) 안 입력창만 곡률 12 — 좁은 카드 안에서 18 은 너무 둥글어요(사용자 요청 2026-11-27). 게시판 · 다른 입력창은 그대로 */
+.notes :deep(.cc .box) { border-radius: var(--ref-radius-06); }
 .newrow { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); }
 .fa { flex: none; margin-top: 6px; }
 .grow { flex: 1; min-width: 0; }

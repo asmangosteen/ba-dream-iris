@@ -7,7 +7,8 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
  * 약어 · 상태는 문서 머리 메타 줄(DocReader)에, 읽은 수 줄은 빼요(사용자 요청 2026-11-27)
  */
 const props = defineProps<{ doc: DocRow; compact?: boolean }>()
-const emit = defineEmits<{ go: [at: { block: string; row: number | null }] }>()
+const emit = defineEmits<{ go: [at: { block: string; row: number | null }]; edit: [] }>()
+const fix = (w: FormatWarning) => { const t = warningFix(w); return tr(t.key, t.vars) }
 
 const r = computed(() => props.doc.check_result ?? null)
 const warns = computed(() => r.value?.warnings ?? [])
@@ -33,11 +34,13 @@ function where(w: FormatWarning) {
         <EditorIcon name="chevron_down" :size="14" :class="{ flip: open }" />
       </button>
       <div v-if="open" class="list">
+        <p class="tx-meta how">{{ tr('Warnings go away when you fix the document. Choose Edit, change the Markdown, then save.') }}</p>
         <button v-for="(w, i) in warns" :key="i" type="button" class="sq wrow" @click="emit('go', { block: w.block, row: w.row })">
           <span class="dot" aria-hidden="true" />
-          <span class="wcol"><span>{{ text(w) }}</span><span class="tx-meta">{{ where(w) }}</span></span>
+          <span class="wcol"><span>{{ text(w) }}</span><span class="tx-meta">{{ where(w) }}</span><span class="fix">{{ fix(w) }}</span></span>
           <span class="tx-meta go">{{ tr('Go') }}</span>
         </button>
+        <button type="button" class="sq editbtn" @click="emit('edit')"><EditorIcon name="pencil" :size="14" />{{ tr('Edit to fix') }}</button>
       </div>
     </template>
   </div>
@@ -58,5 +61,9 @@ function where(w: FormatWarning) {
 .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 .wcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .go { flex: none; }
+.how { margin: 0; padding: var(--ref-spacing-02) var(--ref-spacing-05) var(--ref-spacing-04); }
+.fix { margin-top: 2px; color: var(--sys-color-neutral-700); }
+.editbtn { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 28px; margin: var(--ref-spacing-02) 0 0 var(--ref-spacing-02); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-800); }
+.editbtn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .compact .warnbar { height: 28px; }
 </style>
