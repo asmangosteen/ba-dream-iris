@@ -134,7 +134,7 @@ function restore(before = false) {
             <tbody><tr v-for="(l, i) in v.lines" :key="i" :class="l.kind"><td v-for="(c, j) in l.cells" :key="j">{{ c }}</td></tr></tbody>
           </table>
           <template v-else>
-            <p v-for="(l, i) in v.lines" :key="i" :class="['tline', l.kind, v.type]">{{ l.text }}</p>
+            <p v-for="(l, i) in v.lines" :key="i" :class="['sqc', 'tline', l.kind, v.type]">{{ l.text }}</p>
           </template>
         </div>
         <p v-if="!views.length" class="tx-meta">{{ tr('Only the order of blocks changed') }}</p>

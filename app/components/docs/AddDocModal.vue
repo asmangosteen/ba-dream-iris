@@ -379,7 +379,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <button v-if="check.warnings.some((w) => w.kind !== 'no_screen')" type="button" class="sq wbar" :aria-expanded="warnOpen" @click="warnOpen = !warnOpen">
                   <b>{{ tr('{n} warnings — you can still add it', { n: check.warnings.filter((w) => w.kind !== 'no_screen').length }) }}</b><span class="tx-meta">{{ warnOpen ? tr('Hide') : tr('Show') }}</span>
                 </button>
-                <ul v-if="warnOpen" class="wlist">
+                <ul v-if="warnOpen" class="sq wlist">
                   <li v-for="(w, i) in check.warnings.filter((x) => x.kind !== 'no_screen')" :key="i"><span class="dot" />{{ wText(w) }}</li>
                 </ul>
                 <span class="tx-meta">{{ tr('Each row of the screen table becomes a screen slot, and the policies in its Policy column are linked as “Unchecked”.') }}</span>

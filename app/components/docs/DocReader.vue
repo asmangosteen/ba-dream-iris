@@ -366,11 +366,14 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
           <span class="tx-meta warn"><EditorIcon name="warning" :size="12" />{{ tr("Couldn't load the page content") }}</span>
         </span>
       </div>
+      <!-- 붙여넣기 묶음: 링크 카드와 24 띄우고, 묶음 안(제목 · 입력칸 · 저장)은 8 — 덩어리가 보이게(사용자 요청 2026-11-27) -->
+      <div class="paste-grp">
       <label class="tx-head" :for="`paste-${doc.id}`">{{ tr('Paste content') }}</label>
       <div class="sq area-box"><textarea :id="`paste-${doc.id}`" v-model="draft" class="area" rows="6" @input="growArea" :placeholder="tr('Copy the text from the original page and paste it here')" /></div>
       <div class="paste-foot">
         <span v-if="saveError" class="tx-meta warn" role="alert">{{ saveError }}</span>
         <Button size="s" :type="compact ? 'tertiary' : 'primary'" :stroke="compact" :loading="saving" :disabled="!draft.trim() && !saving" @click="savePaste">{{ tr('Save') }}</Button>
+      </div>
       </div>
     </div>
 
@@ -502,7 +505,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .compact .card { flex-wrap: wrap; padding: var(--ref-spacing-08); }
 .warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-theme-error-default); }
 
-.paste { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.paste { display: flex; flex-direction: column; gap: var(--ref-spacing-12); }
+.paste-grp { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 120px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 /* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
 /* 여러 줄 입력칸 둥글기: 댓글 입력칸과 같은 18 */
@@ -542,7 +546,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 
 .tool.below { transform: translate(-50%, 0); }
 /* 메모 자리: 노란 하이라이트 + 굵은 글씨(밑줄 없이 — 사용자 요청 2026-11-27) */
-.nmark { background: #FFF1C2; color: inherit; font-weight: 600; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.nmark { background: #FFF1C2; color: inherit; font-weight: 600; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
 .tool-btn:hover { --sq-fill: rgb(253 253 253 / 12%); }

@@ -437,6 +437,5 @@ section:not(:hover):not(:focus-within) .styl-w:not(:has(.open)){opacity:0}
 
 /* 양식 경고 줄을 눌러 간 자리: 펼친 경고 막대와 같은 주황(#FFEEDC)이 들어왔다 빠져요(사용자 요청 2026-11-27) */
 .warn-flash, .warn-flash > td { animation: warn-flash 1.6s ease; }
-.warn-flash:not(tr) { border-radius: var(--ref-radius-03); }
 @keyframes warn-flash { 0% { background-color: transparent; } 15%, 55% { background-color: #FFEEDC; } 100% { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { .warn-flash, .warn-flash > td { animation-duration: .01s; } }
