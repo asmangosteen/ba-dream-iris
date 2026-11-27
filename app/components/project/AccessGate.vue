@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Icon } from '@ba-dream/design-system'
+import { Button } from '@ba-dream/design-system'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import { ROLE_NAME, accessError, useProjectAccess } from '~/composables/useProjectAccess'
 import { relativeTime } from '~/composables/useProjects'
@@ -46,7 +46,7 @@ onMounted(() => nextTick(() => btn.value?.querySelector('button')?.focus()))
 <template>
   <div v-if="gate" class="gate" role="main">
     <section class="sq pop card" aria-labelledby="gateTitle" aria-live="polite">
-      <span :class="['mark', view.tone]" aria-hidden="true"><EditorIcon v-if="view.icon === 'lock'" name="lock" :size="20" /><Icon v-else :name="view.icon" :size="20" /></span>
+      <span :class="['mark', view.tone]" aria-hidden="true"><EditorIcon :name="view.icon" :size="20" /></span>
       <h1 id="gateTitle" class="ttl">{{ view.title }}</h1>
       <p class="pop-desc">{{ view.desc }}</p>
       <p v-if="view.sub" class="sq sub tx-meta">{{ view.sub }}</p>

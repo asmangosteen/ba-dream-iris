@@ -8,7 +8,7 @@ import { relativeTime } from '~/composables/useProjects'
  * 코멘트 목록(오른쪽 패널 — 피그마와 같아요): 위에 검색 · 거르기(열림 · 해결됨 · 전체, 내 것과 멘션만, 이 페이지 · 모든 페이지).
  * 줄: 아바타 · #번호 · ↳ 놓인 곳 · 이름 · 시각 · 글 · 이미지 수 · 답글 수. 누르면 그 핀으로 가서 스레드를 열어요(다른 페이지면 그 페이지로)
  */
-const props = defineProps<{ threads: Thread[]; pageId: string | null; pages: { id: string; name: string }[]; screens: { id: string; name: string }[]; people: { id: string; name: string; avatar?: string | null }[]; myId: string | null; openId: string | null }>()
+const props = defineProps<{ threads: Thread[]; pageId: string | null; pages: { id: string; name: string }[]; screens: { id: string; name: string }[]; people: { id: string; name: string; avatar?: string | null }[]; authors?: { id: string; name: string; avatar?: string | null }[]; myId: string | null; openId: string | null }>()
 const emit = defineEmits<{ open: [t: Thread]; close: []; resolve: [root: CommentRow, done: boolean]; readAll: [] }>()
 const tab = ref<'open' | 'resolved' | 'all'>('open')
 const scope = ref<'page' | 'all'>('page')
@@ -29,7 +29,8 @@ function onDocDown(e: PointerEvent) {
 onMounted(() => document.addEventListener('pointerdown', onDocDown, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown, true))
 
-const person = (id: string | null) => props.people.find((p) => p.id === id) ?? null
+/** 글쓴이: 프로젝트를 나간 사람도 이름 · 사진 그대로(authors) */
+const person = (id: string | null) => (props.authors ?? props.people).find((p) => p.id === id) ?? null
 const involved = (t: Thread) => [t.root, ...t.replies].some((c) => c.author_id === props.myId || (props.myId && c.mentions.includes(props.myId)))
 /** 검색: 글 · 쓴 사람 이름(답글 포함) */
 const hit = (t: Thread, s: string) => [t.root, ...t.replies].some((c) => c.body.toLowerCase().includes(s) || (person(c.author_id)?.name ?? '').toLowerCase().includes(s))
@@ -96,7 +97,7 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
         <span class="ih">
           <MemberAvatar :name="person(t.root.author_id)?.name ?? '?'" :src="person(t.root.author_id)?.avatar" :size="28" />
           <span class="meta"><b>{{ person(t.root.author_id)?.name ?? tr('Former member') }}</b><span class="tx-meta">{{ relativeTime(t.last.created_at) }}</span><span class="tx-meta ell">↳ {{ where(t) }}</span></span>
-          <button type="button" :class="['sq', 'ib', 'rs', { ok: !!t.root.resolved_at }]" :aria-label="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click.stop="emit('resolve', t.root, !t.root.resolved_at)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M5.8 9.2l2.2 2.2 4.2-4.6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+          <button type="button" :class="['sq', 'ib', 'rs', { ok: !!t.root.resolved_at }]" :aria-label="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click.stop="emit('resolve', t.root, !t.root.resolved_at)"><EditorIcon name="resolve" :size="18" /></button>
           <i v-if="t.unread" class="dot" :aria-label="tr('Unread')" />
         </span>
         <span v-if="t.root.body" class="txt">{{ t.root.body }}</span>
@@ -113,7 +114,7 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
 <style scoped>
 .cp { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 여백은 왼쪽 패널(Pages · Layers)과 같아요: 바깥 8 + 줄 안쪽 8 → 글자는 패널 끝에서 16 */
-.hd { flex: none; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
+.hd { flex: none; height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10); }
 .ib { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-700); }
 .ib:hover, .ib.on { --sq-fill: var(--sys-color-neutral-100); }
 .bar { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); border-bottom: 1px solid var(--iris-line); }
@@ -133,8 +134,8 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
 .item:hover { --sq-fill: var(--sys-color-neutral-100); }
 .item.on { --sq-fill: var(--sys-color-brand-primary-lightest); }
 .item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
-.ih { display: flex; align-items: center; gap: var(--ref-spacing-06); margin-bottom: var(--ref-spacing-03, 6px); }
-.meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--ref-spacing-03, 6px); white-space: nowrap; }
+.ih { display: flex; align-items: center; gap: var(--ref-spacing-06); margin-bottom: var(--ref-spacing-03); }
+.meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--ref-spacing-03); white-space: nowrap; }
 .meta b { flex: none; font-weight: 600; color: var(--sys-color-neutral-800); }
 .meta > .tx-meta { flex: none; }
 .meta > .ell { flex: 0 1 auto; min-width: 0; }
@@ -147,5 +148,5 @@ const TABS = [['open', 'Unresolved'], ['resolved', 'Resolved'], ['all', 'All']] 
 .txt { color: var(--sys-color-neutral-800); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .blue { color: var(--sys-color-brand-primary-default); }
 .dot { flex: none; width: 6px; height: 6px; margin-right: var(--ref-spacing-02); border-radius: 50%; background: var(--sys-color-brand-primary-default); }
-.empty { padding: 40px 16px; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.empty { padding: var(--ref-spacing-04) var(--ref-spacing-06); display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); text-align: left; }
 </style>

@@ -418,7 +418,7 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 .tsf-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tsf-v { color: var(--sys-color-neutral-600); }
 .tsf.open .tsf-v { color: inherit; }
-.tsp-x { flex: none; width: 24px; height: 24px; color: var(--sys-color-neutral-700); }
+.tsp-x { flex: none; width: 28px; height: 28px; color: var(--sys-color-neutral-700); }
 .tsp .ts { width: 20px; font-size: 14px; line-height: 18px; }
 .tsv { color: var(--sys-color-neutral-500); }
 

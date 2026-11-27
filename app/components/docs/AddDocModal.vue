@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Button, Icon, IconButton, TextInput } from '@ba-dream/design-system'
+import { Button, IconButton, TextInput } from '@ba-dream/design-system'
 import type { DocBlock, DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ projectId: string }>()
@@ -236,18 +237,18 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
         aria-modal="true"
         aria-labelledby="addDocTitle"
         class="sq pop"
-        style="--pop-w: 560px"
+        style="--pop-w: 520px"
         @keydown="onKeydown"
       >
         <div class="pop-top">
           <h1 id="addDocTitle" class="pop-ttl">{{ tr('Add document') }}</h1>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </div>
 
         <!-- 다 넣은 뒤 -->
         <template v-if="done">
           <div class="pop-body content success" role="status">
-            <span class="badge-ok"><Icon name="check" :size="20" /></span>
+            <span class="badge-ok"><EditorIcon name="check" :size="20" /></span>
             <span class="tx-head">{{ tr('Document added') }}</span>
             <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 requirement') : done.found ? tr('Found {n} requirements', { n: done.found }) : tr('No numbered requirements (like REQ-001) found') }}</span>
           </div>
@@ -272,7 +273,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 
           <div class="pop-body content">
             <!-- 파일 -->
-            <div v-if="mode === 'file'" class="col8">
+            <div v-if="mode === 'file'" class="col8 fill">
               <label
                 v-if="!file"
                 :class="['sq', 'drop', { over: dragging }]"
@@ -280,7 +281,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 @dragleave="dragging = false"
                 @drop.prevent="onDrop"
               >
-                <span class="up"><Icon name="upload" :size="20" /></span>
+                <span class="up"><EditorIcon name="upload" :size="24" /></span>
                 <span class="tx-head">{{ tr('Drag a file here or click to choose') }}</span>
                 <span class="tx-meta">{{ tr('PDF, Word or Markdown, up to 50 MB') }}</span>
                 <input type="file" class="sr" accept=".pdf,.docx,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown" data-autofocus @change="setFile(($event.target as HTMLInputElement).files?.[0])">
@@ -310,17 +311,17 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                   :input-props="{ id: 'docUrl', type: 'url', inputmode: 'url', autocomplete: 'off', onKeydown: (e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); fetchLink() } }, onBlur: fetchLink }"
                   :label-props="{ htmlFor: 'docUrl' }"
                 />
-                <Button size="m" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">{{ tr('Fetch') }}</Button>
+                <Button size="s" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">{{ tr('Fetch') }}</Button>
               </div>
               <div v-if="fetched" class="sq card">
-                <span class="sq chip"><Icon name="document" :size="16" /></span>
+                <span class="sq chip"><EditorIcon name="document" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
                   <span class="tx-meta num">{{ linkHost }} · {{ tr('Requirements: {n}', { n: foundCount }) }}</span>
                 </span>
               </div>
               <div v-else-if="fetchFailed" class="sq card">
-                <span class="sq chip"><Icon name="warning" :size="16" /></span>
+                <span class="sq chip"><EditorIcon name="warning" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name">{{ fetchFailed }}</span>
                   <span class="tx-meta">{{ tr('You can add it anyway and paste the content into the document') }}</span>
@@ -331,7 +332,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
             <!-- 직접 쓰기 -->
             <div v-else class="col10">
               <TextInput v-model:value="title" v-bind="TI" data-autofocus :label="tr('Document name')" essential :placeholder="tr('e.g. Sign-up flow dev notes')" :input-props="{ id: 'docName', autocomplete: 'off' }" :label-props="{ htmlFor: 'docName' }" />
-              <div class="col6">
+              <div class="choice">
                 <span id="tplLabel" class="tx-head">{{ tr('Start from a template') }}</span>
                 <div class="tpl" role="radiogroup" aria-labelledby="tplLabel">
                   <button
@@ -353,7 +354,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
             </div>
 
             <!-- 분류 -->
-            <div class="col6">
+            <div class="choice">
               <span id="catLabel" class="tx-head">{{ tr('Category') }}</span>
               <div class="seg cats" role="radiogroup" aria-labelledby="catLabel">
                 <button
@@ -368,7 +369,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               </div>
             </div>
 
-            <p v-if="error" class="tx-meta err" role="alert"><Icon name="warning" :size="12" />{{ error }}</p>
+            <p v-if="error" class="tx-meta err" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</p>
           </div>
 
           <div class="pop-foot">
@@ -382,30 +383,38 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 </template>
 
 <style scoped>
-/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 여기에는 안쪽 내용만 — 탭은 제목과 같은 왼쪽 16 에서, 본문은 탭 아래 12 */
-.tabs { flex: none; padding: 0 var(--ref-spacing-10) 0 calc(var(--ref-spacing-10) - var(--ref-spacing-06)); }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 여기에는 안쪽 내용만 — 탭 · 분류 알약의 왼쪽 끝은 제목 · 본문과 같은 16 선에, 본문은 탭 아래 12 */
+.tabs { flex: none; padding: 0 var(--ref-spacing-10); }
 .content { min-height: 300px; padding-top: var(--ref-spacing-08); }
 .col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-/* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
+/* 칸 라벨은 디자인 시스템 입력칸 라벨과 같게: 12/18 SemiBold neutral/700 */
 .col6 > .tx-head:first-child { color: var(--sys-color-neutral-700); }
 .col6 > .tx-meta:last-child { margin-top: var(--ref-spacing-02); }
-.col8 { display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
+.col8 { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
 .col10 { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
-.cats { margin-left: calc(-1 * var(--ref-spacing-06)); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.drop { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-14) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--ref-color-gray-900-20); --sq-line-w: 1px; text-align: center; cursor: pointer; }
-.drop:hover, .drop.over { --sq-fill: var(--sys-color-neutral-100); }
-.drop:active { --sq-fill: var(--sys-color-neutral-200); }
+.fill { flex: 1; }
+/* 올리기 영역: 옅은 바탕 + 얇은 테두리, 그림자 없이(팝업 안은 평평하게 — 그림자는 떠 있는 팝업에만). 고른 파일 카드는 바탕만 */
+.drop { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-14) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; text-align: center; cursor: pointer; transition: color .12s ease; }
+.drop:hover { --sq-fill: var(--sys-color-neutral-200); --sq-line: var(--ref-color-gray-900-20); }
+.drop:active { --sq-fill: var(--sys-color-neutral-200); --sq-overlay: var(--interaction-light-gray-pressed); }
+/* 끌어다 놓는 중: 파랑 옅은 바탕 + 얇은 파랑 선(놓을 수 있다는 표시) */
+.drop.over { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1px; }
+.drop.over .up { color: var(--sys-color-brand-primary-default); }
 .drop:has(input:focus-visible) { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.up { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--sys-color-common-white-default); color: var(--sys-color-brand-primary-default); box-shadow: var(--shadow-01); }
+.drop .tx-meta { color: var(--sys-color-neutral-500); }
+.up { margin-bottom: var(--ref-spacing-04); display: grid; place-items: center; color: var(--sys-color-neutral-500); }
 
-.card { display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-10); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.chip { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.name { font-weight: 500; }
+.card { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 48px; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-neutral-100); }
+.chip { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); font-size: 10px; font-weight: 600; color: var(--sys-color-neutral-700); }
+.card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.card-col .tx-meta { color: var(--sys-color-neutral-500); }
+.name { font-weight: 500; color: var(--sys-color-neutral-800); }
 
 .url-row { display: flex; align-items: flex-end; gap: var(--ref-spacing-04); }
+/* 입력칸(s, 30) 옆 버튼도 30 — 공유 창 초대 줄과 같아요 */
+.url-row :deep(.bd-button) { height: 30px; min-height: 30px; }
 .url-in { flex: 1; min-width: 0; }
 
 .tpl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }

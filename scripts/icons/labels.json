@@ -188,5 +188,18 @@
  "flatten": "평탄화(Flatten)",
  "arc_sweep": "원 호: 쓸어 간 정도",
  "arc_ratio": "원 호: 안쪽 구멍 비율",
- "pin": "고정 탭"
+ "pin": "고정 탭",
+ "bell": "알림",
+ "emoji": "이모지(코멘트 입력 · 반응)",
+ "mention": "멘션(@)",
+ "send": "보내기(코멘트)",
+ "clock": "대기(참여 요청 보냄)",
+ "resolve": "코멘트 해결",
+ "status_reflected": "요구사항 반영",
+ "status_partial": "요구사항 일부 반영",
+ "status_missing": "요구사항 미반영",
+ "status_na": "요구사항 해당 없음",
+ "upload": "파일 올리기",
+ "download": "내려받기",
+ "logout": "로그아웃"
 }

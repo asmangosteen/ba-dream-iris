@@ -438,7 +438,8 @@ function applyRange(patch: RunStyle) {
 }
 function onDocDown(e: PointerEvent) {
   const t = e.target as HTMLElement | null
-  downKeep = !!t?.closest?.(KEEP)
+  // 메뉴 · 팝오버가 열려 있으면 이번 누름은 그 창 닫기만(utils/dismiss.ts) — 글자 고치기를 끝내지 않아요
+  downKeep = !!t?.closest?.(KEEP) || dismissPress(e)
   if (!parked) return
   if (textEl.value?.contains(t)) { parked = false; hideHighlight(); return }
   if (downKeep) return

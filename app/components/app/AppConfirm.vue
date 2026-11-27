@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Button, Icon } from '@ba-dream/design-system'
+import { Button } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * Iris 확인 창(공용) — 기존 팝업(프로필 편집 ProfileModal)과 같은 양식 · 무드:
@@ -30,7 +31,7 @@ const uid = `cf-${Math.random().toString(36).slice(2, 8)}`
       <section ref="box" role="alertdialog" aria-modal="true" :aria-labelledby="`${uid}-t`" :aria-describedby="desc ? `${uid}-d` : undefined" class="sq pop" @keydown="onKey">
         <div class="pop-top">
           <h1 :id="`${uid}-t`" class="pop-ttl">{{ title }}</h1>
-          <button v-if="closable" type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><Icon name="close" :size="16" /></button>
+          <button v-if="closable" type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
         </div>
         <div class="pop-body">
           <p v-if="desc" :id="`${uid}-d`" class="pop-desc">{{ desc }}</p>

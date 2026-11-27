@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Button, EmptyState, Icon, Skeleton } from '@ba-dream/design-system'
+import { Button, Skeleton } from '@ba-dream/design-system'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import ScreenThumb from '~/components/editor/ScreenThumb.vue'
 import { ROLE_NAME, useMyProjectRoles } from '~/composables/useProjectAccess'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 /** 웹 · 데스크톱 화면이면 넓은 표지(폭 768 이상 — 태블릿 · 데스크톱 프레임) */
 const isWide = (s: { width: number }) => s.width >= 768
 
@@ -47,27 +48,19 @@ function createProject() { newOpen.value = true }
         <div v-if="status === 'pending'" class="grid">
           <div v-for="i in 3" :key="i" class="card"><Skeleton shape="rectangle" height="176px" /><Skeleton shape="text" width="60%" /></div>
         </div>
-        <EmptyState
-          v-else-if="error"
-          on="section"
-          :title="tr('Could not load projects')"
-          :description="tr('Try again in a moment.')"
-          show-button
-          :button-label="tr('Reload')"
-          @button-click="refresh()"
-        />
-        <EmptyState
-          v-else-if="!list.length"
-          on="section"
-          :title="tr('No projects yet')"
-          show-button
-          :button-label="tr('New project')"
-          @button-click="createProject"
-        />
+        <!-- 빈 화면: 요구사항 화면과 같은 모양(main.css .page-empty) -->
+        <div v-else-if="error" class="page-empty">
+          <p class="tx-meta">{{ tr('Could not load projects') }}</p>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="refresh()">{{ tr('Reload') }}</Button>
+        </div>
+        <div v-else-if="!list.length" class="page-empty">
+          <p class="tx-meta">{{ tr('No projects yet') }}</p>
+          <Button size="s" type="tertiary" stroke @click="createProject">{{ tr('New project') }}</Button>
+        </div>
         <div v-else class="grid">
           <NuxtLink v-for="p in list" :key="p.id" :to="`/p/${p.id}`" class="card proj">
             <span class="sq sq-clip thumb" aria-hidden="true"><span v-if="covers?.[p.id]?.custom" class="full"><ScreenThumb :screen="covers[p.id]!" fit="cover" /></span><span v-else-if="covers?.[p.id]" :class="['sq', 'cover', { wide: isWide(covers[p.id]!) }]"><span class="sqc sq-clip-inner"><ScreenThumb :screen="covers[p.id]!" :fit="isWide(covers[p.id]!) ? 'top' : 'width'" /></span></span><span v-else-if="coverStatus === 'success'" class="no-cover"><span class="sq ghost" /><span class="tx-meta">{{ tr('No frames yet') }}</span></span></span>
-            <button class="ib more" :aria-label="tr('{name} settings', { name: p.name })" @click.prevent.stop="settingsId = p.id"><Icon name="menu_kebab" :size="16" /></button>
+            <button class="ib more" :aria-label="tr('{name} settings', { name: p.name })" @click.prevent.stop="settingsId = p.id"><EditorIcon name="menu_kebab" :size="16" /></button>
             <span class="col">
               <span class="tx-body name">{{ p.name }}</span>
               <span class="tx-meta">{{ statusLabel(p.status) }}<template v-if="access?.roles[p.id]"> · {{ tr(ROLE_NAME[access.roles[p.id]!]) }}</template><template v-if="progress?.[p.id]?.total"> · {{ tr('Applied') }} <span class="num">{{ progress[p.id]!.done }}/{{ progress[p.id]!.total }}</span></template> · {{ relativeTime(p.updated_at) }}</span>
@@ -87,7 +80,8 @@ function createProject() { newOpen.value = true }
 .inner { min-width: 0; } /* 요구사항 화면처럼 오른쪽 흰 면 전체를 써요(사용자 요청 2026-11-26) — 카드는 칸이 넓어지면 열이 늘어요 */
 .head { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
-.filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10) calc(-1 * var(--ref-spacing-06)); }
+/* 페이지 공통: 제목 → 거르기 줄 12, 거르기 줄 → 내용 16, 알약 왼쪽 끝은 제목과 같은 선(요구사항 화면과 같아요) */
+.filters { margin: var(--ref-spacing-08) 0 var(--ref-spacing-10); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--ref-spacing-12) var(--ref-spacing-08); }
 .card { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-08); min-width: 0; }
 /* 썸네일 칸은 화면 폭과 상관없이 딱 3:2 — 썸네일용 프레임도 3:2(예: 1200 × 800)로 만들면 그대로 꽉 차요 */

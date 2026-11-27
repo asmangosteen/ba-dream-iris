@@ -188,7 +188,7 @@ async function copyCode() {
 .tile[draggable='true'] { cursor: grab; }
 .m0 { margin: 0; }
 .dsec { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); box-shadow: 0 -1px 0 var(--iris-line); }
-.h24 { height: 24px; }
+.h24 { height: 28px; }
 .p0 { padding: 0; }
 .ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .f1 { flex: 1; }

@@ -45,7 +45,7 @@ const thumb = (layers: unknown) => ({ ...props.screen, layers })
 .opt.on { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; }
 .opt:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .pv { height: 96px; border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); display: grid; place-items: center; overflow: hidden; }
-.who { display: flex; align-items: center; gap: var(--ref-spacing-03, 6px); }
+.who { display: flex; align-items: center; gap: var(--ref-spacing-03); }
 .who b { font-weight: 600; color: var(--sys-color-neutral-800); }
 p.tx-meta { margin: 0; }
 </style>

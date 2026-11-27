@@ -228,10 +228,10 @@ watch(code, (v) => { const d = v.replace(/\D/g, '').slice(0, 6); if (d !== v) co
 .otp-cell { display: block; height: 64px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .otp-cell:hover { --sq-line: var(--ref-color-gray-900-20); }
 .otp-cell.on { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 2px; }
-.otp-cell.bad { --sq-line: var(--sys-color-theme-destructed-default); }
-.otp-cell.bad.on { --sq-line: var(--sys-color-theme-destructed-default); }
+.otp-cell.bad { --sq-line: var(--sys-color-theme-error-default); }
+.otp-cell.bad.on { --sq-line: var(--sys-color-theme-error-default); }
 .otp-box { width: 100%; height: 100%; box-sizing: border-box; padding: 0; border: 0; background: transparent; text-align: center; font-family: var(--font-family-base); font-size: 28px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--sys-color-neutral-800); caret-color: var(--sys-color-brand-primary-default); outline: none; }
 .otp-msg { text-align: center; }
-.otp-msg.bad { color: var(--sys-color-theme-destructed-default); }
+.otp-msg.bad { color: var(--sys-color-theme-error-default); }
 @media (max-width: 760px) { .side { padding: var(--ref-spacing-12) var(--ref-spacing-08); } }
 </style>

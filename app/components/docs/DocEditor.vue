@@ -136,8 +136,9 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
 </script>
 
 <script setup lang="ts">
-import { Button, Icon, TextInput } from '@ba-dream/design-system'
+import { Button, TextInput } from '@ba-dream/design-system'
 import type { DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 const props = defineProps<{
   doc: DocRow
@@ -301,7 +302,7 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
     />
 
     <div class="row">
-      <div class="col6">
+      <div class="choice">
         <span :id="`edCat-${doc.id}`" class="tx-head">{{ tr('Category') }}</span>
         <div class="seg cats" role="radiogroup" :aria-labelledby="`edCat-${doc.id}`">
           <button
@@ -327,8 +328,8 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
       />
     </div>
 
-    <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><Icon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
-    <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><Icon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
+    <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><EditorIcon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
+    <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><EditorIcon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
 
     <div class="col6 grow">
       <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? tr('Content') : tr('Body text') }}</label>
@@ -347,7 +348,7 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
     </div>
 
     <div class="foot">
-      <span v-if="error" class="tx-meta warn" role="alert"><Icon name="warning" :size="12" />{{ error }}</span>
+      <span v-if="error" class="tx-meta warn" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</span>
       <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">{{ tr('Cancel') }}</Button>
       <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Save') }}</Button>
     </div>
@@ -363,7 +364,6 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
 .col6 > .tx-meta:last-child { margin-top: var(--ref-spacing-02); }
 .row { display: flex; align-items: flex-start; gap: var(--ref-spacing-12); flex-wrap: wrap; }
 .ver { width: 140px; flex: none; }
-.cats { margin-left: calc(-1 * var(--ref-spacing-06)); }
 .grow { flex: 1; }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

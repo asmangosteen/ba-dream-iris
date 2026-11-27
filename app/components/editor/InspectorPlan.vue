@@ -173,7 +173,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .bars span { border-radius: 2px; min-width: 0; }
 .legend { display: flex; gap: var(--ref-spacing-08); color: var(--sys-color-neutral-600); }
 .legend span { display: flex; align-items: center; gap: var(--ref-spacing-02); }
-.sec2 { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
+.sec2 { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10) var(--iris-insp-x); box-shadow: 0 -1px 0 var(--iris-line); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .sec2.tight { gap: var(--ref-spacing-02); }
 .h24 { height: 28px; padding: 0; }
 .s24 { width: 28px; height: 28px; }
@@ -204,8 +204,8 @@ defineExpose({ openPicker: () => (picking.value = true) })
 .note { text-align: left; }
 .note:hover { --sq-overlay: var(--interaction-light-gray-hover); }
 .pb2 { padding-bottom: var(--ref-spacing-02); }
-.empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
-.doc { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); }
+.empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); }
+.doc { display: flex; align-items: center; gap: var(--ref-spacing-06); height: 28px; margin: 0 calc(-1 * var(--ref-spacing-04)); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); }
 .f1 { flex: 1; }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
 .m0 { margin: 0; }

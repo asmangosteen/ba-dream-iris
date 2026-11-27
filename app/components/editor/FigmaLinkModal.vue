@@ -285,7 +285,7 @@ onBeforeUnmount(() => {
 .dim { color: var(--sys-color-neutral-500); flex: none; }
 
 .note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-04) 0 0; padding: var(--ref-spacing-06) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
-.note.warn { color: var(--sys-color-theme-destructed-default); }
+.note.warn { color: var(--sys-color-theme-error-default); }
 .note-ic { flex: none; margin-top: 1px; }
 
 .result { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }

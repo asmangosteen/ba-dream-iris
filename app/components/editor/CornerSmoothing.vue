@@ -69,7 +69,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true)
 
 <template>
   <Teleport to="body">
-    <div ref="root" v-front class="sq float cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
+    <div ref="root" v-front class="sq float s cs" role="dialog" :aria-label="tr('Corner smoothing')" :style="pos">
       <div class="cs-h">
         <span>{{ tr('Corner smoothing') }}</span>
         <button class="ib s24" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" /></button>
@@ -94,8 +94,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDoc, true)
 
 <style scoped>
 .cs { position: fixed; z-index: 60; width: 240px; display: flex; flex-direction: column; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.cs-h { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-08); font-weight: 600; box-shadow: 0 1px 0 var(--iris-line); }
-.cs-b { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-08) var(--ref-spacing-06); }
+.cs-h { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); font-weight: 600; box-shadow: 0 1px 0 var(--iris-line); }
+.cs-b { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08); }
 .cs-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: var(--ref-spacing-06); align-items: start; }
 /* 슬라이더: 알약 막대(16) 안에 손잡이(12)가 2px 안쪽으로 — 막대 밖으로 안 나가요. 숫자 칸(28) 가운데 높이에 맞춰요 */
 .cs-slide { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; min-width: 0; }

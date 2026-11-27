@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * 단축키 모음(메인 메뉴 'Keyboard shortcuts' · ⌃⇧?): 기능별로 간단히 — 팝업 양식은 main.css 공통(.pop-*, 프로필 편집 창과 같아요).
@@ -29,7 +29,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     ['Opacity 10% … 100%', '⇧1 … ⇧0'], ['Remove fill', '⌥/'], ['Remove stroke', '⇧/'], ['Swap fill and stroke', '⇧X'], ['Pick color', '⌃C'],
   ] },
   { title: 'View', rows: [
-    ['Zoom in · out', '+ · −'], ['Zoom to 100%', '⌘0'], ['Zoom to fit', '1'], ['Zoom to selection', '2'], ['Rulers', '⇧R'], ['Layout grids', '⌃G'],
+    ['Zoom in · out', '+ · −'], ['Zoom to 100%', '⌘0'], ['Zoom to fit', '1'], ['Zoom to selection', '2'], ['Rulers', '⇧R'], ['Layout grids', '⌃G'], ['Show · hide comments', '⇧C'],
     ['Pixel grid', "⇧'"], ['Show · hide UI', '⌘\\'], ['Next · previous frame', 'N · ⇧N'], ['Previous · next page', 'PageUp · PageDown'], ['Keyboard shortcuts', '⌃⇧?'],
   ] },
 ]
@@ -44,7 +44,7 @@ onMounted(() => nextTick(() => box.value?.focus()))
       <section ref="box" role="dialog" aria-modal="true" :aria-label="tr('Keyboard shortcuts')" class="sq pop ks" tabindex="-1" @keydown="onKey">
         <div class="pop-top">
           <h1 class="pop-ttl">{{ tr('Keyboard shortcuts') }}</h1>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
         </div>
         <div v-ovscroll class="pop-body ks-body">
           <section v-for="g in GROUPS" :key="g.title" class="ks-g">

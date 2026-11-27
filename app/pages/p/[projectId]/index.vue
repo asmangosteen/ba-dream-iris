@@ -11,6 +11,7 @@ import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import InspectorPlan from '~/components/editor/InspectorPlan.vue'
 import KeyboardShortcuts from '~/components/editor/KeyboardShortcuts.vue'
+import FramePresets from '~/components/editor/FramePresets.vue'
 import InspectorDev from '~/components/editor/InspectorDev.vue'
 import InspectorDesign from '~/components/editor/InspectorDesign.vue'
 import { importSvg } from '~/canvas/vector'
@@ -58,10 +59,12 @@ function togglePanel() {
 }
 /** 접힌 채로 탭을 누르면 좌우를 함께 펼쳐요 */
 const expandPanels = () => { if (collapsed.value.left || collapsed.value.right) togglePanel() }
-// 보기 설정(오른쪽 패널 위 ⚙): 피그마 보기 메뉴 중 Iris 가 그리는 것 — Pixel grid · Layout grids · Rulers
+// 보기 설정(오른쪽 패널 위 ⚙): 피그마 보기 메뉴 중 Iris 가 그리는 것 — Pixel grid · Layout grids · Rulers · Comments
 const viewOpen = ref(false)
 const gridsShown = useLayoutGridsShown()
 const rulersShown = useState('iris-rulers', () => false)
+/** 캔버스 코멘트(핀 · 영역) 보이기 — 보기 설정 'Comments' · ⇧C(피그마와 같아요). 끈 채로 코멘트 도구를 누르면 다시 켜져요 */
+const pinsShown = useState('iris-comments-shown', () => true)
 // 페이지 우클릭 메뉴 · 지우기 확인
 const pageCtx = useContextMenu()
 const confirmPage = ref<{ id: string; name: string; count: number } | null>(null)
@@ -243,13 +246,21 @@ const openThread = ref<string | null>(null)
 const draft = ref<{ screenId: string | null; layerId: string | null; x: number; y: number; area: CommentArea | null } | null>(null)
 const confirmThread = ref<CommentRow | null>(null)
 const mentionPeople = computed(() => access.members.value.map((m) => ({ id: m.member_id, name: m.member?.name || m.member?.email || '?', avatar: m.member?.avatar_url ?? null, role: ROLE_NAME[m.role] })))
+/** 코멘트 글쓴이 · 멘션 이름표: 지금 멤버 + 프로젝트를 나간 사람(워크스페이스 멤버 정보로 이름 · 사진을 그대로 — '이전 멤버'로 바꾸지 않아요) */
+const commentAuthors = computed(() => {
+  const list: { id: string; name: string; avatar?: string | null }[] = [...mentionPeople.value]
+  for (const m of members.data.value ?? []) if (!list.some((p) => p.id === m.id)) list.push({ id: m.id, name: m.name || m.email, avatar: m.avatar_url ?? null })
+  return list
+})
 /**
  * 오른쪽 패널을 코멘트 목록으로(피그마와 같아요): 코멘트 모드(도구 막대 · C)면 계속, 아니면 핀을 열었거나 새 코멘트를 쓰는 동안만 —
  * 캔버스 빈 곳을 누르면 스레드가 닫히고 원래 패널로 돌아와요
  */
 const commentsShown = computed(() => commentMode.value || !!openThread.value || !!draft.value)
 // 핀 · 스레드는 늘 보여요. 코멘트 모드는 '새 코멘트 달기'만: 커서가 말풍선으로 바뀌고 어디든 누르거나 끌면 달아요
-watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null } else draft.value = null })
+watch(commentMode, (on) => { if (on) { tool.value = 'move'; following.value = null; pinsShown.value = true } else draft.value = null })
+// 코멘트를 숨기면 코멘트 모드 · 열린 스레드 · 쓰던 새 코멘트도 함께 닫아요
+watch(pinsShown, (on) => { if (!on) { commentMode.value = false; openThread.value = null; draft.value = null } })
 /**
  * 코멘트 달기 커서: 흰 말풍선 + 진한 테두리(피그마 코멘트 커서 — 누르는 점 = 왼쪽 아래 뾰족한 끝).
  * 브라우저 이미지 커서는 화면이 계속 다시 그려질 때(다른 사람 커서 · 호버 표시) 움직이는 동안 화살표로 바뀌었다가 멈추면 돌아왔어요 →
@@ -331,6 +342,8 @@ const drawing = ref<{ x: number; y: number; w: number; h: number } | null>(null)
  */
 function onCommentDown(e: PointerEvent) {
   if (e.button !== 0) return
+  // 다른 창(알림 · 메뉴 · 팝오버 …)이 열려 있으면 이번 누름은 그 창 닫기만(utils/dismiss.ts) — 코멘트를 달지 않아요
+  if (dismissPress(e)) return
   const el = canvasEl()
   if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return
   // 답글 · 새 코멘트에 쓰던 게 있으면(피그마와 같아요): 처음 누름은 글을 골라 흔들어 알려 주기만, 한 번 더 누르면 닫아요
@@ -371,6 +384,10 @@ function onCommentKey(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
   if (e.code === 'KeyC' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); commentMode.value = !commentMode.value; return }
+  // 코멘트 모드 중 도구 단축키(V K H F R L O P T · ⇧S ⇧L ⇧P)를 누르면 코멘트 모드를 끄고 그 도구로(툴바를 누를 때와 같아요) — 키는 그대로 캔버스로 넘겨요
+  if (commentMode.value && !e.metaKey && !e.ctrlKey && !e.altKey && (e.shiftKey ? ['KeyS', 'KeyL', 'KeyP'] : ['KeyV', 'KeyK', 'KeyH', 'KeyF', 'KeyR', 'KeyL', 'KeyO', 'KeyP', 'KeyT']).includes(e.code)) commentMode.value = false
+  // ⇧C: 코멘트 보이기 · 숨기기(피그마와 같아요)
+  if (e.code === 'KeyC' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); pinsShown.value = !pinsShown.value; return }
   if (e.key === 'Escape' && (commentMode.value || openThread.value || draft.value)) {
     e.stopPropagation()
     if (draft.value) draft.value = null
@@ -505,6 +522,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', stopFollowKey))
  */
 function stopFollowInput(e: Event) {
   if (!following.value) return
+  if (e.type === 'pointerdown' && dismissPress(e)) return
   const el = canvasEl()
   if (el && e.target instanceof Node && el.contains(e.target)) following.value = null
 }
@@ -819,6 +837,22 @@ function onArrangeScreens(op: ArrangeOp) {
   const back = before.filter((b) => after.some((a) => a.id === b.id))
   apply(after)
   store.pushAction(null, () => apply(back), () => apply(after))
+}
+/** 프레임 템플릿(오른쪽 패널): 그 크기 · 이름으로 맨 오른쪽 프레임 옆(80px)에 만들고 그리로 화면을 옮겨요(실행취소 한 번) */
+async function onPreset(p: { name: string; w: number; h: number }) {
+  if (blockEdit()) return
+  const top = list.value.length ? Math.min(...list.value.map((s) => s.y)) : 0
+  const rect = { x: Math.round(nextX.value), y: Math.round(top), width: p.w, height: p.h }
+  tool.value = 'move'
+  try {
+    const row = await addScreen(rect, p.name)
+    if (row) {
+      store.selectScreen(row.id); tab.value = 'design'
+      let cur = row.id
+      store.pushAction(null, async () => { await removeScreen(cur); store.selectScreen(null) }, async () => { const r = await addScreen(rect, row.name); if (r) cur = r.id })
+      nextTick(() => canvas.value?.fitSelection(1))
+    }
+  } catch { sayFail(tr('Couldn\'t create the frame. Try again')) }
 }
 async function onCreate(rect: { x: number; y: number; width: number; height: number }) {
   if (blockEdit()) return
@@ -1579,8 +1613,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       @reload="tabReload.reload(projectId)"
     />
  <CommentLayer
-      v-if="!gateActive"
-      :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :my-id="comments.myId.value"
+      v-if="!gateActive && pinsShown"
+      :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value"
       :can-moderate="access.can.value.manage" :draft="draft" :drawing="drawing" :open-id="openThread" :layer-box="layerBox"
       @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
       :draft-nudge="draftNudge" @draft-dirty="(v) => (draftDirty = v)" @draft-area="setDraftArea" :reply-nudge="replyNudge" @reply-dirty="(v) => (replyDirty = v)"
@@ -1761,11 +1795,14 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="currentPage?.viewport?.snapPixel !== false" @click="onPageSettings({ snapPixel: currentPage?.viewport?.snapPixel === false })"><EditorIcon name="check" :size="12" :class="['zck', { off: currentPage?.viewport?.snapPixel === false }]" /><span class="f1">{{ tr('Snap to pixel grid') }}</span><span class="tx-meta">⇧⌘'</span></button>
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="gridsShown" @click="gridsShown = !gridsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !gridsShown }]" /><span class="f1">{{ tr('Layout grids') }}</span><span class="tx-meta">⇧G</span></button>
               <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="rulersShown" @click="rulersShown = !rulersShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !rulersShown }]" /><span class="f1">{{ tr('Rulers') }}</span><span class="tx-meta">⇧R</span></button>
+              <button class="sq menu-item" role="menuitemcheckbox" :aria-checked="pinsShown" @click="pinsShown = !pinsShown"><EditorIcon name="check" :size="12" :class="['zck', { off: !pinsShown }]" /><span class="f1">{{ tr('Comments') }}</span><span class="tx-meta">⇧C</span></button>
             </div>
           </div>
         </div>
 
-        <template v-if="current">
+        <!-- 프레임 도구(F): 오른쪽 패널이 크기 템플릿으로(피그마와 같아요) — 누르면 그 크기로 바로 그려요 -->
+        <div v-if="tool === 'frame' && tab === 'design' && !readOnly" class="scroll insp"><FramePresets @pick="onPreset" /></div>
+        <template v-else-if="current">
           <div v-if="tab !== 'design'" class="obj">
             <div class="obj-row">
               <span class="tx-head ellipsis">{{ current.name }}</span>
@@ -1812,7 +1849,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
-      <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false; openThread = null; draft = null" @resolve="resolveComment" @read-all="readAllComments" />
+      <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false; openThread = null; draft = null" @resolve="resolveComment" @read-all="readAllComments" />
     </aside>
 
     <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
@@ -1929,6 +1966,10 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
 <style scoped>
 .editor.commenting :deep(.canvas), .editor.commenting :deep(.canvas *) { cursor: none !important; }
+/* 코멘트 모드: 캔버스 안쪽 요소는 마우스를 받지 않아요 — 마우스 아래 요소가 늘 캔버스(main) 하나라 브라우저가 커서를 다시 정하지 않아요.
+   (움직일 때마다 프레임 · 글자 · 다른 사람 커서 등 아래 요소가 바뀌면 그 사이 잠깐 기본 화살표가 보였어요 — 사용자 지적 2026-11-27)
+   코멘트 달기 · 영역 끌기는 창(capture)에서, 휠 확대 · 이동은 캔버스(main)에서 받아서 그대로예요 */
+.editor.commenting :deep(.canvas *) { pointer-events: none !important; }
 /* 코멘트 커서: 브라우저 커서 대신 마우스 자리에 직접 그려요(움직이는 동안 화살표로 바뀌던 것 — 사용자 요청 2026-11-27). 누르는 점 = 말풍선 왼쪽 아래(3, 17) */
 .cm-cursor { position: fixed; left: 0; top: 0; z-index: 45; width: 20px; height: 20px; pointer-events: none; opacity: 0; will-change: transform; }
 /* 따라가는 중: 탭 줄 아래 편집기 영역 테두리를 그 사람 색 3px 로(피그마와 같아요) */
@@ -1977,7 +2018,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .pbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: clip; }
 /* 좌측 패널 맨 아래 Variables: 위 구분선 + 안쪽 6 · 8 여백 안에 행 32(모서리 6, 호버 · 연 상태 회색) — 패널 둥근 모서리 밖으로 칠이 나가지 않게 */
 .vars-foot { flex: none; margin-top: auto; padding: var(--ref-spacing-05) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
-.vars-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); width: 100%; height: 32px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-800); text-align: left; }
+.vars-btn { display: flex; align-items: center; gap: var(--ref-spacing-06); width: 100%; height: 32px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-800); text-align: left; }
 .vars-btn:hover, .vars-btn.on { --sq-fill: var(--sys-color-neutral-100); }
 .vars-btn .muted { color: var(--sys-color-neutral-500); }
 .home-wrap { position: relative; flex: none; }
@@ -2036,7 +2077,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 /* 묶음 라벨(Planning · Design …): 섹션 제목보다 한 단계 아래 — 12 · 500 · neutral-500, 글자 열 x+8 */
 .dgroup .nav-label { padding: 0 var(--ref-spacing-06) var(--ref-spacing-04); color: var(--sys-color-neutral-500); font-weight: 500; }
 .warn { flex: none; display: grid; color: var(--sys-color-theme-warning-default); }
-.empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); padding: var(--ref-spacing-02) var(--ref-spacing-06); }
+.empty-col { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); padding: var(--ref-spacing-02) var(--ref-spacing-06); }
 .flex-none { flex: none; }
 .f1 { flex: 1; }
 .muted { color: var(--sys-color-neutral-500); flex: none; }
@@ -2050,7 +2091,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .view-wrap { position: relative; flex: none; }
 .vmenu { width: 184px; }
 .zck.off { visibility: hidden; }
-.obj { flex: none; display: flex; flex-direction: column; padding: var(--ref-spacing-02) var(--ref-spacing-10) var(--ref-spacing-08); box-shadow: inset 0 -1px 0 var(--iris-line); }
+.obj { flex: none; display: flex; flex-direction: column; padding: var(--ref-spacing-02) var(--ref-spacing-10) var(--ref-spacing-08) var(--iris-insp-x); box-shadow: inset 0 -1px 0 var(--iris-line); }
 .obj-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); }
 .badge { flex: none; height: 20px; line-height: 20px; white-space: nowrap; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-02); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-weight: 500; }
 .scroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; }
@@ -2063,7 +2104,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .doc-h .back { display: flex; align-items: center; gap: var(--ref-spacing-02); height: 24px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-02); margin-left: 3px; border-radius: var(--ref-radius-03); font-weight: 600; color: var(--sys-color-neutral-800); }
 .doc-h .back .flip { transform: scaleX(-1); color: var(--sys-color-neutral-600); }
 .doc-with { flex: none; max-width: 50%; }
-.none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.none { padding: var(--ref-spacing-04) var(--ref-spacing-10) var(--ref-spacing-08) var(--iris-insp-x); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .self-start { align-self: flex-start; }
 /* 토스트: 도구 막대(아래 16 + 높이 44 = 60) 위로 16 띄워서 */
 .toast-wrap { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; pointer-events: none; font-size: 12px; line-height: 18px; } /* body 로 옮겨서 편집기 글자 크기(12 · 18)를 직접 정해요 — 예전 모양 그대로 */

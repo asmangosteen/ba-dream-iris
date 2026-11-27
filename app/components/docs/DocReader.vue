@@ -21,8 +21,9 @@ export function scrollToDocAnchor(
 </script>
 
 <script setup lang="ts">
-import { Button, Icon, TextButton } from '@ba-dream/design-system'
+import { Button, TextButton } from '@ba-dream/design-system'
 import type { DocRow, ReqRow } from '~/composables/useIrisData'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 const props = withDefaults(defineProps<{
   doc: DocRow
@@ -245,9 +246,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <TextButton v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" :loading="opening" @click="openFile">{{ tr('Original') }}</TextButton>
       </div>
       <a v-if="doc.source_type === 'link' && doc.url" :href="doc.url" target="_blank" rel="noopener noreferrer" class="tx-meta src">
-        <Icon name="link" :size="12" />
+        <EditorIcon name="link" :size="12" />
         <span class="ellipsis">{{ doc.url }}</span>
-        <Icon name="arrow_up_right" :size="12" />
+        <EditorIcon name="arrow_up_right" :size="12" />
       </a>
     </header>
 
@@ -264,10 +265,10 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
     <!-- 링크 본문을 못 가져온 경우: 붙여넣기 -->
     <div v-else-if="linkFailed" class="paste">
       <div class="sq card">
-        <span class="sq chip"><Icon name="link" :size="16" /></span>
+        <span class="sq chip"><EditorIcon name="link" :size="16" /></span>
         <span class="card-col">
           <span class="tx-body name ellipsis" :title="linkHost || doc.title">{{ linkHost || doc.title }}</span>
-          <span class="tx-meta warn"><Icon name="warning" :size="12" />{{ tr("Couldn't load the page content") }}</span>
+          <span class="tx-meta warn"><EditorIcon name="warning" :size="12" />{{ tr("Couldn't load the page content") }}</span>
         </span>
       </div>
       <label class="tx-head" :for="`paste-${doc.id}`">{{ tr('Paste content') }}</label>
@@ -306,7 +307,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </div>
 
       <div v-if="tool" class="sq tool" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="sq tool-btn" @click="createReq"><Icon name="plus" :size="14" />{{ tr('Create requirement') }}</button>
+        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create requirement') }}</button>
       </div>
     </article>
 

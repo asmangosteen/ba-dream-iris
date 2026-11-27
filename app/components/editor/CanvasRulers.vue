@@ -101,7 +101,7 @@ function onKey(e: KeyboardEvent) {
     emit('change', remove(g))
   } else if (e.key === 'Escape') picked.value = null
 }
-function onDocDown(e: PointerEvent) { if (!(e.target as HTMLElement).closest?.('.guide')) picked.value = null }
+function onDocDown(e: PointerEvent) { if (dismissPress(e)) return; if (!(e.target as HTMLElement).closest?.('.guide')) picked.value = null }
 onMounted(() => { window.addEventListener('keydown', onKey, true); window.addEventListener('pointerdown', onDocDown, true) })
 onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDocDown, true) })
 function world(e: PointerEvent) {

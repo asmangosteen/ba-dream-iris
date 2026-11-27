@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import MemberAvatar from '~/components/app/MemberAvatar.vue'
 
 /** 편집기 기본 드롭다운 — 브라우저 <select> 대신 써요(PRD/07 §7.1 메뉴 규격을 Iris 흰 메뉴로).
     버튼은 .dd(28h · neutral-200), 메뉴는 아래(자리가 없으면 위)에 4px 띄워서. 고른 항목은 ✓ 칸, 묶음 사이는 구분선.
     키보드: ↑ ↓ 로 옮기고 Enter · Space 로 고르기, Esc 로 닫기. 열고 닫을 때 애니메이션 없음(피그마와 같아요) */
 /** raw = 이 항목 글자는 번역하지 않기(글꼴 굵기 이름 · 이미 번역한 글자 등) */
-export interface SelectOption { value: string; label: string; short?: string; sep?: boolean; disabled?: boolean; raw?: boolean }
+/** person = 사람 고르기(코멘트 멘션처럼 앞에 프로필 사진), hint = 오른쪽 옅은 글자(예: 지금 역할 — 번역해서 보여 줘요) */
+export interface SelectOption { value: string; label: string; short?: string; sep?: boolean; disabled?: boolean; raw?: boolean; person?: { name: string; src?: string | null }; hint?: string }
 /** variant: field = 칸 모양 드롭다운(기본) · inline = 입력칸 안의 작은 글자 버튼(W 칸의 Hug ▾) · icon = 24 아이콘 버튼(슬롯) */
 /** 글자(label · short · placeholder · ariaLabel)는 부모가 영어 원문으로 넘기고 여기서 지금 언어로 바꿔요. raw = 사용자 · 컴포넌트 값이라 번역하지 않기 */
 const props = withDefaults(defineProps<{ modelValue: string | null | undefined; options: readonly SelectOption[]; ariaLabel?: string; placeholder?: string; variant?: 'field' | 'inline' | 'icon'; raw?: boolean }>(), { variant: 'field', placeholder: undefined, ariaLabel: '', raw: false })
 const L = (s: string | undefined, raw = false) => (s && !props.raw && !raw ? tr(s) : s)
+/** 사람 고르기 메뉴(프로필 사진이 있는 항목): 줄을 32 로 — 코멘트 멘션 목록과 같아요 */
+const hasPeople = computed(() => props.options.some((o) => !!o.person))
+/** 아직 아무것도 안 골랐으면 ✓ 칸을 비워 두지 않아요(왼쪽 빈자리 없이) */
+const hasPick = computed(() => props.options.some((o) => o.value === props.modelValue))
 const aria = computed(() => L(props.ariaLabel) ?? '')
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
@@ -106,6 +112,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
   <div ref="root" :class="['esel', { 'is-inl': variant === 'inline' }]" @keydown="onKey">
     <button v-if="variant === 'field'" type="button" :class="['sq', 'dd', { open }]" :aria-label="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle">
       <slot name="lead" />
+      <MemberAvatar v-if="current?.person" :name="current.person.name" :src="current.person.src" :size="20" class="pav" />
       <span :class="['v', { ph: !current }]">{{ L(current?.label ?? placeholder, current?.raw) ?? '' }}</span>
       <EditorIcon name="chevron_down" :size="12" class="cv" />
     </button>
@@ -115,7 +122,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
     </button>
     <button v-else type="button" :class="['ib', 's24', { on: open }]" :aria-label="aria" :data-tip="aria" aria-haspopup="listbox" :aria-expanded="open" :aria-controls="open ? uid : undefined" :aria-activedescendant="open && active >= 0 ? `${uid}-${active}` : undefined" @click="toggle"><slot /></button>
     <!-- 바깥(검은 바탕 · 테두리)은 그대로, 안쪽 목록만 스크롤 — 바탕을 그리는 ::before 가 내용과 함께 스크롤되어 아래 행이 바탕 밖으로 튀어나오던 문제 -->
-    <div v-if="open" :id="uid" ref="menuEl" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline' }]" :style="shift" role="listbox" :aria-label="aria">
+    <div v-if="open" :id="uid" ref="menuEl" :class="['sq', 'menu', 'esel-m', { up, right: variant === 'icon', 'm-inl': variant === 'inline', people: hasPeople }]" :style="shift" role="listbox" :aria-label="aria">
       <div ref="list" class="menu-sc esel-sc">
       <template v-for="(o, i) in options" :key="o.value">
         <div v-if="o.sep && i > 0" class="msep" role="separator" />
@@ -130,8 +137,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
           @pointerenter="active = i"
           @click="pick(o)"
         >
-          <span class="ck" aria-hidden="true"><EditorIcon v-if="o.value === modelValue" name="check" :size="12" /></span>
+          <span v-if="hasPick" class="ck" aria-hidden="true"><EditorIcon v-if="o.value === modelValue" name="check" :size="12" /></span>
+          <MemberAvatar v-if="o.person" :name="o.person.name" :src="o.person.src" :size="20" class="pav" />
           <span class="l">{{ L(o.label, o.raw) }}</span>
+          <span v-if="o.hint" class="hint">{{ L(o.hint) }}</span>
         </button>
       </template>
       </div>
@@ -145,6 +154,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 .dd .v.ph { color: var(--sys-color-neutral-500); }
 .dd .cv { flex: none; color: var(--sys-color-neutral-500); }
 .esel-m { font-weight: 400; text-align: left; bottom: auto; height: auto; left: 0; right: auto; min-width: 100%; width: max-content; max-width: 240px; }
+/* 칸 모양 드롭다운의 메뉴는 칸과 같은 폭에서 시작(안쪽 여백까지 폭에 넣어요 — 전엔 여백 16 만큼 넓었어요), 글자가 더 길 때만 넓어져요(잘리지 않게) — 서비스 공통 */
+.esel-m { box-sizing: border-box; }
 /* 스크롤은 안쪽만(.menu-sc, main.css) — 바깥 높이 최대 320(안쪽 여백 8 · 8 빼고 304) */
 .esel-sc { max-height: 304px; }
 .esel-m.up { top: auto; bottom: calc(100% + 4px); }
@@ -165,5 +176,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDoc, true))
 .ck { flex: none; width: 12px; height: 12px; color: var(--sys-color-neutral-800); }
 /* 아이콘 버튼(☰ 등)이 메뉴를 연 동안: 눌린 표시 */
 .ib.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
-.l { flex: 1; white-space: nowrap; padding-right: var(--ref-spacing-06); }
+.l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: var(--ref-spacing-06); }
+/* 사람 고르기: 프로필 20 + 이름 + 오른쪽 옅은 역할(코멘트 멘션 목록과 같아요) */
+.pav { flex: none; }
+.esel-m.people .menu-item { height: 32px !important; min-height: 32px; gap: var(--ref-spacing-06); }
+.dd .pav { margin-left: calc(-1 * var(--ref-spacing-02)); }
+.hint { flex: none; padding-right: var(--ref-spacing-04); opacity: .6; }
 </style>

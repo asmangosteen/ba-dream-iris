@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
-import { Icon } from '@ba-dream/design-system'
 import CommentComposer, { type MentionPerson } from '~/components/editor/CommentComposer.vue'
 import EmojiPicker from '~/components/editor/EmojiPicker.vue'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
@@ -23,6 +22,8 @@ const props = defineProps<{
   screens: { id: string; name: string; x: number; y: number; width: number; height: number }[]
   pageId: string | null
   people: (MentionPerson & { email?: string })[]
+  /** 글쓴이 · 멘션 이름표용: 프로젝트를 나간 사람까지(이름 · 사진을 그대로 보여 줘요). 없으면 people */
+  authors?: { id: string; name: string; avatar?: string | null }[]
   myId: string | null
   canModerate: boolean
   draft: { screenId: string | null; layerId?: string | null; x: number; y: number; area?: CommentArea | null } | null
@@ -79,7 +80,7 @@ function areaWorld(at: Parameters<typeof origin>[0] & { area?: CommentArea | nul
 const sx = (x: number) => props.vp.x + x * props.vp.zoom
 const sy = (y: number) => props.vp.y + y * props.vp.zoom
 const rectStyle = (b: Box) => ({ left: sx(b.x) + 'px', top: sy(b.y) + 'px', width: b.w * props.vp.zoom + 'px', height: b.h * props.vp.zoom + 'px' })
-const person = (id: string | null) => props.people.find((p) => p.id === id) ?? null
+const person = (id: string | null) => (props.authors ?? props.people).find((p) => p.id === id) ?? null
 const nameOf = (id: string | null) => person(id)?.name ?? tr('Former member')
 const me = computed(() => person(props.myId))
 
@@ -214,7 +215,7 @@ function draftBoxAt(w: { x: number; y: number }) {
 
 /** 글 속 @이름은 파랗게 */
 function parts(body: string) {
-  const names = props.people.map((p) => '@' + p.name).filter((n) => body.includes(n)).sort((a, b) => b.length - a.length)
+  const names = (props.authors ?? props.people).map((p) => '@' + p.name).filter((n) => body.includes(n)).sort((a, b) => b.length - a.length)
   if (!names.length) return [{ t: body, m: false }]
   const re = new RegExp('(' + names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'g')
   return body.split(re).filter(Boolean).map((t) => ({ t, m: names.includes(t) }))
@@ -335,15 +336,15 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
         <h2 id="cmtT" class="pop-ttl">{{ tr('Comment') }}</h2>
         <span class="tools">
           <span ref="moreEl" class="more-w">
-            <button type="button" class="sq pop-x" :aria-label="tr('More')" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen"><Icon name="menu_kebab" :size="16" /></button>
+            <button type="button" class="sq pop-x" :aria-label="tr('More')" :aria-expanded="moreOpen" @click="moreOpen = !moreOpen"><EditorIcon name="menu_kebab" :size="16" /></button>
             <div v-if="moreOpen" class="sq menu mm" role="menu">
               <button type="button" role="menuitem" class="sq menu-item" @click="moreOpen = false; emit('unread', open.root)">{{ tr('Mark as unread') }}</button>
               <button type="button" role="menuitem" class="sq menu-item" @click="moreOpen = false; emit('copyLink', open.root)">{{ tr('Copy link') }}</button>
               <button v-if="canDelete(open.root)" type="button" role="menuitem" class="sq menu-item danger" @click="moreOpen = false; emit('remove', open.root)">{{ tr('Delete thread') }}</button>
             </div>
           </span>
-          <button type="button" :class="['sq', 'pop-x', 'rs', { ok: !!open.root.resolved_at }]" :aria-pressed="!!open.root.resolved_at" :aria-label="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="emit('resolve', open.root, !open.root.resolved_at)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.25" fill="none" stroke="currentColor" stroke-width="1.25" /><path d="M5.8 9.2l2.2 2.2 4.2-4.6" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('open', null)"><Icon name="close" :size="16" /></button>
+          <button type="button" :class="['sq', 'pop-x', 'rs', { ok: !!open.root.resolved_at }]" :aria-pressed="!!open.root.resolved_at" :aria-label="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="open.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="emit('resolve', open.root, !open.root.resolved_at)"><EditorIcon name="resolve" :size="18" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="emit('open', null)"><EditorIcon name="close" :size="16" /></button>
         </span>
       </div>
       <div v-ovscroll class="pop-body msgs">
@@ -352,14 +353,14 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
           <span class="mh">
             <MemberAvatar :name="nameOf(c.author_id)" :src="person(c.author_id)?.avatar" :size="24" /><b>{{ nameOf(c.author_id) }}</b><span class="tx-meta">{{ relativeTime(c.created_at) }}<template v-if="c.edited_at"> · {{ tr('edited') }}</template></span>
             <span v-if="canEditMsg(c) || canDeleteMsg(c, 1 + open.replies.length)" :class="['msg-more', { on: msgMenu === c.id }]">
-              <button type="button" class="sq pop-x mb-x" :aria-label="tr('More')" :aria-expanded="msgMenu === c.id" @click="openMsgMenu(c, $event)"><Icon name="menu_meatball" :size="16" /></button>
+              <button type="button" class="sq pop-x mb-x" :aria-label="tr('More')" :aria-expanded="msgMenu === c.id" @click="openMsgMenu(c, $event)"><EditorIcon name="menu_meatball" :size="16" /></button>
             </span>
           </span>
           <!-- 고치기: 그 자리에서 입력칸(Cancel · Save) -->
           <CommentComposer v-if="editingId === c.id" class="ed" :people="people" :initial="c.body" editing @send="(b, m) => { editingId = null; if (b !== c.body) emit('edit', c, b, m) }" @cancel="editingId = null" />
           <div v-else-if="c.body" class="body-row">
             <p class="body"><template v-for="(x, i) in parts(c.body)" :key="i"><b v-if="x.m" class="at">{{ x.t }}</b><template v-else>{{ x.t }}</template></template></p>
-            <button v-if="!reactionsOf(c).length" type="button" :class="['sq', 'pop-x', 'rx-add', 'rx-hover', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="smile" :size="16" /></button>
+            <button v-if="!reactionsOf(c).length" type="button" :class="['sq', 'pop-x', 'rx-add', 'rx-hover', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
           </div>
           <div v-if="imgCount(c)" class="imgs">
             <button v-for="src in c.attachments" :key="src" type="button" class="sq img" :aria-label="tr('Open image')" @click="viewImage(src)"><img :src="resolveSrc(src)" alt=""></button>
@@ -370,7 +371,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
               v-for="[emo, ids] in reactionsOf(c)" :key="emo" type="button" :class="['sq', 'rx', { me: mine(ids) }]" :aria-pressed="mine(ids)"
               :aria-label="`${emo} ${ids.length}`" :data-tip="whoReacted(ids)" @click="emit('react', c, emo)"
             ><span class="rx-e">{{ emo }}</span><span class="num">{{ ids.length }}</span></button>
-            <button type="button" :class="['sq', 'pop-x', 'rx-add', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="smile" :size="16" /></button>
+            <button type="button" :class="['sq', 'pop-x', 'rx-add', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
           </div>
         </div>
       </div>
@@ -417,7 +418,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 /* 카드가 펼쳐진 동안 원래 핀은 숨겨요(자리 · 마우스는 그대로) */
 .pin.hid { opacity: 0; }
 .pa { margin: 0; }
-.pb { min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-03, 6px); padding-top: 5px; font-size: 12px; line-height: 18px; }
+.pb { min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-03); padding-top: 5px; font-size: 12px; line-height: 18px; }
 .pt { color: var(--sys-color-neutral-800); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 /* 새 코멘트 입력칸: 떠 있는 상자 */
 .nw { position: absolute; width: 320px; z-index: 4; filter: drop-shadow(0 4px 12px rgb(3 9 26 / 12%)); }
@@ -435,14 +436,15 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 /* 글 목록: 3~4개쯤 보이는 높이(최대 340)에서 넘치면 안쪽 스크롤 — 사이드바와 같은 떠 있는 얇은 막대(v-ovscroll) */
 .msgs { flex: 1 1 auto; min-height: 0; max-height: 340px; overflow-y: auto; scrollbar-width: none; }
 .msgs::-webkit-scrollbar { display: none; }
-.msg { display: flex; flex-direction: column; gap: var(--ref-spacing-03, 6px); }
+.msg { display: flex; flex-direction: column; gap: var(--ref-spacing-03); }
 /* 이름 줄: 아바타 · 이름 · 시각 사이 8 */
 .mh { display: flex; gap: var(--ref-spacing-06); align-items: center; }
 .mh b { font-weight: 600; color: var(--sys-color-neutral-800); }
 /* 글마다 ⋯: 줄 오른쪽 끝, 마우스를 올리거나 메뉴가 열렸을 때만 */
 .msg-more { position: relative; margin-left: auto; opacity: 0; }
 .msg:hover .msg-more, .msg-more.on, .msg-more:focus-within { opacity: 1; }
-.mb-x { width: 24px; height: 24px; }
+/* ⋯ 와 아래 😊(28) 가 같은 세로 중심선에 오게: 폭을 28 로 맞춰요(높이는 머리 줄 24) */
+.mb-x { width: 28px; height: 24px; }
 .msg-menu { position: absolute; left: auto; bottom: auto; width: 140px; z-index: 8; opacity: 1; margin: 0; }
 .ed { margin-left: 32px; }
 .body { margin: 0; padding-left: 32px; color: var(--sys-color-neutral-800); white-space: pre-wrap; overflow-wrap: anywhere; }

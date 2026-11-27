@@ -19,6 +19,7 @@ export function useCanvasMenu(canvas: Ctx) {
   } = canvas
   const gridsShown = useLayoutGridsShown()
   const rulersShown = useState('iris-rulers', () => false)
+  const pinsShown = useState('iris-comments-shown', () => true)
   const lastCopy = useLastCopy()
   const renameReq = useRenameReq()
   const ctx = useContextMenu()
@@ -171,6 +172,7 @@ export function useCanvasMenu(canvas: Ctx) {
       'sep',
       { label: rulersShown.value ? tr('Hide rulers') : tr('Show rulers'), shortcut: '⇧R', action: () => (rulersShown.value = !rulersShown.value) },
       { label: gridsShown.value ? tr('Hide layout grids') : tr('Show layout grids'), shortcut: '⇧G', action: () => (gridsShown.value = !gridsShown.value) },
+      { label: pinsShown.value ? tr('Hide comments') : tr('Show comments'), shortcut: '⇧C', action: () => (pinsShown.value = !pinsShown.value) },
     ])
   }
   return { gridsShown, rulersShown, lastCopy, renameReq, doPaste, sectionScreens, onContext }

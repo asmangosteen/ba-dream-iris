@@ -42,7 +42,8 @@ const GROUP_LABEL: Record<string, string> = { move: 'Move tools', frame: 'Region
 const tip = (it: Item) => (it.key2 ? `${tr(it.label)} (${it.key2})` : tr(it.label))
 /** 묶음 버튼에 보이는 도구: 지금 고른 도구가 이 묶음이면 그것, 아니면 마지막에 쓴 것(Image 는 한 번 쓰고 돌아와서 제외) */
 const shown = (g: { id: string; tools: Tool[] }) => ITEMS[g.tools.includes(tool.value) && tool.value !== 'image' ? tool.value : last[g.id]!]
-function pick(t: Tool) { tool.value = t; open.value = null }
+/** 코멘트 모드 중에 도구를 누르면 코멘트 모드를 끄고 그 도구로(피그마와 같아요 — 코멘트 중엔 다른 도구가 선택돼 보이지 않아요) */
+function pick(t: Tool) { if (props.commenting) emit('rail', 'comment'); tool.value = t; open.value = null }
 /** 펼침 메뉴 키보드: 열면 지금 도구에 초점, ↑↓ Home End 로 옮기고 Esc · Tab 으로 닫아요(Esc 는 ▾ 로 초점을 돌려줘요) */
 const root = ref<HTMLElement | null>(null)
 async function toggle(id: string, focusIn = false) {
@@ -94,9 +95,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
         :data-tip="tr(shown(g).label)"
         :data-tip-key="shown(g).key2"
         data-tip-at="top"
-        :aria-pressed="g.tools.includes(tool)"
+        :aria-pressed="!props.commenting && g.tools.includes(tool)"
         type="button"
-        :class="['rail-btn', { on: g.tools.includes(tool) }]"
+        :class="['rail-btn', { on: !props.commenting && g.tools.includes(tool) }]"
         @click="pick(shown(g).key)"
       >
         <template v-for="it in [shown(g)]" :key="it.key">

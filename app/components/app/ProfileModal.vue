@@ -2,6 +2,7 @@
 import { Button, Icon, TextInput } from '@ba-dream/design-system'
 import { AVATAR_MAX_BYTES, ROLE_LABEL, squareAvatar, useMe, useUpdateMe, useUploadAvatar, type MemberRole, type MemberRow } from '~/composables/useMembers'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /** 내 프로필(사진 · 이름 · 역할) 고치기 — 영어 UI. v-model:open 으로 엽니다 */
 const open = defineModel<boolean>('open', { default: false })
@@ -125,7 +126,7 @@ function onRoleKey(e: KeyboardEvent) {
       >
         <div class="pop-top">
           <h1 id="profileTitle" class="pop-ttl">{{ tr('Edit profile') }}</h1>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </div>
 
         <form class="pop-body" @submit.prevent="save">
@@ -150,7 +151,7 @@ function onRoleKey(e: KeyboardEvent) {
             <span class="lbl">{{ tr('Email') }}</span>
             <span class="tx-meta">{{ me?.email }}</span>
           </div>
-          <div class="col">
+          <div class="choice">
             <span id="profileRoleLabel" class="lbl">{{ tr('Role') }}</span>
             <div class="seg roles" role="radiogroup" aria-labelledby="profileRoleLabel" @keydown="onRoleKey">
               <button
@@ -166,7 +167,7 @@ function onRoleKey(e: KeyboardEvent) {
             </div>
           </div>
           <p v-if="preview" class="tx-meta">{{ tr("Preview mode — changes stay on this screen and aren't saved") }}</p>
-          <p v-if="error" class="tx-meta err" role="alert"><Icon name="warning" :size="12" />{{ error }}</p>
+          <p v-if="error" class="tx-meta err" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</p>
         </form>
 
         <div class="pop-foot">
@@ -180,9 +181,9 @@ function onRoleKey(e: KeyboardEvent) {
 
 <style scoped>
 /* 프로필 창 = 팝업 기준(main.css 의 .pop · .pop-top · .pop-body · .pop-foot). 여기에는 안쪽 내용만 */
-.col { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.lbl { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.roles { margin-left: calc(-1 * var(--ref-spacing-06)); }
+/* 칸(라벨 + 내용): 라벨 → 내용 8 — 공통 .choice 와 같아요 */
+.col { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.lbl { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-700); }
 .photo { display: flex; align-items: center; gap: var(--ref-spacing-08); }
 .pic { position: relative; flex: none; border-radius: 50%; }
 .pic:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }

@@ -211,7 +211,7 @@ const isOn = (col: number, row: number) => {
 <style scoped>
 .s { padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
 .s:has(> .sec-h:only-child) { padding-bottom: var(--ref-spacing-08); }
-.hacts { display: flex; align-items: center; gap: var(--ref-spacing-02); }
+.hacts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .h24 { height: 28px; padding: 0; }
 /* 꺼져 있으면 빈 섹션(Stroke · Effects)처럼 제목을 옅게 */
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }

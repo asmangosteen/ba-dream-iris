@@ -264,6 +264,8 @@ function onKey(e: KeyboardEvent) {
   }
 }
 function onDown(e: PointerEvent) {
+  // 메뉴 · 팝오버가 열려 있으면 이번 누름은 그 창 닫기만(utils/dismiss.ts) — 자르기를 끝내지 않아요
+  if (dismissPress(e)) return
   const t = e.target as HTMLElement | null
   if (!t || t.closest('.crop-ui, .paint-pop, .panel-right, .esel-m, .menu, [role="dialog"]')) return
   apply()

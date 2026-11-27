@@ -4,6 +4,7 @@ import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import DocEditor from '~/components/docs/DocEditor.vue'
 import type { DocRow, LinkRow, ReqRow } from '~/composables/useIrisData'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
 const route = useRoute()
@@ -178,8 +179,8 @@ const moreEl = ref<HTMLElement | null>(null)
 function onDocPointer(e: PointerEvent) {
   if (menuOpen.value && moreEl.value && !moreEl.value.contains(e.target as Node)) menuOpen.value = false
 }
-onMounted(() => document.addEventListener('pointerdown', onDocPointer))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer))
+onMounted(() => document.addEventListener('pointerdown', onDocPointer, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, true))
 
 // 지우기 -----------------------------------------------------------------
 const deleting = ref(false)
@@ -227,7 +228,7 @@ async function removeDoc() {
     <div class="sq float s pill">
       <NuxtLink :to="backHref" class="ib" :aria-label="tr('Back to editor')"><Icon name="chevron_left" :size="16" /></NuxtLink>
       <NuxtLink :to="backHref" class="tx-meta crumb ellipsis">{{ projectName || tr('Project') }}</NuxtLink>
-      <Icon name="chevron_right" :size="12" color="var(--sys-color-neutral-400)" />
+      <EditorIcon name="chevron_right" :size="12" color="var(--sys-color-neutral-400)" />
       <span class="tx-head">{{ tr('Split view') }}</span>
     </div>
 
@@ -279,7 +280,7 @@ async function removeDoc() {
             :class="['sq', 'seg-item', 'tab', { on: d.id === docId }]"
             :title="d.title"
           >
-            <Icon :name="docIcon(d)" :size="12" />
+            <EditorIcon :name="docIcon(d)" :size="12" />
             <span class="ellipsis">{{ d.title }}</span>
           </NuxtLink>
         </nav>
@@ -316,7 +317,7 @@ async function removeDoc() {
               </span>
               <span class="tx-meta">{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Requirements') }}</NuxtLink>{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
             </span>
-            <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><Icon name="close" :size="14" /></button>
+            <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><EditorIcon name="close" :size="14" /></button>
           </div>
           <DocReader
             ref="reader"
@@ -342,7 +343,7 @@ async function removeDoc() {
                   @keydown.esc="menuOpen = false"
                 />
                 <div v-if="menuOpen" class="sq menu" role="menu" @keydown.esc="menuOpen = false">
-                  <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><Icon name="trashbin" :size="14" />{{ tr('Delete document') }}</button>
+                  <button type="button" role="menuitem" class="sq menu-item danger" @click="askDelete"><EditorIcon name="trashbin" :size="14" />{{ tr('Delete document') }}</button>
                 </div>
               </div>
             </template>

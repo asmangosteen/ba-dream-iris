@@ -73,7 +73,7 @@ function pick(n: string) { emit('update:modelValue', n); emit('close') }
 .ip { position: fixed; z-index: 70; width: 240px; max-height: min(480px, calc(100vh - 16px)); display: flex; flex-direction: column; border-radius: var(--ref-radius-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .ip-h { flex: none; display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-08); box-shadow: 0 1px 0 var(--iris-line); }
 .ip-t { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; }
-.s24 { width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-03); }
+.s24 { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); }
 .ip-b { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-06) var(--ref-spacing-08) var(--ref-spacing-08); }
 .ip-q { flex: none; height: 28px; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); color: var(--sys-color-neutral-500); }
 .ip-q input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--sys-color-neutral-800); -webkit-appearance: none; appearance: none; }

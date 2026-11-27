@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@ba-dream/design-system'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import { useNotifications, type NotificationRow } from '~/composables/useNotifications'
 import { ROLE_NAME, type ProjectRole } from '~/composables/useProjectAccess'
@@ -77,7 +77,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
 <template>
   <div ref="root" class="nb" @keydown="onKey">
     <button type="button" :class="['sq', 'bell', { on: open }]" :aria-label="label" :data-tip="tr('Notifications')" :aria-expanded="open" aria-haspopup="dialog" @click="toggle">
-      <Icon name="bell" :size="20" />
+      <EditorIcon name="bell" :size="20" />
       <span v-if="unread" class="cnt num" aria-hidden="true">{{ unread > 9 ? '9+' : unread }}</span>
     </button>
     <section v-if="open" class="sq panel" role="dialog" :aria-label="tr('Notifications')">
@@ -86,7 +86,7 @@ const label = computed(() => (unread.value ? tr('Notifications, {n} unread', { n
         <button v-if="unread" type="button" class="sq act" @click="markAllRead">{{ tr('Mark all as read') }}</button>
       </header>
       <div v-if="!(list.data.value ?? []).length" class="empty">
-        <Icon name="bell" :size="24" class="muted" />
+        <EditorIcon name="bell" :size="24" class="muted" />
         <span class="tx-head">{{ tr('No notifications yet') }}</span>
         <span class="tx-meta">{{ tr('Invites, role changes and requests show up here') }}</span>
       </div>

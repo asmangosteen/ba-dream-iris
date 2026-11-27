@@ -82,6 +82,13 @@ button:active{cursor:grabbing}
 .float{--sq-fill:var(--sys-color-common-white-emphasis);--sq-line:var(--iris-float-line);--sq-line-w:var(--iris-float-line-w);border-radius:var(--ref-radius-07);filter:var(--iris-float-shadow)}
 .float.s{border-radius:var(--ref-radius-06)}
 .seg{display:flex;align-items:center;gap:var(--ref-spacing-02)}
+/* 고르는 묶음(라벨 + 알약 줄 · 고르는 칸들) 공통: 라벨과 줄 사이 8, 알약 · 칸의 왼쪽 끝은 라벨 · 본문과 같은 선(음수 여백으로 내밀지 않아요) — 문서 추가 · 문서 편집 · 프로필 · 프로젝트 창 */
+/* 페이지 빈 화면 공통(프로젝트 · 요구사항): 아이콘 없이 가운데 옅은 글자 + 작은 버튼, 위아래 48 · 사이 8 */
+.page-empty{display:flex;flex-direction:column;align-items:center;gap:var(--ref-spacing-06);padding:var(--ref-spacing-17) 0;text-align:center}
+.page-empty p{margin:0}
+.choice{display:flex;flex-direction:column;gap:var(--ref-spacing-06);min-width:0}
+/* 칸 라벨은 디자인 시스템 입력칸 라벨(bd-label)과 같게: 12/18 600 neutral-700 — 묶음 제목(Members 등)만 neutral-800 */
+.choice>:first-child{font-size:12px;line-height:18px;font-weight:600;color:var(--sys-color-neutral-700)}
 /* 탭 · 세그먼트 · 버튼 묶음의 고른 칸이 스르륵 옮겨 가요(plugins/slide.client.ts). 고른 칸은 이웃 글자 · 아이콘 밑으로 지나가게 한 층 아래(묶음 안에서만 — 묶음이 쌓임 맥락) */
 .grp,.pp-tabs,.pp-types,.td-tabs{isolation:isolate}
 .grp>.ib.on,.pp-tabs>.pp-tab.on,.pp-types>.pp-type.on,.td-tabs>.td-tab.on{z-index:-1}
@@ -238,7 +245,7 @@ html:not(.kbd-nav) :is(.cs-track,.bar):focus-visible{box-shadow:none!important}
 /* 인스펙터 격자 — 피그마 UI3 열 구성: [칸 | 칸 | 아이콘 24], 사이 8. 아이콘이 없는 줄도 오른쪽 24 를 비워 끝선을 맞춰요
    .ig-l: 칸 위 보조 라벨(11/16 neutral-500), 라벨 → 칸 4 · 줄 → 줄 8 */
 .editor .ig{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px;gap:var(--ref-spacing-06);align-items:center;min-width:0}
-.editor .ig.w1{grid-template-columns:minmax(0,1fr) 24px}
+.editor .ig.w1{grid-template-columns:minmax(0,1fr) 28px}
 .editor .ig>.span2{grid-column:span 2;min-width:0}
 .editor .ig>*{min-width:0}
 /* 오른쪽 아이콘 열(24)은 아이콘이 없는 줄도 비워 둬요(빈 <span />) — 피그마와 같아요: 모든 줄의 칸 끝이 한 세로선에 맞아요 */
@@ -248,7 +255,7 @@ html:not(.kbd-nav) :is(.cs-track,.bar):focus-visible{box-shadow:none!important}
 .editor .ig .fld:not(:hover):not(:focus-within)>.reveal{display:none}
 /* 칸 안 드롭다운 메뉴가 열려 있으면 그 칸을 위로(칸이 isolation 으로 쌓임 맥락을 만들어서 뒤 요소에 가려지지 않게) */
 .editor .fld:has(.esel-m),.editor .esel:has(.esel-m){z-index:20}
-.editor .ig-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 24px;gap:0 var(--ref-spacing-06);margin-bottom:calc(-1 * var(--ref-spacing-04))}
+.editor .ig-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px;gap:0 var(--ref-spacing-06);margin-bottom:calc(-1 * var(--ref-spacing-04))}
 .editor .ig-l>span{font-size:11px;line-height:16px;color:var(--sys-color-neutral-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 켜진 아이콘 토글(오토 레이아웃 · 비율 잠금 · 개별 모서리 · 절대 위치): 옅은 파랑 + 파란 아이콘(피그마 #E5F4FF) */
 .editor .ib.tog{color:var(--sys-color-neutral-600)}
@@ -360,8 +367,9 @@ html,body{background:var(--iris-canvas)}
 @media (prefers-reduced-motion:reduce){:root{--iris-slide:0ms}}
 /* 패널 목록 끌어서 순서 바꾸기(useRowDrag, 피그마와 같아요): 패널 왼쪽 여백(16) 안, 입력칸 바로 옆에 작은 ≡ — 행 · 손잡이에 올리면 보이고 손 커서.
    끄는 동안 행은 흐리게, 넣을 자리는 파란 줄 */
-/* 오른쪽 패널 왼쪽 여백 20(오른쪽 16): 끝 – 손잡이 – 입력칸 사이가 고르게(피그마와 같아요) */
-.insp section.s{padding-left:20px}
+/* 오른쪽 패널 왼쪽 여백 20(오른쪽 16): 끝 – 손잡이 – 입력칸 사이가 고르게(피그마와 같아요). 오른쪽 패널의 모든 칸(Design · Plan · Dev 섹션, 머리, 빈 안내, 프레임 템플릿)이 이 값을 같이 써요 */
+:root{--iris-insp-x:20px}
+.insp section.s{padding-left:var(--iris-insp-x)}
 .drag-box{position:relative}
 [data-drag-row]{position:relative}
 .drag-h{position:absolute;left:-17px;top:50%;width:14px;height:28px;transform:translateY(-50%);display:grid;place-items:center;padding:0;border:0;background:none;color:var(--sys-color-neutral-500);opacity:0;cursor:grab;touch-action:none}

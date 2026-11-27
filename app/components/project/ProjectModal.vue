@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Button, Icon, TextInput } from '@ba-dream/design-system'
+import { Button, TextInput } from '@ba-dream/design-system'
 import { KIND_INFO, type ProjectKind } from '~/composables/useProjectActions'
 import { statusLabel, type ProjectStatus } from '~/composables/useProjects'
 import ProjectMembersPanel from '~/components/project/ProjectMembersPanel.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import EditorSelect from '~/components/editor/EditorSelect.vue'
-import { accessError, useProjectAccess } from '~/composables/useProjectAccess'
+import { ROLE_NAME, accessError, useProjectAccess } from '~/composables/useProjectAccess'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /** 새 프로젝트 만들기(projectId 없음) · 프로젝트 설정(projectId 있음, PRD/16 F): 탭 일반(이름 · 설명 · 종류 · 단계) · 멤버 · 위험 구역(방장만: 방장 넘기기 · 지우기) */
 const props = defineProps<{ projectId?: string | null }>()
@@ -32,7 +33,8 @@ const can = computed(() => access?.can.value ?? { manage: true, owner: true })
 const tabs = computed(() => ([['general', 'General'], ['members', 'Members'], ...(can.value.owner ? [['danger', 'Danger zone']] : [])] as [Tab, string][]))
 /** 방장 넘기기: 받을 멤버(나 말고) */
 const heir = ref<string | null>(null)
-const heirOptions = computed(() => (access?.members.value ?? []).filter((m) => m.member_id !== access?.me.value).map((m) => ({ value: m.member_id, label: m.member?.name || m.member?.email || '?', raw: true })))
+/** 새 방장 고르기: 프로필 사진 + 이름 + 오른쪽에 지금 역할(코멘트 멘션 목록처럼) */
+const heirOptions = computed(() => (access?.members.value ?? []).filter((m) => m.member_id !== access?.me.value).map((m) => ({ value: m.member_id, label: m.member?.name || m.member?.email || '?', raw: true, person: { name: m.member?.name || m.member?.email || '?', src: m.member?.avatar_url }, hint: ROLE_NAME[m.role] })))
 const confirmTransfer = ref(false)
 async function transfer() {
   if (!access || !heir.value) return
@@ -109,7 +111,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="projTitle" :class="['sq', 'pop', { wide: editing }]" :style="{ '--pop-w': editing ? '640px' : '440px' }" @keydown="onKeydown">
         <header class="pop-top">
           <h2 id="projTitle" class="pop-ttl">{{ editing ? tr('Project settings') : tr('New project') }}</h2>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </header>
 
         <div :class="{ split: editing }">
@@ -121,10 +123,11 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
           <TextInput v-model:value="name" size="s" :label="tr('Name')" :placeholder="tr('e.g. Subscription sign-up flow redesign')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projName', maxlength: 60 }" :label-props="{ htmlFor: 'projName' }" />
 
           <template v-if="editing">
-            <TextInput v-model:value="description" class="mt" size="s" :label="tr('Description')" :placeholder="tr('One line on what this project changes')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projDesc', maxlength: 120 }" :label-props="{ htmlFor: 'projDesc' }" />
+            <TextInput v-model:value="description" size="s" :label="tr('Description')" :placeholder="tr('One line on what this project changes')" :show-left-icon="false" :show-right-icon="false" :show-button="false" :show-supporting-text="false" :input-props="{ id: 'projDesc', maxlength: 120 }" :label-props="{ htmlFor: 'projDesc' }" />
           </template>
 
-          <span class="tx-head mt">{{ tr('Type') }}</span>
+          <div class="choice">
+          <span class="tx-head">{{ tr('Type') }}</span>
           <div class="kinds" role="radiogroup" :aria-label="tr('Project type')">
             <button v-for="(k, key) in KIND_INFO" :key="key" type="button" role="radio" :aria-checked="kind === key" :class="['sq', 'kind', { on: kind === key }]" @click="kind = key">
               <span class="sh-box" aria-hidden="true"><span class="sq shape" :class="key" /></span>
@@ -132,11 +135,14 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
               <span class="tx-meta kd">{{ tr(KIND_DEVICE[key]) }}<br><span class="num">{{ k.w }} × {{ k.h }}</span></span>
             </button>
           </div>
+          </div>
 
           <template v-if="editing">
-            <span class="tx-head mt">{{ tr('Stage') }}</span>
-            <div class="seg" role="radiogroup" :aria-label="tr('Stage')">
-              <button v-for="s in STATUSES" :key="s" type="button" role="radio" :aria-checked="status === s" :class="['sq', 'seg-item', { on: status === s }]" @click="status = s">{{ statusLabel(s) }}</button>
+            <div class="choice">
+              <span class="tx-head">{{ tr('Stage') }}</span>
+              <div class="seg" role="radiogroup" :aria-label="tr('Stage')">
+                <button v-for="s in STATUSES" :key="s" type="button" role="radio" :aria-checked="status === s" :class="['sq', 'seg-item', { on: status === s }]" @click="status = s">{{ statusLabel(s) }}</button>
+              </div>
             </div>
           </template>
 
@@ -187,9 +193,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 </template>
 
 <style scoped>
-/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 이 창 본문은 항목이 촘촘해서 사이 6 */
-.body { gap: var(--ref-spacing-04); }
-.mt { margin-top: var(--ref-spacing-06); }
+/* 팝업 양식은 main.css .pop-*(프로필 창 기준). 항목 사이는 팝업 공통 16(.pop-body · .fs) */
 .kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }
 .kind { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-02); padding: var(--ref-spacing-08); text-align: left; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .kind:hover { --sq-overlay: var(--interaction-light-gray-hover); }
@@ -212,13 +216,14 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
 .side-item.on { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 .side-item.red { color: var(--sys-color-theme-error-default); }
 .side-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
-.fs { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.fs { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
 .fs:disabled { opacity: .6; }
 .box { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-08) var(--ref-spacing-10) var(--ref-spacing-10); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); }
+/* 상자 안 드롭다운 메뉴가 열려 있으면 그 상자를 위로(상자마다 쌓임 맥락이 있어 아래 상자에 메뉴가 깔렸어요) */
+.box:has(.esel-m) { z-index: 2; }
 .box.danger { --sq-fill: color-mix(in srgb, var(--sys-color-theme-error-default) 6%, transparent); }
 .box .row { margin-top: var(--ref-spacing-04); }
 .red { color: var(--sys-color-theme-error-default); }
 .kd { white-space: nowrap; }
 .kind:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.mt { margin-top: var(--ref-spacing-06); }
 </style>

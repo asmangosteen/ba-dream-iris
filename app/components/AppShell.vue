@@ -4,7 +4,6 @@
  * 사이드바: 계정(아바타 · 이름 ▾ → 검은 계정 메뉴) · 검색(⌘K 창) · 메뉴(Projects · Requirements). 디자인 시스템은 편집기 Assets 로 합쳤어요.
  * 본문은 <slot> — 프로젝트 목록 · 요구사항 · 디자인 시스템 화면이 채워요.
  */
-import { Icon } from '@ba-dream/design-system'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
@@ -109,14 +108,14 @@ async function signOut(scope: 'local' | 'global' = 'local') {
           <LangSwitch />
           <div class="msep" role="separator" />
           <button type="button" role="menuitem" class="sq menu-item" tabindex="-1" @click="openProfile">
-            <Icon name="pencil" :size="16" />{{ tr('Edit profile') }}
+            <EditorIcon name="pencil" :size="16" />{{ tr('Edit profile') }}
           </button>
           <div class="msep" role="separator" />
           <button type="button" role="menuitem" class="sq menu-item" tabindex="-1" :disabled="signingOut" @click="signOut('local')">
-            <Icon name="logout_right" :size="16" />{{ signingOut ? tr('Logging out…') : tr('Log out') }}
+            <EditorIcon name="logout" :size="16" />{{ signingOut ? tr('Logging out…') : tr('Log out') }}
           </button>
           <button type="button" role="menuitem" class="sq menu-item" tabindex="-1" :disabled="signingOut" @click="signOut('global')">
-            <Icon name="logout_right" :size="16" />{{ tr('Log out of all devices') }}
+            <EditorIcon name="logout" :size="16" />{{ tr('Log out of all devices') }}
           </button>
         </div>
       </div>

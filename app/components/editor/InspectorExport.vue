@@ -122,7 +122,7 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
           <EditorIcon name="menu_meatball" />
         </button>
         <button class="ib s24" :aria-label="tr('Remove export setting')" :title="tr('Remove export setting')" @click="removeAt(i)"><EditorIcon name="minus" /></button>
-        <div v-if="menu === i" class="sq float emenu" role="dialog" :aria-label="tr('Export settings')">
+        <div v-if="menu === i" class="sq float s emenu" role="dialog" :aria-label="tr('Export settings')">
           <div class="em-h"><span>{{ tr('Export') }}</span><button class="ib s24" :aria-label="tr('Close')" @click="menu = null"><EditorIcon name="close" /></button></div>
           <div class="em-r"><span class="tx-meta">{{ tr('Suffix') }}</span><label class="sq fld"><input :value="e.suffix ?? ''" :placeholder="fileNameOf('', e).replace(/^Untitled|\.\w+$/g, '') || tr('None')" :aria-label="tr('Suffix')" @change="setSuffix(i, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()"></label></div>
           <div class="em-r"><span class="tx-meta">{{ tr('Color profile') }}</span><span class="sq fld ro">sRGB</span></div>
@@ -149,12 +149,14 @@ watch([pvOpen, () => props.sid, () => props.ids.join(), () => props.screen?.id],
 /* 패널 맨 끝 칸: 아래 여백(다른 패널과 같은 12) */
 .ex:last-child { margin-bottom: var(--ref-spacing-12); }
 /* 한 줄: [배율] [형식] [⋯] [−] */
-.erow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px 28px; gap: var(--ref-spacing-04); align-items: center; }
+.erow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px 28px; gap: 0; align-items: center; }
+/* 칠 · 효과 줄과 같게: 칸 ↔ 칸 · 칸 ↔ 아이콘 8, 아이콘끼리는 붙여요 */
+.erow > .esc, .erow > .esel-w { margin-right: var(--ref-spacing-06); }
 .esc input { flex: 1; min-width: 0; }
 .esc.off { opacity: .5; }
 .ib.on { --sq-fill: var(--sys-color-neutral-200); }
 /* ⋯ 설정: 줄 아래 떠 있는 작은 패널 */
-.emenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.emenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 220px; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .em-h { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .em-r { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: var(--ref-spacing-04); }
 .ro { color: var(--sys-color-neutral-600); }

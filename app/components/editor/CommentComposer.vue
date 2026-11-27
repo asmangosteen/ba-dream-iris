@@ -81,7 +81,12 @@ function startMention() {
 const emojiOpen = ref(false)
 function onEmoji(e: string) { emojiOpen.value = false; insert(e) }
 /** 바깥을 누르면 이모지 창을 닫아요 */
-function onDocDown(e: PointerEvent) { if (emojiOpen.value && !root.value?.contains(e.target as Node | null)) emojiOpen.value = false }
+function onDocDown(e: PointerEvent) {
+  const t = e.target as Element | null
+  if (emojiOpen.value && !root.value?.contains(t)) emojiOpen.value = false
+  // 멘션 목록: 목록 바깥을 누르면 닫아요(입력칸을 눌러도 — 다시 @ 를 치면 또 열려요)
+  if (q.value !== null && !t?.closest?.('.mm')) q.value = null
+}
 onMounted(() => document.addEventListener('pointerdown', onDocDown, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown, true))
 
@@ -168,7 +173,7 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
           :aria-controls="matches.length ? `${uid}-m` : undefined" :aria-expanded="!!matches.length" aria-autocomplete="list"
           @input="onType" @click="readQuery" @keydown="onKey" @scroll="syncScroll" @paste="onPaste"
         />
-        <button v-if="!expanded" type="button" :class="['sq', 'send', 'mini', { on: canSend }]" :disabled="!canSend" :aria-label="tr('Send')" @click.stop="send"><EditorIcon name="arrow_up" :size="16" /></button>
+        <button v-if="!expanded" type="button" :class="['sq', 'send', 'mini', { on: canSend }]" :disabled="!canSend" :aria-label="tr('Send')" @click.stop="send"><EditorIcon name="send" :size="16" /></button>
       </div>
       <div v-if="atts.length" class="atts">
         <span v-for="(a, i) in atts" :key="a.src" class="sq att">
@@ -178,15 +183,15 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
       </div>
       <p v-if="err" class="err" role="alert">{{ err }}</p>
       <div v-if="expanded" class="tools">
-        <button type="button" :class="['sq', 'tl', { on: emojiOpen }]" :aria-label="tr('Add emoji')" :data-tip="tr('Add emoji')" :aria-expanded="emojiOpen" @mousedown.prevent @click="emojiOpen = !emojiOpen; q = null"><EditorIcon name="smile" :size="16" /></button>
-        <button type="button" class="sq tl" :aria-label="tr('Mention someone')" :data-tip="tr('Mention someone')" @mousedown.prevent @click="startMention"><EditorIcon name="at" :size="16" /></button>
+        <button type="button" :class="['sq', 'tl', { on: emojiOpen }]" :aria-label="tr('Add emoji')" :data-tip="tr('Add emoji')" :aria-expanded="emojiOpen" @mousedown.prevent @click="emojiOpen = !emojiOpen; q = null"><EditorIcon name="emoji" :size="16" /></button>
+        <button type="button" class="sq tl" :aria-label="tr('Mention someone')" :data-tip="tr('Mention someone')" @mousedown.prevent @click="startMention"><EditorIcon name="mention" :size="16" /></button>
         <button type="button" class="sq tl" :aria-label="tr('Add image')" :data-tip="tr('Add image')" @mousedown.prevent @click="emojiOpen = false; q = null; fileEl?.click()"><EditorIcon name="image" :size="16" /></button>
         <span class="f1" />
         <template v-if="editing">
           <Button size="s" type="tertiary" stroke @click="emit('cancel')">{{ tr('Cancel') }}</Button>
           <Button size="s" type="primary" :disabled="!canSend" @click="send">{{ tr('Save') }}</Button>
         </template>
-        <button v-else type="button" :class="['sq', 'send', { on: canSend }]" :disabled="!canSend" :aria-label="tr('Send')" :data-tip="tr('Send')" @click="send"><EditorIcon name="arrow_up" :size="16" /></button>
+        <button v-else type="button" :class="['sq', 'send', { on: canSend }]" :disabled="!canSend" :aria-label="tr('Send')" :data-tip="tr('Send')" @click="send"><EditorIcon name="send" :size="16" /></button>
       </div>
       <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
     </div>
@@ -230,7 +235,7 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 .att img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .att-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; --sq-fill: rgb(3 9 26 / 60%); color: #FFFFFF; opacity: 0; transition: opacity .12s ease; }
 .att:hover .att-x, .att-x:focus-visible { opacity: 1; }
-.err { margin: 0; padding: 0 var(--ref-spacing-07) var(--ref-spacing-04); font-size: 11px; color: var(--sys-color-theme-danger-default, #E72F37); }
+.err { margin: 0; padding: 0 var(--ref-spacing-07) var(--ref-spacing-04); font-size: 11px; color: var(--sys-color-theme-error-default, #E72F37); }
 /* 도구 막대: 위 선으로 나누고 이모지 · @ · 이미지, 오른쪽 끝 둥근 보내기 */
 /* 도구 막대: 안쪽 4 — 보내기 버튼(반지름 14)이 상자 모서리(18)와 같은 중심으로 둥글어요 */
 .tools { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: 4px; border-top: 1px solid var(--iris-line); cursor: default; }

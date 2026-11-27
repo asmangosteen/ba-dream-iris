@@ -98,7 +98,7 @@ onMounted(() => nextTick(() => searchEl.value?.focus()))
 </template>
 
 <style scoped>
-.ep { width: 300px; display: flex; flex-direction: column; border-radius: var(--ref-radius-08); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); overflow: hidden; }
+.ep { width: 300px; display: flex; flex-direction: column; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); filter: var(--iris-float-shadow); overflow: hidden; }
 .tabs { flex: none; display: flex; justify-content: space-between; padding: var(--ref-spacing-04) var(--ref-spacing-06) 0; border-bottom: 1px solid var(--iris-line); }
 .tb { width: 28px; height: 32px; display: grid; place-items: center; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-03); box-shadow: inset 0 -2px 0 transparent; }
 .tb:hover { color: var(--sys-color-neutral-800); }

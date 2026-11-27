@@ -142,6 +142,9 @@ export default {
   'Hide rulers': '눈금자 숨기기',
   'Show layout grids': '레이아웃 그리드 보기',
   'Hide layout grids': '레이아웃 그리드 숨기기',
+  'Show comments': '코멘트 보기',
+  'Hide comments': '코멘트 숨기기',
+  'Show · hide comments': '코멘트 보이기 · 숨기기',
   'Layout grids shown': '레이아웃 그리드를 켰어요',
   'Layout grids hidden': '레이아웃 그리드를 껐어요',
   'Copied properties': '속성을 복사했어요',
@@ -373,4 +376,12 @@ export default {
   'Previous · next page': '이전 · 다음 페이지',
   '⌘ click': '⌘ 클릭',
   '⌥ drag': '⌥ 끌기',
+  // 프레임 템플릿(프레임 도구 오른쪽 패널)
+  'Frame presets': '프레임 템플릿',
+  'Phone': '휴대폰',
+  'Tablet': '태블릿',
+  'Presentation': '프레젠테이션',
+  'Paper': '종이',
+  'Social media': '소셜 미디어',
+  'Archive': '예전 기기',
 } satisfies Record<string, string>

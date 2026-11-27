@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Button, Icon, TextInput } from '@ba-dream/design-system'
+import { Button, TextInput } from '@ba-dream/design-system'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import EditorSelect, { type SelectOption } from '~/components/editor/EditorSelect.vue'
 import { ASSIGNABLE, ROLE_NAME, accessError, useProjectAccess, type ProjectMemberRow, type ProjectRole } from '~/composables/useProjectAccess'
 import { relativeTime } from '~/composables/useProjects'
 import { useToastReq } from '~/composables/useLayerMenu'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * 멤버 · 초대 목록(공유 창 · 프로젝트 설정 '멤버' 탭이 함께 써요, PRD/16 A · F)
@@ -110,7 +111,7 @@ onMounted(() => { if (props.autofocus) nextTick(() => root.value?.querySelector<
       <EditorSelect v-if="can.manage" v-model="inviteRole" class="inv-role" :options="roleOptions" aria-label="Role for the invite" />
       <Button size="s" type="primary" :loading="busy === 'invite'" @click="invite">{{ can.manage ? tr('Invite') : tr('Request') }}</Button>
     </form>
-    <p v-if="err" class="tx-meta err" role="alert"><Icon name="warning" :size="12" />{{ err }}</p>
+    <p v-if="err" class="tx-meta err" role="alert"><EditorIcon name="warning" :size="12" />{{ err }}</p>
     <p v-else-if="role && !can.manage" class="tx-meta hint">{{ tr('An owner or co-owner approves invites and picks the role') }}</p>
 
     <!-- 승인 대기 -->
@@ -122,7 +123,7 @@ onMounted(() => { if (props.autofocus) nextTick(() => root.value?.querySelector<
         <template v-if="can.manage">
           <EditorSelect v-model="pickRole[i.id]" class="row-role" :options="roleOptions" placeholder="Choose role" :aria-label="`Role for ${i.email}`" />
           <Button size="s" type="primary" :disabled="!pickRole[i.id]" :loading="busy === i.id" @click="decide(i.id, true)">{{ tr('Approve') }}</Button>
-          <button type="button" class="sq ib dec" :aria-label="tr('Decline')" :data-tip="tr('Decline')" @click="decide(i.id, false)"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq ib dec" :aria-label="tr('Decline')" :data-tip="tr('Decline')" @click="decide(i.id, false)"><EditorIcon name="close" :size="16" /></button>
         </template>
         <Button v-else size="s" type="tertiary" :loading="busy === i.id" @click="cancel(i.id)">{{ tr('Cancel request') }}</Button>
       </div>

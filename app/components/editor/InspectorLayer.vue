@@ -492,7 +492,7 @@ function onSizing(axis: 'w' | 'h', v: string) {
   if (v === VAR_OPT) { nextTick(() => sizeVar[axis]?.show()); return }
   setSizing(axis, v as Sizing)
 }
-/** Hug · Fill 이면 칸은 숫자 대신 'Hug ▾ · Fill ▾' 흰 드롭다운(피그마 UI3와 같아요) — 숫자로 바꾸려면 ▾ 에서 Fixed */
+/** Hug · Fill 이면 칸에 옅은 숫자 + 'Hug · Fill' 글자(피그마 UI3와 같아요) — 올리면 진한 숫자 + ▾, 숫자를 고치면 Fixed 가 돼요 */
 const autoSize = (axis: 'w' | 'h') => { const v = sizingNow(axis); return v === 'hug' || v === 'fill' }
 /** 오토 레이아웃 안(자리를 레이아웃이 정해요): X · Y · 회전 칸은 흰 테두리 칸 + 옅은 값(피그마와 같아요) */
 const flowOwned = computed(() => inFlow.value && same((n) => !!n.absolute) === false)
@@ -503,13 +503,23 @@ function setSizing(axis: 'w' | 'h', v: Sizing) {
   const hugParents = v === 'fill' ? [...new Set(nodes.value.map((n) => parentOf(n)).filter((p): p is LayerNode => !!p && p[key] === 'hug').map((p) => p.id))] : []
   // 내용 크기(Hug)로 재던 값을 고정으로 바꿀 땐 정수로 — 손으로 바꾸지 않은 크기는 소수점을 보이지 않아요(사용자 요청 2026-11-26)
   if (hugParents.length) { store.hold(sid.value); store.update(sid.value, hugParents, (p) => ({ [key]: undefined, [axis]: Math.round(p[axis]) })) }
+  // 반대로 피그마처럼: 오토 레이아웃 부모를 그 방향 Hug 로 바꾸면 그 방향 Fill 인 자식은 지금 크기 그대로 Fixed 로(Fill 끼리만 있으면 Hug 가 0 이 돼요). 실행취소 한 번
+  const fillKids = v === 'hug'
+    ? nodes.value.flatMap((n) => (n.style.layout ? n.children ?? [] : [])).map((id) => store.node(sid.value, id)).filter((c): c is LayerNode => !!c && c[key] === 'fill' && !c.absolute)
+    : []
+  const held = hugParents.length > 0 || fillKids.length > 0
+  if (fillKids.length) {
+    if (!hugParents.length) store.hold(sid.value)
+    const size = new Map(fillKids.map((c) => [c.id, Math.round(dim(c, axis))]))
+    store.update(sid.value, fillKids.map((c) => c.id), (c) => ({ [key]: undefined, [axis]: size.get(c.id) ?? Math.round(c[axis]) }))
+  }
   store.update(sid.value, ids.value, (n) => {
     const p: Partial<LayerNode> = axis === 'w' ? { sizeH: v === 'fixed' ? undefined : v } : { sizeV: v === 'fixed' ? undefined : v }
     if (v === 'fixed') p[axis] = Math.round(dim(n, axis))
     if (n.type === 'text' && axis === 'w') n.style.autoWidth = v === 'hug'
     return p
   })
-  if (hugParents.length) store.release(sid.value)
+  if (held) store.release(sid.value)
 }
 const showConstraints = computed(() => !inFlow.value && !isPageCanvas(sid.value) && nodes.value.every((n) => !parentOf(n) || isContainer(parentOf(n))))
 const consNow = (axis: 'h' | 'v') => same((n) => n.constraints?.[axis] ?? (axis === 'h' ? 'left' : 'top'))
@@ -795,7 +805,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
         <div class="ig-l"><span>{{ sizingNow('w') === 'fixed' && sizingNow('h') === 'fixed' ? tr('Dimensions') : tr('Resizing') }}</span></div>
         <div class="ig">
           <!-- 피그마처럼 W/H 칸 안에는 숫자 + Hug · Fill ▾ 만: 변수 연결은 ▾ 메뉴의 'Apply variable…' 로(칸에 버튼이 더 나오면 숫자가 잘려요) -->
-          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1, auto: autoSize(k) }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k) && !autoSize(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="Mixed" @update:model-value="(v) => onSizing(k, v)" /></label>
+          <label v-for="k in (['w', 'h'] as const)" :key="k" class="sq fld sz" :class="{ multi: sizingOpts(k).length > 1, auto: autoSize(k) }"><span>{{ k === 'w' ? 'W' : 'H' }}</span><input v-if="!vb(k)" :value="showG(same((n) => dim(n, k)))" :placeholder="same((n) => dim(n, k)) === 'Mixed' ? tr('Mixed') : ''" inputmode="decimal" :aria-label="k === 'w' ? tr('Width') : tr('Height')" @change="setNum(k, $event)" @keydown="blurOnEnter($event); step($event, (d) => store.update(sid, ids, (n) => sized(n, k, dim(n, k) + d)))"><TokenPicker :ref="(c) => setSizeRef(k, c)" :kinds="['spacing']" :bound="vb(k)" :label="k === 'w' ? 'Width' : 'Height'" @pick="(t) => pickNum(k, t)" @unbind="unbind(k)" @step="(d) => stepNum(k, d)" /><EditorSelect variant="inline" :model-value="sizingNow(k) === 'Mixed' ? null : String(sizingNow(k))" :options="sizeOptions(k)" :aria-label="k === 'w' ? 'Horizontal resizing' : 'Vertical resizing'" placeholder="" @update:model-value="(v) => onSizing(k, v)" /></label>
           <button :class="['ib', 's24', 'tog', { on: locked }]" :aria-pressed="locked" :aria-label="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" :title="locked ? tr('Unlock aspect ratio') : tr('Lock aspect ratio')" @click="toggleRatio">
             <EditorIcon :name="locked ? 'ratio_locked' : 'ratio_unlocked'" />
           </button>
@@ -1014,13 +1024,11 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 /* 단위(° % px)는 숫자 바로 뒤에 붙고, 남는 자리는 단위 뒤로(피그마: "0°" · "100%") */
 .li .ig .fld.u > input { flex: 0 1 auto; width: auto; field-sizing: content; min-width: 1ch; max-width: 100%; }
 .fld.u > .unit { flex: 1 1 0; min-width: 0; margin-left: calc(var(--ref-spacing-03) * -1); color: var(--sys-color-neutral-500); }
-/* Hug · Fill: 칸 전체가 흰 드롭다운('W  Fill ▾') — 피그마 UI3와 같아요 */
-.fld.sz.auto { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.fld.sz.auto:hover { --sq-line: var(--ref-color-gray-900-20); }
-.fld.sz.auto :deep(.esel) { flex: 1; min-width: 0; }
-.fld.sz.auto :deep(.inl) { width: 100%; justify-content: space-between; padding: 0; color: var(--sys-color-neutral-800); }
-.fld.sz.auto :deep(.inl:hover), .fld.sz.auto :deep(.inl.open) { --sq-fill: transparent; }
-.fld.sz.auto :deep(.inl .cv) { display: block; color: var(--sys-color-neutral-500); }
+/* Hug · Fill(피그마 UI3): 평소엔 옅은 숫자 + 진한 'Fill · Hug' 글자, 칸에 올리거나 메뉴 · 입력 중이면 진한 숫자 + ▾ (글자는 숨겨요) */
+.fld.sz.auto > input { color: var(--sys-color-neutral-500); }
+.fld.sz.auto:hover > input, .fld.sz.auto:focus-within > input, .fld.sz.auto:has(.inl.open) > input { color: var(--sys-color-neutral-800); }
+.fld.sz.auto :deep(.inl) { color: var(--sys-color-neutral-800); }
+.fld.sz.auto:hover :deep(.inl .v), .fld.sz.auto:focus-within :deep(.inl .v), .fld.sz.auto :deep(.inl.open .v) { display: none; }
 /* 오토 레이아웃 안 X · Y · 회전: 흰 테두리 칸 + 옅은 값(자리는 레이아웃이 정해요) */
 .fld.lo { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .fld.lo > input, .fld.lo > .unit { color: var(--sys-color-neutral-400); }
@@ -1029,6 +1037,8 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 /* 크기 방식이 여럿이면(오토 레이아웃 안 · 오토 레이아웃 프레임 · 글자) ▾ 를 늘 보여 줘요 — 옅게, 칸에 올리면 진하게 */
 .fld.sz.multi :deep(.inl .cv) { display: block; color: var(--sys-color-neutral-400); }
 .fld.sz.multi:hover :deep(.inl .cv), .fld.sz.multi :deep(.inl.open .cv) { color: var(--sys-color-neutral-700); }
+.fld.sz.auto :deep(.inl .cv) { display: none; }
+.fld.sz.auto:hover :deep(.inl .cv), .fld.sz.auto:focus-within :deep(.inl .cv), .fld.sz.auto :deep(.inl.open .cv) { display: block; color: var(--sys-color-neutral-700); }
 /* 제약: 그림 72 × 64(칸 두 줄 높이 28 + 8 + 28), 드롭다운은 오른쪽 끝까지 */
 .cons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; grid-template-rows: 28px 28px; gap: var(--ref-spacing-06); align-items: center; min-width: 0; }
 .cons > :deep(.esel) { grid-column: 2; grid-row: 1; min-width: 0; }

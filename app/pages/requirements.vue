@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Icon, SearchField, Skeleton, TextButton } from '@ba-dream/design-system'
+import { Button, SearchField, Skeleton, TextButton } from '@ba-dream/design-system'
 import type { LinkRow, LinkStatus, ReqRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 
@@ -201,7 +201,8 @@ function link(screenId: string) {
 // 화면 연결 고르기 드롭다운
 const addOpen = ref(false)
 const addRef = ref<HTMLElement | null>(null)
-function onDocClick(e: MouseEvent) {
+/** 바깥 누르기로 닫기 — 서비스 공통 규칙(utils/dismiss.ts)에 맞춰 누를 때(pointerdown, capture) 닫아요 */
+function onDocClick(e: PointerEvent) {
   if (addOpen.value && addRef.value && !addRef.value.contains(e.target as Node)) addOpen.value = false
 }
 function onKey(e: KeyboardEvent) {
@@ -211,11 +212,11 @@ function onKey(e: KeyboardEvent) {
   else selectedId.value = null
 }
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  document.addEventListener('pointerdown', onDocClick, true)
   document.addEventListener('keydown', onKey)
 })
 onBeforeUnmount(() => {
-  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('pointerdown', onDocClick, true)
   document.removeEventListener('keydown', onKey)
 })
 
@@ -278,7 +279,7 @@ function exportCsv() {
         </div>
       </div>
 
-      <div v-if="!projectId" class="empty">
+      <div v-if="!projectId" class="page-empty">
         <p class="tx-meta">{{ projectsError ? tr("Couldn't load projects") : tr('Create a project first') }}</p>
         <Button v-if="projectsError" size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">{{ tr('Reload') }}</Button>
         <Button v-else size="s" type="tertiary" stroke @click="navigateTo('/')">{{ tr('Go to projects') }}</Button>
@@ -307,7 +308,7 @@ function exportCsv() {
           </div>
         </div>
 
-        <div v-if="failed" class="empty">
+        <div v-if="failed" class="page-empty">
           <p class="tx-meta">{{ tr("Couldn't load requirements") }}</p>
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">{{ tr('Reload') }}</Button>
         </div>
@@ -360,11 +361,11 @@ function exportCsv() {
           </tbody>
         </table></div>
 
-        <div v-if="!loading && !failed && !rows.length" class="empty">
+        <div v-if="!loading && !failed && !rows.length" class="page-empty">
           <p class="tx-meta">{{ tr('No requirements yet. Write IDs like REQ-001 in a document and they’re collected automatically') }}</p>
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="document" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add a document') }}</Button>
         </div>
-        <div v-else-if="!loading && !failed && !shown.length" class="empty">
+        <div v-else-if="!loading && !failed && !shown.length" class="page-empty">
           <p class="tx-meta">{{ emptyText }}</p>
           <TextButton size="s" color="blue" @click="clearFilters">{{ tr('Clear filters') }}</TextButton>
         </div>
@@ -375,7 +376,7 @@ function exportCsv() {
     <aside v-if="selected" :aria-label="tr('Requirement details')" class="sq float detail"><div class="scroller">
       <div class="sec-h d-top">
         <span class="num">{{ selected.req.code }}</span>
-        <button type="button" class="ib s" :aria-label="tr('Close')" @click="selectedId = null"><Icon name="close" :size="14" /></button>
+        <button type="button" class="ib s" :aria-label="tr('Close')" @click="selectedId = null"><EditorIcon name="close" :size="14" /></button>
       </div>
       <div class="d-pad">
         <p class="tx-body d-title">{{ selected.req.title }}</p>
@@ -398,7 +399,7 @@ function exportCsv() {
         <div class="sec-h">
           <span>{{ tr('Linked screens') }} <span class="tx-meta num">{{ selected.links.length }}</span></span>
           <div ref="addRef" class="add">
-            <button type="button" class="ib s" :aria-label="tr('Link a screen')" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><Icon name="plus" :size="14" /></button>
+            <button type="button" class="ib s" :aria-label="tr('Link a screen')" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><EditorIcon name="plus" :size="14" /></button>
             <div v-if="addOpen" class="sq menu" role="menu">
               <div class="menu-sc">
               <p v-if="!linkable.length" class="tx-meta menu-empty">{{ tr('No more screens to link') }}</p>
@@ -423,7 +424,7 @@ function exportCsv() {
                 <NuxtLink :to="`/p/${projectId}?screen=${l.screen_id}`" class="tx-body card-name ellipsis" :title="screen?.name ?? undefined">{{ screen?.name ?? tr('Untitled screen') }}</NuxtLink>
                 <span class="tx-meta ellipsis">{{ tr(LINK_STATUS[l.status].label) }}<template v-if="screen?.page"> · {{ screen.page }}</template></span>
               </div>
-              <button type="button" class="ib s" :disabled="saving" :aria-label="tr('Unlink')" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><Icon name="trashbin" :size="14" /></button>
+              <button type="button" class="ib s" :disabled="saving" :aria-label="tr('Unlink')" :aria-expanded="unlinking === l.screen_id" @click="unlinking = unlinking === l.screen_id ? null : l.screen_id"><EditorIcon name="trashbin" :size="14" /></button>
             </div>
             <p v-if="l.note" class="sq tx-body note">{{ l.note }}</p>
             <div v-if="unlinking === l.screen_id" class="unlink" role="alertdialog" :aria-label="tr('Unlink {name}', { name: screen?.name ?? tr('Untitled screen') })">
@@ -463,8 +464,9 @@ function exportCsv() {
 .title-col { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .actions { display: flex; gap: var(--ref-spacing-04); }
 /* 거르기 줄: 왼쪽 상태 세그먼트(한 줄, 넘치면 가로로) · 오른쪽 손볼 것 + 검색 */
-.tools { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-08) 0 var(--ref-spacing-08); flex-wrap: wrap; }
-.filters { margin-left: calc(-1 * var(--ref-spacing-06)); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+/* 페이지 공통: 제목 → 거르기 줄 12, 거르기 줄 → 내용 16, 알약 왼쪽 끝은 제목과 같은 선(프로젝트 화면과 같아요) */
+.tools { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-08); margin: var(--ref-spacing-08) 0 var(--ref-spacing-10); flex-wrap: wrap; }
+.filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .tools-right { display: flex; align-items: center; gap: var(--ref-spacing-04); flex: none; }
 .search { width: 200px; }
 
@@ -495,8 +497,6 @@ function exportCsv() {
 .unlinked { color: var(--sys-color-neutral-500); }
 .status { display: inline-flex; align-items: center; gap: var(--ref-spacing-04); white-space: nowrap; }
 .st-none { display: block; flex: none; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sys-color-neutral-300); }
-.empty { display: flex; flex-direction: column; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-17) 0; text-align: center; }
-.empty p { margin: 0; }
 
 /* 오른쪽 상세 */
 .detail { flex: 0 0 340px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
@@ -534,7 +534,7 @@ function exportCsv() {
 .unlink { display: flex; align-items: center; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-06); box-shadow: inset 0 1px 0 var(--iris-line); }
 .unlink > span { flex: 1; min-width: 0; }
 .note { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-03); --sq-fill: var(--sys-color-neutral-100); }
-.err { color: var(--sys-color-theme-destructed-default); }
+.err { color: var(--sys-color-theme-error-default); }
 .shell > .float { --sq-fill: transparent; --sq-line: transparent; --sq-line-w: 0px; filter: none; border-radius: 0; }
 .shell > .float + .float { border-left: 1px solid var(--iris-line); }
 </style>

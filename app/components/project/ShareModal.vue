@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Button, Icon } from '@ba-dream/design-system'
+import { Button } from '@ba-dream/design-system'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import ProjectMembersPanel from '~/components/project/ProjectMembersPanel.vue'
 import { accessError, useProjectAccess } from '~/composables/useProjectAccess'
 import { useToastReq } from '~/composables/useLayerMenu'
+import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * 공유 창(PRD/16 A) — 사내 링크 공유 + 멤버 초대. 바깥 공유는 없어요(@ba-dream.com 만).
@@ -53,7 +54,7 @@ function onKeydown(e: KeyboardEvent) {
       <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle" class="sq pop" style="--pop-w: 520px" @keydown="onKeydown">
         <header class="pop-top">
           <h2 id="shareTitle" class="pop-ttl">{{ tr('Share “{name}”', { name: projectName }) }}</h2>
-          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><Icon name="close" :size="16" /></button>
+          <button type="button" class="sq pop-x" :aria-label="tr('Close')" @click="close"><EditorIcon name="close" :size="16" /></button>
         </header>
         <div class="pop-body">
           <ProjectMembersPanel :project-id="projectId" autofocus />

@@ -124,7 +124,7 @@ async function save() {
 .val { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; min-height: 18px; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); font-variant-numeric: proportional-nums; }
 .vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vsw { flex: none; width: 16px; height: 16px; border-radius: var(--ref-radius-02); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
-.err { font-size: 11px; line-height: 16px; color: var(--sys-color-system-error, #E5484D); }
+.err { font-size: 11px; line-height: 16px; color: var(--sys-color-theme-error-default); }
 .end { display: flex; justify-content: flex-end; gap: var(--ref-spacing-04); margin-top: var(--ref-spacing-02); }
 .act { height: 28px; }
 .act:disabled { opacity: 0.4; }
