@@ -172,6 +172,11 @@ const MALL_MD = `# 착한구독 상세 기획서
 | C-04 | 요금제 선택 | 요금제 카드 3개, 월 구독료 · 총액 | 로딩 | P-PLN-01, P-PLN-02 |
 | C-05 | 서류 제출 | 면허증 · 신분증 올리기, [제출] | 오류 | P-DOC-01, P-DOC-03 |
 | C-06 | 신청 완료 | 예상 인도일 · 담당자 연락처 (P-DOC-02) | - |  |
+| C-07 | 상품 상세 | 긴 상세 — 사진 · 요금 · 혜택 · 후기 · 자주 묻는 질문 | - | P-PLN-01, P-PAY-01 |
+| A-01 | 신청 심사 | 관리자 신청 목록 · 서류 보기 · 승인 / 반려 | 빈 목록 | P-DOC-01, P-DOC-02 |
+| S-01 | 인도 확인 | 케어샵 태블릿 — 차량 인도 체크리스트 | - | P-DOC-02 |
+| N-01 | 심사 결과 알림 | 푸시 — 승인 · 반려 문구 | - | P-DOC-02 |
+| CMP-01 | 요금제 카드 | 기간 · 월 구독료 · '가장 많이 선택' 배지 | 선택됨 | P-PLN-01, P-PLN-02 |
 `
 const MALL_BLOCKS: DocBlock[] = parseMarkdown(MALL_MD).map((x, i) => ({ ...x, id: 'mb' + i }))
 const MALL = analyzeDoc(MALL_BLOCKS)
@@ -202,6 +207,12 @@ const PREVIEW_SLOTS: Omit<SlotRow, 'project_id'>[] = MALL.slots.map((x) => ({ id
 const l = (screen_id: string, requirement_id: string, status: LinkStatus, note: string | null = null): LinkRow => ({ screen_id, requirement_id, status, note })
 const PREVIEW_LINKS: LinkRow[] = [
   { ...l('sc-4', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-4', 'mp-P-PLN-02', 'unchecked'), origin: 'doc_table', layer_ids: ['p4b'] }, { ...l('sc-5', 'mp-P-DOC-01', 'unchecked'), origin: 'doc_table' },
+  // 예시: 긴 화면 · 관리자(A) · 센터(S) · 알림(N) · 공통 부품(CMP) 칸
+  { ...l('sc-9', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-9', 'mp-P-PAY-01', 'unchecked'), origin: 'doc_table', layer_ids: ['d9'] },
+  { ...l('sc-10', 'mp-P-DOC-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-10', 'mp-P-DOC-02', 'unchecked'), origin: 'doc_table' },
+  { ...l('sc-13', 'mp-P-DOC-02', 'unchecked'), origin: 'doc_table' },
+  { ...l('sc-11', 'mp-P-DOC-02', 'unchecked'), origin: 'doc_table' },
+  { ...l('sc-12', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-12', 'mp-P-PLN-02', 'unchecked'), origin: 'doc_table', layer_ids: ['k4'] },
   l('sc-1', 'r1', 'reflected'), l('sc-1', 'r2', 'partial', '금액은 있고 결제일이 빠졌어요'), l('sc-1', 'r3', 'missing'),
   l('sc-2', 'r4', 'reflected'), l('sc-2', 'r5', 'reflected'), l('sc-2', 'r6', 'missing', '버튼이 스크롤과 같이 움직여요'),
   l('sc-3', 'r7', 'partial'),
@@ -268,7 +279,7 @@ function previewStore() {
     tokens: useState('pv-tokens', () => structuredClone(PREVIEW_TOKENS)),
     slots: useState<Omit<SlotRow, 'project_id'>[]>('pv-slots', () => structuredClone(PREVIEW_SLOTS)),
     /** 미리보기 화면 → 화면 칸 { 화면 id: { slot, state } } */
-    screenSlots: useState<Record<string, { slot: string | null; state: string | null }>>('pv-screen-slots', () => ({ 'sc-4': { slot: 'ms-C-04', state: null }, 'sc-5': { slot: 'ms-C-05', state: null } })),
+    screenSlots: useState<Record<string, { slot: string | null; state: string | null }>>('pv-screen-slots', () => ({ 'sc-4': { slot: 'ms-C-04', state: null }, 'sc-5': { slot: 'ms-C-05', state: null }, 'sc-9': { slot: 'ms-C-07', state: null }, 'sc-10': { slot: 'ms-A-01', state: null }, 'sc-13': { slot: 'ms-S-01', state: null }, 'sc-11': { slot: 'ms-N-01', state: null }, 'sc-12': { slot: 'ms-CMP-01', state: null } })),
     history: useState<DocHistoryRow[]>('pv-doc-history', () => []),
   }
 }

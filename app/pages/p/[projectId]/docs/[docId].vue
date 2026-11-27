@@ -100,7 +100,7 @@ function pickSlot(code: string) {
   activeLayer.value = null
   activeNote.value = null
   activeCol.value = c.key
-  nextTick(() => revealCol(c.key))
+  nextTick(() => focusCols([c.key]))
 }
 function pickCol(c: Col) {
   activeCol.value = null
@@ -281,8 +281,7 @@ function pickReq(id: string) {
   if (!activeReq.value) return
   nextTick(() => {
     const code = activeCode.value
-    const first = frames.value.find((c) => (c.screen && activeLinks.value.has(c.screen.id)) || (!!code && !!c.slot?.policy_codes.includes(code)))
-    if (first) revealCol(first.key)
+    focusCols(frames.value.filter((c) => (c.screen && activeLinks.value.has(c.screen.id)) || (!!code && !!c.slot?.policy_codes.includes(code))).map((c) => c.key))
   })
 }
 
@@ -492,9 +491,12 @@ function onFrameClick(c: Col) {
     activeLayer.value = same ? null : { screen: c.screen.id, layer: h.layer }
     const first = same ? null : docLinks.value.find((l) => l.screen_id === c.screen!.id && l.layer_ids?.includes(h.layer!))
     if (first) nextTick(() => reader.value?.scrollToReq(first.requirement_id))
+    if (!same) focusCols([c.key])
     return
   }
   pickCol(c)
+  // 캔버스에서 화면을 눌러도 그 화면으로 확대해 맞춰요(사용자 요청 2026-11-27)
+  focusCols([c.key])
 }
 watch(activeLayer, (v) => { if (!v) selBox.value = null })
 /** 상자 자리는 캔버스(화면 좌표) 기준 — 동그라미 · 테두리는 확대와 상관없이 같은 크기로 캔버스 위 층에 그려요 */
@@ -535,8 +537,15 @@ type Placed = { c: Col; x: number; y: number; w: number; h: number }
 const placed = computed<Placed[]>(() => {
   const size = (c: Col) => { const a = c.screen ? art.data.value?.[c.screen.id] : null; return { w: a?.width || FR_W, h: a?.height || FR_H } }
   if (idOrder.value) {
-    let x = 0
-    return frames.value.map((c) => { const { w, h } = size(c); const p = { c, x, y: 0, w, h }; x += w + 120; return p })
+    // 종류(C · A · S · N · CMP)마다 한 줄 — 크기가 다른 화면(관리자 웹 · 긴 화면 · 알림 · 부품)이 한 줄에 섞여 너무 작아지지 않게(사용자 요청 2026-11-27)
+    const out: Placed[] = []
+    let y = 0
+    for (const r of idRows.value) {
+      let x = 0, rowH = 0
+      for (const c of r.cols) { const { w, h } = size(c); out.push({ c, x, y, w, h }); x += w + 120; rowH = Math.max(rowH, h) }
+      y += rowH + 600
+    }
+    return out
   }
   const groups = new Map<string, Col[]>()
   for (const c of frames.value) if (c.screen) { const g = groups.get(c.screen.page_id) ?? []; g.push(c); groups.set(c.screen.page_id, g) }
@@ -551,6 +560,21 @@ const placed = computed<Placed[]>(() => {
   return out
 })
 const placedOf = (key: string) => placed.value.find((p) => p.c.key === key)
+const KIND_ORDER = ['C', 'A', 'S', 'N', 'CMP', 'etc'] as const
+const KIND_LABEL: Record<(typeof KIND_ORDER)[number], string> = { C: 'Customer screens', A: 'Admin screens', S: 'Center screens', N: 'Notifications', CMP: 'Shared components', etc: 'Other linked screens' }
+/** ID 순서 보기의 줄: 종류마다 칸 순서대로(문서 화면 표 순서) */
+const idRows = computed(() => {
+  const by = new Map<string, Col[]>()
+  for (const c of frames.value) {
+    const k = c.slot?.kind ?? 'etc'
+    const g = by.get(k) ?? []
+    g.push(c)
+    by.set(k, g)
+  }
+  return KIND_ORDER.filter((k) => by.has(k)).map((k) => ({ kind: k, cols: by.get(k)! }))
+})
+/** ID 순서 보기 줄 이름(그 줄 첫 화면 위) */
+const rowLabels = computed(() => (idOrder.value ? idRows.value.map((r) => { const p = placedOf(r.cols[0]!.key); return p ? { kind: r.kind, x: p.x, y: p.y, text: tr(KIND_LABEL[r.kind]) + (r.kind === 'etc' ? '' : ` · ${r.kind}`) } : null }).filter((x): x is { kind: (typeof KIND_ORDER)[number]; x: number; y: number; text: string } => !!x) : []))
 /** 캔버스에서 문서 패널에 가리지 않는 영역(안쪽 여백 뺀 곳) */
 function visibleArea() {
   const el = canvas.value
@@ -567,23 +591,24 @@ function setView(v: { x: number; y: number; z: number }, animate = false) {
   view.value = v
 }
 onBeforeUnmount(() => clearTimeout(animTimer))
-function fit(animate = false) {
+/** keys 를 주면 그 화면들만 화면 가득(최대 100%) — 문서에서 정책 · 화면 ID 를 고를 때 캔버스처럼 그 화면으로 확대해 맞춰요(사용자 요청 2026-11-27) */
+function fit(animate = false, keys?: string[]) {
   const a = visibleArea()
-  const ps = placed.value
+  const ps = keys ? placed.value.filter((p) => keys.includes(p.c.key)) : placed.value
   if (!a || !ps.length) return
-  const bx = Math.min(...ps.map((p) => p.x)), by = Math.min(...ps.map((p) => p.y)) - 40
-  const bw = Math.max(...ps.map((p) => p.x + p.w)) - bx, bh = Math.max(...ps.map((p) => p.y + p.h)) + 40 - by
-  const z = Math.min(1, Math.max(0.05, Math.min(a.w / bw, a.h / bh)))
-  setView({ z, x: a.L + (a.w - bw * z) / 2 - bx * z, y: a.T + (a.h - bh * z) / 2 - by * z }, animate)
+  const bx = Math.min(...ps.map((p) => p.x)), by = Math.min(...ps.map((p) => p.y))
+  const bw = Math.max(...ps.map((p) => p.x + p.w)) - bx, bh = Math.max(...ps.map((p) => p.y + p.h)) - by
+  // 위 · 아래 이름 줄(화면 크기 그대로 그려져요) 자리를 화면 px 로 남겨 두고 맞춰요
+  const top = idOrder.value && !keys ? 64 : 28, bottom = 28
+  const z = Math.min(1, Math.max(0.02, Math.min(a.w / bw, (a.h - top - bottom) / bh)))
+  setView({ z, x: a.L + (a.w - bw * z) / 2 - bx * z, y: a.T + top + (a.h - top - bottom - bh * z) / 2 - by * z }, animate)
 }
-/** 화면 칸이 보이는 영역 밖이면 가운데로 옮겨요(확대는 그대로) */
-function revealCol(key: string) {
-  const p = placedOf(key), a = visibleArea()
-  if (!p || !a) return
-  const { x, y, z } = view.value
-  const l = x + p.x * z, t = y + p.y * z, r = l + p.w * z, b = t + p.h * z
-  if (l >= a.L && r <= a.L + a.w && t >= a.T && b <= a.T + a.h) return
-  setView({ z, x: a.L + a.w / 2 - (p.x + p.w / 2) * z, y: a.T + a.h / 2 - (p.y + p.h / 2) * z }, true)
+/** 그 화면들로 확대해 맞추기 — 캔버스 배치에 없는 칸(디자인 없는 빈 칸)이면 ID 순서 보기로 바꿔서 */
+function focusCols(keys: string[]) {
+  if (!keys.length) return
+  if (!keys.some((k) => placedOf(k))) { idOrder.value = true; userMoved = true; nextTick(() => fit(true, keys)); return }
+  userMoved = true
+  fit(true, keys)
 }
 function zoomAt(px: number, py: number, nz: number, animate = false) {
   const { x, y, z } = view.value
@@ -908,7 +933,7 @@ async function removeDoc() {
 
 <template>
   <!-- 문서 추가 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
-  <div class="split" :aria-hidden="addOpen ? 'true' : undefined">
+  <div :class="['split', { 'notes-on': notesShown }]" :aria-hidden="addOpen ? 'true' : undefined">
     <!-- 왼쪽 위: 편집기 캔버스와 같은 Iris 로고 메뉴(사용자 요청 2026-11-27) + 프로젝트 이름(누르면 편집기로) -->
     <div class="sq float s pill">
       <div ref="homeEl" class="home-wrap">
@@ -931,6 +956,8 @@ async function removeDoc() {
     <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown, panning }]" @click="onCanvasClick" @wheel="onWheel" @pointerdown="onCanvasDown">
       <!-- 확대 · 이동되는 캔버스(편집기 좌표 그대로) -->
       <div :class="['world', { anim: animView }]" :style="{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, '--z': view.z }">
+        <!-- ID 순서 보기: 줄마다 종류 이름 -->
+        <span v-for="r in rowLabels" :key="r.kind" class="row-label" :style="{ left: r.x + 'px', top: r.y + 'px' }">{{ r.text }}</span>
         <div
           v-for="p in placed"
           :key="p.c.key"
@@ -1171,6 +1198,9 @@ async function removeDoc() {
 </template>
 
 <style scoped>
+/* 문서 패널 너비(사용자 요청 2026-11-27): 화면이 넓을수록 넓게(창 너비의 40%, 600 ~ 960). 메모를 켜면 메모 칸(280 고정)만큼 넓어지되 최대 960 을 넘지 않고, 최대일 땐 그 안에서 문서 · 메모로 나눠요 */
+.split { --doc-base: clamp(600px, 40vw, 960px); --doc-w: var(--doc-base); }
+.split.notes-on { --doc-w: min(calc(var(--doc-base) + 280px), 960px); }
 .split { position: relative; height: calc(100vh - var(--iris-tabs-h, 0px)); overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -1184,18 +1214,18 @@ async function removeDoc() {
 .crumb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .pill .tx-head { white-space: nowrap; }
 
-.canvas { position: absolute; inset: 0; overflow: hidden; padding: 64px 632px 48px 48px; box-sizing: border-box; cursor: default; touch-action: none; }
+.canvas { position: absolute; inset: 0; overflow: hidden; padding: 64px calc(var(--doc-w) + 32px) 48px 48px; box-sizing: border-box; cursor: default; touch-action: none; }
 .canvas.panning { cursor: grabbing; }
 .canvas { transition: padding-right .24s cubic-bezier(0.2, 0, 0, 1); }
-.canvas.wide { padding-right: 912px; }
-.bl { position: absolute; left: 16px; bottom: 16px; right: 648px; z-index: 4; display: flex; align-items: center; gap: var(--ref-spacing-08); pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); }
-.canvas.wide .bl { right: 928px; }
+.bl { position: absolute; left: 16px; bottom: 16px; right: calc(var(--doc-w) + 48px); z-index: 4; display: flex; align-items: center; gap: var(--ref-spacing-08); pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); }
 .bl > * { pointer-events: auto; }
 .hint { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none !important; }
 /* 확대 · 이동되는 층: 안의 자리는 편집기 좌표(px), 글자 · 선 두께는 --z 로 나눠서 화면에서 늘 같은 크기 */
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .world.anim { transition: transform .24s cubic-bezier(0.2, 0, 0, 1); }
 .frame-col { position: absolute; transition: opacity .15s; }
+/* 줄 이름: 화면 이름 줄(22) 위에, 확대와 상관없이 같은 크기 */
+.row-label { position: absolute; transform: translateY(-100%) scale(calc(1 / var(--z))); transform-origin: 0 100%; padding-bottom: 34px; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--sys-color-neutral-700); white-space: nowrap; pointer-events: none; }
 .frame-btn { display: block; width: 100%; height: 100%; text-align: left; position: relative; }
 .ov { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
 .ov .ldot { pointer-events: auto; }
@@ -1259,7 +1289,6 @@ async function removeDoc() {
 @keyframes flash { 0%, 40% { background: #FFF1C2; } 100% { background: transparent; } }
 /* 메모 칸 열고 닫기: 사이드바와 같은 0.24초 곡선으로 패널 폭과 메모 열 폭이 같이 바뀌어요(문서 폭은 그대로) */
 .doc { transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
-.doc.wide { width: 880px; }
 .doc-main { flex: 1; min-height: 0; display: flex; }
 .doc-main > .doc-body { flex: 1; min-width: 0; }
 .notes-col { position: relative; z-index: 0; flex: none; width: 0; overflow: hidden; display: flex; transition: width .24s cubic-bezier(0.2, 0, 0, 1); }
@@ -1281,7 +1310,7 @@ async function removeDoc() {
 .f-card { display: block; height: 54px; border-radius: 8px; --sq-line: var(--iris-paper-line); --sq-line-w: 1px; }
 .f-cta { position: absolute; left: 9px; right: 9px; bottom: 11px; height: 24px; border-radius: 6px; background: #2C7BE2; }
 
-.doc { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); z-index: 3; width: 600px; max-width: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
+.doc { position: absolute; right: var(--iris-gap); top: var(--iris-gap); bottom: var(--iris-gap); z-index: 3; width: var(--doc-w); max-width: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
 /* z-index 2: 아래 선(그림자 1px)이 메모 칸 위 막대에 덮이지 않게 */
 .doc-tabs { position: relative; z-index: 2; flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-06); box-shadow: 0 1px 0 var(--iris-line); }
 /* 가로로만 넘기고 세로로는 움직이지 않게(높이 고정) */
@@ -1314,8 +1343,7 @@ async function removeDoc() {
 
 
 /* 편집기(pages/p/[projectId]/index.vue)의 .toast 와 같은 모양 — 문서 패널을 뺀 캔버스 영역 아래 가운데 */
-.toast-wrap { position: absolute; left: 0; right: calc(600px + var(--iris-gap) * 2); bottom: 32px; z-index: 6; display: flex; justify-content: center; pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); font-size: 12px; line-height: 18px; }
-.toast-wrap.wide { right: calc(880px + var(--iris-gap) * 2); }
+.toast-wrap { position: absolute; left: 0; right: calc(var(--doc-w) + var(--iris-gap) * 2); bottom: 32px; z-index: 6; display: flex; justify-content: center; pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); font-size: 12px; line-height: 18px; }
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; margin: 0; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
