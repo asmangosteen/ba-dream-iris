@@ -386,7 +386,7 @@ const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select()
 /* 비어 있는 섹션: 머리 줄만, 제목은 보통 굵기(피그마 §2.4) */
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
-.acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.acts { display: flex; align-items: center; gap: 0; } /* 머리 ⁘ · + 는 아래 행 👁 · − 와 같은 세로줄(28 · 28, 간격 없음) */
 .s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
 /* 피그마 Fill · Stroke 행: [견본 16 · 값 | 불투명도 48 %] 8 [👁 24][− 24] */

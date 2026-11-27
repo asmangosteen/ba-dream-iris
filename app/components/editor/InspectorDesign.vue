@@ -347,7 +347,8 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <button v-if="native" :class="['cb', { on: !mixClip && look.clip !== false, mix: mixClip }]" role="checkbox" :aria-checked="mixClip ? 'mixed' : look.clip !== false" @click="fstyle({ clip: !mixClip && look.clip !== false ? false : undefined })"><i class="sq" />{{ tr('Clip content') }}</button>
     </section>
 
-    <template v-if="native && !scaleMode">
+    <!-- 피그마에서 가져온 화면도 모양 · 선 · 효과 · 그리드는 그대로(채우기만 빼요 — 바탕이 가져온 그림이라서, 사용자 요청 2026-11-27) -->
+    <template v-if="!scaleMode">
       <section class="s">
         <div class="sec-h h24"><span>{{ tr('Appearance') }}</span></div>
         <div class="ig-l"><span>{{ tr('Opacity') }}</span><span>{{ tr('Corner radius') }}</span></div>
@@ -364,7 +365,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
         <CornerSmoothing v-if="smoothOpen && separate" :anchor="smoothBtnEl" :value="smoothNow" @update="setSmoothing" @start="holdAll" @end="releaseAll" @close="smoothOpen = false" />
       </section>
 
-      <InspectorPaints :sid="screen.id" :sids="ids" :ids="[]" kind="fill" title="Fill" frame />
+      <InspectorPaints v-if="native" :sid="screen.id" :sids="ids" :ids="[]" kind="fill" title="Fill" frame />
 
       <!-- Stroke: Fill 과 같은 칠 목록(견본 · HEX | % · 👁 · −, 여러 칠 · 스타일) + 선 설정(피그마와 같아요: Position · Weight · ⚙ 세부 설정 · ▢ 변마다) -->
       <InspectorPaints :sid="screen.id" :sids="ids" :ids="[]" kind="stroke" title="Stroke" frame>
@@ -392,7 +393,7 @@ watch(() => props.screen.id, () => { smoothOpen.value = false })
       <InspectorEffects :sid="screen.id" :sids="ids" :ids="[]" frame />
 
       <!-- 프레임 안에 쓰인 색(피그마 Selection colors) — 색이 많아서 처음엔 버튼만 -->
-      <InspectorSelectionColors :targets="ids.map((id) => ({ sid: id, ids: [] }))" lazy />
+      <InspectorSelectionColors v-if="native" :targets="ids.map((id) => ({ sid: id, ids: [] }))" lazy />
 
       <InspectorGrids :grids="look.grids ?? []" :mixed="mixGrids" @change="(g) => fstyle({ grids: g })" />
     </template>

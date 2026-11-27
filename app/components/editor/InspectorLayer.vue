@@ -895,7 +895,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
     <section v-if="has('text') && !editing && !scaleMode" class="s">
       <!-- 피그마 Typography: 스타일이 걸렸으면 [Ag 스타일 칸 | 떼기] 하나만, 떼면 스타일 속 변수가 칸마다 칩으로 —
            [글꼴 (한 줄)] / [굵기 | 크기 ▾] / 줄 높이 · 자간 / 정렬 · 세로 정렬 | 상세 ⚙ -->
-      <div class="sec-h h24"><span>{{ tr('Typography') }}</span><TokenPicker v-if="!tsBound" variant="icon" icon="styles" :kinds="['textStyle']" label="Text styles" @pick="pickTextStyle" /></div>
+      <div class="sec-h h24"><span>{{ tr('Typography') }}</span><span v-if="!tsBound" class="styl-w"><TokenPicker variant="icon" icon="styles" :kinds="['textStyle']" label="Text styles" @pick="pickTextStyle" /></span></div>
       <div v-if="tsBound" class="ig w1 ts-row">
         <TokenPicker variant="style" :kinds="['textStyle']" :bound="tsBound" label="Text style" @pick="pickTextStyle" />
         <button type="button" class="ib s24 ts-x" :aria-label="tr('Detach style')" :data-tip="tr('Detach style')" @click="detachStyle"><EditorIcon name="unlink" :size="16" /></button>
@@ -1030,7 +1030,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
 .acts .ib.boolbtn { display: inline-flex; align-items: center; gap: 1px; width: auto; height: 28px; padding: 0 var(--ref-spacing-02) 0 var(--ref-spacing-04); }
 .ell { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 머리 아이콘 버튼: 24 × 24, 사이 4 (Fill · Stroke 머리와 같아요) */
-.acts { display: flex; align-items: center; gap: var(--ref-spacing-04); flex: none; }
+.acts { display: flex; align-items: center; gap: 0; flex: none; } /* 머리 버튼(28)은 간격 없이 — 아래 행 버튼 열과 같은 세로줄 */
 .acts :deep(.ib) { width: 28px; height: 28px; }
 .sec-h.h24 > .ib { margin-left: auto; }
 .h24 { height: 28px; padding: 0; }

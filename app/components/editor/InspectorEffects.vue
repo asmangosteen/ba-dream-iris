@@ -209,7 +209,7 @@ function detach() {
       <span>{{ tr('Effects') }}</span>
       <span class="acts">
         <!-- 스타일 적용: 채우기 · 글자와 같은 토큰 목록 창(검색 · 라이브러리 · 묶음) -->
-        <TokenPicker variant="icon" icon="apply_styles" :kinds="['shadow']" label="Effect styles" @pick="applyStyle" />
+        <span class="styl-w"><TokenPicker variant="icon" icon="apply_styles" :kinds="['shadow']" label="Effect styles" @pick="applyStyle" /></span>
         <button class="ib s24" :aria-label="tr('Add effect')" :data-tip="tr('Add effect')" aria-haspopup="menu" @click="addMenu"><EditorIcon name="plus" :size="16" /></button>
       </span>
     </div>
@@ -301,7 +301,7 @@ function detach() {
 .s:has(> .sec-h.empty:only-child) { padding-bottom: var(--ref-spacing-08); }
 .h24 { height: 28px; padding: 0; }
 .sec-h.empty > span:first-child { color: var(--sys-color-neutral-500); }
-.acts { display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.acts { display: flex; align-items: center; gap: 0; } /* 머리 버튼(28)은 간격 없이 — 아래 행의 👁 · − 열과 같은 세로줄 */
 .s24 { width: 28px; height: 28px; }
 .m0 { margin: 0; }
 /* 피그마 Effects 행: [아이콘 + 이름] 8 [👁 24][− 24] — Fill 행과 같은 열 */

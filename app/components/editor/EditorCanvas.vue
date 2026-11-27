@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Tool } from '~/components/editor/EditorToolbar.vue'
 import type { Paint } from '~/canvas/schema'
-import { DEFAULT_STYLE, frameCss, frameDashStroke, frameSmoothLayers, frameStroke, type LayerType } from '~/canvas/schema'
+import { DEFAULT_STYLE, frameCss, frameDashStroke, frameSmooth, frameSmoothLayers, frameStroke, type LayerType } from '~/canvas/schema'
 import { useLayerStore } from '~/canvas/store'
-import { ellipsePath, radiiOf, rectPath, vectorPath } from '~/canvas/paint'
+import { effectCss, ellipsePath, radiiOf, rectPath, vectorPath } from '~/canvas/paint'
 import { nodePathIn } from '~/canvas/vector'
 import GridOverlay from '~/components/editor/GridOverlay.vue'
 import CanvasRulers from '~/components/editor/CanvasRulers.vue'
@@ -259,10 +259,24 @@ function rootMask(sid: string) {
   const m = d.nodes[d.rootIds[i]!]!
   return { below: d.rootIds.slice(0, i), mask: m.id, above: d.rootIds.slice(i + 1), clip: `path(${m.evenodd ? 'evenodd, ' : ''}'${nodePathIn(d, m, 0, 0)}')` }
 }
-const frameLook = (s: ScreenRow) => (s.source === 'native' ? frameCss(store.doc(s.id).frame, store.color, frameImg, s.width, s.height) : {})
+/**
+ * 화면 모양(채우기 · 선 · 그림자 · 모서리 · 투명도 · 그리드). 피그마에서 가져온 화면도 채우기만 빼고 같아요(사용자 요청 2026-11-27) —
+ * 바탕은 가져온 그림이라 채우기 칸은 없어요
+ */
+const lookOf = (s: ScreenRow) => { const f = store.doc(s.id).frame; return f && s.source !== 'native' ? { ...f, fill: undefined, fills: undefined } : f }
+const frameLook = (s: ScreenRow) => frameCss(lookOf(s), store.color, frameImg, s.width, s.height)
+/** 피그마 화면의 안쪽 그림자: 가져온 그림 위에 얹어요(바탕에 그리면 그림에 가려요) */
+const figInner = (s: ScreenRow) => {
+  if (s.source === 'native') return null
+  const f = store.doc(s.id).frame
+  const inner = effectCss(f?.effects, store.color, true).inner
+  if (!inner.length) return null
+  const sq = frameSmooth(f, s.width, s.height)
+  return { boxShadow: inner.join(', '), ...(sq ? { clipPath: `path('${sq.path}')`, borderRadius: '0' } : {}) }
+}
 /** Corner smoothing 화면: 바탕 · 그림자 · 선을 squircle 모양으로 그리는 층 */
-const frameDash = (s: ScreenRow) => (s.source === 'native' ? frameDashStroke(store.doc(s.id).frame, s.width, s.height, store.color) : null)
-const frameSm = (s: ScreenRow) => (s.source === 'native' ? frameSmoothLayers(store.doc(s.id).frame, s.width, s.height, store.color, frameImg) : null)
+const frameDash = (s: ScreenRow) => frameDashStroke(lookOf(s), s.width, s.height, store.color)
+const frameSm = (s: ScreenRow) => frameSmoothLayers(lookOf(s), s.width, s.height, store.color, frameImg)
 const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.value === 'hand' ? 'grab' : tool.value === 'move' || tool.value === 'scale' ? 'default' : tool.value === 'text' ? 'text' : 'crosshair'))
 </script>
 
@@ -311,11 +325,13 @@ const cursor = computed(() => (panning.value ? 'grabbing' : space.value || tool.
             </template>
             <LayerView v-for="id in rm ? [] : store.doc(s.id).rootIds" :key="id" :doc="store.doc(s.id)" :id="id" :screen-id="s.id" />
           </template>
-          <GridOverlay v-if="store.doc(s.id).frame?.grids" :grids="store.doc(s.id).frame?.grids" :w="s.width" :h="s.height" />
-          <!-- 화면 스트로크(안쪽): 자식 레이어 위에 — 피그마처럼 안에 든 레이어가 테두리를 덮지 않아요 -->
-          <i v-if="s.source === 'native' && frameStroke(store.doc(s.id).frame, store.color, s.width, s.height)" class="frame-stk" :style="{ boxShadow: frameStroke(store.doc(s.id).frame, store.color, s.width, s.height) }" />
-          <template v-for="sk in [frameSm(s)?.stroke ?? frameDash(s)]" :key="'fsk'"><svg v-if="sk" class="frame-sqk" :width="s.width" :height="s.height" overflow="visible" aria-hidden="true"><path v-for="(c, i) in sk.colors" :key="i" :d="sk.d" fill="none" :stroke="c" :stroke-width="sk.w" :stroke-dasharray="sk.dash" :stroke-linecap="sk.cap" /></svg></template>
         </template>
+        <!-- 아래는 Iris 화면 · 피그마 화면 모두: 안쪽 그림자(피그마 그림 위) · 그리드 · 선 -->
+        <i v-if="figInner(s)" class="frame-stk" :style="figInner(s)!" />
+        <GridOverlay v-if="store.doc(s.id).frame?.grids" :grids="store.doc(s.id).frame?.grids" :w="s.width" :h="s.height" />
+        <!-- 화면 스트로크(안쪽): 자식 레이어 위에 — 피그마처럼 안에 든 레이어가 테두리를 덮지 않아요 -->
+        <i v-if="frameStroke(lookOf(s), store.color, s.width, s.height)" class="frame-stk" :style="{ boxShadow: frameStroke(lookOf(s), store.color, s.width, s.height) }" />
+        <template v-for="sk in [frameSm(s)?.stroke ?? frameDash(s)]" :key="'fsk'"><svg v-if="sk" class="frame-sqk" :width="s.width" :height="s.height" overflow="visible" aria-hidden="true"><path v-for="(c, i) in sk.colors" :key="i" :d="sk.d" fill="none" :stroke="c" :stroke-width="sk.w" :stroke-dasharray="sk.dash" :stroke-linecap="sk.cap" /></svg></template>
       </div>
       <!-- 캔버스 위(화면 밖) 레이어: 화면들 위에 그려요 -->
       <div v-if="canvasDoc" class="free" :data-screen="canvasDoc.id" @pointerdown.stop="start($event, canvasDoc)">

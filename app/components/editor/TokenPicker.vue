@@ -424,5 +424,6 @@ const KIND_ICON: Partial<Record<string, string>> = { spacing: 'var_spacing', rad
 .tsp .ts { width: 20px; font-size: 14px; line-height: 18px; }
 .tsv { color: var(--sys-color-neutral-500); }
 
-.sh { border-radius: var(--ref-radius-02); --sq-fill: var(--iris-paper); width: 12px; height: 12px; margin: 0 2px; }
+/* 그림자 미리보기: 흰 칸이 바탕에 묻히지 않게 옅은 선(squircle — .sq) */
+.sh { border-radius: var(--ref-radius-02); --sq-fill: var(--iris-paper); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; width: 12px; height: 12px; margin: 0 2px; }
 </style>
