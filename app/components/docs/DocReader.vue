@@ -19,7 +19,7 @@ export function scrollToDocAnchor(
   return true
 }
 
-/** 양식 경고 줄을 누르면: 문서의 그 블록 · 표 행으로 스크롤하고 경고 박스와 같은 옅은 주황으로 잠깐 깜빡여요(사용자 요청 2026-11-27) */
+/** 양식 경고 줄을 누르면: 문서의 그 블록 · 표 행으로 스크롤하고 펼친 경고 막대와 같은 주황으로 잠깐 깜빡여요(사용자 요청 2026-11-27) */
 export function flashWarnAt(root: ParentNode | null | undefined, at: { block: string; row: number | null }): boolean {
   if (!root) return false
   const blockEl = root.querySelector(`[data-block="${at.block}"]`)

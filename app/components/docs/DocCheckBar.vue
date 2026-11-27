@@ -26,9 +26,9 @@ function where(w: FormatWarning) {
 </script>
 
 <template>
-  <div v-if="warns.length" :class="['sq', 'check', { compact, open }]">
+  <div v-if="warns.length" :class="['sq', 'sq-clip', 'check', { compact, open }]">
     <template v-if="warns.length">
-      <button type="button" class="sq warnbar" :aria-expanded="open" @click="open = !open">
+      <button type="button" class="warnbar" :aria-expanded="open" @click="open = !open">
         <EditorIcon name="warning" :size="14" />
         <b>{{ warns.length === 1 ? tr('1 warning') : tr('{n} warnings', { n: warns.length }) }}</b>
         <span class="f1" />
@@ -46,15 +46,13 @@ function where(w: FormatWarning) {
 </template>
 
 <style scoped>
-.check { display: flex; flex-direction: column; margin-bottom: var(--ref-spacing-10); border-radius: var(--ref-radius-05); font-size: 12px; line-height: 18px; --sq-fill: transparent; transition: --sq-fill .16s ease; }
-/* 펼치면 막대 + 목록이 옅은 주황 박스 하나에 */
+.check { display: flex; flex-direction: column; margin-bottom: var(--ref-spacing-10); border-radius: var(--ref-radius-05); font-size: 12px; line-height: 18px; }
+/* 박스 전체를 squircle 로 자르고, 막대는 모서리 없이 일자로 채워요 — 펼치면 위 막대(진한 주황) · 아래 목록(옅은 주황)으로 나뉘어요(사용자 요청 2026-11-27) */
 .check.open { --sq-fill: #FFF6EC; padding-bottom: var(--ref-spacing-04); }
-.check.open .warnbar { --sq-fill: transparent; }
-.check.open .warnbar:hover { --sq-fill: #FFEEDC; }
-.warnbar { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 32px; padding: 0 var(--ref-spacing-07); border-radius: var(--ref-radius-05); color: #B44A0E; --sq-fill: #FFF6EC; text-align: left; }
-.warnbar:hover { --sq-fill: #FFEEDC; }
+.warnbar { display: flex; align-items: center; gap: var(--ref-spacing-04); width: 100%; height: 32px; padding: 0 var(--ref-spacing-07); border-radius: 0; color: #B44A0E; background-color: #FFF6EC; text-align: left; transition: background-color .16s ease; }
+.warnbar:hover, .check.open .warnbar { background-color: #FFEEDC; }
 .warnbar b { font-weight: 600; }
-.warnbar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.warnbar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
 .f1 { flex: 1; }
 .flip { transform: rotate(180deg); }
 .list { display: flex; flex-direction: column; gap: 1px; padding: var(--ref-spacing-02) var(--ref-spacing-04) 0; }
