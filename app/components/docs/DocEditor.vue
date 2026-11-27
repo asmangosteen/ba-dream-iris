@@ -739,7 +739,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
     <!-- PDF · 링크 글: 글 상자 하나 -->
     <div v-else class="col6 grow">
       <label :for="`edBody-${doc.id}`" class="tx-head lbl">{{ tr('Body text') }}</label>
-      <div class="sq area-box"><textarea :id="`edBody-${doc.id}`" v-model="form.body" class="area" rows="16" :placeholder="tr('Paste or edit the original text')" /></div>
+      <div class="sq area-box"><textarea :id="`edBody-${doc.id}`" v-model="form.body" class="auto area" rows="16" @input="fit($event.target as HTMLTextAreaElement)" :placeholder="tr('Paste or edit the original text')" /></div>
     </div>
   </form>
 </template>
@@ -770,9 +770,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
 .grow { flex: 1; }
 .empty { margin: 0; }
 
-.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 240px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 .area.md { min-height: 320px; font-family: var(--font-family-base); }
-.area-box { display: flex; flex-direction: column; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+/* 여러 줄 입력칸 둥글기: 댓글 입력칸과 같은 18 */
+.area-box { display: flex; flex-direction: column; border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 

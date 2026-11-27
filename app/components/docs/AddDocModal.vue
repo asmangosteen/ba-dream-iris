@@ -30,6 +30,9 @@ const done = ref<{ docId: string; found: number; slots: number; warnings: number
 // 직접 쓰기 ----------------------------------------------------------------
 const title = ref('')
 const body = ref('')
+/** 여러 줄 입력칸: 크기 조절 손잡이 대신 글 길이에 맞춰 늘어나요(사용자 요청 2026-11-27) */
+const growArea = (e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
+
 const TEMPLATES: { key: string; label: string; cat: DocCategory; text: string }[] = [
   { key: 'plan', label: 'Spec', cat: 'planning', text: '## 1. Document info\n\n| Item | Value |\n| --- | --- |\n| Document abbreviation | |\n| Version | v0.1 |\n| Status | Draft |\n\n## 2. Policies\n\n| ID | Policy | Rules |\n| --- | --- | --- |\n| P-AREA-01 | | |\n\n## 3. Screens\n\n| ID | Screen | What to show | States | Policy |\n| --- | --- | --- | --- | --- |\n| C-01 | | | | P-AREA-01 |\n' },
   { key: 'dev', label: 'Dev notes', cat: 'dev', text: '# Overview\n\n## API\n- \n\n## To check\n- \n' },
@@ -358,7 +361,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               </div>
               <div class="col6">
                 <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
-                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
+                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
                 <span class="tx-meta num">{{ tr('Policy tables (P-AREA-01) and screen tables (C-01) are read automatically. Lines starting with REQ-001 still work') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
               </div>
             </div>
@@ -458,9 +461,10 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .tpl-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .tpl-item.on { font-weight: 600; --sq-overlay: transparent; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
 
-.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 128px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 128px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 /* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
-.area-box { display: block; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+/* 여러 줄 입력칸 둥글기: 댓글 입력칸과 같은 18 */
+.area-box { display: block; border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }

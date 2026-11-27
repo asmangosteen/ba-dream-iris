@@ -164,6 +164,9 @@ async function unlink(requirement_id: string) {
 // 메모 고치기
 const editing = ref<string | null>(null)
 const noteDraft = ref('')
+/** 여러 줄 입력칸: 크기 조절 손잡이 대신 글 길이에 맞춰 늘어나요(사용자 요청 2026-11-27) */
+const growArea = (e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
+
 function editNote(link: { requirement_id: string; note: string | null }) { editing.value = link.requirement_id; noteDraft.value = link.note ?? '' }
 async function saveNote(link: { requirement_id: string; status: LinkStatus; note: string | null }) {
   const before = link.note
@@ -261,7 +264,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
             <span class="tx-meta ell"><span class="num">{{ req.code }}</span> · {{ fromTable(lk) && lk.status === 'unchecked' ? tr('From the screen table') : anchorLabel(req) }}<template v-if="req.removed_at"> · {{ tr('Removed from the doc') }}</template></span>
           </div>
           <div v-if="editing === req.id" class="note-edit">
-            <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" :aria-label="tr('Note')" :placeholder="tr('Describe what is missing')" @keydown.meta.enter="saveNote(lk)" /></div>
+            <div class="sq txt-box"><textarea v-model="noteDraft" rows="2" class="txt" @input="growArea" :aria-label="tr('Note')" :placeholder="tr('Describe what is missing')" @keydown.meta.enter="saveNote(lk)" /></div>
             <span class="row-end"><Button size="s" type="tertiary" @click="editing = null">{{ tr('Cancel') }}</Button><Button size="s" type="tertiary" stroke @click="saveNote(lk)">{{ tr('Save') }}</Button></span>
           </div>
           <button v-else-if="lk.note" class="sq note" @click="editNote(lk)"><EditorIcon name="warning" :size="16" class="mt3" /><span>{{ lk.note }}</span></button>
@@ -320,7 +323,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 /* 16 아이콘을 18 줄 높이 첫 줄 가운데에 */
 .mt3 { margin-top: 1px; flex: none; }
 .note-edit { margin-left: var(--ref-spacing-10); display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.txt { width: 100%; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); display: block; background: transparent; font-size: 12px; line-height: 18px; }
+.txt { width: 100%; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); display: block; background: transparent; font-size: 12px; line-height: 18px; }
 /* 메모 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선을 그려요 */
 .txt-box { border-radius: var(--iris-field-r); --sq-fill: var(--sys-color-neutral-200); --sq-line-w: 0.5px; }
 .txt-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
