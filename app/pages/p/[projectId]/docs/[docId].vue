@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Icon, IconButton, Skeleton } from '@ba-dream/design-system'
+import { Button, IconButton, Skeleton } from '@ba-dream/design-system'
 import DocReader, { flashWarnAt } from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import DocEditor from '~/components/docs/DocEditor.vue'
@@ -388,8 +388,12 @@ onMounted(() => {
 // "…" 메뉴 ---------------------------------------------------------------
 const menuOpen = ref(false)
 const moreEl = ref<HTMLElement | null>(null)
+/** 왼쪽 위 Iris 로고 메뉴 */
+const homeOpen = ref(false)
+const homeEl = ref<HTMLElement | null>(null)
 function onDocPointer(e: PointerEvent) {
   if (menuOpen.value && moreEl.value && !moreEl.value.contains(e.target as Node)) menuOpen.value = false
+  if (homeOpen.value && homeEl.value && !homeEl.value.contains(e.target as Node)) homeOpen.value = false
 }
 onMounted(() => document.addEventListener('pointerdown', onDocPointer, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, true))
@@ -436,9 +440,19 @@ async function removeDoc() {
 <template>
   <!-- 문서 추가 모달이 열려 있으면 뒤 화면은 보조기기에서 숨깁니다 -->
   <div class="split" :aria-hidden="addOpen ? 'true' : undefined">
-    <!-- 왼쪽 위: 돌아가기 알약 -->
+    <!-- 왼쪽 위: 편집기 캔버스와 같은 Iris 로고 메뉴(사용자 요청 2026-11-27) + 프로젝트 이름(누르면 편집기로) -->
     <div class="sq float s pill">
-      <NuxtLink :to="backHref" class="ib" :aria-label="tr('Back to editor')"><Icon name="chevron_left" :size="16" /></NuxtLink>
+      <div ref="homeEl" class="home-wrap">
+        <button type="button" class="sq hov home" :aria-label="tr('Main menu')" :aria-expanded="homeOpen" @click="homeOpen = !homeOpen"><IrisLogo kind="symbol" :height="16" /><EditorIcon name="chevron_down" :size="12" /></button>
+        <div v-if="homeOpen" class="sq menu pmenu" role="menu" @click="homeOpen = false">
+          <NuxtLink :to="backHref" class="sq menu-item" role="menuitem">{{ tr('Back to editor') }}</NuxtLink>
+          <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
+          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Policies board') }}</NuxtLink>
+          <div class="msep" role="separator" />
+          <ThemeSwitch compact />
+          <LangSwitch />
+        </div>
+      </div>
       <NuxtLink :to="backHref" class="tx-meta crumb ellipsis">{{ projectName || tr('Project') }}</NuxtLink>
       <EditorIcon name="chevron_right" :size="12" color="var(--sys-color-neutral-400)" />
       <span class="tx-head">{{ tr('Split view') }}</span>
@@ -636,7 +650,11 @@ async function removeDoc() {
 .split { position: relative; height: calc(100vh - var(--iris-tabs-h, 0px)); overflow: hidden; background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.pill { position: absolute; left: var(--iris-gap); top: var(--iris-gap); z-index: 3; height: 40px; max-width: calc(100% - 640px); box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-04); }
+.pill { position: absolute; left: var(--iris-gap); top: var(--iris-gap); z-index: 3; height: 40px; max-width: calc(100% - 640px); box-sizing: border-box; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-06); } /* 왼쪽 안쪽 8 · 로고 버튼 크기는 편집기 패널 맨 위 줄과 같게(사용자 요청 2026-11-27) */
+.home-wrap { position: relative; flex: none; }
+.home { display: flex; align-items: center; gap: var(--ref-spacing-02); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-03); flex: none; color: var(--sys-color-neutral-500); }
+.home:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.pmenu { left: 0; right: auto; width: 232px; }
 .crumb { border-radius: var(--ref-radius-02); transition: color .12s ease; }
 .crumb:hover { color: var(--sys-color-neutral-800); }
 .crumb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }

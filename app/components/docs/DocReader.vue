@@ -449,7 +449,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 <style scoped>
 .reader { display: flex; flex-direction: column; gap: var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .head { display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
-.compact .head { gap: var(--ref-spacing-02); }
+/* 패널(compact)도 제목과 칩 줄 사이 4 — 넓은 화면과 같게(사용자 요청 2026-11-27) */
 .title-row { display: flex; align-items: flex-start; gap: var(--ref-spacing-08); min-width: 0; }
 .title-row > h1, .title-row > h2 { flex: 1; min-width: 0; }
 .acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); margin-top: -1px; }
