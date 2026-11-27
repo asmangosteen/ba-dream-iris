@@ -18,7 +18,7 @@ const displayName = computed(() => me.value?.name || email.value)
 // 사이드바 메뉴(라벨은 영어 원문 — 그릴 때 tr 로 바꿔요)
 const nav = [
   { to: '/', label: 'Projects', icon: 'folder' },
-  { to: '/requirements', label: 'Requirements', icon: 'document' },
+  { to: '/requirements', label: 'Policies', icon: 'document' },
 ]
 const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 

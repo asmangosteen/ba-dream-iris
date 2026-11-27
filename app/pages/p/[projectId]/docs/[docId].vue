@@ -3,7 +3,10 @@ import { Button, Icon, IconButton, Skeleton } from '@ba-dream/design-system'
 import DocReader from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import DocEditor from '~/components/docs/DocEditor.vue'
-import type { DocRow, LinkRow, ReqRow } from '~/composables/useIrisData'
+import DocCheckBar from '~/components/docs/DocCheckBar.vue'
+import DocNotes, { type DocAnchor } from '~/components/docs/DocNotes.vue'
+import DocHistory from '~/components/docs/DocHistory.vue'
+import type { DocBlock, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /** 문서 함께 보기 — 오른쪽에 문서, 왼쪽 캔버스에 이 문서와 연결된 화면 (design/iris-canvas/DocSplit.dc.html) */
@@ -16,7 +19,9 @@ const { data: projects } = useProjects()
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const screens = useProjectScreens(projectId)
-const { addRequirement } = useIrisMutations()
+const slots = useScreenSlots(projectId)
+const { addRequirement, linkMany, syncDocFormat, addHistory } = useIrisMutations()
+const comments = useComments(projectId)
 
 const projectName = computed(() => projects.value?.find((p) => p.id === projectId)?.name ?? '')
 const doc = computed(() => docs.data.value?.find((d) => d.id === docId.value) ?? null)
@@ -35,15 +40,177 @@ const backHref = computed(() => ({ path: `/p/${projectId}`, query: { doc: docId.
 // 편집기에서 '넓게 보기'로 왔으면(?req=) 고르던 REQ 를 그대로
 onMounted(() => { if (typeof route.query.req === 'string') activeReq.value = route.query.req })
 
-/** 이 문서의 요구사항과 연결된 화면만 보여 줍니다 */
-const frames = computed(() => {
+/**
+ * 캔버스(B안): 이 문서 화면 표의 화면 칸 순서대로 — 칸에 붙은 디자인, 아직 없으면 '디자인 없음' 자리.
+ * 그 뒤에 칸 없이 이 문서 정책과 연결된 화면.
+ */
+interface Col { key: string; slot: SlotRow | null; screen: ProjectScreen | null; code: string | null; name: string; page: string }
+const docSlots = computed(() => (slots.data.value ?? []).filter((x) => x.document_id === docId.value && !x.removed_at))
+const frames = computed<Col[]>(() => {
+  const all = screens.data.value ?? []
+  const out: Col[] = []
+  const used = new Set<string>()
+  for (const sl of docSlots.value) {
+    const att = all.filter((x) => x.slot_id === sl.id)
+    if (att.length) for (const x of att) { out.push({ key: x.id, slot: sl, screen: x, code: sl.code + (x.slot_state ? '/' + x.slot_state : ''), name: x.slot_state ? sl.name : x.name, page: x.page }); used.add(x.id) }
+    else out.push({ key: 'slot-' + sl.id, slot: sl, screen: null, code: sl.code, name: sl.name, page: '' })
+  }
   const linked = new Set(docLinks.value.map((l) => l.screen_id))
-  return (screens.data.value ?? []).filter((s) => linked.has(s.id))
+  for (const x of all) if (linked.has(x.id) && !used.has(x.id)) out.push({ key: x.id, slot: null, screen: x, code: null, name: x.name, page: x.page })
+  return out
 })
 const activeLinks = computed(() => new Map(docLinks.value.filter((l) => l.requirement_id === activeReq.value).map((l) => [l.screen_id, l])))
+const activeCode = computed(() => docReqs.value.find((r) => r.id === activeReq.value)?.code ?? null)
 const reqCount = (screenId: string) => docLinks.value.filter((l) => l.screen_id === screenId).length
-const isLit = (screenId: string) => activeLinks.value.has(screenId) || activeScreen.value === screenId
-const isDim = (screenId: string) => (!!activeReq.value || !!activeScreen.value) && !isLit(screenId)
+/** 고른 메모가 가리키는 화면들(핀이 붙은 화면 + 그 정책에 연결된 화면) */
+const activeNote = ref<string | null>(null)
+const noteDraft = ref<DocAnchor | null>(null)
+const noteThread = computed(() => comments.docThreads(docId.value).find((t) => t.root.id === activeNote.value) ?? null)
+const noteScreens = computed(() => {
+  const t = noteThread.value
+  if (!t) return new Set<string>()
+  const ids = new Set<string>(t.root.screen_id ? [t.root.screen_id] : [])
+  const r = t.root.doc_anchor?.code ? docReqs.value.find((x) => x.code === t.root.doc_anchor!.code) : null
+  if (r) for (const l of docLinks.value) if (l.requirement_id === r.id) ids.add(l.screen_id)
+  return ids
+})
+/** 고른 메모의 정책(문서에서 그 줄도 강조) */
+const noteReqId = computed(() => { const c = noteThread.value?.root.doc_anchor?.code; return c ? docReqs.value.find((x) => x.code === c)?.id ?? null : null })
+const pinCount = (screenId: string) => comments.docThreads(docId.value).filter((t) => t.root.screen_id === screenId && !t.root.resolved_at).length
+const activeCol = ref<string | null>(null)
+function isLit(c: Col) {
+  if (c.screen && (activeLinks.value.has(c.screen.id) || activeScreen.value === c.screen.id || noteScreens.value.has(c.screen.id))) return true
+  if (activeCol.value === c.key) return true
+  return !!activeCode.value && !!c.slot?.policy_codes.includes(activeCode.value)
+}
+const isNoteLit = (c: Col) => !!c.screen && noteScreens.value.has(c.screen.id)
+const isDim = (c: Col) => (!!activeReq.value || !!activeScreen.value || !!activeCol.value || !!activeNote.value) && !isLit(c)
+watch(activeNote, (v) => { if (v) { activeReq.value = null; activeScreen.value = null; activeCol.value = null } })
+/** 문서에서 화면 ID(C-05)를 누르면 그 화면 칸으로 */
+function pickSlot(code: string) {
+  const c = frames.value.find((x) => x.slot?.code === code)
+  if (!c) { say(tr('{code} isn’t a screen slot in this document', { code })); return }
+  activeReq.value = null
+  activeScreen.value = null
+  activeNote.value = null
+  activeCol.value = c.key
+  nextTick(() => canvas.value?.querySelector(`[data-col="${c.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }))
+}
+function pickCol(c: Col) {
+  activeCol.value = null
+  activeNote.value = null
+  if (c.screen) return pickScreen(c.screen.id)
+  activeScreen.value = null
+  activeCol.value = c.key
+  // 칸의 '정책' 열 첫 정책으로 문서를 옮겨요
+  const r = docReqs.value.find((x) => c.slot?.policy_codes.includes(x.code))
+  activeReq.value = r?.id ?? null
+  if (r) nextTick(() => reader.value?.scrollToReq(r.id))
+}
+
+// 끌어서 연결(새 1): 화면 오른쪽 가장자리 점을 끌어 문서의 정책 줄에 놓으면 연결 --------------
+const drag = ref<{ screen: ProjectScreen; x0: number; y0: number; x: number; y: number; over: ReqRow | null } | null>(null)
+let dropEl: Element | null = null
+function startLinkDrag(c: Col, e: PointerEvent) {
+  if (!c.screen) return
+  e.preventDefault()
+  e.stopPropagation()
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  drag.value = { screen: c.screen, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: e.clientX, y: e.clientY, over: null }
+  window.addEventListener('pointermove', onLinkMove)
+  window.addEventListener('pointerup', onLinkUp, { once: true })
+  window.addEventListener('keydown', onLinkKey)
+}
+function reqAt(x: number, y: number): { el: Element; req: ReqRow } | null {
+  const el = document.elementFromPoint(x, y)?.closest('[data-reqs]')
+  const id = el?.getAttribute('data-reqs')?.split(' ')[0]
+  const req = id ? docReqs.value.find((r) => r.id === id) : null
+  return el && req ? { el, req } : null
+}
+function onLinkMove(e: PointerEvent) {
+  if (!drag.value) return
+  drag.value.x = e.clientX
+  drag.value.y = e.clientY
+  const hit = reqAt(e.clientX, e.clientY)
+  if (dropEl !== hit?.el) { dropEl?.classList.remove('drop-on'); dropEl = hit?.el ?? null; dropEl?.classList.add('drop-on') }
+  drag.value.over = hit?.req ?? null
+}
+function endLinkDrag() {
+  dropEl?.classList.remove('drop-on')
+  dropEl = null
+  drag.value = null
+  window.removeEventListener('pointermove', onLinkMove)
+  window.removeEventListener('keydown', onLinkKey)
+}
+function onLinkKey(e: KeyboardEvent) { if (e.key === 'Escape') { window.removeEventListener('pointerup', onLinkUp); endLinkDrag() } }
+async function onLinkUp() {
+  const d = drag.value
+  const req = d?.over
+  endLinkDrag()
+  if (!d || !req) return
+  if (docLinks.value.some((l) => l.screen_id === d.screen.id && l.requirement_id === req.id)) { say(tr('{code} is already linked to {name}', { code: req.code, name: d.screen.name })); return }
+  try {
+    await linkMany([{ screen_id: d.screen.id, requirement_id: req.id }], links.data.value ?? [])
+    await links.refresh()
+    activeReq.value = req.id
+    say(tr('Linked {code} to {name}', { code: req.code, name: d.screen.name }))
+  } catch { say(tr("Couldn't link. Try again")) }
+}
+onBeforeUnmount(endLinkDrag)
+
+// 문서 옆 메모 · 수정 기록 ---------------------------------------------------
+/** 문서 옆 메모 칸: 메모가 있으면 열고, 없으면 닫아 둬요(캔버스를 넓게). 직접 열고 닫으면 그대로 */
+const notesOpen = ref(false)
+let notesTouched = false
+const notesRef = ref<{ count: number } | null>(null)
+const noteCount = computed(() => comments.docThreads(docId.value).filter((t) => !t.root.resolved_at).length)
+watch(noteCount, (n) => { if (n > 0 && !notesTouched) notesOpen.value = true }, { immediate: true })
+watch(docId, () => { notesTouched = false; notesOpen.value = noteCount.value > 0 })
+function toggleNotes() { notesTouched = true; notesOpen.value = !notesOpen.value }
+function onComment(p: { quote: string; block: string | null; row: number | null; code: string | null }) {
+  notesOpen.value = true
+  activeNote.value = null
+  noteDraft.value = { block: p.block, row: p.row, code: p.code, quote: p.quote }
+}
+function goAnchor(a: DocAnchor) {
+  const r = a.code ? docReqs.value.find((x) => x.code === a.code) : null
+  if (r) { activeReq.value = null; nextTick(() => reader.value?.scrollToReq(r.id)) }
+  else if (a.block) goBlock({ block: a.block, row: a.row ?? null })
+}
+/** 문서의 블록 · 표 행으로 스크롤(양식 경고 [Go]) */
+function goBlock(at: { block: string; row: number | null }) {
+  const root = reader.value?.root
+  const blockEl = root?.querySelector(`[data-block="${at.block}"]`)
+  const el = (at.row ? blockEl?.querySelector(`tr[data-row="${at.row}"]`) : null) ?? blockEl
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  el.classList.add('flash')
+  setTimeout(() => el.classList.remove('flash'), 1400)
+}
+const histOpen = ref(false)
+watch(docId, () => { histOpen.value = false; activeNote.value = null; noteDraft.value = null; activeCol.value = null })
+/** 기록에서 [이 버전으로 되돌리기]: 그때 글로 저장하고, 되돌린 것도 기록으로 남겨요 */
+async function restoreDoc(blocks: DocBlock[], label: string) {
+  const d = doc.value
+  if (!d) return
+  const plain = blocks.map((b) => b.text).join('\n') || null
+  try {
+    if (preview) {
+      const store = useState<Omit<DocRow, 'project_id'>[]>('pv-docs')
+      const i = store.value?.findIndex((x) => x.id === d.id) ?? -1
+      if (i >= 0) store.value[i] = { ...store.value[i]!, content_blocks: blocks, plain_text: plain, updated_at: new Date().toISOString() }
+    } else {
+      const { error } = await supabase.from('documents').update({ content_blocks: blocks, plain_text: plain }).eq('id', d.id)
+      if (error) throw error
+    }
+    const result = analyzeDoc(blocks)
+    await syncDocFormat(projectId, d.id, result, { reqs: reqs.data.value ?? [], slots: slots.data.value ?? [], screens: screens.data.value ?? [], links: links.data.value ?? [] }).catch(() => null)
+    await addHistory(projectId, d.id, d.content_blocks ?? [], blocks, label).catch(() => null)
+    await refreshNuxtData([`docs-${projectId}`, `reqs-${projectId}`, `links-${projectId}`, `slots-${projectId}`, `doc-history-${projectId}`])
+    histOpen.value = false
+    say(tr('Restored'))
+  } catch { say(tr("Couldn't restore. Try again in a moment.")) }
+}
 
 const reader = ref<InstanceType<typeof DocReader> | null>(null)
 const canvas = ref<HTMLElement | null>(null)
@@ -53,8 +220,9 @@ function pickReq(id: string) {
   activeReq.value = activeReq.value === id ? null : id
   if (!activeReq.value) return
   nextTick(() => {
-    const first = frames.value.find((s) => activeLinks.value.has(s.id))
-    if (first) canvas.value?.querySelector(`[data-screen="${first.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+    const code = activeCode.value
+    const first = frames.value.find((c) => (c.screen && activeLinks.value.has(c.screen.id)) || (!!code && !!c.slot?.policy_codes.includes(code)))
+    if (first) canvas.value?.querySelector(`[data-col="${first.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
   })
 }
 
@@ -76,12 +244,13 @@ function say(msg: string) {
 }
 onBeforeUnmount(() => clearTimeout(noticeTimer))
 
+/** 문서에 번호 없이 고른 글로 만든 정책은 임시 번호(#12) — 문서에 없는 번호임을 드러내요(PRD/11 3-3) */
 function nextCode(): string {
   const max = (reqs.data.value ?? []).reduce((m, r) => {
-    const n = Number(r.code.match(/^REQ-(\d+)$/i)?.[1] ?? 0)
+    const n = Number(r.code.match(/^#(\d+)$/)?.[1] ?? 0)
     return n > m ? n : m
   }, 0)
-  return 'REQ-' + String(max + 1).padStart(3, '0')
+  return '#' + (max + 1)
 }
 
 async function createReq({ text, block }: { text: string; block: string | null }) {
@@ -99,9 +268,9 @@ async function createReq({ text, block }: { text: string; block: string | null }
     await reqs.refresh()
     activeScreen.value = null
     activeReq.value = id
-    say(tr('Created requirement {code}', { code }))
+    say(tr('Created policy {code}', { code }))
   } catch {
-    say(tr("Couldn't create the requirement. Try again in a moment."))
+    say(tr("Couldn't create the policy. Try again in a moment."))
   }
 }
 
@@ -142,11 +311,12 @@ function discard() {
   stopEdit()
   next?.()
 }
-function onSaved({ found, gone: codes }: { found: number; gone: string[] }) {
+function onSaved({ found, gone: codes, warnings }: { found: number; gone: string[]; warnings: number }) {
   stopEdit()
   closeBars()
   gone.value = codes
-  say(found === 1 ? tr('Found 1 new requirement') : found > 0 ? tr('Found {n} new requirements', { n: found }) : tr('Document saved'))
+  const base = found === 1 ? tr('Found 1 new policy') : found > 0 ? tr('Found {n} new policies', { n: found }) : tr('Document saved')
+  say(warnings ? base + ' · ' + (warnings === 1 ? tr('1 warning') : tr('{n} warnings', { n: warnings })) : base)
 }
 
 // 다른 문서 · 다른 화면으로 갈 때
@@ -232,43 +402,56 @@ async function removeDoc() {
       <span class="tx-head">{{ tr('Split view') }}</span>
     </div>
 
-    <!-- 캔버스: 연결된 화면 -->
-    <main ref="canvas" :aria-label="tr('Canvas')" class="canvas-dots canvas">
+    <!-- 캔버스(B안): 화면 표의 화면 칸 순서대로 + 칸 없이 연결된 화면 -->
+    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesOpen && !editing }]">
       <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
-      <p v-else-if="frames.length" class="tx-meta hint">{{ activeReq ? tr('Highlighted screens are linked to this requirement') : tr('Click a requirement to highlight its linked screens') }}</p>
+      <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
       <div class="frames">
-        <button
-          v-for="s in frames"
-          :key="s.id"
-          type="button"
-          :data-screen="s.id"
-          :class="['frame-col', { lit: isLit(s.id), dim: isDim(s.id) }]"
-          :aria-pressed="isLit(s.id)"
-          :aria-label="tr('{name} · Requirements: {n}', { name: s.name, n: reqCount(s.id) })"
-          @click="pickScreen(s.id)"
+        <div
+          v-for="c in frames"
+          :key="c.key"
+          :data-col="c.key"
+          :class="['frame-col', { lit: isLit(c), note: isNoteLit(c), dim: isDim(c), empty: !c.screen }]"
         >
-          <span class="frame-label">
-            <span class="ellipsis">{{ s.name }}</span>
-            <StatusIcon v-if="activeLinks.get(s.id)" :status="activeLinks.get(s.id)!.status" :size="10" />
-          </span>
-          <span class="frame" aria-hidden="true">
-            <span class="f-status" />
-            <span class="f-title">{{ s.name }}</span>
-            <span class="f-body">
-              <span class="sqc f-bar" />
-              <span class="sq f-card" />
-              <span class="sq f-card" />
-              <span class="sq f-card" />
+          <button type="button" class="frame-btn" :aria-pressed="isLit(c)" :aria-label="c.screen ? tr('{name} · Policies: {n}', { name: c.name, n: reqCount(c.screen.id) }) : tr('{code} {name} · No design yet', { code: c.code ?? '', name: c.name })" @click="pickCol(c)">
+            <span class="frame-label">
+              <span v-if="c.code" class="sq sid num">{{ c.code }}</span>
+              <span class="ellipsis">{{ c.name }}</span>
+              <StatusIcon v-if="c.screen && activeLinks.get(c.screen.id)" :status="activeLinks.get(c.screen.id)!.status" :size="10" />
+              <span v-if="c.screen && pinCount(c.screen.id)" class="sq npin num" :title="tr('Notes')">{{ pinCount(c.screen.id) }}</span>
             </span>
-            <span class="sqc f-cta" />
-          </span>
-          <span class="frame-page">{{ s.page }}</span>
-        </button>
+            <span v-if="c.screen" class="frame" aria-hidden="true">
+              <span class="f-status" />
+              <span class="f-title">{{ c.name }}</span>
+              <span class="f-body">
+                <span class="sqc f-bar" />
+                <span class="sq f-card" />
+                <span class="sq f-card" />
+                <span class="sq f-card" />
+              </span>
+              <span class="sqc f-cta" />
+            </span>
+            <span v-else class="frame noframe">
+              <b>{{ tr('No design yet') }}</b>
+              <span class="tx-meta">{{ tr('Import from Figma or draw a frame, then link it to this slot') }}</span>
+            </span>
+            <span class="frame-page">{{ c.page || (c.slot?.states.length ? tr('States: {list}', { list: c.slot.states.join(', ') }) : '') }}</span>
+          </button>
+          <!-- 끌어서 연결 점 -->
+          <button v-if="c.screen && !editing" type="button" class="link-dot" :aria-label="tr('Drag onto a policy row to link {name}', { name: c.name })" :title="tr('Drag onto a policy row to link')" @pointerdown="startLinkDrag(c, $event)" />
+        </div>
       </div>
     </main>
 
+    <!-- 끌어서 연결 중: 점선 + 놓을 곳 -->
+    <svg v-if="drag" class="drag-line" aria-hidden="true">
+      <path :d="`M ${drag.x0} ${drag.y0} C ${(drag.x0 + drag.x) / 2} ${drag.y0}, ${(drag.x0 + drag.x) / 2} ${drag.y}, ${drag.x} ${drag.y}`" />
+      <circle :cx="drag.x" :cy="drag.y" r="4" />
+    </svg>
+    <span v-if="drag" class="sq drag-chip" :style="{ left: drag.x + 12 + 'px', top: drag.y + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
+
     <!-- 오른쪽: 문서 -->
-    <aside :aria-label="tr('Document')" class="sq float doc">
+    <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesOpen && !editing && !histOpen }]">
       <div class="doc-tabs">
         <nav class="seg tabs" :aria-label="tr('Choose a document')">
           <NuxtLink
@@ -289,7 +472,7 @@ async function removeDoc() {
       </div>
 
       <div class="doc-body">
-        <div v-if="docs.status.value === 'pending'" class="loading">
+        <div v-if="docs.status.value === 'pending' && !docs.data.value?.length" class="loading">
           <Skeleton shape="text" width="60%" />
           <Skeleton shape="text" />
           <Skeleton shape="text" width="80%" />
@@ -308,14 +491,17 @@ async function removeDoc() {
           @cancel="cancelEdit"
           @saved="onSaved"
         />
-        <template v-else>
+        <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" @close="histOpen = false" @restore="restoreDoc" />
+        <div v-else class="read-cols">
+        <div class="read-main">
+          <DocCheckBar :doc="doc" @go="goBlock" />
           <div v-if="goneReqs.length" class="sq gone" role="status">
             <span class="gone-col">
               <span class="tx-body gone-t">
                 {{ tr('No longer in the document:') }}
                 <button v-for="r in goneReqs" :key="r.id" type="button" class="sq code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
-              <span class="tx-meta">{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Requirements') }}</NuxtLink>{{ tr('These requirements and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
+              <span class="tx-meta">{{ tr('These policies and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Policies') }}</NuxtLink>{{ tr('These policies and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
             </span>
             <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><EditorIcon name="close" :size="14" /></button>
           </div>
@@ -323,13 +509,17 @@ async function removeDoc() {
             ref="reader"
             :doc="doc"
             :reqs="docReqs"
-            :highlight="activeReq"
+            :highlight="activeReq ?? noteReqId"
             :linked="links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))] : null"
             @pick-req="pickReq"
+            @pick-slot="pickSlot"
             @create-req="createReq"
+            @comment="onComment"
             @edit="startEdit"
           >
             <template #actions>
+              <button type="button" :class="['sq', 'hbtn', { on: notesOpen }]" :aria-pressed="notesOpen" @click="toggleNotes"><EditorIcon name="comment" :size="14" />{{ noteCount ? tr('Comments {n}', { n: noteCount }) : tr('Comments') }}</button>
+              <button type="button" class="sq hbtn" @click="histOpen = true"><EditorIcon name="clock" :size="14" />{{ tr('History') }}</button>
               <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">{{ tr('Edit') }}</Button>
               <div ref="moreEl" class="more">
                 <IconButton
@@ -348,7 +538,11 @@ async function removeDoc() {
               </div>
             </template>
           </DocReader>
-        </template>
+          <DocNotes part="board" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @toast="say" />
+        </div>
+        <!-- 문서 옆 메모(Word 노트처럼) -->
+        <DocNotes v-if="notesOpen" ref="notesRef" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" class="read-notes" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" />
+        </div>
       </div>
 
       <!-- 확인 줄 -->
@@ -360,7 +554,7 @@ async function removeDoc() {
       <div v-else-if="bar === 'delete' && doc" class="confirm" role="alertdialog" aria-labelledby="delMsg" aria-describedby="delSub">
         <span class="confirm-col">
           <span id="delMsg" class="tx-head">{{ tr('Delete “{name}”?', { name: doc.title }) }}</span>
-          <span id="delSub" class="tx-meta">{{ tr('Its requirements and screen links will be deleted too. This can’t be undone.') }}</span>
+          <span id="delSub" class="tx-meta">{{ tr('Its policies and screen links will be deleted too. This can’t be undone.') }}</span>
         </span>
         <Button size="s" type="tertiary" :disabled="deleting" @click="closeBars">{{ tr('Cancel') }}</Button>
         <Button size="s" type="destructed" :loading="deleting" @click="removeDoc">{{ tr('Delete') }}</Button>
@@ -387,19 +581,45 @@ async function removeDoc() {
 .pill .tx-head { white-space: nowrap; }
 
 .canvas { position: absolute; inset: 0; overflow: auto; padding: 64px 632px 48px 48px; box-sizing: border-box; }
+.canvas.wide { padding-right: 912px; }
 .hint { margin: 0 0 var(--ref-spacing-12); }
 .frames { display: flex; flex-wrap: wrap; gap: 32px 44px; }
-.frame-col { display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 176px; flex: none; text-align: left; transition: opacity .15s; }
+.frame-col { position: relative; width: 176px; flex: none; transition: opacity .15s; }
+.frame-btn { display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 100%; text-align: left; }
+.frame-btn:focus-visible { outline: none; }
+.frame-btn:focus-visible .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .frame-col.dim { opacity: .55; }
 .frame-label { display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
 .frame-col.lit .frame-label { color: var(--sys-color-brand-primary-default); font-weight: 500; }
 .frame-page { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); }
 /* 375 × 812 화면을 176 폭으로 줄인 틀 (썸네일 전까지 자리만) */
 .frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 2px; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
-.frame-col:hover .frame { outline-color: var(--ref-color-gray-900-20); }
+.frame-btn:hover .frame { outline-color: var(--ref-color-gray-900-20); }
 .frame-col.lit .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
-.frame-col:focus-visible { outline: none; }
-.frame-col:focus-visible .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.frame-col.note .frame { outline: 2px solid #E8C14A; outline-offset: 2px; box-shadow: 0 0 0 6px rgb(232 193 74 / 22%); }
+.noframe { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10); text-align: center; background: transparent; box-shadow: none; outline: 1.5px dashed var(--iris-line-strong); font-size: 12px; color: var(--sys-color-neutral-700); }
+.noframe b { font-weight: 600; }
+.frame-label .sid { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
+.npin { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 4px; border-radius: 8px 8px 8px 2px; font-size: 10px; font-weight: 600; color: #8A6100; --sq-fill: #FFF1C2; }
+.link-dot { position: absolute; right: -6px; top: 210px; width: 12px; height: 12px; border-radius: 50%; background: var(--sys-color-common-white-default); box-shadow: 0 0 0 1.5px var(--iris-peek); cursor: crosshair; opacity: 0; transition: opacity .12s, transform .12s; }
+.frame-col:hover .link-dot, .link-dot:focus-visible { opacity: 1; }
+.link-dot:hover { transform: scale(1.25); background: var(--iris-peek); }
+.drag-line { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20; pointer-events: none; overflow: visible; }
+.drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 2; stroke-dasharray: 6 4; }
+.drag-line circle { fill: var(--iris-peek); }
+.drag-chip { position: fixed; z-index: 21; pointer-events: none; height: 24px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.split :deep(.drop-on) td, .split :deep(.drop-on.blk) { background: color-mix(in srgb, var(--iris-peek) 12%, transparent) !important; }
+.split :deep(.drop-on) td:first-child { box-shadow: inset 2px 0 0 var(--iris-peek); }
+.split :deep(.flash) { animation: flash 1.4s ease; }
+@keyframes flash { 0%, 40% { background: #FFF1C2; } 100% { background: transparent; } }
+.doc.wide { width: 880px; }
+.read-cols { display: flex; gap: var(--ref-spacing-12); align-items: flex-start; }
+.read-main { flex: 1; min-width: 0; }
+.read-notes { width: 248px; flex: none; position: sticky; top: 0; }
+.hbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 28px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-04); font-size: 12px; color: var(--sys-color-neutral-700); white-space: nowrap; }
+.hbtn:hover { --sq-fill: var(--sys-color-neutral-100); }
+.hbtn.on { color: #8A6100; --sq-fill: #FFF6DA; }
+.hbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f-status { display: block; height: 26px; }
 .f-title { display: block; padding: 0 9px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: #03091A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .f-body { display: flex; flex-direction: column; gap: 6px; padding: 0 9px; }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button, IconButton, TextInput } from '@ba-dream/design-system'
-import type { DocBlock, DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
+import type { DocBlock, DocCategory, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -9,8 +9,11 @@ const emit = defineEmits<{ created: [docId: string] }>()
 
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
-const { addDocument, addRequirement } = useIrisMutations()
+const { addDocument, addRequirement, syncDocFormat } = useIrisMutations()
 const cachedReqs = useNuxtData<ReqRow[]>(`reqs-${props.projectId}`).data
+const cachedLinks = useNuxtData<LinkRow[]>(`links-${props.projectId}`).data
+const cachedSlots = useNuxtData<SlotRow[]>(`slots-${props.projectId}`).data
+const cachedScreens = useNuxtData<ProjectScreen[]>(`all-screens-${props.projectId}`).data
 
 type Mode = 'file' | 'link' | 'write'
 // 라벨은 영어 원문 — 그릴 때 tr() 로 감싸요
@@ -22,13 +25,13 @@ const mode = ref<Mode>('file')
 const category = ref<DocCategory>('planning')
 const saving = ref(false)
 const error = ref('')
-const done = ref<{ docId: string; found: number } | null>(null)
+const done = ref<{ docId: string; found: number; slots: number; warnings: number } | null>(null)
 
 // 직접 쓰기 ----------------------------------------------------------------
 const title = ref('')
 const body = ref('')
 const TEMPLATES: { key: string; label: string; cat: DocCategory; text: string }[] = [
-  { key: 'plan', label: 'Spec', cat: 'planning', text: '# Background\nWhy are we doing this?\n\n# Requirements\n- REQ-001 \n- REQ-002 \n\n# Edge cases\n' },
+  { key: 'plan', label: 'Spec', cat: 'planning', text: '## 1. Document info\n\n| Item | Value |\n| --- | --- |\n| Document abbreviation | |\n| Version | v0.1 |\n| Status | Draft |\n\n## 2. Policies\n\n| ID | Policy | Rules |\n| --- | --- | --- |\n| P-AREA-01 | | |\n\n## 3. Screens\n\n| ID | Screen | What to show | States | Policy |\n| --- | --- | --- | --- | --- |\n| C-01 | | | | P-AREA-01 |\n' },
   { key: 'dev', label: 'Dev notes', cat: 'dev', text: '# Overview\n\n## API\n- \n\n## To check\n- \n' },
   { key: 'blank', label: 'Blank', cat: 'etc', text: '' },
 ]
@@ -42,29 +45,16 @@ function pickTemplate(t: (typeof TEMPLATES)[number]) {
   template.value = t.key
   category.value = t.cat
 }
-/** 줄 단위로 나눕니다: '# ' → h1, '## ' → h2, '- ' → li, 나머지 → 문단(빈 줄로 구분) */
+/** Markdown → 블록(표 포함, utils/docFormat): '# ' → h1, '## ' → h2, '- ' → li, '| … |' → 표, 나머지 → 문단 */
 function toBlocks(src: string): DocBlock[] {
-  const out: DocBlock[] = []
-  let para: string[] = []
-  let n = 0
-  const id = () => 'b' + ++n
-  const flush = () => { if (para.length) out.push({ id: id(), type: 'p', text: para.join(' ') }); para = [] }
-  for (const raw of src.split('\n')) {
-    const line = raw.trim()
-    if (!line) { flush(); continue }
-    const m = line.match(/^(##|#|-)\s+(.*)$/)
-    if (m) {
-      flush()
-      if (m[2]!.trim()) out.push({ id: id(), type: m[1] === '#' ? 'h1' : m[1] === '##' ? 'h2' : 'li', text: m[2]!.trim() })
-    } else para.push(line)
-  }
-  flush()
-  return out
+  return parseMarkdown(src).map((b, i) => ({ ...b, id: 'b' + (i + 1) }))
 }
 
 // 파일 -------------------------------------------------------------------
 const file = ref<File | null>(null)
 const fileText = ref<string | null>(null)
+/** Markdown 파일은 블록으로 읽어 둬요(표 · ID 를 읽고, 문서에서 바로 고칠 수 있게) */
+const fileBlocks = computed(() => (fileText.value ? toBlocks(fileText.value) : null))
 const dragging = ref(false)
 const fileExt = computed(() => (file.value?.name.split('.').pop() ?? '').toLowerCase() as 'pdf' | 'docx' | 'md' | '')
 async function setFile(f: File | null | undefined) {
@@ -114,11 +104,16 @@ const linkHost = computed(() => { try { return new URL(url.value.trim()).hostnam
 // 미리 찾은 요구사항 수 (카드에 보여 주기용) --------------------------------
 const draftDoc = computed<DocRow>(() => ({
   id: 'draft', project_id: props.projectId, title: '', category: category.value, source_type: mode.value === 'write' ? 'native' : mode.value === 'file' ? 'upload' : 'link',
-  content_blocks: mode.value === 'write' ? toBlocks(body.value) : null, file_path: null, file_type: null, url: null,
+  content_blocks: mode.value === 'write' ? toBlocks(body.value) : mode.value === 'file' ? fileBlocks.value : null, file_path: null, file_type: null, url: null,
   plain_text: mode.value === 'file' ? fileText.value : mode.value === 'link' ? fetched.value?.text ?? null : null,
   fetch_status: null, version_label: null, updated_at: '',
 }))
-const foundCount = computed(() => detectRequirements(draftDoc.value).length)
+/** 양식 검사(시안 1): 정책 표 · 화면 표를 읽은 결과 */
+const check = computed(() => (draftDoc.value.content_blocks?.length ? analyzeDoc(draftDoc.value.content_blocks) : null))
+const foundCount = computed(() => detectRequirements(draftDoc.value).length + (check.value?.policies.length ?? 0))
+const showCheck = computed(() => !!check.value && ((mode.value === 'file' && fileExt.value === 'md') || (mode.value === 'write' && !!body.value.trim())))
+const warnOpen = ref(false)
+const wText = (w: FormatWarning) => { const t = warningText(w); return tr(t.key, t.vars) }
 
 const canSave = computed(() => {
   if (saving.value) return false
@@ -146,7 +141,10 @@ async function save() {
         const { error: upErr } = await supabase.storage.from('documents').upload(path, f, { contentType: f.type || undefined, upsert: false })
         if (upErr) throw new Error(tr("Couldn't upload the file"))
       }
-      doc = { title: f.name.replace(/\.[^.]+$/, ''), category: category.value, source_type: 'upload', file_path: path, file_type: ext, plain_text: fileText.value }
+      const fb = fileBlocks.value
+      const first = fb?.[0]
+      const title = first?.type === 'h1' ? first.text : f.name.replace(/\.[^.]+$/, '')
+      doc = { title, category: category.value, source_type: 'upload', file_path: path, file_type: ext, plain_text: fileText.value, ...(fb?.length ? { content_blocks: fb } : {}) }
     } else {
       const u = url.value.trim()
       if (!fetched.value && !fetchFailed.value) await fetchLink()
@@ -156,10 +154,22 @@ async function save() {
 
     const docId = await addDocument(props.projectId, doc)
 
-    // 번호 규칙(REQ-001 …)으로 요구사항 후보를 찾아 넣습니다. 이미 있는 번호는 건너뜁니다
     const full = { ...draftDoc.value, ...doc, id: docId } as DocRow
-    const existing = new Set((cachedReqs.value ?? []).map((r) => r.code.toUpperCase()))
     let found = 0
+    let slotsN = 0
+    let warnings = 0
+    // 양식 읽기: 정책 표 → 정책, 화면 표 → 화면 칸, '정책' 열 → '확인 전' 연결
+    const result = full.content_blocks?.length ? analyzeDoc(full.content_blocks) : null
+    if (result && (result.policies.length || result.slots.length || result.abbr || result.status)) {
+      try {
+        const out = await syncDocFormat(props.projectId, docId, result, { reqs: cachedReqs.value ?? [], slots: cachedSlots.value ?? [], screens: cachedScreens.value ?? [], links: cachedLinks.value ?? [] })
+        found += out.added.length
+        slotsN = out.slots
+      } catch { /* 문서는 들어갔어요 — 고치기에서 다시 저장하면 다시 읽어요 */ }
+      warnings = result.warnings.filter((w) => w.kind !== 'no_screen').length
+    }
+    // 옛 번호 규칙(REQ-001 …) 줄도 읽어요. 이미 있는 번호는 건너뜁니다
+    const existing = new Set((cachedReqs.value ?? []).filter((r) => r.document_id === docId).map((r) => r.code.toUpperCase()))
     for (const c of detectRequirements(full)) {
       if (existing.has(c.code)) continue
       existing.add(c.code)
@@ -169,8 +179,8 @@ async function save() {
       } catch { /* 하나가 실패해도 나머지는 계속 넣습니다 */ }
     }
 
-    await refreshNuxtData([`docs-${props.projectId}`, `reqs-${props.projectId}`])
-    done.value = { docId, found }
+    await refreshNuxtData([`docs-${props.projectId}`, `reqs-${props.projectId}`, `links-${props.projectId}`, `slots-${props.projectId}`, `all-screens-${props.projectId}`])
+    done.value = { docId, found, slots: slotsN, warnings }
     emit('created', docId)
   } catch (e) {
     error.value = (e as Error)?.message && !(e as Error).message.startsWith('{') ? (e as Error).message : tr("Couldn't add the document. Try again in a moment.")
@@ -250,7 +260,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
           <div class="pop-body content success" role="status">
             <span class="badge-ok"><EditorIcon name="check" :size="20" /></span>
             <span class="tx-head">{{ tr('Document added') }}</span>
-            <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 requirement') : done.found ? tr('Found {n} requirements', { n: done.found }) : tr('No numbered requirements (like REQ-001) found') }}</span>
+            <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 policy') : done.found ? tr('Found {n} policies', { n: done.found }) : tr('No policies found in this document') }}<template v-if="done.slots"> · {{ tr('{n} screen slots', { n: done.slots }) }}</template><template v-if="done.warnings"> · {{ done.warnings === 1 ? tr('1 warning') : tr('{n} warnings', { n: done.warnings }) }}</template></span>
           </div>
           <div class="pop-foot">
             <Button size="s" type="tertiary" @click="close">{{ tr('Close') }}</Button>
@@ -290,7 +300,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <span class="sq chip num">{{ fileExt.toUpperCase() }}</span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="file.name">{{ file.name }}</span>
-                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · {{ tr('Requirements: {n}', { n: foundCount }) }}</template><template v-else> · {{ tr('Content is kept as a file only') }}</template></span>
+                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · {{ tr('Policies: {n}', { n: foundCount }) }}</template><template v-else> · {{ tr('Content is kept as a file only') }}</template></span>
                 </span>
                 <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Remove file')" data-autofocus @click="clearFile" />
               </div>
@@ -317,7 +327,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <span class="sq chip"><EditorIcon name="document" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
-                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Requirements: {n}', { n: foundCount }) }}</span>
+                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Policies: {n}', { n: foundCount }) }}</span>
                 </span>
               </div>
               <div v-else-if="fetchFailed" class="sq card">
@@ -349,8 +359,32 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               <div class="col6">
                 <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
                 <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
-                <span class="tx-meta num">{{ tr('Lines starting with a requirement number (like REQ-001) become requirements') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
+                <span class="tx-meta num">{{ tr('Policy tables (P-AREA-01) and screen tables (C-01) are read automatically. Lines starting with REQ-001 still work') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
               </div>
+            </div>
+
+            <!-- 양식 검사 결과(시안 1) -->
+            <div v-if="showCheck && check" class="sq fcheck">
+              <span class="fc-h"><b>{{ tr('Format check') }}</b><span class="tx-meta">{{ tr('Iris planning format') }}</span></span>
+              <template v-if="check.format !== 'none'">
+                <div class="counts">
+                  <span class="sq cnt pol"><b class="num">{{ check.policies.length }}</b><span>{{ tr('Policies') }}</span></span>
+                  <span class="sq cnt slot"><b class="num">{{ check.slots.length }}</b><span>{{ tr('Screen slots') }}</span></span>
+                  <span class="sq cnt"><b class="num">{{ check.links }}</b><span>{{ tr('Links') }}</span></span>
+                  <span class="sq cnt warnc"><b class="num">{{ check.warnings.filter((w) => w.kind !== 'no_screen').length }}</b><span>{{ tr('Warnings') }}</span></span>
+                </div>
+                <button v-if="check.warnings.some((w) => w.kind !== 'no_screen')" type="button" class="sq wbar" :aria-expanded="warnOpen" @click="warnOpen = !warnOpen">
+                  <b>{{ tr('{n} warnings — you can still add it', { n: check.warnings.filter((w) => w.kind !== 'no_screen').length }) }}</b><span class="tx-meta">{{ warnOpen ? tr('Hide') : tr('Show') }}</span>
+                </button>
+                <ul v-if="warnOpen" class="wlist">
+                  <li v-for="(w, i) in check.warnings.filter((x) => x.kind !== 'no_screen')" :key="i"><span class="dot" />{{ wText(w) }}</li>
+                </ul>
+                <span class="tx-meta">{{ tr('Each row of the screen table becomes a screen slot, and the policies in its Policy column are linked as “Unchecked”.') }}</span>
+              </template>
+              <template v-else>
+                <b class="nf">{{ tr('This doesn’t follow the Iris planning format') }}</b>
+                <span class="tx-meta">{{ tr('No policy table or screen table was found, so policies and screens won’t be linked automatically.') }}</span>
+              </template>
             </div>
 
             <!-- 분류 -->
@@ -430,6 +464,25 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
+
+.fcheck { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.fc-h { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
+.fc-h b, .nf { font-weight: 600; }
+.counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
+.cnt { display: flex; flex-direction: column; padding: var(--ref-spacing-05) var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); font-size: 11px; color: var(--sys-color-neutral-700); }
+.cnt b { font-size: 16px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.cnt.pol { --sq-fill: var(--iris-peek-bg); }
+.cnt.pol b { color: var(--iris-peek-ink); }
+.cnt.slot { --sq-fill: var(--sys-color-brand-primary-lightest); }
+.cnt.slot b { color: var(--sys-color-brand-primary-default); }
+.cnt.warnc { --sq-fill: #FFF1E8; }
+.cnt.warnc b { color: #B44A0E; }
+.wbar { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); height: 30px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: #FFF6EC; color: #B44A0E; text-align: left; }
+.wbar b { font-weight: 600; }
+.wbar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.wlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ref-spacing-03); }
+.wlist li { display: flex; gap: var(--ref-spacing-04); align-items: flex-start; }
+.wlist .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 
 .err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0; color: var(--sys-color-theme-error-default); }
 

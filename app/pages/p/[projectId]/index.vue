@@ -27,7 +27,8 @@ import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUpload
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
-import DocReader from '~/components/docs/DocReader.vue'
+import DocReader, { scrollToDocAnchor } from '~/components/docs/DocReader.vue'
+import DocCheckBar from '~/components/docs/DocCheckBar.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
 import ShareModal from '~/components/project/ShareModal.vue'
@@ -180,7 +181,51 @@ async function onPageSettings(patch: PageSettings) {
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
   } catch { sayFail(tr('Couldn\'t save page settings')) }
 }
-const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
+/**
+ * 정렬 보기(새 2): 버튼을 누르면 화면 ID 순서(종류 C → A → S → N → CMP, 번호, 상태 변형)로 보기만 바꿔요.
+ * 디자이너가 놓은 자리는 저장하지 않고 그대로 — 다시 누르거나 Esc 면 원래 배치로. 정렬 보기 동안은 보기 전용
+ */
+const sortedView = ref(false)
+const slotRows = useScreenSlots(projectId)
+const projScreens = useProjectScreens(projectId)
+const SORT_ROWS = ['C', 'A', 'S', 'N', 'CMP', '']
+const sortedPos = computed(() => {
+  if (!sortedView.value || !list.value.length) return null
+  const slotById = new Map((slotRows.data.value ?? []).map((x) => [x.id, x]))
+  const slotOf = new Map((projScreens.data.value ?? []).map((x) => [x.id, x]))
+  const keyed = list.value.map((sc) => {
+    const ps = slotOf.get(sc.id)
+    const sl = ps?.slot_id ? slotById.get(ps.slot_id) : null
+    const byName = slotFromName(sc.name)
+    const code = sl?.code ?? byName?.code ?? null
+    const state = ps?.slot_state ?? byName?.state ?? null
+    const kind = code ? code.split('-')[0]! : ''
+    return { sc, code, state, kind }
+  })
+  const x0 = Math.min(...list.value.map((v) => v.x)), y0 = Math.min(...list.value.map((v) => v.y))
+  const pos = new Map<string, { x: number; y: number }>()
+  let top = y0
+  for (const k of SORT_ROWS) {
+    const row = keyed.filter((x) => (SORT_ROWS.includes(x.kind) ? x.kind : '') === k)
+      .sort((a, b) => (a.code && b.code ? compareCodes(a.code, b.code) : a.code ? -1 : b.code ? 1 : a.sc.name.localeCompare(b.sc.name)) || (a.state ? 1 : 0) - (b.state ? 1 : 0) || (a.state ?? '').localeCompare(b.state ?? ''))
+    if (!row.length) continue
+    let x = x0
+    let h = 0
+    for (const r of row) { pos.set(r.sc.id, { x, y: top }); x += r.sc.width + 80; h = Math.max(h, r.sc.height) }
+    top += h + 200
+  }
+  return pos
+})
+const sortedList = computed(() => (sortedPos.value ? list.value.map((v) => { const p = sortedPos.value!.get(v.id); return p ? { ...v, x: p.x, y: p.y } : v }) : list.value))
+function toggleSorted() {
+  sortedView.value = !sortedView.value
+  if (sortedView.value) { store.selectScreen(null); nextTick(() => canvas.value?.fit()) }
+}
+watch(pageId, () => { sortedView.value = false })
+function onSortedKey(e: KeyboardEvent) { if (e.key === 'Escape' && sortedView.value) { e.preventDefault(); sortedView.value = false } }
+onMounted(() => window.addEventListener('keydown', onSortedKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onSortedKey))
+const canvasList = computed(() => (canvasScreen.value ? [...sortedList.value, canvasScreen.value] : sortedList.value))
 const { tokens } = useDesignSystem()
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
@@ -212,7 +257,7 @@ provide(LAYER_STORE, store)
 // 역할 · 보기 전용(PRD/12, 16 E): 디자인 편집 권한이 없으면 캔버스 · 디자인 패널을 잠가요(진짜로 막는 건 DB 규칙)
 const access = useProjectAccess(projectId)
 const readOnly = computed(() => access.data.status.value === 'success' && !access.can.value.editDesign && !access.gate.value)
-watchEffect(() => { store.readonly.value = readOnly.value })
+watchEffect(() => { store.readonly.value = readOnly.value || sortedView.value })
 /** 권한 안내 화면이 떠 있나(그때는 코멘트 핀도 숨겨요) */
 const gateActive = computed(() => !!access.gate.value)
 // 저장 충돌(PRD/16 J-2): 같은 화면을 다른 사람이 먼저 저장했어요 — 그 사람 것 / 내 것
@@ -1339,7 +1384,18 @@ const docGroups = computed(() => {
     .map((k) => ({ k, label: tr(DOC_CATEGORY_LABEL[k]), items: (docs.data.value ?? []).filter((d) => d.category === k) }))
     .filter((g) => g.items.length)
 })
-const reqCount = (id: string) => (reqs.data.value ?? []).filter((r) => r.document_id === id).length
+const reqCount = (id: string) => (reqs.data.value ?? []).filter((r) => r.document_id === id && !r.removed_at).length
+const warnCount = (d: { check_result?: { warnings: { kind: string }[] } | null }) => (d.check_result?.warnings ?? []).filter((w) => w.kind !== 'no_screen').length
+/** 문서에서 화면 ID(C-05)를 누르면: 그 화면 칸에 붙은 화면(없으면 이름이 'C-05 …' 인 화면)으로 */
+const docScroll = ref<HTMLElement | null>(null)
+function onPickSlot(code: string) {
+  const slotIds = new Set((slotRows.data.value ?? []).filter((x) => x.code === code && !x.removed_at).map((x) => x.id))
+  const ps = (projScreens.data.value ?? []).find((x) => x.slot_id && slotIds.has(x.slot_id) && list.value.some((v) => v.id === x.id))
+  const sid = ps?.id ?? list.value.find((v) => slotFromName(v.name)?.code === code)?.id
+  if (!sid) { say(tr('No design for {code} on this page yet', { code })); return }
+  store.selectScreen(sid)
+  nextTick(() => canvas.value?.focusOn(sid, []))
+}
 function showDoc(id: string, reqId?: string | null) {
   // 문서는 왼쪽 Docs 탭(목록 자리)에서 읽어요 — 오른쪽 패널은 그대로(사용자 요청 2026-11-26)
   left.value = 'docs'
@@ -1423,8 +1479,9 @@ function focusReq(id: string) {
 
 async function onCreateReq(p: { text: string; block: string | null }) {
   if (!docId.value) return
-  const nums = (reqs.data.value ?? []).map((r) => Number(r.code.match(/(\d+)$/)?.[1] ?? 0))
-  const code = 'REQ-' + String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, '0')
+  // 문서에 번호 없이 고른 글로 만든 정책은 임시 번호(#12) — PRD/11 3-3
+  const nums = (reqs.data.value ?? []).map((r) => Number(r.code.match(/^#(\d+)$/)?.[1] ?? 0))
+  const code = '#' + ((nums.length ? Math.max(...nums) : 0) + 1)
   const title = p.text.replace(/\s+/g, ' ').trim().slice(0, 80)
   try {
     const id = await addRequirement(projectId, { document_id: docId.value, code, title, anchor: p.block ? { block: p.block } : null })
@@ -1434,7 +1491,7 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
-  } catch { sayFail(tr('Couldn\'t create the requirement. Try again')) }
+  } catch { sayFail(tr('Couldn\'t create the policy. Try again')) }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -1880,8 +1937,9 @@ function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev
   if (next) pageId.value = next.id
 }
 // 툴바 버튼
-function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
-  if (k === 'assets') { left.value = 'assets'; asset.value = null }
+function onRail(k: 'assets' | 'link' | 'figma' | 'comment' | 'sort') {
+  if (k === 'sort') toggleSorted()
+  else if (k === 'assets') { left.value = 'assets'; asset.value = null }
   else if (k === 'figma') figmaOpen.value = true
   else if (k === 'link') {
     if (!current.value) return say(tr('Select a frame on the canvas first'))
@@ -1995,7 +2053,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     />
  <CommentLayer
       v-if="!gateActive && pinsShown"
-      :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value"
+      :vp="vp" :threads="comments.threads.value" :screens="sortedList" :page-id="pageId" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value"
       :can-moderate="access.can.value.manage" :draft="draft" :drawing="drawing" :open-id="openThread" :layer-box="layerBox"
       @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
       :draft-nudge="draftNudge" @draft-dirty="(v) => (draftDirty = v)" @draft-area="setDraftArea" :reply-nudge="replyNudge" @reply-dirty="(v) => (replyDirty = v)"
@@ -2039,7 +2097,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <button type="button" class="sq fb-stop ok" @click="acceptSpot">{{ tr('Follow') }}</button>
       <button type="button" class="sq fb-x" :aria-label="tr('Dismiss')" @click="spotPrompt = null"><EditorIcon name="close" :size="12" /></button>
     </div>
-    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
+    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="sortedList" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
       <span class="tx-meta ce-sub">{{ tr('Draw a frame with the Frame tool (F) or import one from Figma') }}</span>
@@ -2059,7 +2117,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
             <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
             <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
-            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requirements board') }}</NuxtLink>
+            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Policies board') }}</NuxtLink>
             <button class="sq menu-item ks-mi" role="menuitem" @click="shortcutsOpen = true"><span>{{ tr('Keyboard shortcuts') }}</span><span class="mi-key">⌃⇧?</span></button>
             <div class="msep" role="separator" />
             <ThemeSwitch compact />
@@ -2114,8 +2172,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <span v-if="current" class="tx-meta ellipsis doc-with">{{ tr('Viewing with {name}', { name: current.name }) }}</span>
         </div>
         <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
-        <div v-ovscroll class="scroll doc-scroll">
-          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
+        <div ref="docScroll" v-ovscroll class="scroll doc-scroll">
+          <DocCheckBar :doc="openDoc" compact @go="(at: { block: string; row: number | null }) => scrollToDocAnchor(docScroll, { block: at.block })" />
+          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @pick-slot="onPickSlot" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
         </div>
       </div>
       <div v-else v-ovscroll class="docs">
@@ -2124,9 +2183,11 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
           <span class="nav-label">{{ g.label }}</span>
           <button v-for="d in g.items" :key="d.id" :class="['sq', 'nav-item', 's', 'drow', { on: docId === d.id }]" :aria-current="docId === d.id ? 'true' : undefined" @click="showDoc(d.id)">
-            <EditorIcon :name="docIcon(d)" :size="16" class="flex-none muted" />
+            <span v-if="d.abbr" class="sq dabbr">{{ d.abbr }}</span>
+            <EditorIcon v-else :name="docIcon(d)" :size="16" class="flex-none muted" />
             <span class="ellipsis f1">{{ d.title }}</span>
-            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} requirements', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
+            <span v-if="warnCount(d)" class="sq dwarn num" :title="tr('{n} warnings', { n: warnCount(d) })">⚠ {{ warnCount(d) }}</span>
+            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} policies', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
             <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
           </button>
         </div>
@@ -2198,7 +2259,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             <span class="tx-meta">{{ current.source === 'figma' ? tr('Figma frame') : tr('Iris frame') }} · <span class="num">{{ fmtNum(current.width) }} × {{ fmtNum(current.height) }}</span></span>
           </div>
           <div :class="['scroll', 'insp', { ro: readOnly && tab === 'design' }]" :inert="(readOnly && tab === 'design') || undefined">
-            <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
+            <InspectorPlan v-if="tab === 'plan'" ref="plan" :key="current.id" :project-id="projectId" :screen="current" :screens="multiList.length > 1 ? multiList : undefined" @open-doc="(id: string, req?: string) => showDoc(id, req)" @toast="say" @add-doc="addDocOpen = true" />
             <InspectorDev v-else-if="tab === 'dev'" :screen="current" @synced="screens.refresh()" @open-asset="(id: string) => { left = 'assets'; asset = id }" @toast="say" />
             <template v-else-if="store.layerIds.value.length">
               <InspectorLayer :screen="current" :scale-mode="tool === 'scale'" @replace-image="pickImage" />
@@ -2232,16 +2293,23 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <div v-else class="none">
           <span class="tx-head">{{ tr('Select a frame') }}</span>
-          <span class="tx-meta">{{ tr('Select a frame on the canvas or in Layers to see its requirements, design and dev info here') }}</span>
+          <span class="tx-meta">{{ tr('Select a frame on the canvas or in Layers to see its policies, design and dev info here') }}</span>
           <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
       <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false; openThread = null; draft = null" @resolve="resolveComment" @read-all="readAllComments" />
     </aside>
 
-    <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
+    <EditorToolbar v-model="tool" :readonly="readOnly || sortedView" :sorted="sortedView" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
+    <!-- 정렬 보기 띠(새 2) -->
+    <div v-if="sortedView" class="sq ro-band sort-band" role="status">
+      <EditorIcon name="list_numbered" :size="16" />
+      <span>{{ tr('Sorted by screen ID') }}</span>
+      <span class="sb-sub">{{ tr('Layout isn’t changed · Esc to go back') }}</span>
+      <button type="button" class="sq sb-btn" @click="sortedView = false">{{ tr('Back to layout') }}</button>
+    </div>
     <!-- 보기 전용 띠(PRD/16 E): 캔버스 위 가운데 -->
-    <div v-if="readOnly && !commentMode && !followPeer" class="sq ro-band" role="status">
+    <div v-else-if="readOnly && !commentMode && !followPeer" class="sq ro-band" role="status">
       <EditorIcon name="visibility_on" :size="16" />
       <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
     </div>
@@ -2300,7 +2368,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <AppConfirm
       v-if="confirmFrames"
       :title="confirmFrames.frames.length === 1 ? tr('Delete the frame &quot;{name}&quot;?', { name: confirmFrames.frames[0]!.name }) : tr('Delete {n} frames?', { n: confirmFrames.frames.length })"
-      :desc="tr('{n} linked requirements will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
+      :desc="tr('{n} linked policies will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmFrames = null) }, { label: confirmFrames.frames.length === 1 ? tr('Delete frame') : tr('Delete frames'), kind: 'destructed', onClick: doConfirmFrames }]"
       @close="confirmFrames = null"
     />
@@ -2395,6 +2463,12 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 @media (prefers-reduced-motion: reduce) { .cchat { transition: none; } }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
+.dabbr { flex: none; height: 18px; min-width: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: var(--sys-color-neutral-800); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.dwarn { flex: none; height: 18px; display: inline-flex; align-items: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #B44A0E; --sq-fill: #FFF1E8; }
+.sort-band { pointer-events: auto; padding-right: var(--ref-spacing-03); }
+.sb-sub { color: rgb(253 253 253 / 60%); font-weight: 400; }
+.sb-btn { height: 24px; padding: 0 var(--ref-spacing-06); margin-left: var(--ref-spacing-04); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-size: 12px; font-weight: 600; }
+.sb-btn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .insp.ro { opacity: .64; }
 .ro-note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-06) var(--ref-spacing-08) 0; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px; }

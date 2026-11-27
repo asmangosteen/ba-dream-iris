@@ -162,7 +162,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
           </div>
           <div class="sq box danger">
             <span class="tx-head red">{{ tr('Delete project') }}</span>
-            <span class="tx-meta">{{ tr('Deleting a project also deletes all its pages, frames, docs and requirements.') }}</span>
+            <span class="tx-meta">{{ tr('Deleting a project also deletes all its pages, frames, docs and policies.') }}</span>
             <span class="row"><Button size="s" type="destructed" contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">{{ tr('Delete project') }}</Button></span>
           </div>
           <p v-if="err" class="tx-meta err" role="alert">{{ err }}</p>

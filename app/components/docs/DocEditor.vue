@@ -3,36 +3,12 @@ import type { DocBlock } from '~/composables/useIrisData'
 
 type RawBlock = Omit<DocBlock, 'id'>
 
-/** 줄 단위로 나눕니다(AddDocModal 과 같은 규칙): '# ' → h1, '## ' → h2, '- ' → li, 나머지 → 문단(빈 줄로 구분) */
-export function parseDocText(src: string): RawBlock[] {
-  const out: RawBlock[] = []
-  let para: string[] = []
-  const flush = () => { if (para.length) out.push({ type: 'p', text: para.join(' ') }); para = [] }
-  for (const raw of src.split('\n')) {
-    const line = raw.trim()
-    if (!line) { flush(); continue }
-    const m = line.match(/^(##|#|-)\s+(.*)$/)
-    if (m) {
-      flush()
-      if (m[2]!.trim()) out.push({ type: m[1] === '#' ? 'h1' : m[1] === '##' ? 'h2' : 'li', text: m[2]!.trim() })
-    } else para.push(line)
-  }
-  flush()
-  return out
-}
+/** Markdown → 블록(utils/docFormat 의 parseMarkdown — 표 포함). 예전 이름도 남겨 둬요 */
+export const parseDocText = (src: string): RawBlock[] => parseMarkdown(src)
+/** 블록 → Markdown */
+export const blocksToText = (blocks: RawBlock[]): string => blocksToMarkdown(blocks)
 
-/** 블록을 다시 글로 되돌립니다. 문단 · 제목 앞뒤는 빈 줄, 이어지는 목록은 한 줄씩 */
-export function blocksToText(blocks: RawBlock[]): string {
-  let out = ''
-  blocks.forEach((b, i) => {
-    const line = b.type === 'h1' ? `# ${b.text}` : b.type === 'h2' ? `## ${b.text}` : b.type === 'li' ? `- ${b.text}` : b.text
-    if (i > 0) out += b.type === 'li' && blocks[i - 1]!.type === 'li' ? '\n' : '\n\n'
-    out += line
-  })
-  return out
-}
-
-const CODE_RE = /\b(?:REQ|FR|NFR|SR)-\d{1,4}\b/gi
+const CODE_RE = /\b(?:REQ|FR|NFR|SR)-\d{1,4}\b|\bP-[A-Z]{2,6}-\d{1,4}\b|\b(?:CMP|C|A|S|N)-\d{1,4}\b/gi
 const codesIn = (t: string) => new Set((t.match(CODE_RE) ?? []).map((c) => c.toUpperCase()))
 
 /** 글자 두 개씩 끊어 겹치는 비율(0~1). 한글에도 그대로 씁니다 */
@@ -52,12 +28,11 @@ function similarity(a: string, b: string): number {
 }
 
 /**
- * 고친 글(next)에 원래 블록(old)의 id 를 되도록 그대로 붙입니다. 요구사항 anchor.block 이 끊기지 않게 하려는 것.
+ * Markdown 으로 고친 글(next)에 원래 블록(old)의 id 를 되도록 그대로 붙입니다. 정책 anchor.block · 댓글 자리가 끊기지 않게 하려는 것.
  * 1) 종류 + 글이 똑같은 블록을 순서대로 짝짓습니다(LCS).
- * 2) 짝 사이 빈칸에서는 같은 종류끼리, 글이 비슷한 쪽을 순서를 지키며 짝짓습니다(제자리에서 고친 블록).
- *    같은 요구사항 번호가 들어 있으면 더 강하게 묶습니다. 요구사항이 붙은 블록은 종류가 바뀌어도 글이 비슷하면 짝짓습니다.
- * 3) 그래도 남은 "요구사항이 붙은 블록"은 위치와 상관없이 같은 번호가 든 블록, 또는 글이 많이 비슷한(0.6↑) 블록을 찾아 id 를 넘깁니다(옮긴 블록).
- * 4) 나머지 새 블록은 기존 · 요구사항이 가리키는 id 와 겹치지 않는 새 id 를 받습니다.
+ * 2) 짝 사이 빈칸에서는 같은 종류끼리, 글이 비슷한 쪽을 순서를 지키며 짝짓습니다(제자리에서 고친 블록). 같은 ID 가 들어 있으면 더 강하게 묶습니다.
+ * 3) 그래도 남은 "자리가 붙은 블록"은 같은 ID 가 든 블록, 또는 글이 많이 비슷한(0.6↑) 블록을 찾아 id 를 넘깁니다(옮긴 블록).
+ * 4) 나머지 새 블록은 기존 · 자리가 가리키는 id 와 겹치지 않는 새 id 를 받습니다.
  */
 export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<string>): DocBlock[] {
   const n = old.length, m = next.length
@@ -65,7 +40,6 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
   const usedOld = new Array<boolean>(n).fill(false)
   const pair = (i: number, j: number) => { ids[j] = old[i]!.id; usedOld[i] = true }
 
-  // 1) 똑같은 블록 LCS
   const same = (i: number, j: number) => old[i]!.type === next[j]!.type && old[i]!.text === next[j]!.text
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i]![j] = same(i, j) ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!)
@@ -77,13 +51,12 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
   }
   anchors.forEach(([i, j]) => pair(i, j))
 
-  // 2) 빈칸마다 순서를 지키는 정렬(점수 최대)
   const score = (i: number, j: number): number => {
     const o = old[i]!, x = next[j]!
     const sim = similarity(o.text, x.text)
     const oc = codesIn(o.text), xc = codesIn(x.text)
     const shared = [...oc].some((c) => xc.has(c))
-    const clash = oc.size > 0 && xc.size > 0 && !shared // 서로 다른 번호면 다른 요구사항
+    const clash = oc.size > 0 && xc.size > 0 && !shared && o.type !== 'table'
     if (clash) return 0
     if (o.type === x.type) return 0.5 + sim + (shared ? 1 : 0)
     if (anchored.has(o.id) && (shared || sim >= 0.3)) return sim + (shared ? 1 : 0)
@@ -107,7 +80,6 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
     }
   }
 
-  // 3) 남은 요구사항 블록: 옮겨 간 곳 찾기
   for (let i = 0; i < n; i++) {
     if (usedOld[i] || !anchored.has(old[i]!.id)) continue
     const oc = codesIn(old[i]!.text)
@@ -122,7 +94,6 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
     if (best >= 0) pair(i, best)
   }
 
-  // 4) 새 id
   const taken = new Set([...old.map((x) => x.id), ...anchored])
   const fresh = () => {
     let id = ''
@@ -131,7 +102,7 @@ export function keepBlockIds(old: DocBlock[], next: RawBlock[], anchored: Set<st
     taken.add(id)
     return id
   }
-  return next.map((x, j) => ({ id: ids[j] ?? fresh(), type: x.type, text: x.text }))
+  return next.map((x, j) => ({ id: ids[j] ?? fresh(), type: x.type, text: x.text, ...(x.rows ? { rows: x.rows } : {}) }))
 }
 </script>
 
@@ -140,74 +111,367 @@ import { Button, TextInput } from '@ba-dream/design-system'
 import type { DocCategory, DocRow, ReqRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 
+/**
+ * 문서 고치기(새 3, DocEdit 시안): 블록마다 바로 고치고, 표는 칸을 눌러 바로 써요(라이브러리 없이 직접).
+ * AI 가 쓴 Markdown 은 붙여 넣으면 블록 · 표로 바뀌어요. 위 막대에 저장 상태 · 양식 경고 · 완료(아래 버튼 줄이 본문을 가리던 것 대신).
+ */
 const props = defineProps<{
   doc: DocRow
-  /** 이 문서의 요구사항(anchor 보존 · 사라진 번호 확인용) */
+  /** 이 문서의 정책(자리 보존 · 사라진 번호 확인용) */
   docReqs: ReqRow[]
-  /** 프로젝트 전체 요구사항(이미 있는 번호 건너뛰기용) */
+  /** 프로젝트 전체 정책(ID 추천 · 옛 번호 건너뛰기용) */
   allReqs: ReqRow[]
 }>()
 const emit = defineEmits<{
   cancel: []
-  saved: [result: { found: number; gone: string[] }]
+  saved: [result: { found: number; gone: string[]; warnings: number }]
 }>()
-/** 저장하지 않은 바뀐 내용이 있는지(부모가 나가기 전에 확인) */
 const dirty = defineModel<boolean>('dirty', { default: false })
 
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
-const { addRequirement } = useIrisMutations()
+const { addRequirement, syncDocFormat, addHistory } = useIrisMutations()
+const { reqs: reqData, links: linkData } = useRequirements(props.doc.project_id)
+const slotData = useScreenSlots(props.doc.project_id)
+const screenData = useProjectScreens(props.doc.project_id)
 
 const CATS = Object.entries(DOC_CATEGORY_LABEL) as [DocCategory, string][]
-const native = computed(() => props.doc.source_type === 'native')
+/** 블록으로 고치는 문서: 직접 쓴 것 · Markdown 파일(블록으로 읽은 것). 나머지(PDF · 링크 글)는 글 상자 하나 */
+const blockMode = computed(() => props.doc.source_type === 'native' || !!props.doc.content_blocks?.length)
 
-/** 첫 h1 이 문서 이름과 같으면(읽기 화면에서 숨기는 머리) 편집 글에서도 빼 두고 저장할 때 새 이름으로 되돌려 붙입니다 */
+/** 첫 h1 이 문서 이름과 같으면 편집에서 빼 두고 저장할 때 새 이름으로 되돌려 붙여요 */
 const titleBlock = computed(() => {
   const first = props.doc.content_blocks?.[0]
-  return native.value && first && first.type === 'h1' && first.text.trim() === props.doc.title.trim() ? first : null
+  return blockMode.value && first && first.type === 'h1' && first.text.trim() === props.doc.title.trim() ? first : null
 })
 const bodyBlocks = computed(() => (props.doc.content_blocks ?? []).slice(titleBlock.value ? 1 : 0))
 
+/** 반응형(프록시) 블록을 그대로 복사하면 structuredClone 이 실패해서 JSON 으로 복사해요 */
+const copyBlocks = (bs: DocBlock[]): DocBlock[] => JSON.parse(JSON.stringify(bs))
+
 interface Form { title: string; category: DocCategory; version: string; body: string }
-const initial = (): Form => ({
-  title: props.doc.title,
-  category: props.doc.category,
-  version: props.doc.version_label ?? '',
-  body: native.value ? blocksToText(bodyBlocks.value) : props.doc.plain_text ?? '',
-})
+const initial = (): Form => ({ title: props.doc.title, category: props.doc.category, version: props.doc.version_label ?? '', body: blockMode.value ? '' : props.doc.plain_text ?? '' })
 const form = reactive<Form>(initial())
-let base = JSON.stringify(form)
-watch(() => props.doc.id, () => { Object.assign(form, initial()); base = JSON.stringify(form); error.value = '' })
-watch(form, () => { dirty.value = JSON.stringify(form) !== base }, { deep: true, immediate: true })
+/** 블록 편집 중인 내용(표는 rows 를 직접 고쳐요) */
+const blocks = ref<DocBlock[]>(copyBlocks(bodyBlocks.value))
+/** 'blocks' = 블록 · 표 편집, 'md' = Markdown 글 상자(AI 문서 붙여 넣기 · 크게 고치기) */
+const view = ref<'blocks' | 'md'>('blocks')
+const mdText = ref('')
 
-const found = computed(() => {
-  const d = buildDoc()
-  return detectRequirements(d).length
+const snapshot = () => JSON.stringify([form, blocks.value, view.value === 'md' ? mdText.value : null])
+let base = snapshot()
+watch(() => props.doc.id, () => {
+  Object.assign(form, initial())
+  blocks.value = copyBlocks(bodyBlocks.value)
+  view.value = 'blocks'
+  base = snapshot()
+  error.value = ''
+})
+watch([form, blocks, mdText, view], () => { dirty.value = snapshot() !== base }, { deep: true, immediate: true })
+
+// ---------------------------------------------------------------------------
+// 블록 다루기
+// ---------------------------------------------------------------------------
+const taken = () => new Set([...(props.doc.content_blocks ?? []).map((b) => b.id), ...blocks.value.map((b) => b.id)])
+function newId(): string {
+  const used = taken()
+  let id = ''
+  do id = 'b' + Math.random().toString(36).slice(2, 8)
+  while (used.has(id))
+  return id
+}
+const root = ref<HTMLElement | null>(null)
+function focusBlock(id: string, atEnd = true) {
+  nextTick(() => {
+    const el = root.value?.querySelector<HTMLTextAreaElement>(`[data-edit="${id}"]`)
+    if (!el) return
+    el.focus()
+    const n = atEnd ? el.value.length : 0
+    el.setSelectionRange(n, n)
+    fit(el)
+  })
+}
+/** 글 상자 높이를 글에 맞춰요 */
+function fit(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+function fitAll() { nextTick(() => root.value?.querySelectorAll<HTMLTextAreaElement>('textarea.auto').forEach(fit)) }
+onMounted(fitAll)
+// 패널 폭이 바뀌면(창 크기 · 메모 열기) 줄바꿈이 달라져서 높이를 다시 맞춰요
+let ro: ResizeObserver | null = null
+onMounted(() => { if (root.value && typeof ResizeObserver !== 'undefined') { let w = 0; ro = new ResizeObserver((es) => { const nw = Math.round(es[0]?.contentRect.width ?? 0); if (nw !== w) { w = nw; fitAll() } }); ro.observe(root.value) } })
+onBeforeUnmount(() => ro?.disconnect())
+/** 표 열 폭: ID 열(첫 칸이 ID 거나 머리가 'ID')은 좁게, 짧은 글 열은 조금, 나머지는 나눠 가져요 */
+function colWidth(b: DocBlock, ci: number): string {
+  const rows = b.rows ?? []
+  const head = (rows[0]?.[ci] ?? '').trim()
+  const body = rows.slice(1).map((r) => r[ci] ?? '')
+  if (ci === 0 && (/^(id|번호)$/i.test(head) || body.some((c) => /^[A-Z]{1,3}-/.test(c.trim())))) return '96px'
+  const longest = Math.max(head.length, ...body.map((c) => c.length))
+  return longest <= 8 ? '76px' : 'auto'
+}
+watch(() => blocks.value.length, fitAll)
+watch(view, (v) => {
+  if (v === 'md') mdText.value = blocksToText(blocks.value)
+  else {
+    const anchored = new Set(props.docReqs.map((r) => r.anchor?.block).filter((x): x is string => !!x))
+    blocks.value = keepBlockIds(blocks.value, parseDocText(mdText.value), anchored)
+  }
+  fitAll()
 })
 
-function buildBlocks() {
-  const anchored = new Set(props.docReqs.map((r) => r.anchor?.block).filter((x): x is string => !!x))
-  const kept = keepBlockIds(bodyBlocks.value, parseDocText(form.body), anchored)
-  const t = form.title.trim()
-  return titleBlock.value ? [{ id: titleBlock.value.id, type: 'h1' as const, text: t || titleBlock.value.text }, ...kept] : kept
+const TYPES: { k: DocBlock['type']; label: string; icon: string }[] = [
+  { k: 'p', label: 'Paragraph', icon: 'text' },
+  { k: 'h1', label: 'Heading', icon: 'text_box' },
+  { k: 'h2', label: 'Subheading', icon: 'text_settings' },
+  { k: 'li', label: 'Bulleted list', icon: 'list' },
+  { k: 'table', label: 'Table', icon: 'table' },
+]
+/** 블록 사이 '+' 메뉴 · 블록 손잡이 메뉴 */
+const menu = ref<{ id: string; kind: 'add' | 'more' } | null>(null)
+function closeMenu() { menu.value = null }
+function addAfter(id: string | null, type: DocBlock['type']) {
+  const i = id ? blocks.value.findIndex((b) => b.id === id) : blocks.value.length - 1
+  const b: DocBlock = type === 'table'
+    ? { id: newId(), type, text: '', rows: [['ID', tr('Policy'), tr('Rules')], ['', '', '']] }
+    : { id: newId(), type, text: '' }
+  blocks.value.splice(i + 1, 0, b)
+  closeMenu()
+  if (type === 'table') nextTick(() => focusCell(b.id, 1, 0))
+  else focusBlock(b.id)
 }
+function turnInto(id: string, type: DocBlock['type']) {
+  const b = blocks.value.find((x) => x.id === id)
+  if (!b || b.type === type) return closeMenu()
+  if (type === 'table') { b.rows = [[b.text || 'ID', '', ''], ['', '', '']]; b.text = tableText(b.rows) }
+  else if (b.type === 'table') { b.text = (b.rows ?? []).map((r) => r.filter(Boolean).join(' ')).filter(Boolean).join(' '); delete b.rows }
+  b.type = type
+  closeMenu()
+  focusBlock(id)
+}
+function move(id: string, d: -1 | 1) {
+  const i = blocks.value.findIndex((b) => b.id === id)
+  const j = i + d
+  if (i < 0 || j < 0 || j >= blocks.value.length) return
+  const [b] = blocks.value.splice(i, 1)
+  blocks.value.splice(j, 0, b!)
+  closeMenu()
+}
+function removeBlock(id: string) {
+  const i = blocks.value.findIndex((b) => b.id === id)
+  if (i < 0) return
+  blocks.value.splice(i, 1)
+  closeMenu()
+  const prev = blocks.value[i - 1]
+  if (prev && prev.type !== 'table') focusBlock(prev.id)
+}
+
+/** 글 블록 입력: '# ' · '## ' · '- ' 로 시작하면 그 종류로 바꿔요 */
+function onText(b: DocBlock, e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  let v = el.value
+  const m = v.match(/^(##|#|-|\*)\s(.*)$/s)
+  if (m && b.type === 'p') {
+    b.type = m[1] === '#' ? 'h1' : m[1] === '##' ? 'h2' : 'li'
+    v = m[2]!
+    el.value = v
+  }
+  b.text = v.replace(/\n/g, b.type === 'p' ? '\n' : ' ')
+  fit(el)
+}
+function onTextKey(b: DocBlock, e: KeyboardEvent) {
+  if (e.isComposing) return
+  const el = e.target as HTMLTextAreaElement
+  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault()
+    // 커서 뒤 글은 새 블록으로 넘겨요. 빈 목록 줄에서 Enter 면 문단으로
+    if (b.type === 'li' && !b.text.trim()) { b.type = 'p'; return }
+    const at = el.selectionStart ?? b.text.length
+    const rest = b.text.slice(at)
+    b.text = b.text.slice(0, at)
+    const nb: DocBlock = { id: newId(), type: b.type === 'li' ? 'li' : 'p', text: rest }
+    blocks.value.splice(blocks.value.indexOf(b) + 1, 0, nb)
+    focusBlock(nb.id, false)
+    return
+  }
+  if (e.key === 'Backspace' && el.selectionStart === 0 && el.selectionEnd === 0) {
+    const i = blocks.value.indexOf(b)
+    if (b.type !== 'p') { e.preventDefault(); b.type = 'p'; return }
+    const prev = blocks.value[i - 1]
+    if (prev && prev.type !== 'table') {
+      e.preventDefault()
+      const len = prev.text.length
+      prev.text += b.text
+      blocks.value.splice(i, 1)
+      nextTick(() => { const p = root.value?.querySelector<HTMLTextAreaElement>(`[data-edit="${prev.id}"]`); if (p) { p.focus(); p.setSelectionRange(len, len); fit(p) } })
+    }
+    return
+  }
+  if (e.key === 'ArrowUp' && el.selectionStart === 0) { const p = blocks.value[blocks.value.indexOf(b) - 1]; if (p && p.type !== 'table') { e.preventDefault(); focusBlock(p.id) } }
+  if (e.key === 'ArrowDown' && el.selectionStart === el.value.length) { const n = blocks.value[blocks.value.indexOf(b) + 1]; if (n && n.type !== 'table') { e.preventDefault(); focusBlock(n.id, false) } }
+}
+/** 여러 줄 · Markdown(표 포함)을 붙여 넣으면 블록으로 바꿔 끼워요 */
+function onPaste(b: DocBlock, e: ClipboardEvent) {
+  const t = e.clipboardData?.getData('text/plain') ?? ''
+  if (!t.includes('\n')) return
+  e.preventDefault()
+  const parsed = parseDocText(t).map((x) => ({ ...x, id: newId() }))
+  if (!parsed.length) return
+  const i = blocks.value.indexOf(b)
+  blocks.value.splice(b.text.trim() ? i + 1 : i, b.text.trim() ? 0 : 1, ...parsed)
+  const last = parsed[parsed.length - 1]!
+  if (last.type !== 'table') focusBlock(last.id)
+}
+
+// ---------------------------------------------------------------------------
+// 표 블록
+// ---------------------------------------------------------------------------
+function syncTable(b: DocBlock) { b.text = tableText(b.rows ?? []) }
+function focusCell(id: string, r: number, c: number) {
+  nextTick(() => {
+    const el = root.value?.querySelector<HTMLTextAreaElement>(`[data-cell="${id}:${r}:${c}"]`)
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  })
+}
+function addRow(b: DocBlock, after?: number) {
+  const rows = b.rows ?? (b.rows = [['']])
+  const w = rows[0]?.length ?? 1
+  const at = after === undefined ? rows.length : after + 1
+  rows.splice(at, 0, Array(w).fill(''))
+  syncTable(b)
+  focusCell(b.id, at, 0)
+}
+function removeRow(b: DocBlock, r: number) {
+  if (!b.rows || b.rows.length <= 2) return
+  b.rows.splice(r, 1)
+  syncTable(b)
+}
+function addCol(b: DocBlock) {
+  for (const row of b.rows ?? []) row.push('')
+  syncTable(b)
+  focusCell(b.id, 0, (b.rows?.[0]?.length ?? 1) - 1)
+}
+function removeCol(b: DocBlock, c: number) {
+  if (!b.rows || (b.rows[0]?.length ?? 0) <= 1) return
+  for (const row of b.rows) row.splice(c, 1)
+  syncTable(b)
+}
+function onCell(b: DocBlock, r: number, c: number, e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  b.rows![r]![c] = el.value
+  syncTable(b)
+  fit(el)
+  idQuery(b, r, c, el.value)
+}
+function onCellKey(b: DocBlock, r: number, c: number, e: KeyboardEvent) {
+  if (e.isComposing) return
+  if (suggest.value && suggest.value.key === `${b.id}:${r}:${c}`) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = suggest.value.items.length; suggest.value.i = (suggest.value.i + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; return }
+    if (e.key === 'Enter' || e.key === 'Tab') { const it = suggest.value.items[suggest.value.i]; if (it) { e.preventDefault(); pickSuggest(b, r, c, it.code); return } }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); suggest.value = null; return }
+  }
+  const rows = b.rows ?? []
+  const w = rows[0]?.length ?? 1
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    let nr = r, nc = c + (e.shiftKey ? -1 : 1)
+    if (nc >= w) { nc = 0; nr++ }
+    if (nc < 0) { nc = w - 1; nr-- }
+    if (nr >= rows.length) { addRow(b); return }
+    if (nr >= 0) focusCell(b.id, nr, nc)
+    return
+  }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    if (r + 1 >= rows.length) addRow(b)
+    else focusCell(b.id, r + 1, c)
+  }
+}
+/** 표 칸에 여러 줄 Markdown 표를 붙여 넣으면 그 자리부터 칸을 채워요 */
+function onCellPaste(b: DocBlock, r: number, c: number, e: ClipboardEvent) {
+  const t = e.clipboardData?.getData('text/plain') ?? ''
+  if (!t.includes('\n') && !t.includes('\t')) return
+  const parsed = parseDocText(t).find((x) => x.type === 'table')?.rows ?? t.trim().split('\n').map((l) => l.split('\t'))
+  if (!parsed.length) return
+  e.preventDefault()
+  const rows = b.rows!
+  parsed.forEach((pr, i) => {
+    const ri = r + i
+    if (!rows[ri]) rows.push(Array(rows[0]!.length).fill(''))
+    pr.forEach((v, j) => { if (rows[ri]![c + j] !== undefined) rows[ri]![c + j] = v })
+  })
+  syncTable(b)
+  fitAll()
+}
+
+// 정책 ID 추천(새 3): ID 칸에 'P' 를 치면 영역의 다음 번호 + 이미 있는 번호
+const suggest = ref<{ key: string; items: { code: string; isNew: boolean; label: string }[]; i: number } | null>(null)
+function idQuery(b: DocBlock, r: number, c: number, v: string) {
+  if (c !== 0 || r === 0 || !/^P/i.test(v.trim()) || POLICY_ONE_RE.test(v.trim())) { suggest.value = null; return }
+  const existing = [...new Set([...props.allReqs.map((x) => x.code), ...liveCodes.value])].filter((x) => x.startsWith('P-'))
+  const items = suggestPolicyIds(v, existing).map((x) => ({ ...x, label: x.isNew ? tr('New — next number in {area}', { area: policyArea(x.code) ?? '' }) : (props.allReqs.find((q) => q.code === x.code)?.title ?? '') + ' · ' + tr('already used') }))
+  suggest.value = items.length ? { key: `${b.id}:${r}:${c}`, items, i: 0 } : null
+}
+const POLICY_ONE_RE = /^P-[A-Z]{2,6}-\d{1,4}$/
+function pickSuggest(b: DocBlock, r: number, c: number, code: string) {
+  b.rows![r]![c] = code
+  syncTable(b)
+  suggest.value = null
+  focusCell(b.id, r, c + 1)
+}
+function onCellBlur() { setTimeout(() => { if (!root.value?.querySelector('.sug:hover')) suggest.value = null }, 120) }
+
+// ---------------------------------------------------------------------------
+// 바로 검사(양식): 경고가 난 표 행은 옅은 주황 + 점, 위 막대에 경고 수
+// ---------------------------------------------------------------------------
+const liveBlocks = computed<DocBlock[]>(() => (view.value === 'md' ? parseDocText(mdText.value).map((x, i) => ({ ...x, id: 'md' + i })) : blocks.value))
+const check = computed(() => analyzeDoc(liveBlocks.value))
+const liveCodes = computed(() => check.value.policies.map((p) => p.code))
+const warnAt = computed(() => {
+  const m = new Map<string, FormatWarning[]>()
+  for (const w of check.value.warnings) { if (w.kind === 'no_screen') continue; const k = `${w.block}:${w.row ?? ''}`; m.set(k, [...(m.get(k) ?? []), w]) }
+  return m
+})
+const blockWarns = (id: string) => check.value.warnings.filter((w) => w.block === id && w.kind !== 'no_screen')
+const warnCount = computed(() => check.value.warnings.filter((w) => w.kind !== 'no_screen').length)
+const wText = (w: FormatWarning) => { const t = warningText(w); return tr(t.key, t.vars) }
+
+// ---------------------------------------------------------------------------
+// 저장
+// ---------------------------------------------------------------------------
+function buildBlocks(): DocBlock[] {
+  let body: DocBlock[]
+  if (view.value === 'md') {
+    const anchored = new Set(props.docReqs.map((r) => r.anchor?.block).filter((x): x is string => !!x))
+    body = keepBlockIds(bodyBlocks.value, parseDocText(mdText.value), anchored)
+  } else body = copyBlocks(blocks.value).filter((b) => b.type === 'table' || b.text.trim() || b.type === 'p')
+  // 빈 문단은 빼요(줄 띄우기는 블록 간격으로)
+  body = body.filter((b) => b.type !== 'p' || b.text.trim())
+  const t = form.title.trim()
+  return titleBlock.value ? [{ id: titleBlock.value.id, type: 'h1', text: t || titleBlock.value.text }, ...body] : body
+}
+const plainOf = (bs: DocBlock[]) => bs.map((x) => x.text).join('\n') || null
 function buildDoc(): DocRow {
-  if (native.value) {
-    const blocks = buildBlocks()
-    return { ...props.doc, title: form.title.trim(), content_blocks: blocks, plain_text: blocks.map((x) => x.text).join('\n') || null }
+  if (blockMode.value) {
+    const bs = buildBlocks()
+    return { ...props.doc, title: form.title.trim(), content_blocks: bs, plain_text: plainOf(bs) }
   }
   return { ...props.doc, title: form.title.trim(), plain_text: form.body.trim() ? form.body : null }
 }
-
 const allText = (d: DocRow) => (d.content_blocks ? d.content_blocks.map((x) => x.text).join('\n') : d.plain_text ?? '')
 
-/** 고치기 전엔 글에 있었는데 이제 없는 요구사항 번호(지우지는 않고 알려만 줍니다) */
+/** 고치기 전엔 글에 있었는데 이제 없는 옛 번호(REQ- · 직접 만든 것). 표에서 읽은 정책은 syncDocFormat 이 알려줘요 */
 function goneCodes(before: DocRow, after: DocRow): string[] {
   const was = allText(before), now = allText(after)
   const oldIds = new Set((before.content_blocks ?? []).map((x) => x.id))
   const newIds = new Set((after.content_blocks ?? []).map((x) => x.id))
   const out: string[] = []
   for (const r of props.docReqs) {
+    if (r.origin === 'doc_table' || r.removed_at) continue
     const re = new RegExp('\\b' + r.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
     const inNow = re.test(now)
     const blockGone = !!r.anchor?.block && oldIds.has(r.anchor.block) && !newIds.has(r.anchor.block)
@@ -218,6 +482,7 @@ function goneCodes(before: DocRow, after: DocRow): string[] {
 
 const saving = ref(false)
 const error = ref('')
+const savedAt = ref<string | null>(null)
 const canSave = computed(() => !saving.value && !!form.title.trim() && dirty.value)
 
 async function save() {
@@ -226,13 +491,8 @@ async function save() {
   error.value = ''
   const before = props.doc
   const after = buildDoc()
-  const patch: Partial<DocRow> = {
-    title: after.title,
-    category: form.category,
-    version_label: form.version.trim() || null,
-    plain_text: after.plain_text,
-  }
-  if (native.value) patch.content_blocks = after.content_blocks
+  const patch: Partial<DocRow> = { title: after.title, category: form.category, version_label: form.version.trim() || null, plain_text: after.plain_text }
+  if (blockMode.value) patch.content_blocks = after.content_blocks
   else if (before.source_type === 'link' && (after.plain_text ?? '') !== (before.plain_text ?? '') && after.plain_text) patch.fetch_status = 'manual'
 
   try {
@@ -242,7 +502,7 @@ async function save() {
       if (i < 0) throw new Error('missing')
       store.value[i] = { ...store.value[i]!, ...patch, updated_at: new Date().toISOString() }
     } else {
-      const { error: upErr } = await supabase.from('documents').update(patch).eq('id', before.id)
+      const { error: upErr } = await supabase.from('documents').update(patch as never).eq('id', before.id)
       if (upErr) throw upErr
     }
   } catch {
@@ -251,42 +511,65 @@ async function save() {
     return
   }
 
-  // 새 번호(REQ-001 …)는 요구사항으로 넣고, 이미 있는 번호는 건너뜁니다
-  const existing = new Set(props.allReqs.map((r) => r.code.toUpperCase()))
+  // 양식 읽기: 정책 표 · 화면 표 → 정책 · 화면 칸 · '확인 전' 연결
+  const full = { ...after, ...patch } as DocRow
+  const result = analyzeDoc(full.content_blocks ?? [])
   let added = 0
-  for (const c of detectRequirements({ ...after, ...patch } as DocRow)) {
+  let gone: string[] = []
+  const hadTable = props.docReqs.some((r) => r.origin === 'doc_table')
+  if (result.policies.length || result.slots.length || hadTable) {
+    try {
+      const out = await syncDocFormat(before.project_id, before.id, result, { reqs: reqData.data.value ?? [], slots: slotData.data.value ?? [], screens: screenData.data.value ?? [], links: linkData.data.value ?? [] })
+      added += out.added.length
+      gone = out.removed
+    } catch { error.value = tr('Saved, but couldn’t update policies from the tables. Try saving again.') }
+  }
+  // 옛 번호(REQ-001 …) 줄도 계속 읽어요
+  const existing = new Set(props.allReqs.filter((r) => r.document_id === before.id).map((r) => r.code.toUpperCase()))
+  for (const c of detectRequirements(full)) {
     if (existing.has(c.code)) continue
     existing.add(c.code)
     try {
       await addRequirement(before.project_id, { document_id: before.id, code: c.code, title: c.title.slice(0, 120), body: c.title, origin: 'auto_pattern', anchor: c.block ? { block: c.block } : {} })
       added++
-    } catch { /* 하나가 실패해도 나머지는 계속 넣습니다 */ }
+    } catch { /* 하나가 실패해도 나머지는 계속 */ }
   }
+  // 수정 기록(바뀐 블록만)
+  if (blockMode.value) await addHistory(before.project_id, before.id, before.content_blocks ?? [], full.content_blocks ?? []).catch(() => null)
 
-  const gone = goneCodes(before, after)
-  await refreshNuxtData([`docs-${before.project_id}`, `reqs-${before.project_id}`])
+  gone = [...new Set([...gone, ...goneCodes(before, after)])].sort()
+  await refreshNuxtData([`docs-${before.project_id}`, `reqs-${before.project_id}`, `links-${before.project_id}`, `slots-${before.project_id}`, `all-screens-${before.project_id}`, `doc-history-${before.project_id}`])
   saving.value = false
-  base = JSON.stringify(form)
+  savedAt.value = new Date().toISOString()
+  base = snapshot()
   dirty.value = false
-  emit('saved', { found: added, gone })
+  emit('saved', { found: added, gone, warnings: result.warnings.filter((w) => w.kind !== 'no_screen').length })
 }
 
-const root = ref<HTMLElement | null>(null)
 onMounted(() => root.value?.querySelector<HTMLInputElement>(`#edTitle-${props.doc.id}`)?.focus())
 const TI = { size: 's', showLeftIcon: false, showRightIcon: false, showButton: false } as const
-/** 한 줄 칸에서 Enter 로 저장(예전 submit 버튼과 같은 동작) */
 const onEnter = (e: KeyboardEvent) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); save() } }
 defineExpose({ save })
 
 const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? '')
+const statusText = computed(() => saving.value ? tr('Saving…') : dirty.value ? tr('Unsaved changes') : savedAt.value ? tr('Saved') : '')
+function onDocPointer(e: PointerEvent) { if (menu.value && !(e.target as HTMLElement).closest('.bmenu, .gut')) closeMenu() }
+onMounted(() => document.addEventListener('pointerdown', onDocPointer, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, true))
 </script>
 
 <template>
-  <form ref="root" class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save">
-    <header class="head">
-      <h1 class="tx-title">{{ tr('Edit document') }}</h1>
-      <span class="tx-meta">{{ native ? tr('Written in Iris') : doc.source_type === 'upload' ? tr('Uploaded file · Only the text changes. The original file stays as is.') : tr('Link · Only the text changes. The original page stays as is.') }}</span>
-    </header>
+  <form ref="root" class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save" @keydown.meta.s.prevent="save" @keydown.ctrl.s.prevent="save">
+    <!-- 위 막대: 편집 중 · 저장 상태 · 경고 · 취소 · 저장 (예전 아래 버튼 줄이 본문을 가리던 문제 — 위로 옮겼어요) -->
+    <div class="topbar">
+      <span class="sq chip-edit">{{ tr('Editing') }}</span>
+      <span class="tx-meta status" role="status" aria-live="polite">{{ statusText }}</span>
+      <span class="f1" />
+      <span v-if="blockMode && warnCount" class="sq warnchip" :title="tr('Format warnings')"><EditorIcon name="warning" :size="12" />{{ warnCount }}</span>
+      <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">{{ tr('Cancel') }}</Button>
+      <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Save') }}</Button>
+    </div>
+    <p v-if="error" class="tx-meta warn" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</p>
 
     <TextInput
       v-model:value="form.title"
@@ -300,80 +583,200 @@ const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? 
       :input-props="{ id: `edTitle-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
       :label-props="{ htmlFor: `edTitle-${doc.id}` }"
     />
-
     <div class="row">
       <div class="choice">
-        <span :id="`edCat-${doc.id}`" class="tx-head">{{ tr('Category') }}</span>
+        <span :id="`edCat-${doc.id}`" class="tx-head lbl">{{ tr('Category') }}</span>
         <div class="seg cats" role="radiogroup" :aria-labelledby="`edCat-${doc.id}`">
-          <button
-            v-for="c in CATS"
-            :key="c[0]"
-            type="button"
-            role="radio"
-            :aria-checked="form.category === c[0]"
-            :class="['sq', 'seg-item', { on: form.category === c[0] }]"
-            @click="form.category = c[0]"
-          >{{ tr(c[1]) }}</button>
+          <button v-for="c in CATS" :key="c[0]" type="button" role="radio" :aria-checked="form.category === c[0]" :class="['sq', 'seg-item', { on: form.category === c[0] }]" @click="form.category = c[0]">{{ tr(c[1]) }}</button>
         </div>
       </div>
-      <TextInput
-        v-model:value="form.version"
-        v-bind="TI"
-        class="ver"
-        :label="tr('Version')"
-        :placeholder="tr('e.g. v1.3')"
-        :show-supporting-text="false"
-        :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
-        :label-props="{ htmlFor: `edVer-${doc.id}` }"
-      />
+      <TextInput v-model:value="form.version" v-bind="TI" class="ver" :label="tr('Version')" :placeholder="tr('e.g. v1.3')" :show-supporting-text="false" :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }" :label-props="{ htmlFor: `edVer-${doc.id}` }" />
     </div>
 
     <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><EditorIcon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
     <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><EditorIcon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
 
-    <div class="col6 grow">
-      <label :for="`edBody-${doc.id}`" class="tx-head">{{ native ? tr('Content') : tr('Body text') }}</label>
-      <div class="sq area-box">
-      <textarea
-        :id="`edBody-${doc.id}`"
-        v-model="form.body"
-        class="area"
-        rows="16"
-        :placeholder="native ? tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`) : tr('Paste or edit the original text')"
-      />
+    <!-- 본문: 블록 편집 -->
+    <template v-if="blockMode">
+      <div class="body-h">
+        <span class="tx-head lbl">{{ tr('Content') }}</span>
+        <span class="f1" />
+        <div class="seg views" role="tablist" :aria-label="tr('Edit as')">
+          <button type="button" role="tab" :aria-selected="view === 'blocks'" :class="['sq', 'seg-item', { on: view === 'blocks' }]" @click="view = 'blocks'">{{ tr('Blocks') }}</button>
+          <button type="button" role="tab" :aria-selected="view === 'md'" :class="['sq', 'seg-item', { on: view === 'md' }]" @click="view = 'md'">Markdown</button>
+        </div>
       </div>
-      <span class="tx-meta num">
-        <template v-if="native">{{ tr(`'# ' heading, '## ' subheading, '- ' list, blank line for a new paragraph.`) }} </template>{{ tr('Lines starting with a requirement number (like REQ-001) become requirements') }}{{ found ? ' · ' + tr('{n} found', { n: found }) : '' }}
-      </span>
-    </div>
+      <p class="tx-meta hint">{{ view === 'blocks' ? tr('Paste Markdown to add sections. Type in a table cell to edit it directly.') : tr('Paste the whole document written by AI. Tables become table blocks.') }}</p>
 
-    <div class="foot">
-      <span v-if="error" class="tx-meta warn" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</span>
-      <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">{{ tr('Cancel') }}</Button>
-      <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Save') }}</Button>
+      <div v-if="view === 'md'" class="sq area-box">
+        <textarea v-model="mdText" class="area md" rows="20" spellcheck="false" :aria-label="tr('Markdown')" />
+      </div>
+
+      <div v-else class="blocks">
+        <div v-for="(b, bi) in blocks" :key="b.id" :class="['blk', b.type]">
+          <!-- 왼쪽 손잡이: + 블록 더하기 · ⋮ 옮기기 · 바꾸기 · 지우기 -->
+          <span class="gut">
+            <button type="button" class="ib g" :aria-label="tr('Add block')" :aria-expanded="menu?.id === b.id && menu.kind === 'add'" @click="menu = menu?.id === b.id && menu.kind === 'add' ? null : { id: b.id, kind: 'add' }"><EditorIcon name="plus" :size="12" /></button>
+            <button type="button" class="ib g" :aria-label="tr('Block menu')" :aria-expanded="menu?.id === b.id && menu.kind === 'more'" @click="menu = menu?.id === b.id && menu.kind === 'more' ? null : { id: b.id, kind: 'more' }"><EditorIcon name="menu_kebab" :size="12" /></button>
+          </span>
+          <div v-if="menu?.id === b.id" class="sq bmenu" role="menu">
+            <template v-if="menu.kind === 'add'">
+              <button v-for="t in TYPES" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="addAfter(b.id, t.k)"><EditorIcon :name="t.icon" :size="14" />{{ tr(t.label) }}</button>
+            </template>
+            <template v-else>
+              <button v-for="t in TYPES.filter((x) => x.k !== b.type)" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="turnInto(b.id, t.k)"><EditorIcon :name="t.icon" :size="14" />{{ tr('Turn into {type}', { type: tr(t.label) }) }}</button>
+              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === 0" @click="move(b.id, -1)"><EditorIcon name="chevron_down" :size="14" class="up" />{{ tr('Move up') }}</button>
+              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === blocks.length - 1" @click="move(b.id, 1)"><EditorIcon name="chevron_down" :size="14" />{{ tr('Move down') }}</button>
+              <button type="button" role="menuitem" class="sq menu-item danger" @click="removeBlock(b.id)"><EditorIcon name="trashbin" :size="14" />{{ tr('Delete') }}</button>
+            </template>
+          </div>
+
+          <!-- 표 블록 -->
+          <div v-if="b.type === 'table'" class="tbl-edit">
+            <div class="tscroll">
+              <table class="etbl">
+                <colgroup>
+                  <col v-for="(_, ci) in b.rows?.[0] ?? []" :key="ci" :style="{ width: colWidth(b, ci) }">
+                  <col style="width: 24px">
+                </colgroup>
+                <tbody>
+                  <tr v-for="(row, ri) in b.rows ?? []" :key="ri" :class="{ head: ri === 0, warned: warnAt.has(`${b.id}:${ri}`) }">
+                    <td v-for="(cell, ci) in row" :key="ci" :class="{ idcol: ci === 0 && ri > 0 && colWidth(b, 0) === '96px' }">
+                      <span v-if="ci === 0 && warnAt.has(`${b.id}:${ri}`)" class="wdot" role="img" :aria-label="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" :title="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" />
+                      <textarea
+                        :value="cell"
+                        :data-cell="`${b.id}:${ri}:${ci}`"
+                        class="auto cell"
+                        rows="1"
+                        cols="1"
+                        :aria-label="ri === 0 ? tr('Column {n} header', { n: ci + 1 }) : tr('Row {r}, column {c}', { r: ri, c: ci + 1 })"
+                        :placeholder="ri === 0 ? tr('Header') : ''"
+                        @input="onCell(b, ri, ci, $event)"
+                        @keydown="onCellKey(b, ri, ci, $event)"
+                        @paste="onCellPaste(b, ri, ci, $event)"
+                        @focus="idQuery(b, ri, ci, cell)"
+                        @blur="onCellBlur"
+                      />
+                      <div v-if="suggest && suggest.key === `${b.id}:${ri}:${ci}`" class="sq sug" role="listbox" :aria-label="tr('Policy IDs')">
+                        <button v-for="(s, si) in suggest.items" :key="s.code" type="button" role="option" :aria-selected="si === suggest.i" :class="['sq', 'menu-item', { on: si === suggest.i }]" @mousedown.prevent="pickSuggest(b, ri, ci, s.code)"><span class="sq pid num">{{ s.code }}</span><span class="ellipsis">{{ s.label }}</span></button>
+                        <span class="tx-meta sug-hint">{{ tr('↑↓ to move · Enter to pick') }}</span>
+                      </div>
+                    </td>
+                    <td class="rowact">
+                      <button v-if="ri > 0 && (b.rows?.length ?? 0) > 2" type="button" class="ib g" :aria-label="tr('Delete row {r}', { r: ri })" @click="removeRow(b, ri)"><EditorIcon name="close" :size="12" /></button>
+                      <button v-else-if="ri === 0" type="button" class="ib g" :aria-label="tr('Add column')" :title="tr('Add column')" @click="addCol(b)"><EditorIcon name="plus" :size="12" /></button>
+                    </td>
+                  </tr>
+                  <tr class="colact">
+                    <td v-for="(_, ci) in b.rows?.[0] ?? []" :key="ci"><button v-if="(b.rows?.[0]?.length ?? 0) > 1" type="button" class="ib g" :aria-label="tr('Delete column {n}', { n: ci + 1 })" :title="tr('Delete column')" @click="removeCol(b, ci)"><EditorIcon name="minus" :size="12" /></button></td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button type="button" class="sq addrow" @click="addRow(b)"><EditorIcon name="plus" :size="12" />{{ tr('Add row') }}</button>
+            <div v-for="(w, wi) in blockWarns(b.id)" :key="wi" class="sq warnline" role="note"><EditorIcon name="warning" :size="12" />{{ wText(w) }}</div>
+          </div>
+
+          <!-- 글 블록 -->
+          <textarea
+            v-else
+            :value="b.text"
+            :data-edit="b.id"
+            :class="['auto', 'btext', b.type]"
+            rows="1"
+            :placeholder="b.type === 'h1' ? tr('Heading') : b.type === 'h2' ? tr('Subheading') : b.type === 'li' ? tr('List item') : tr(`Type '# ' for a heading, '- ' for a list`)"
+            :aria-label="tr(TYPES.find((t) => t.k === b.type)?.label ?? 'Paragraph')"
+            @input="onText(b, $event)"
+            @keydown="onTextKey(b, $event)"
+            @paste="onPaste(b, $event)"
+          />
+        </div>
+        <button type="button" class="sq addblock" @click="addAfter(null, 'p')"><EditorIcon name="plus" :size="14" />{{ tr('Add block') }}</button>
+        <button type="button" class="sq addblock" @click="addAfter(null, 'table')"><EditorIcon name="table" :size="14" />{{ tr('Add table') }}</button>
+      </div>
+    </template>
+
+    <!-- PDF · 링크 글: 글 상자 하나 -->
+    <div v-else class="col6 grow">
+      <label :for="`edBody-${doc.id}`" class="tx-head lbl">{{ tr('Body text') }}</label>
+      <div class="sq area-box"><textarea :id="`edBody-${doc.id}`" v-model="form.body" class="area" rows="16" :placeholder="tr('Paste or edit the original text')" /></div>
     </div>
   </form>
 </template>
 
 <style scoped>
 .editor { display: flex; flex-direction: column; gap: var(--ref-spacing-10); min-height: 100%; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.head { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
-/* 입력 라벨은 DS Label 과 같게: 12/18 SemiBold neutral/700, 칸과 2px */
-.col6 > .tx-head:first-child { color: var(--sys-color-neutral-700); }
-.col6 > .tx-meta:last-child { margin-top: var(--ref-spacing-02); }
+/* 위 막대: 스크롤해도 위에 붙어 있어요(본문을 가리지 않게 흰 바탕 + 아래 선) */
+.topbar { position: sticky; top: calc(-1 * var(--ref-spacing-14)); z-index: 3; display: flex; align-items: center; gap: var(--ref-spacing-06); margin: calc(-1 * var(--ref-spacing-14)) calc(-1 * var(--ref-spacing-16)) 0; padding: var(--ref-spacing-08) var(--ref-spacing-16); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+.chip-edit { height: 22px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
+.status { white-space: nowrap; }
+.warnchip { height: 22px; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: #B44A0E; --sq-fill: #FFF1E8; }
+.f1 { flex: 1; }
+.lbl { color: var(--sys-color-neutral-700); }
 .row { display: flex; align-items: flex-start; gap: var(--ref-spacing-12); flex-wrap: wrap; }
+.choice { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
 .ver { width: 140px; flex: none; }
-.grow { flex: 1; }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.area { flex: 1; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
-/* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
-.area-box { flex: 1; display: flex; flex-direction: column; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+.body-h { display: flex; align-items: center; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-04); }
+.hint { margin: calc(-1 * var(--ref-spacing-06)) 0 0; }
+.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
+.grow { flex: 1; }
+.warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); margin: 0; color: var(--sys-color-theme-error-default); }
+
+.area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area.md { min-height: 420px; }
+.area-box { display: flex; flex-direction: column; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
-.area::placeholder { color: var(--sys-color-neutral-500); }
-.foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08) 0; background: var(--sys-color-common-white-emphasis); }
-.foot .warn { margin-right: auto; }
-.warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); color: var(--sys-color-theme-error-default); }
+
+/* 블록 */
+.blocks { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding-left: 36px; padding-bottom: var(--ref-spacing-24); }
+.blk { position: relative; }
+.gut { position: absolute; left: -36px; top: 2px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.blk:hover .gut, .blk:focus-within .gut, .gut:has([aria-expanded='true']) { opacity: 1; }
+.ib.g { width: 16px; height: 22px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); }
+.ib.g:hover { color: var(--sys-color-neutral-800); background: var(--sys-color-neutral-100); }
+.ib.g:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; opacity: 1; }
+.bmenu { position: absolute; left: -36px; top: 26px; z-index: 5; min-width: 180px; display: flex; flex-direction: column; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); }
+.bmenu .menu-item { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: var(--sys-color-common-white-default); text-align: left; font-size: 12px; }
+.bmenu .menu-item:hover:not(:disabled) { --sq-fill: rgb(253 253 253 / 12%); }
+.bmenu .menu-item:disabled { opacity: .4; }
+.bmenu .menu-item.danger { color: #FF8A8A; }
+.up { transform: rotate(180deg); }
+.btext { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-family: var(--font-family-base); font-size: 13px; line-height: 21px; color: var(--sys-color-neutral-800); }
+.btext:hover { background: var(--sys-color-neutral-100); }
+.btext:focus { background: var(--sys-color-neutral-100); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
+.btext::placeholder { color: var(--sys-color-neutral-400); }
+.btext.h1 { font-size: 18px; line-height: 26px; font-weight: 600; margin-top: var(--ref-spacing-08); }
+.btext.h2 { font-size: 15px; line-height: 22px; font-weight: 600; margin-top: var(--ref-spacing-06); }
+.blk.li { padding-left: var(--ref-spacing-10); }
+.blk.li::before { content: ''; position: absolute; left: 6px; top: 12px; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-500); }
+
+/* 표 블록 */
+.tbl-edit { display: flex; flex-direction: column; gap: var(--ref-spacing-04); margin: var(--ref-spacing-04) 0; }
+.tscroll { overflow: visible; }
+.etbl { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.etbl td { position: relative; border: 1px solid var(--iris-line); padding: 0; vertical-align: top; }
+.etbl tr.head td { background: var(--sys-color-neutral-100); }
+.etbl tr.head .cell { font-weight: 600; color: var(--sys-color-neutral-700); }
+.etbl tr.warned td { background: #FFF9F2; }
+.etbl td.rowact, .etbl tr.colact td { border: 0; background: transparent; min-width: 0; width: 24px; text-align: center; }
+.etbl tr.colact td { height: 18px; }
+.etbl tr.colact .ib.g, .etbl td.rowact .ib.g { opacity: 0; height: 18px; margin: 0 auto; }
+.tbl-edit:hover .ib.g { opacity: 1; }
+.cell { display: block; width: 100%; min-width: 0; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-04) var(--ref-spacing-05); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.cell:focus { box-shadow: inset 0 0 0 1.5px var(--sys-color-brand-primary-default); background: var(--sys-color-common-white-default); }
+.idcol .cell { font-weight: 600; color: var(--iris-peek-ink); }
+.wdot { position: absolute; left: -10px; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: #E2601B; }
+.addrow, .addblock { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 26px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); font-size: 12px; }
+.addrow:hover, .addblock:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.addblock { margin-top: var(--ref-spacing-02); }
+.warnline { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: #FFF6EC; color: #B44A0E; font-size: 12px; }
+.sug { position: absolute; left: 0; top: calc(100% + 4px); z-index: 6; width: 260px; display: flex; flex-direction: column; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; filter: drop-shadow(0 8px 16px rgb(69 76 88 / 16%)); }
+.sug .menu-item { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); }
+.sug .menu-item.on, .sug .menu-item:hover { --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
+.sug-hint { padding: var(--ref-spacing-02) var(--ref-spacing-04) var(--ref-spacing-03); }
+.pid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); white-space: nowrap; flex: none; }
 </style>

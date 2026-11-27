@@ -4,9 +4,14 @@
  * (미리보기에서 바꾼 값은 새로고침하면 처음으로 돌아갑니다).
  */
 
+import type { Aliases, CheckResult, FormatBlock, FormatResult, Mark, SlotKind } from '~/utils/docFormat'
+import { analyzeDoc, compareCodes, parseMarkdown, slotFromName, toCheckResult } from '~/utils/docFormat'
+
 export type DocCategory = 'planning' | 'dev' | 'design' | 'etc'
 export type DocSource = 'native' | 'upload' | 'link'
-export interface DocBlock { id: string; type: 'h1' | 'h2' | 'p' | 'li'; text: string }
+/** 문서 블록: 제목 · 문단 · 목록 · 표(rows, 첫 줄이 머리) — utils/docFormat.ts */
+export type DocBlock = FormatBlock
+export type DocStatus = 'draft' | 'review' | 'confirmed'
 export interface DocRow {
   id: string
   project_id: string
@@ -21,6 +26,10 @@ export interface DocRow {
   fetch_status: 'ok' | 'failed' | 'manual' | null
   version_label: string | null
   updated_at: string
+  /** 문서 약어(ID 가 겹치면 '몰 C-05'), 상태, 양식 검사 결과 — 3단계 */
+  abbr?: string | null
+  status?: DocStatus
+  check_result?: CheckResult | null
 }
 
 export type ReqPriority = 'must' | 'should' | 'could'
@@ -31,13 +40,37 @@ export interface ReqRow {
   code: string
   title: string
   body: string | null
-  anchor: { block?: string } | null
+  anchor: { block?: string; row?: number | null } | null
   priority: ReqPriority | null
-  origin: 'auto_pattern' | 'manual' | 'ai'
+  origin: 'auto_pattern' | 'doc_table' | 'manual' | 'ai'
+  /** P-ORD-05 의 ORD */
+  area?: string | null
+  marks?: Mark[]
+  /** 화면 없는 정책(반영률에서 빼요) */
+  has_screen?: boolean
+  /** 문서에서 빠진 시각(지우지 않고 표시) */
+  removed_at?: string | null
 }
 
-export type LinkStatus = 'reflected' | 'partial' | 'missing' | 'na'
-export interface LinkRow { screen_id: string; requirement_id: string; status: LinkStatus; note: string | null }
+export type LinkStatus = 'unchecked' | 'reflected' | 'partial' | 'missing' | 'na'
+export interface LinkRow { screen_id: string; requirement_id: string; status: LinkStatus; note: string | null; layer_ids?: string[] | null; origin?: 'doc_table' | 'figma_desc' | 'manual' | 'ai' }
+
+/** 화면 칸: 기획서 화면 표의 한 행(C-05 상품 상세). 디자인(screens.slot_id)이 여기에 붙어요 */
+export interface SlotRow {
+  id: string
+  project_id: string
+  document_id: string
+  code: string
+  kind: SlotKind
+  name: string
+  spec: string | null
+  states: string[]
+  policy_codes: string[]
+  anchor: { block?: string; row?: number | null } | null
+  removed_at: string | null
+}
+/** 프로젝트 화면(페이지를 가로질러) + 붙은 화면 칸 */
+export interface ProjectScreen { id: string; name: string; page_id: string; page: string; slot_id: string | null; slot_state: string | null }
 
 export interface ComponentRow {
   id: string
@@ -57,15 +90,16 @@ export const DOC_CATEGORY_LABEL: Record<DocCategory, string> = { planning: 'Plan
 export const DOC_SOURCE_LABEL: Record<DocSource, string> = { native: 'Written', upload: 'File', link: 'Link' }
 export const PRIORITY_LABEL: Record<ReqPriority, string> = { must: 'Must', should: 'Should', could: 'Could' }
 export const LINK_STATUS: Record<LinkStatus, { label: string }> = {
+  unchecked: { label: 'Unchecked' },
   reflected: { label: 'Reflected' },
   partial: { label: 'Partial' },
   missing: { label: 'Missing' },
   na: { label: 'Not applicable' },
 }
 /** 반영 상태 순환(상태 아이콘을 누를 때) — 시안과 같은 순서 */
-export const NEXT_STATUS: Record<LinkStatus, LinkStatus> = { reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' }
+export const NEXT_STATUS: Record<LinkStatus, LinkStatus> = { unchecked: 'reflected', reflected: 'partial', partial: 'missing', missing: 'na', na: 'reflected' }
 /** 목록에서 보여 줄 순서: 손볼 것부터 */
-export const STATUS_ORDER: LinkStatus[] = ['missing', 'partial', 'reflected', 'na']
+export const STATUS_ORDER: LinkStatus[] = ['unchecked', 'missing', 'partial', 'reflected', 'na']
 export const TOKEN_TYPE_LABEL: Record<TokenType, string> = { color: 'Color', typography: 'Typography', spacing: 'Spacing', radius: 'Radius', shadow: 'Shadow' }
 
 /** 문서 아이콘 이름(디자인 시스템 Icon) */
@@ -107,6 +141,40 @@ const PREVIEW_DOCS: Omit<DocRow, 'project_id'>[] = [
   { id: 'd5', title: '마이 페이지 디자인 가이드', category: 'design', source_type: 'native', file_path: null, file_type: null, url: null, fetch_status: null, version_label: null, updated_at: ago(60 * 24 * 9), plain_text: null, content_blocks: [b('m1', 'h1', '마이 페이지 디자인 가이드'), b('m2', 'p', '목록 행은 ListItem 컴포넌트, 구분은 1px 선만 씁니다.'), b('m3', 'li', 'REQ-013 프로필 영역에 이름과 회원 등급을 보여준다.'), b('m4', 'li', 'REQ-014 설정은 알림 · 계정 · 약관 세 묶음으로 나눈다.')] },
 ]
 
+// 새 양식(3단계) 예시: 정책 표 · 화면 표가 있는 기획서
+const MALL_MD = `# 착한구독 상세 기획서
+
+## 1. 문서 정보
+
+| 항목 | 내용 |
+| --- | --- |
+| 문서 | 착한구독 상세 기획서 |
+| 문서 약어 | 구독 |
+| 버전 | v1.0 |
+| 상태 | 초안 |
+
+## 2. 정책
+
+| ID | 정책 | 세부 규칙 |
+| --- | --- | --- |
+| P-PLN-01 | 요금제 구성 | 요금제는 12 · 24 · 36개월, 기간이 길수록 월 구독료가 내려간다 |
+| P-PLN-02 | 가장 많이 선택 〔기본값〕 | 가장 많이 고르는 요금제에 '가장 많이 선택' 표시를 붙인다 |
+| P-DOC-01 | 서류 올리기 | 운전면허증 · 신분증은 촬영 또는 앨범에서 올린다 |
+| P-DOC-02 | 심사 결과 알림 ⏸ | 서류 심사는 영업일 1일 안에 끝내고 결과를 알림으로 보낸다 |
+| P-PAY-01 | 청약 철회 고지 ⚖️ | 결제 직전에 청약 철회 기간을 고지한다. 문구는 법무 원문을 쓴다 |
+
+## 3. 화면
+
+| ID | 화면 | 보여 줄 것 | 상태 | 정책 |
+| --- | --- | --- | --- | --- |
+| C-04 | 요금제 선택 | 요금제 카드 3개, 월 구독료 · 총액 | 로딩 | P-PLN-01, P-PLN-02 |
+| C-05 | 서류 제출 | 면허증 · 신분증 올리기, [제출] | 오류 | P-DOC-01, P-DOC-03 |
+| C-06 | 신청 완료 | 예상 인도일 · 담당자 연락처 (P-DOC-02) | - |  |
+`
+const MALL_BLOCKS: DocBlock[] = parseMarkdown(MALL_MD).map((x, i) => ({ ...x, id: 'mb' + i }))
+const MALL = analyzeDoc(MALL_BLOCKS)
+PREVIEW_DOCS.unshift({ id: 'd6', title: '착한구독 상세 기획서', category: 'planning', source_type: 'native', file_path: null, file_type: null, url: null, fetch_status: null, version_label: 'v1.0', updated_at: ago(20), plain_text: null, content_blocks: MALL_BLOCKS, abbr: MALL.abbr, status: 'draft', check_result: toCheckResult(MALL) })
+
 const r = (id: string, doc: string, code: string, title: string, block: string | null, priority: ReqPriority | null, origin: ReqRow['origin'] = 'auto_pattern'): Omit<ReqRow, 'project_id'> =>
   ({ id, document_id: doc, code, title, body: null, anchor: block ? { block } : null, priority, origin })
 
@@ -125,10 +193,13 @@ const PREVIEW_REQS: Omit<ReqRow, 'project_id'>[] = [
   r('r12', 'd2', 'REQ-012', '예상 인도일 · 담당자 연락처', null, 'must'),
   r('r13', 'd5', 'REQ-013', '프로필에 이름 · 회원 등급', 'm3', 'should'),
   r('r14', 'd5', 'REQ-014', '설정은 알림 · 계정 · 약관 묶음', 'm4', 'could', 'manual'),
+  ...MALL.policies.map((p): Omit<ReqRow, 'project_id'> => ({ id: 'mp-' + p.code, document_id: 'd6', code: p.code, title: p.title, body: p.body, anchor: { block: p.block, row: p.row }, priority: null, origin: 'doc_table', area: p.area, marks: p.marks, has_screen: true, removed_at: null })),
 ]
+const PREVIEW_SLOTS: Omit<SlotRow, 'project_id'>[] = MALL.slots.map((x) => ({ id: 'ms-' + x.code, document_id: 'd6', code: x.code, kind: x.kind, name: x.name, spec: x.spec, states: x.states, policy_codes: x.policyCodes, anchor: { block: x.block, row: x.row }, removed_at: null }))
 
 const l = (screen_id: string, requirement_id: string, status: LinkStatus, note: string | null = null): LinkRow => ({ screen_id, requirement_id, status, note })
 const PREVIEW_LINKS: LinkRow[] = [
+  { ...l('sc-4', 'mp-P-PLN-01', 'unchecked'), origin: 'doc_table' }, { ...l('sc-4', 'mp-P-PLN-02', 'unchecked'), origin: 'doc_table' }, { ...l('sc-5', 'mp-P-DOC-01', 'unchecked'), origin: 'doc_table' },
   l('sc-1', 'r1', 'reflected'), l('sc-1', 'r2', 'partial', '금액은 있고 결제일이 빠졌어요'), l('sc-1', 'r3', 'missing'),
   l('sc-2', 'r4', 'reflected'), l('sc-2', 'r5', 'reflected'), l('sc-2', 'r6', 'missing', '버튼이 스크롤과 같이 움직여요'),
   l('sc-3', 'r7', 'partial'),
@@ -193,6 +264,10 @@ function previewStore() {
     links: useState('pv-links', () => structuredClone(PREVIEW_LINKS)),
     components: useState('pv-components', () => structuredClone(PREVIEW_COMPONENTS)),
     tokens: useState('pv-tokens', () => structuredClone(PREVIEW_TOKENS)),
+    slots: useState<Omit<SlotRow, 'project_id'>[]>('pv-slots', () => structuredClone(PREVIEW_SLOTS)),
+    /** 미리보기 화면 → 화면 칸 { 화면 id: { slot, state } } */
+    screenSlots: useState<Record<string, { slot: string | null; state: string | null }>>('pv-screen-slots', () => ({ 'sc-4': { slot: 'ms-C-04', state: null }, 'sc-5': { slot: 'ms-C-05', state: null } })),
+    history: useState<DocHistoryRow[]>('pv-doc-history', () => []),
   }
 }
 
@@ -201,7 +276,7 @@ const uid = () => (globalThis.crypto?.randomUUID?.() ?? 'id-' + Math.random().to
 // ---------------------------------------------------------------------------
 // 읽기
 // ---------------------------------------------------------------------------
-const DOC_COLS = 'id, project_id, title, category, source_type, content_blocks, file_path, file_type, url, plain_text, fetch_status, version_label, updated_at'
+const DOC_COLS = 'id, project_id, title, category, source_type, content_blocks, file_path, file_type, url, plain_text, fetch_status, version_label, updated_at, abbr, status, check_result'
 
 /** 프로젝트의 문서 목록 */
 export function useDocuments(projectId: string) {
@@ -221,15 +296,15 @@ export function useRequirements(projectId: string) {
   const preview = useDevPreview()
   const reqs = useAsyncData(`reqs-${projectId}`, async () => {
     if (preview) return previewStore().reqs.value.map((x) => ({ ...x, project_id: projectId })) as ReqRow[]
-    const { data, error } = await supabase.from('requirements').select('id, project_id, document_id, code, title, body, anchor, priority, origin').eq('project_id', projectId).order('code')
+    const { data, error } = await supabase.from('requirements').select('id, project_id, document_id, code, title, body, anchor, priority, origin, area, marks, has_screen, removed_at').eq('project_id', projectId).order('code')
     if (error) throw error
     return (data ?? []) as unknown as ReqRow[]
   }, { deep: true })
   const links = useAsyncData(`links-${projectId}`, async () => {
     if (preview) return previewStore().links.value
-    const { data, error } = await supabase.from('screen_requirements').select('screen_id, requirement_id, status, note, requirements!inner(project_id)').eq('requirements.project_id', projectId)
+    const { data, error } = await supabase.from('screen_requirements').select('screen_id, requirement_id, status, note, layer_ids, origin, requirements!inner(project_id)').eq('requirements.project_id', projectId)
     if (error) throw error
-    return ((data ?? []) as unknown as LinkRow[]).map(({ screen_id, requirement_id, status, note }) => ({ screen_id, requirement_id, status, note }))
+    return ((data ?? []) as unknown as LinkRow[]).map(({ screen_id, requirement_id, status, note, layer_ids, origin }) => ({ screen_id, requirement_id, status, note, layer_ids, origin }))
   }, { deep: true })
   return { reqs, links }
 }
@@ -239,11 +314,26 @@ export function useProjectScreens(projectId: string) {
   const supabase = useSupabaseClient()
   const preview = useDevPreview()
   return useAsyncData(`all-screens-${projectId}`, async () => {
-    if (preview) return Object.entries(PREVIEW_SCREENS).flatMap(([page_id, list]) => list.map((s) => ({ id: s.id, name: s.name, page_id, page: PREVIEW_PAGES.find((p) => p.id === page_id)?.name ?? '' })))
-    const { data, error } = await supabase.from('screens').select('id, name, page_id, pages!inner(name, project_id)').eq('pages.project_id', projectId).order('sort_order')
+    if (preview) {
+      const slotOf = previewStore().screenSlots.value
+      return Object.entries(PREVIEW_SCREENS).flatMap(([page_id, list]) => list.map((s): ProjectScreen => ({ id: s.id, name: s.name, page_id, page: PREVIEW_PAGES.find((p) => p.id === page_id)?.name ?? '', slot_id: slotOf[s.id]?.slot ?? null, slot_state: slotOf[s.id]?.state ?? null })))
+    }
+    const { data, error } = await supabase.from('screens').select('id, name, page_id, slot_id, slot_state, pages!inner(name, project_id)').eq('pages.project_id', projectId).order('sort_order')
     if (error) throw error
-    return ((data ?? []) as unknown as { id: string; name: string; page_id: string; pages: { name: string } }[]).map((s) => ({ id: s.id, name: s.name, page_id: s.page_id, page: s.pages.name }))
+    return ((data ?? []) as unknown as { id: string; name: string; page_id: string; slot_id: string | null; slot_state: string | null; pages: { name: string } }[]).map((s): ProjectScreen => ({ id: s.id, name: s.name, page_id: s.page_id, page: s.pages.name, slot_id: s.slot_id, slot_state: s.slot_state }))
   }, { deep: true })
+}
+
+/** 프로젝트의 화면 칸(문서마다 화면 표에서 읽은 것) */
+export function useScreenSlots(projectId: string) {
+  const supabase = useSupabaseClient()
+  const preview = useDevPreview()
+  return useAsyncData(`slots-${projectId}`, async () => {
+    if (preview) return previewStore().slots.value.map((x) => ({ ...x, project_id: projectId })) as SlotRow[]
+    const { data, error } = await supabase.from('screen_slots').select('id, project_id, document_id, code, kind, name, spec, states, policy_codes, anchor, removed_at').eq('project_id', projectId)
+    if (error) return [] as SlotRow[] // 마이그레이션 전 DB
+    return ((data ?? []) as unknown as SlotRow[]).sort((a, b) => compareCodes(a.code, b.code))
+  }, { deep: true, default: () => [] as SlotRow[] })
 }
 
 /** 디자인 시스템: 컴포넌트 · 토큰 (워크스페이스 공용) */
@@ -381,7 +471,226 @@ export function useIrisMutations() {
     if (error) throw error
   }
 
-  return { setLink, removeLink, addDocument, addRequirement, addComponent, addTokens }
+  /** 여러 화면에 정책 하나를 한 번에 연결(이미 있으면 건너뛰고, 고른 레이어는 더해요) */
+  async function linkMany(rows: { screen_id: string; requirement_id: string; layer_ids?: string[] }[], existing: LinkRow[]) {
+    const add: LinkRow[] = []
+    for (const r of rows) {
+      const ex = existing.find((x) => x.screen_id === r.screen_id && x.requirement_id === r.requirement_id)
+      if (ex && !r.layer_ids?.length) continue
+      const layers = [...new Set([...(ex?.layer_ids ?? []), ...(r.layer_ids ?? [])])]
+      add.push({ screen_id: r.screen_id, requirement_id: r.requirement_id, status: ex?.status ?? 'unchecked', note: ex?.note ?? null, layer_ids: layers.length ? layers : null, origin: ex?.origin ?? 'manual' })
+    }
+    if (!add.length) return add
+    if (preview) { for (const r of add) await setLink(r); return add }
+    const { error } = await supabase.from('screen_requirements').upsert(add.map((r) => ({ ...r, updated_by: me() })))
+    if (error) throw error
+    return add
+  }
+  async function unlinkMany(screenIds: string[], requirementId: string) {
+    if (preview) { for (const sid of screenIds) await removeLink(sid, requirementId); return }
+    const { error } = await supabase.from('screen_requirements').delete().eq('requirement_id', requirementId).in('screen_id', screenIds)
+    if (error) throw error
+  }
+
+  /** 화면(디자인)을 화면 칸에 붙이기 · 떼기 */
+  async function setScreenSlot(screenId: string, slotId: string | null, state: string | null = null) {
+    if (preview) { previewStore().screenSlots.value = { ...previewStore().screenSlots.value, [screenId]: { slot: slotId, state } }; return }
+    const { error } = await supabase.from('screens').update({ slot_id: slotId, slot_state: state }).eq('id', screenId)
+    if (error) throw error
+  }
+
+  /**
+   * 문서를 저장한 뒤 양식 검사 결과를 DB 에 맞춥니다(PRD/11 5장):
+   * 정책 표 → 정책(문서 안 ID 그대로), 화면 표 → 화면 칸, 이름이 'C-05 …' 인 화면은 칸에 붙이고, 칸의 '정책' 열 → '확인 전' 연결.
+   * 문서에서 빠진 정책 · 칸은 지우지 않고 빠진 시각만 남겨요. 결과 수를 돌려줘요.
+   */
+  async function syncDocFormat(projectId: string, docId: string, r: FormatResult, ctx: { reqs: ReqRow[]; slots: SlotRow[]; screens: ProjectScreen[]; links: LinkRow[]; aliases?: Aliases }) {
+    const now = new Date().toISOString()
+    const out = { added: [] as string[], removed: [] as string[], slots: 0, attached: 0, unchecked: 0 }
+    const docReqs = ctx.reqs.filter((x) => x.document_id === docId)
+    const byCode = new Map(docReqs.map((x) => [x.code.toUpperCase(), x]))
+    const found = new Set(r.policies.map((p) => p.code))
+    const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+    // 1) 정책
+    const inserts: Record<string, unknown>[] = []
+    const updates: [string, Record<string, unknown>][] = []
+    for (const p of r.policies) {
+      const fields = { title: p.title.slice(0, 200), body: p.body || null, area: p.area, marks: p.marks, anchor: { block: p.block, row: p.row }, removed_at: null }
+      const ex = byCode.get(p.code)
+      if (!ex) { inserts.push({ ...fields, project_id: projectId, document_id: docId, code: p.code, origin: 'doc_table' }); out.added.push(p.code) }
+      else if (!same(ex.title, fields.title) || !same(ex.body, fields.body) || !same(ex.area, fields.area) || !same(ex.marks ?? [], fields.marks) || !same(ex.anchor, fields.anchor) || ex.removed_at) updates.push([ex.id, fields])
+    }
+    const gone = docReqs.filter((x) => x.origin === 'doc_table' && !found.has(x.code) && !x.removed_at)
+    out.removed = gone.map((x) => x.code)
+
+    // 2) 화면 칸
+    const docSlots = ctx.slots.filter((x) => x.document_id === docId)
+    const slotRows = r.slots.map((s) => ({ project_id: projectId, document_id: docId, code: s.code, kind: s.kind, name: s.name.slice(0, 200), spec: s.spec || null, states: s.states, policy_codes: s.policyCodes, anchor: { block: s.block, row: s.row }, removed_at: null as string | null }))
+    const slotGone = docSlots.filter((x) => !r.slots.some((s) => s.code === x.code) && !x.removed_at)
+    out.slots = r.slots.length
+
+    let reqIds = new Map(docReqs.map((x) => [x.code.toUpperCase(), x.id]))
+    let slotIds = new Map(docSlots.map((x) => [x.code, x.id]))
+
+    if (preview) {
+      const st = previewStore()
+      for (const row of inserts) { const id = uid(); st.reqs.value.push({ has_screen: true, ...(row as Omit<ReqRow, 'id' | 'project_id'>), priority: null, id }); reqIds.set(String(row.code), id) }
+      for (const [id, f] of updates) { const i = st.reqs.value.findIndex((x) => x.id === id); if (i >= 0) st.reqs.value[i] = { ...st.reqs.value[i]!, ...(f as Partial<ReqRow>) } }
+      for (const g of gone) { const i = st.reqs.value.findIndex((x) => x.id === g.id); if (i >= 0) st.reqs.value[i] = { ...st.reqs.value[i]!, removed_at: now } }
+      for (const row of slotRows) {
+        const i = st.slots.value.findIndex((x) => x.document_id === docId && x.code === row.code)
+        if (i >= 0) st.slots.value[i] = { ...st.slots.value[i]!, ...row }
+        else { const id = uid(); st.slots.value.push({ ...row, id }); slotIds.set(row.code, id) }
+      }
+      for (const g of slotGone) { const i = st.slots.value.findIndex((x) => x.id === g.id); if (i >= 0) st.slots.value[i] = { ...st.slots.value[i]!, removed_at: now } }
+      const di = st.docs.value.findIndex((d) => d.id === docId)
+      if (di >= 0) st.docs.value[di] = { ...st.docs.value[di]!, abbr: r.abbr ?? st.docs.value[di]!.abbr ?? null, status: r.status ?? st.docs.value[di]!.status ?? 'draft', check_result: toCheckResult(r) }
+    } else {
+      if (inserts.length) {
+        const { data, error } = await supabase.from('requirements').insert(inserts.map((x) => ({ ...x, created_by: me() }))).select('id, code')
+        if (error) throw error
+        for (const x of (data ?? []) as { id: string; code: string }[]) reqIds.set(x.code.toUpperCase(), x.id)
+      }
+      for (const [id, f] of updates) { const { error } = await supabase.from('requirements').update(f as never).eq('id', id); if (error) throw error }
+      if (gone.length) { const { error } = await supabase.from('requirements').update({ removed_at: now }).in('id', gone.map((x) => x.id)); if (error) throw error }
+      if (slotRows.length) {
+        const { data, error } = await supabase.from('screen_slots').upsert(slotRows, { onConflict: 'document_id,code' }).select('id, code')
+        if (error) throw error
+        slotIds = new Map(((data ?? []) as { id: string; code: string }[]).map((x) => [x.code, x.id]))
+      }
+      if (slotGone.length) { const { error } = await supabase.from('screen_slots').update({ removed_at: now }).in('id', slotGone.map((x) => x.id)); if (error) throw error }
+      const patch: Record<string, unknown> = { check_result: toCheckResult(r) }
+      if (r.abbr) patch.abbr = r.abbr
+      if (r.status) patch.status = r.status
+      const { error } = await supabase.from('documents').update(patch as never).eq('id', docId)
+      if (error) throw error
+    }
+    reqIds = new Map([...reqIds])
+
+    // 3) 이름이 'C-05 …' · 'C-05/일시품절' 인 화면을 칸에 붙여요(아직 칸이 없는 화면만). 디자인 역할이 아니면 DB 가 막아요 — 그땐 건너뛰어요
+    const screenSlot = new Map(ctx.screens.map((s) => [s.id, s.slot_id]))
+    for (const s of ctx.screens) {
+      if (s.slot_id) continue
+      const m = slotFromName(s.name, ctx.aliases)
+      const sid = m ? slotIds.get(m.code) : null
+      if (!m || !sid) continue
+      try { await setScreenSlot(s.id, sid, m.state); screenSlot.set(s.id, sid); out.attached++ } catch { /* 권한 없음 */ }
+    }
+
+    // 4) 칸의 '정책' 열 → 붙은 화면마다 '확인 전' 연결(이미 있으면 그대로)
+    const rows: LinkRow[] = []
+    for (const s of r.slots) {
+      const sid = slotIds.get(s.code)
+      if (!sid) continue
+      const screens = [...screenSlot.entries()].filter(([, v]) => v === sid).map(([k]) => k)
+      for (const code of s.policyCodes) {
+        const rid = reqIds.get(code.toUpperCase())
+        if (!rid) continue
+        for (const screen_id of screens) {
+          if (ctx.links.some((l) => l.screen_id === screen_id && l.requirement_id === rid) || rows.some((l) => l.screen_id === screen_id && l.requirement_id === rid)) continue
+          rows.push({ screen_id, requirement_id: rid, status: 'unchecked', note: null, origin: 'doc_table' })
+        }
+      }
+    }
+    if (rows.length) {
+      try {
+        if (preview) for (const x of rows) await setLink(x)
+        else { const { error } = await supabase.from('screen_requirements').upsert(rows.map((x) => ({ ...x, updated_by: me() })), { ignoreDuplicates: true }); if (error) throw error }
+        out.unchecked = rows.length
+      } catch { /* 연결 권한이 없으면 건너뛰어요 */ }
+    }
+    return out
+  }
+
+  /** 문서 수정 기록 남기기(바뀐 블록만). 기록 20개마다 전체 사본도 */
+  async function addHistory(projectId: string, docId: string, before: DocBlock[], after: DocBlock[], note?: string) {
+    const diff = diffBlocks(before, after)
+    if (!diff.changes.length && !note) return
+    const summary = note ? [note, ...diff.summary] : diff.summary
+    if (preview) {
+      const list = previewStore().history.value
+      const n = list.filter((h) => h.document_id === docId).length
+      list.unshift({ id: uid(), document_id: docId, project_id: projectId, author_id: 'preview-me', changes: diff.changes, summary, snapshot: (n + 1) % 20 === 0 ? after : null, created_at: new Date().toISOString() })
+      return
+    }
+    const { count } = await supabase.from('document_history').select('id', { count: 'exact', head: true }).eq('document_id', docId)
+    const { error } = await supabase.from('document_history').insert({ document_id: docId, project_id: projectId, changes: diff.changes, summary, snapshot: ((count ?? 0) + 1) % 20 === 0 ? after : null })
+    if (error) throw error
+  }
+
+  return { setLink, removeLink, addDocument, addRequirement, addComponent, addTokens, linkMany, unlinkMany, setScreenSlot, syncDocFormat, addHistory }
+}
+
+// ---------------------------------------------------------------------------
+// 문서 수정 기록(새 5): 바뀐 블록만 남겨요
+// ---------------------------------------------------------------------------
+export type HistoryChange =
+  | { op: 'add'; block: string; index: number; after: DocBlock }
+  | { op: 'edit'; block: string; index: number; before: DocBlock; after: DocBlock }
+  | { op: 'del'; block: string; index: number; before: DocBlock }
+  /** 블록 순서가 바뀌었을 때만: 바뀌기 전 순서(id) */
+  | { op: 'order'; before: string[] }
+export interface DocHistoryRow { id: string; document_id: string; project_id: string; author_id: string; changes: HistoryChange[]; summary: string[]; snapshot: DocBlock[] | null; created_at: string }
+
+/** 블록 하나에 든 ID(표는 행 첫 칸 → 행 글) */
+function rowsById(b: DocBlock | undefined): Map<string, string> {
+  const m = new Map<string, string>()
+  if (!b) return m
+  if (b.type === 'table') for (const r of (b.rows ?? []).slice(1)) { const id = (r[0] ?? '').match(/^(?:P-[A-Z]{2,6}-\d{1,4}|(?:CMP|C|A|S|N)-\d{1,4})/)?.[0]; if (id) m.set(id, r.join('|')) }
+  else { const id = b.text.match(/^(?:P-[A-Z]{2,6}-\d{1,4}|REQ-\d{1,4})/)?.[0]; if (id) m.set(id, b.text) }
+  return m
+}
+
+export function diffBlocks(before: DocBlock[], after: DocBlock[]): { changes: HistoryChange[]; summary: string[] } {
+  const changes: HistoryChange[] = []
+  const bMap = new Map(before.map((b, i) => [b.id, { b, i }]))
+  const aIds = new Set(after.map((b) => b.id))
+  const key = (b: DocBlock) => JSON.stringify([b.type, b.text, b.rows ?? null])
+  after.forEach((b, i) => {
+    const old = bMap.get(b.id)
+    if (!old) changes.push({ op: 'add', block: b.id, index: i, after: b })
+    else if (key(old.b) !== key(b)) changes.push({ op: 'edit', block: b.id, index: i, before: old.b, after: b })
+  })
+  before.forEach((b, i) => { if (!aIds.has(b.id)) changes.push({ op: 'del', block: b.id, index: i, before: b }) })
+  const kept = before.filter((b) => aIds.has(b.id)).map((b) => b.id)
+  const keptAfter = after.filter((b) => bMap.has(b.id)).map((b) => b.id)
+  if (kept.join() !== keptAfter.join()) changes.push({ op: 'order', before: before.map((b) => b.id) })
+
+  // 목록 칩: + 새 ID, − 빠진 ID, ~ 바뀐 ID
+  const plus = new Set<string>(), minus = new Set<string>(), tilde = new Set<string>()
+  for (const c of changes) {
+    if (c.op === 'order') continue
+    const was = rowsById(c.op === 'add' ? undefined : c.before)
+    const now = rowsById(c.op === 'del' ? undefined : c.after)
+    now.forEach((v, k) => { if (!was.has(k)) plus.add(k); else if (was.get(k) !== v) tilde.add(k) })
+    was.forEach((_, k) => { if (!now.has(k)) minus.add(k) })
+  }
+  const summary = [...[...plus].map((x) => '+ ' + x), ...[...tilde].map((x) => '~ ' + x), ...[...minus].map((x) => '− ' + x)]
+  return { changes, summary }
+}
+
+/** 기록 하나를 되돌린 블록(after → before) */
+export function undoChanges(blocks: DocBlock[], changes: HistoryChange[]): DocBlock[] {
+  let out = blocks.filter((b) => !changes.some((c) => c.op === 'add' && c.block === b.id))
+  out = out.map((b) => { const c = changes.find((x) => x.op === 'edit' && x.block === b.id); return c && c.op === 'edit' ? c.before : b })
+  for (const c of changes.filter((x): x is Extract<HistoryChange, { op: 'del' }> => x.op === 'del').sort((a, b) => a.index - b.index)) out.splice(Math.min(c.index, out.length), 0, c.before)
+  const order = changes.find((x): x is Extract<HistoryChange, { op: 'order' }> => x.op === 'order')
+  if (order) { const pos = new Map(order.before.map((id, i) => [id, i])); out = [...out].sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9)) }
+  return out
+}
+
+/** 문서 기록(새 것부터) */
+export function useDocHistory(projectId: string, docId: () => string) {
+  const supabase = useSupabaseClient()
+  const preview = useDevPreview()
+  return useAsyncData(`doc-history-${projectId}`, async () => {
+    const id = docId()
+    if (preview) return previewStore().history.value.filter((h) => h.document_id === id)
+    const { data, error } = await supabase.from('document_history').select('id, document_id, project_id, author_id, changes, summary, snapshot, created_at').eq('document_id', id).order('created_at', { ascending: false }).limit(200)
+    if (error) return [] as DocHistoryRow[]
+    return (data ?? []) as unknown as DocHistoryRow[]
+  }, { watch: [docId], default: () => [] as DocHistoryRow[], server: false })
 }
 
 /** 문서 본문에서 'REQ-001 ...' 같은 번호 규칙을 찾아 요구사항 후보로 돌려줍니다 */

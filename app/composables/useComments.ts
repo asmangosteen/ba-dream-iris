@@ -50,7 +50,8 @@ export function useComments(projectId: string) {
     return (c.data ?? []) as CommentRow[]
   }, { server: false })
 
-  const threads = computed<Thread[]>(() => {
+  /** 문서 댓글까지 모든 스레드 */
+  const allThreads = computed<Thread[]>(() => {
     const all = list.data.value ?? []
     const roots = all.filter((c) => !c.thread_id)
     return roots.map((root) => {
@@ -62,6 +63,10 @@ export function useComments(projectId: string) {
       return { root, replies, last, unread }
     }).sort((a, b) => (b.last.created_at > a.last.created_at ? 1 : -1))
   })
+  /** 캔버스 · 코멘트 목록용: 화면 · 캔버스에 붙지 않은 문서 댓글(게시판 · 문서 옆 메모만)은 빼요 */
+  const threads = computed<Thread[]>(() => allThreads.value.filter((t) => !(t.root.document_id && !t.root.screen_id && !t.root.page_id)))
+  /** 한 문서의 댓글(문서 옆 메모 + 아래 게시판) */
+  const docThreads = (docId: string) => allThreads.value.filter((t) => t.root.document_id === docId)
 
   // 실시간: 이 프로젝트 코멘트가 바뀌면 바로
   let ch: ReturnType<typeof supabase.channel> | null = null
@@ -118,12 +123,29 @@ export function useComments(projectId: string) {
     put(data as CommentRow)
     return data as CommentRow
   }
+  /**
+   * 문서 댓글(3단계 B안): 자리(블록 · 표 행 · 고른 글)가 있으면 문서 옆 메모, 없으면 아래 게시판.
+   * 정책이 연결된 화면이 있으면 그 화면 위에도 같은 스레드가 핀으로 보여요(screenId · x · y)
+   */
+  async function createDoc(docId: string, anchor: CommentRow['doc_anchor'], body: string, mentions: string[], pin: { screenId: string; pageId: string | null; x: number; y: number } | null = null) {
+    const base = { project_id: projectId, document_id: docId, doc_anchor: anchor ?? null, page_id: pin?.pageId ?? null, screen_id: pin?.screenId ?? null, x: pin?.x ?? null, y: pin?.y ?? null, body, mentions }
+    if (preview) {
+      const no = Math.max(0, ...(list.data.value ?? []).map((c) => c.no ?? 0)) + 1
+      const row: CommentRow = { id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: null, no, author_id: 'preview-me', attachments: [], resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null, ...base }
+      put(row)
+      return row
+    }
+    const { data, error } = await supabase.from('comments').insert(base).select('*').single()
+    if (error) throw error
+    put(data as CommentRow)
+    return data as CommentRow
+  }
   async function reply(root: CommentRow, body: string, mentions: string[], attachments: string[] = []) {
     if (preview) {
       put({ ...root, id: 'pv-' + Math.random().toString(36).slice(2, 8), thread_id: root.id, no: null, x: null, y: null, author_id: 'preview-me', body, mentions, attachments, resolved_at: null, resolved_by: null, created_at: new Date().toISOString(), edited_at: null })
       return
     }
-    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, thread_id: root.id, body, mentions, ...(attachments.length ? { attachments } : {}) }).select('*').single()
+    const { data, error } = await supabase.from('comments').insert({ project_id: projectId, thread_id: root.id, body, mentions, ...(root.document_id ? { document_id: root.document_id } : {}), ...(attachments.length ? { attachments } : {}) }).select('*').single()
     if (error) throw error
     put(data as CommentRow)
     markRead(root.id)
@@ -188,7 +210,7 @@ export function useComments(projectId: string) {
     supabase.from('comment_reads').upsert({ member_id: myId.value, thread_id: threadId, seen_at: at }).then(() => undefined, () => undefined)
   }
 
-  return { list, threads, myId, create, reply, resolve, remove, edit, movePin, markRead, markUnread, react, dbBehind }
+  return { list, threads, allThreads, docThreads, createDoc, myId, create, reply, resolve, remove, edit, movePin, markRead, markUnread, react, dbBehind }
 }
 
 /** 글 속 @이름 → 멤버 id(글에 아직 남아 있는 것만) */

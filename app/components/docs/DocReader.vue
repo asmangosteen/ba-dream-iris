@@ -38,9 +38,13 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
+  /** 화면 ID(C-05)를 눌렀을 때 — 캔버스의 그 화면 칸으로 */
+  'pick-slot': [code: string]
   /** 요구사항 블록 · 번호에 마우스를 올리면 그 REQ, 벗어나면 null — 캔버스가 그 항목을 청록 선으로 미리 보여 줘요 */
   'hover-req': [reqId: string | null]
   'create-req': [payload: { text: string; block: string | null }]
+  /** 고른 글에 메모 남기기(문서 옆 댓글) — 표 행이면 그 행 · 정책 ID 도 */
+  comment: [payload: { quote: string; block: string | null; row: number | null; code: string | null }]
   /** 빈 문서에서 "내용 쓰기"를 눌렀을 때(넓은 화면 전용, compact 는 고치기 링크로 갑니다) */
   edit: []
 }>()
@@ -51,7 +55,7 @@ const wideHref = computed(() => `/p/${props.doc.project_id}/docs/${props.doc.id}
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
 
-interface ViewBlock { id: string; type: 'h1' | 'h2' | 'p' | 'li'; text: string }
+interface ViewBlock { id: string; type: 'h1' | 'h2' | 'p' | 'li' | 'table'; text: string; rows?: string[][] }
 interface Seg { t: string; req?: ReqRow }
 
 // 링크 문서에 붙여넣은 본문(저장 전후로 바로 보여 주려고 따로 둡니다)
@@ -61,7 +65,8 @@ const text = computed(() => pasted.value ?? props.doc.plain_text ?? '')
 
 const blocks = computed<ViewBlock[]>(() => {
   const d = props.doc
-  if (d.source_type === 'native') {
+  // 직접 쓴 문서 · 블록으로 읽은 Markdown 파일은 블록 그대로(표 포함)
+  if (d.source_type === 'native' || (d.content_blocks?.length && !pasted.value)) {
     const list = d.content_blocks ?? []
     // 첫 h1 이 문서 이름과 같으면 머리에서 이미 보여 주므로 뺍니다
     return list.filter((x, i) => !(i === 0 && x.type === 'h1' && x.text.trim() === d.title.trim()))
@@ -121,7 +126,46 @@ function segments(t: string): Seg[] {
 function headerReqs(b: ViewBlock): ReqRow[] {
   return (reqsByBlock.value.get(b.id) ?? []).filter((r) => !new RegExp('\\b' + r.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(b.text))
 }
-const blockReqIds = (b: ViewBlock) => (reqsByBlock.value.get(b.id) ?? []).map((r) => r.id).join(' ')
+const blockReqIds = (b: ViewBlock) => (b.type === 'table' ? [] : reqsByBlock.value.get(b.id) ?? []).map((r) => r.id).join(' ')
+
+// ---------------------------------------------------------------------------
+// 표 블록: 정책 표의 행 = 정책 하나(행을 누르면 그 정책), ID 는 정책(채운 칩) · 화면(테두리 칩)
+// ---------------------------------------------------------------------------
+const POLICY_LEAD = /^P-[A-Z]{2,6}-\d{1,4}\b/
+/** 이 표 행에 붙은 정책: 첫 칸 ID 가 정책 번호면 그 정책 */
+function rowReq(b: ViewBlock, ri: number): ReqRow | null {
+  const lead = (b.rows?.[ri]?.[0] ?? '').trim().match(POLICY_LEAD)?.[0]
+  const r = lead ? reqByCode.value.get(lead.toUpperCase()) ?? null : null
+  return r && !r.removed_at ? r : null
+}
+interface CellSeg { t: string; req?: ReqRow; slot?: string; policy?: string }
+const ID_RE = /\b(P-[A-Z]{2,6}-\d{1,4}|(?:CMP|C|A|S|N)-\d{1,4})\b/g
+/** 칸 글을 ID 칩 · 글로 나눠요 */
+function cellSegs(t: string): CellSeg[] {
+  const out: CellSeg[] = []
+  let last = 0
+  for (const m of t.matchAll(ID_RE)) {
+    const i = m.index ?? 0
+    if (t[i - 1] === '-') continue
+    if (i > last) out.push({ t: t.slice(last, i) })
+    const code = m[0]
+    // 문서에서 빠진 정책(removed_at)은 '정책 표에 없음' 색으로
+    if (code.startsWith('P-')) { const r = reqByCode.value.get(code); out.push({ t: code, policy: code, req: r && !r.removed_at ? r : undefined }) }
+    else out.push({ t: code, slot: code })
+    last = i + code.length
+  }
+  if (last < t.length) out.push({ t: t.slice(last) })
+  return out
+}
+function pickRow(b: ViewBlock, ri: number, e: MouseEvent) {
+  const r = rowReq(b, ri)
+  if (!r || (e.target as HTMLElement).closest('button, a') || window.getSelection()?.toString()) return
+  emit('pick-req', r.id)
+}
+/** 정책 행 이름 칸은 표기 기호를 빼고 배지로 따로 보여 줘요 */
+const cellText = (b: ViewBlock, ri: number, ci: number, c: string) => (ci === 1 && rowReq(b, ri)?.marks?.length ? c.replace(/〔[^〕]*〕|⏸️?|📌|⚖️?/g, '').replace(/\s{2,}/g, ' ').trim() : c)
+/** 정책 행의 표기 배지(〔기본값〕 · ⏸ · 📌 · ⚖️) */
+const rowMarks = (b: ViewBlock, ri: number) => rowReq(b, ri)?.marks ?? []
 const linkedSet = computed(() => (props.linked ? new Set(props.linked) : null))
 /** 연결된 화면이 없는 요구사항(빨간 번호) */
 const unlinked = (id: string) => !!linkedSet.value && !linkedSet.value.has(id)
@@ -133,7 +177,7 @@ function pickBlock(b: ViewBlock, e: MouseEvent) {
   if (!rs?.length || (e.target as HTMLElement).closest('button, a') || window.getSelection()?.toString()) return
   emit('pick-req', rs[0]!.id)
 }
-const isOn = (b: ViewBlock) => !!props.highlight && (reqsByBlock.value.get(b.id) ?? []).some((r) => r.id === props.highlight)
+const isOn = (b: ViewBlock) => b.type !== 'table' && !!props.highlight && (reqsByBlock.value.get(b.id) ?? []).some((r) => r.id === props.highlight)
 
 // ---------------------------------------------------------------------------
 // 머리 · 메타
@@ -198,7 +242,7 @@ defineExpose({ scrollToReq, root })
 // 글을 고르면 "요구사항으로 만들기" 띄우기
 // ---------------------------------------------------------------------------
 const article = ref<HTMLElement | null>(null)
-const tool = ref<{ x: number; y: number; text: string; block: string | null } | null>(null)
+const tool = ref<{ x: number; y: number; text: string; block: string | null; row: number | null; code: string | null } | null>(null)
 function hideTool() { tool.value = null }
 function onSelectEnd() {
   const sel = window.getSelection()
@@ -211,15 +255,25 @@ function onSelectEnd() {
   const start = range.startContainer
   const startEl = start.nodeType === 1 ? (start as Element) : start.parentElement
   const block = startEl?.closest('[data-block]')?.getAttribute('data-block') ?? null
+  const rowEl = startEl?.closest('tr[data-row]')
+  const row = rowEl ? Number(rowEl.getAttribute('data-row')) : null
+  const b = blocks.value.find((x) => x.id === block)
+  const code = b && row !== null && b.type === 'table' ? rowReq(b, row)?.code ?? null : (b ? reqsByBlock.value.get(b.id)?.[0]?.code ?? null : null)
   const rect = range.getBoundingClientRect()
   const box = el.getBoundingClientRect()
   const x = Math.min(Math.max(rect.left + rect.width / 2 - box.left, 70), Math.max(box.width - 70, 70))
-  tool.value = { x, y: rect.top - box.top - 6, text: picked.slice(0, 500), block }
+  tool.value = { x, y: rect.top - box.top - 6, text: picked.slice(0, 500), block, row, code }
 }
 function onSelectionChange() {
   if (!tool.value) return
   const sel = window.getSelection()
   if (!sel || sel.isCollapsed) hideTool()
+}
+function comment() {
+  if (!tool.value) return
+  emit('comment', { quote: tool.value.text.slice(0, 300), block: tool.value.block, row: tool.value.row, code: tool.value.code })
+  window.getSelection()?.removeAllRanges()
+  hideTool()
 }
 function createReq() {
   if (!tool.value) return
@@ -285,9 +339,40 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <TextButton v-if="compact" size="s" color="blue" contents="icon-text" icon-name="pencil" @click="navigateTo(editHref)">{{ tr('Start writing') }}</TextButton>
         <TextButton v-else size="s" color="blue" contents="icon-text" icon-name="pencil" @click="emit('edit')">{{ tr('Start writing') }}</TextButton>
       </div>
+      <template v-for="b in blocks" :key="b.id">
+      <div v-if="b.type === 'table'" :data-block="b.id" class="tblwrap">
+        <table class="dtbl">
+          <thead v-if="b.rows?.length">
+            <tr><th v-for="(c, ci) in b.rows[0]" :key="ci" scope="col">{{ c }}</th></tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, ri) in (b.rows ?? []).slice(1)"
+              :key="ri"
+              :data-reqs="rowReq(b, ri + 1)?.id"
+              :data-row="ri + 1"
+              :class="{ prow: !!rowReq(b, ri + 1), on: !!highlight && rowReq(b, ri + 1)?.id === highlight, nolink: !!rowReq(b, ri + 1) && unlinked(rowReq(b, ri + 1)!.id) }"
+              @click="pickRow(b, ri + 1, $event)"
+              @mouseenter="rowReq(b, ri + 1) && emit('hover-req', rowReq(b, ri + 1)!.id)"
+              @mouseleave="rowReq(b, ri + 1) && emit('hover-req', null)"
+            >
+              <td v-for="(c, ci) in row" :key="ci" class="tx-read">
+                <template v-for="(s, si) in cellSegs(cellText(b, ri + 1, ci, c))" :key="si">
+                  <button v-if="s.req" type="button" :class="['sq', 'pid', 'num', { nolink: unlinked(s.req.id) }]" :aria-pressed="highlight === s.req.id" :title="unlinked(s.req.id) ? s.req.title + ' · ' + tr('Not drawn in any frame') : s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
+                  <span v-else-if="s.policy" class="sq pid num missing" :title="tr('Not in the policy table')">{{ s.t }}</span>
+                  <button v-else-if="s.slot" type="button" class="sq sid num" :title="tr('Go to the screen slot')" @click="emit('pick-slot', s.slot)">{{ s.t }}</button>
+                  <template v-else>{{ s.t }}</template>
+                </template>
+                <span v-if="ci === 1 && rowMarks(b, ri + 1).length" class="marks">
+                  <span v-for="m in rowMarks(b, ri + 1)" :key="m" :class="['sq', 'mark', m]">{{ MARK_ICON[m] === '〔〕' ? '〔' + tr(MARK_LABEL[m]) + '〕' : MARK_ICON[m] + ' ' + tr(MARK_LABEL[m]) }}</span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div
-        v-for="b in blocks"
-        :key="b.id"
+        v-else
         :data-block="b.id"
         :data-reqs="blockReqIds(b) || undefined"
         :class="['blk', b.type, { sq: reqsByBlock.has(b.id), marked: reqsByBlock.has(b.id), on: isOn(b), nolink: blockUnlinked(b) }]"
@@ -305,9 +390,11 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
           </template>
         </component>
       </div>
+      </template>
 
       <div v-if="tool" class="sq tool" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create requirement') }}</button>
+        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create policy') }}</button>
+        <button v-if="!compact" type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Comment') }}</button>
       </div>
     </article>
 
@@ -372,6 +459,33 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .area::placeholder { color: var(--sys-color-neutral-500); }
 .paste-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--ref-spacing-06); }
 .paste-foot .warn { margin-right: auto; }
+
+.tblwrap { overflow-x: auto; margin: var(--ref-spacing-02) 0; }
+.dtbl { width: 100%; border-collapse: collapse; font-size: 12px; line-height: 18px; }
+.dtbl th { text-align: left; font-weight: 600; color: var(--sys-color-neutral-600); background: var(--sys-color-neutral-100); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-bottom: 1px solid var(--iris-line); white-space: nowrap; }
+.dtbl td { padding: var(--ref-spacing-05) var(--ref-spacing-06); border-bottom: 1px solid var(--iris-line); vertical-align: top; white-space: pre-line; color: var(--sys-color-neutral-800); }
+.dtbl td p { margin: 0; }
+/* 오른쪽 · 왼쪽 좁은 패널: 칸이 너무 좁아지지 않게(넘치면 옆으로 스크롤) */
+.compact .dtbl td, .compact .dtbl th { min-width: 84px; }
+.compact .dtbl td:first-child, .compact .dtbl th:first-child { min-width: 0; }
+.dtbl tr.prow { cursor: pointer; scroll-margin: var(--ref-spacing-16); }
+.dtbl tr.prow:hover td { background: color-mix(in srgb, var(--iris-peek) 6%, transparent); }
+.dtbl tr.prow.on td { background: var(--iris-peek-bg); }
+.dtbl tr.prow.on td:first-child { box-shadow: inset 2px 0 0 var(--iris-peek); }
+.dtbl tr.prow.nolink { cursor: default; }
+/* 정책 ID: 채운 칩(청록) · 화면 ID: 테두리 칩(파랑) */
+.pid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); white-space: nowrap; vertical-align: 1px; }
+.pid:is(button):hover, .pid[aria-pressed='true'] { --sq-fill: var(--iris-peek-bg-strong); }
+.pid.nolink { color: var(--sys-color-theme-error-default); --sq-fill: color-mix(in srgb, var(--sys-color-theme-error-default) 11%, transparent); }
+.pid.missing { color: #B44A0E; --sq-fill: #FFF1E8; }
+.sid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--sys-color-brand-primary-dark, #1F63BD); --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; white-space: nowrap; vertical-align: 1px; }
+.sid:hover { --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
+.pid:focus-visible, .sid:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.marks { display: inline-flex; flex-wrap: wrap; gap: var(--ref-spacing-02); margin-left: var(--ref-spacing-04); vertical-align: 1px; }
+.mark { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
+.mark.pending { color: #8A6100; --sq-fill: #FFF6DA; }
+.mark.legal { color: #7C3AAE; --sq-fill: #F4ECFB; }
+.mark.dev_check { color: #1F63BD; --sq-fill: #EEF5FD; }
 
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }

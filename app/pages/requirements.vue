@@ -21,19 +21,21 @@ type ReqStatus = LinkStatus | 'none'
 type FilterKey = 'all' | ReqStatus | 'todo'
 
 const STATUS_TEXT: Record<ReqStatus, string> = {
+  unchecked: LINK_STATUS.unchecked.label,
   missing: LINK_STATUS.missing.label,
   partial: LINK_STATUS.partial.label,
   reflected: LINK_STATUS.reflected.label,
   na: LINK_STATUS.na.label,
   none: 'Not linked',
 }
-const TODO: ReqStatus[] = ['missing', 'none', 'partial']
+const TODO: ReqStatus[] = ['missing', 'none', 'unchecked', 'partial']
 
 function deriveStatus(list: LinkRow[]): ReqStatus {
   if (!list.length) return 'none'
   const real = list.filter((x) => x.status !== 'na')
   if (!real.length) return 'na'
   if (real.some((x) => x.status === 'missing')) return 'missing'
+  if (real.some((x) => x.status === 'unchecked')) return 'unchecked'
   if (real.some((x) => x.status === 'partial')) return 'partial'
   return 'reflected'
 }
@@ -114,6 +116,7 @@ const query = ref('')
 const filters: { key: 'all' | ReqStatus; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'missing', label: STATUS_TEXT.missing },
+  { key: 'unchecked', label: STATUS_TEXT.unchecked },
   { key: 'partial', label: STATUS_TEXT.partial },
   { key: 'reflected', label: STATUS_TEXT.reflected },
   { key: 'na', label: STATUS_TEXT.na },
@@ -131,9 +134,9 @@ const shown = computed(() => {
   return list
 })
 const emptyText = computed(() => {
-  if (query.value.trim()) return tr('No matching requirements')
+  if (query.value.trim()) return tr('No matching policies')
   if (filter.value === 'todo') return tr('Nothing to fix. Everything is reflected')
-  return tr('No requirements with this status')
+  return tr('No policies with this status')
 })
 function toggleTodo() {
   filter.value = filter.value === 'todo' ? 'all' : 'todo'
@@ -225,7 +228,7 @@ onBeforeUnmount(() => {
 // ---------------------------------------------------------------------------
 function exportCsv() {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const head = [tr('ID'), tr('Requirement'), tr('Document'), tr('Screens'), tr('Priority'), tr('Status')]
+  const head = [tr('ID'), tr('Policy'), tr('Document'), tr('Screens'), tr('Priority'), tr('Status')]
   const body = shown.value.map((r) => [
     r.req.code,
     r.req.title,
@@ -238,7 +241,7 @@ function exportCsv() {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = tr('Requirements-{name}.csv', { name: project.value?.name ?? projectId })
+  a.download = tr('Policies-{name}.csv', { name: project.value?.name ?? projectId })
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -252,7 +255,7 @@ function exportCsv() {
     <main class="sq float body"><div class="scroller">
       <div class="head">
         <div class="title-col">
-          <h1 class="ttl">{{ tr('Requirements') }}</h1>
+          <h1 class="ttl">{{ tr('Policies') }}</h1>
           <!-- 프로젝트 고르기: 따로 있던 프로젝트 목록 칸 대신 제목 옆 메뉴(검은 메뉴) -->
           <div v-if="projects?.length" ref="pickRef" class="pick">
             <button type="button" class="sq pick-btn" aria-haspopup="menu" :aria-expanded="pickOpen" @click="pickOpen = !pickOpen">
@@ -275,7 +278,7 @@ function exportCsv() {
         </div>
         <div class="actions">
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="download" :disabled="!shown.length" @click="exportCsv">{{ tr('Export') }}</Button>
-          <Button v-if="projectId" size="s" type="primary" contents="icon-text" icon-name="plus" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add requirement') }}</Button>
+          <Button v-if="projectId" size="s" type="primary" contents="icon-text" icon-name="plus" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add policy') }}</Button>
         </div>
       </div>
 
@@ -304,12 +307,12 @@ function exportCsv() {
             <Button size="s" type="tertiary" :stroke="filter !== 'todo'" contents="icon-text" :icon-name="filter === 'todo' ? 'check' : 'warning'" :aria-pressed="filter === 'todo'" @click="toggleTodo">
               {{ tr('Needs work') }} <span class="num">{{ count('todo') }}</span>
             </Button>
-            <SearchField v-model:value="query" class="search" type="contained" size="s" :placeholder="tr('Search by ID or text')" :input-props="{ 'aria-label': tr('Search requirements') }" />
+            <SearchField v-model:value="query" class="search" type="contained" size="s" :placeholder="tr('Search by ID or text')" :input-props="{ 'aria-label': tr('Search policies') }" />
           </div>
         </div>
 
         <div v-if="failed" class="page-empty">
-          <p class="tx-meta">{{ tr("Couldn't load requirements") }}</p>
+          <p class="tx-meta">{{ tr("Couldn't load policies") }}</p>
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="refresh" @click="reload()">{{ tr('Reload') }}</Button>
         </div>
 
@@ -317,7 +320,7 @@ function exportCsv() {
           <thead>
             <tr>
               <th scope="col" class="tx-meta c-code">{{ tr('ID') }}</th>
-              <th scope="col" class="tx-meta">{{ tr('Requirement') }}</th>
+              <th scope="col" class="tx-meta">{{ tr('Policy') }}</th>
               <th scope="col" class="tx-meta c-doc">{{ tr('Document') }}</th>
               <th scope="col" class="tx-meta c-screen">{{ tr('Screens') }}</th>
               <th scope="col" class="tx-meta c-pri">{{ tr('Priority') }}</th>
@@ -362,7 +365,7 @@ function exportCsv() {
         </table></div>
 
         <div v-if="!loading && !failed && !rows.length" class="page-empty">
-          <p class="tx-meta">{{ tr('No requirements yet. Write IDs like REQ-001 in a document and they’re collected automatically') }}</p>
+          <p class="tx-meta">{{ tr('No policies yet. Add a policy table (ID · Policy · Rules) to a document and they’re collected automatically') }}</p>
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="document" @click="navigateTo(`/p/${projectId}`)">{{ tr('Add a document') }}</Button>
         </div>
         <div v-else-if="!loading && !failed && !shown.length" class="page-empty">
@@ -373,7 +376,7 @@ function exportCsv() {
     </div></main>
 
     <!-- 오른쪽: 선택한 요구사항 -->
-    <aside v-if="selected" :aria-label="tr('Requirement details')" class="sq float detail"><div class="scroller">
+    <aside v-if="selected" :aria-label="tr('Policy details')" class="sq float detail"><div class="scroller">
       <div class="sec-h d-top">
         <span class="num">{{ selected.req.code }}</span>
         <button type="button" class="ib s" :aria-label="tr('Close')" @click="selectedId = null"><EditorIcon name="close" :size="14" /></button>
