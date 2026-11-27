@@ -44,7 +44,7 @@ import { ROLE_NAME } from '~/composables/useProjectAccess'
 import AppCommandPalette from '~/components/app/CommandPalette.vue'
 import type { Viewport } from '~/components/editor/canvas/types'
 import type { PageSettings, ScreenCopySource, ScreenRow } from '~/composables/useEditor'
-import { docIcon, DOC_CATEGORY_LABEL, type DocCategory } from '~/composables/useIrisData'
+import { docIcon, DOC_CATEGORY_LABEL, DOC_SOURCE_TIP, type DocCategory } from '~/composables/useIrisData'
 
 const route = useRoute()
 const router = useRouter()
@@ -1465,9 +1465,21 @@ function pickReq(id: string) {
  * REQ 가 연결된 화면(지금 고른 화면이 연결돼 있으면 그것, 아니면 첫 번째)에서 그 REQ 를 그린 레이어를 골라 그 자리로 확대해요.
  * 레이어는 직접 연결(레이어 reqs) → 없으면 REQ 문장과 레이어 이름 · 글자로 짐작(app/canvas/reqMatch.ts). 못 찾으면 화면을 골라요
  */
-function focusReq(id: string) {
+async function focusReq(id: string) {
   const r = (reqs.data.value ?? []).find((x) => x.id === id)
-  const linked = (links.data.value ?? []).filter((l) => l.requirement_id === id).map((l) => l.screen_id).filter((sid) => list.value.some((s) => s.id === sid))
+  const all = (links.data.value ?? []).filter((l) => l.requirement_id === id).map((l) => l.screen_id)
+  let linked = all.filter((sid) => list.value.some((s) => s.id === sid))
+  // 연결된 화면이 다른 페이지에만 있으면 그 페이지로 옮겨서 포커스(사용자 요청 2026-11-27)
+  if (r && !linked.length && all.length) {
+    const other = allScreens.data.value?.find((v) => all.includes(v.id))
+    if (!other) return
+    pageId.value = other.page_id
+    await until(() => screens.status.value === 'success' && list.value.some((v) => v.id === other.id))
+    // 페이지를 바꾸면 선택이 풀리면서 고른 정책도 풀려요 — 다시 골라 둬요
+    docReq.value = id
+    await nextTick()
+    linked = all.filter((sid) => list.value.some((s) => s.id === sid))
+  }
   if (!r || !linked.length) return
   const sid = selected.value && linked.includes(selected.value) ? selected.value : linked[0]!
   const ids = matchReqLayers(store.doc(sid), id, [r.title, r.body ?? ''].join(' '))
@@ -2183,9 +2195,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         <div v-for="g in docGroups" :key="g.k" class="dgroup">
           <span class="nav-label">{{ g.label }}</span>
           <button v-for="d in g.items" :key="d.id" :class="['sq', 'nav-item', 's', 'drow', { on: docId === d.id }]" :aria-current="docId === d.id ? 'true' : undefined" @click="showDoc(d.id)">
-            <span v-if="d.abbr" class="sq dabbr">{{ d.abbr }}</span>
-            <EditorIcon v-else :name="docIcon(d)" :size="16" class="flex-none muted" />
+            <span class="dicon" :data-tip="tr(DOC_SOURCE_TIP[d.source_type])" :aria-label="tr(DOC_SOURCE_TIP[d.source_type])"><EditorIcon :name="docIcon(d)" :size="16" class="flex-none muted" /></span>
             <span class="ellipsis f1">{{ d.title }}</span>
+            <span v-if="d.abbr" class="sq dabbr" :data-tip="tr('Document abbreviation')">{{ d.abbr }}</span>
             <span v-if="warnCount(d)" class="sq dwarn num" :title="tr('{n} warnings', { n: warnCount(d) })">⚠ {{ warnCount(d) }}</span>
             <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} policies', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
             <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
@@ -2463,6 +2475,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 @media (prefers-reduced-motion: reduce) { .cchat { transition: none; } }
 .cm-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .cm-band .dimt { opacity: .6; }
+.dicon { flex: none; display: inline-flex; }
 .dabbr { flex: none; height: 18px; min-width: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: var(--sys-color-neutral-800); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .dwarn { flex: none; height: 18px; display: inline-flex; align-items: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #B44A0E; --sq-fill: #FFF1E8; }
 .sort-band { pointer-events: auto; padding-right: var(--ref-spacing-03); }

@@ -3,13 +3,12 @@ import type { DocRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
- * 문서 상세 위 양식 검사 막대(시안 2): 약어 칩 · 상태 · 읽은 수(정책 · 화면 칸 · 연결) · 경고(눌러서 그 자리로).
- * 정책 표 · 화면 표가 없는 문서는 '양식이 아니에요' 한 줄만.
+ * 문서 상세 위 양식 경고 막대(시안 2): 경고가 있을 때만, 눌러서 펼치고 [이동]으로 그 자리로.
+ * 약어 · 상태는 문서 머리 메타 줄(DocReader)에, 읽은 수 줄은 빼요(사용자 요청 2026-11-27)
  */
 const props = defineProps<{ doc: DocRow; compact?: boolean }>()
 const emit = defineEmits<{ go: [at: { block: string; row: number | null }] }>()
 
-const STATUS_LABEL: Record<NonNullable<DocRow['status']>, string> = { draft: 'Draft', review: 'In review', confirmed: 'Confirmed' }
 const r = computed(() => props.doc.check_result ?? null)
 const warns = computed(() => r.value?.warnings ?? [])
 const open = ref(false)
@@ -25,13 +24,7 @@ function where(w: FormatWarning) {
 </script>
 
 <template>
-  <div v-if="r || doc.abbr || doc.status" :class="['check', { compact }]">
-    <div class="line">
-      <span v-if="doc.abbr" class="sq abbr" :title="tr('Document abbreviation')">{{ doc.abbr }}</span>
-      <span v-if="doc.status" :class="['sq', 'st', doc.status]">{{ tr(STATUS_LABEL[doc.status]) }}</span>
-      <span v-if="r && r.format !== 'none'" class="tx-meta num counts">{{ tr('{p} policies · {s} screen slots · {l} links read', { p: r.policies, s: r.slots, l: r.links }) }}</span>
-      <span v-else-if="r" class="tx-meta">{{ tr('Not in the Iris planning format') }}</span>
-    </div>
+  <div v-if="warns.length" :class="['check', { compact }]">
     <template v-if="warns.length">
       <button type="button" class="sq warnbar" :aria-expanded="open" @click="open = !open">
         <EditorIcon name="warning" :size="14" />
@@ -52,13 +45,6 @@ function where(w: FormatWarning) {
 
 <style scoped>
 .check { display: flex; flex-direction: column; gap: var(--ref-spacing-04); margin-bottom: var(--ref-spacing-10); font-size: 12px; line-height: 18px; }
-.line { display: flex; align-items: center; gap: var(--ref-spacing-04); flex-wrap: wrap; }
-.abbr, .st { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; }
-.abbr { color: var(--sys-color-neutral-800); --sq-fill: var(--sys-color-neutral-100); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.st { color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
-.st.review { color: #8A6100; --sq-fill: #FFF6DA; }
-.st.confirmed { color: #14612C; --sq-fill: #DDF4E4; }
-.counts { margin-left: var(--ref-spacing-02); }
 .warnbar { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 32px; padding: 0 var(--ref-spacing-07); border-radius: var(--ref-radius-05); color: #B44A0E; --sq-fill: #FFF6EC; text-align: left; }
 .warnbar:hover { --sq-fill: #FFEEDC; }
 .warnbar b { font-weight: 600; }

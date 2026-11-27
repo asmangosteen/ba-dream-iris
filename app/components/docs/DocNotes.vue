@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Button } from '@ba-dream/design-system'
 import type { CommentRow, Thread } from '~/composables/useComments'
-import { mentionIds } from '~/composables/useComments'
 import type { DocRow, LinkRow, ProjectScreen, ReqRow } from '~/composables/useIrisData'
 import CommentComposer from '~/components/editor/CommentComposer.vue'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import CommentThreadView from '~/components/editor/CommentThreadView.vue'
+import AppConfirm from '~/components/app/AppConfirm.vue'
 
 /**
  * 문서 댓글(새 4, B안 확정): Word 메모처럼 문서 옆 카드(part='notes') + 문서 아래 게시판(part='board').
@@ -62,8 +62,11 @@ function pick(t: Thread) {
 }
 
 const busy = ref(false)
+const myId = computed(() => comments.myId.value)
+const canModerate = computed(() => access.role.value === 'owner' || access.role.value === 'deputy')
+const me = computed(() => who(myId.value ?? ''))
 /** 새 메모 남기기: 정책에 연결된 화면이 있으면 그 화면 왼쪽 위에도 핀으로 */
-async function sendNote(body: string, picked: string[]) {
+async function sendNote(body: string, mentions: string[]) {
   const at = draft.value
   if (!at || busy.value) return
   busy.value = true
@@ -71,27 +74,42 @@ async function sendNote(body: string, picked: string[]) {
     const r = at.code ? reqByCode.value.get(at.code.toUpperCase()) : null
     const sid = r ? props.links.find((l) => l.requirement_id === r.id)?.screen_id ?? null : null
     const pageId = sid ? props.screens.find((s) => s.id === sid)?.page_id ?? null : null
-    const row = await comments.createDoc(props.doc.id, at, body, mentionIds(body, picked.map((id) => who(id))), sid ? { screenId: sid, pageId, x: 16, y: 16 } : null)
+    const row = await comments.createDoc(props.doc.id, at, body, mentions, sid ? { screenId: sid, pageId, x: 16, y: 16 } : null)
     draft.value = null
     active.value = row.id
   } catch { emit('toast', tr("Couldn't post the comment. Try again")) } finally { busy.value = false }
 }
-async function sendBoard(body: string, picked: string[]) {
+async function sendBoard(body: string, mentions: string[]) {
   if (busy.value) return
   busy.value = true
-  try { await comments.createDoc(props.doc.id, null, body, mentionIds(body, picked.map((id) => who(id)))) }
+  try { await comments.createDoc(props.doc.id, null, body, mentions) }
   catch { emit('toast', tr("Couldn't post the comment. Try again")) } finally { busy.value = false }
 }
 const replying = ref<string | null>(null)
-async function sendReply(t: Thread, body: string, picked: string[]) {
+async function sendReply(root: CommentRow, body: string, mentions: string[], attachments: string[] = []) {
   if (busy.value) return
   busy.value = true
-  try { await comments.reply(t.root, body, mentionIds(body, picked.map((id) => who(id)))); replying.value = null }
+  try { await comments.reply(root, body, mentions, attachments); replying.value = null }
   catch { emit('toast', tr("Couldn't post the reply. Try again")) } finally { busy.value = false }
 }
 async function resolve(t: Thread) {
   try { await comments.resolve(t.root, !t.root.resolved_at); if (active.value === t.root.id && !showResolved.value) active.value = null }
   catch { emit('toast', tr("Couldn't change it. Try again")) }
+}
+async function edit(c: CommentRow, body: string, mentions: string[]) {
+  try { await comments.edit(c, body, mentions) } catch { emit('toast', tr("Couldn't change it. Try again")) }
+}
+async function react(c: CommentRow, emoji: string) {
+  try { await comments.react(c, emoji) } catch { emit('toast', tr("Couldn't change it. Try again")) }
+}
+/** 지우기 확인(캔버스 코멘트와 같은 창 · 문구) */
+const confirmThread = ref<CommentRow | null>(null)
+const confirmMsg = ref<CommentRow | null>(null)
+async function removeConfirmed(c: CommentRow | null) {
+  confirmThread.value = null
+  confirmMsg.value = null
+  if (!c) return
+  try { await comments.remove(c); if (active.value === c.id) active.value = null } catch { emit('toast', tr("Couldn't delete. Try again")) }
 }
 const quote = (a: DocAnchor | null | undefined) => (a?.quote ? '“' + (a.quote.length > 60 ? a.quote.slice(0, 59) + '…' : a.quote) + '”' : '')
 defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at).length) })
@@ -102,7 +120,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
   <div v-if="part === 'notes'" class="notes" :aria-label="tr('Notes')">
     <div class="nh">
       <span class="tx-head">{{ tr('Notes') }}</span>
-      <span class="tx-meta num">{{ notes.length }}</span>
+      <span class="tx-meta">{{ notes.length }}</span>
       <span class="f1" />
       <button v-if="resolvedCount" type="button" class="sq tbtn" :aria-pressed="showResolved" @click="showResolved = !showResolved">{{ showResolved ? tr('Hide resolved') : tr('Resolved {n}', { n: resolvedCount }) }}</button>
     </div>
@@ -110,65 +128,72 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
     <!-- 새 메모 -->
     <div v-if="draft" class="sq card on">
       <span class="tags">
-        <span v-if="draft.code" class="sq pid num">{{ draft.code }}</span>
-        <span class="tx-meta ellipsis">{{ quote(draft) }}</span>
+        <span v-if="draft.code" class="sq pid">{{ draft.code }}</span>
+        <span class="tx-meta qt">{{ quote(draft) }}</span>
       </span>
-      <CommentComposer :people="people" :placeholder="tr('Write a note. @ to mention')" autofocus :busy="busy" @send="(b: string, m: string[]) => sendNote(b, m)" @cancel="draft = null" />
+      <div class="newrow">
+        <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
+        <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[]) => sendNote(b, m)" @cancel="draft = null" />
+      </div>
     </div>
 
     <p v-if="!notes.length && !draft" class="tx-meta empty">{{ tr('Select text in the document and choose Comment to leave a note beside it') }}</p>
 
     <div v-for="t in notes" :key="t.root.id" :class="['sq', 'card', { on: active === t.root.id, done: !!t.root.resolved_at }]">
-      <button type="button" class="head" :aria-expanded="active === t.root.id" @click="pick(t)">
-        <span class="tags">
-          <span v-if="t.root.doc_anchor?.code" class="sq pid num">{{ t.root.doc_anchor.code }}</span>
-          <template v-for="sid in screensOf(t)" :key="sid"><span class="tx-meta arrow">→</span><span class="sq sid ellipsis" :title="screenName(sid)">{{ screenName(sid) }}</span></template>
-          <span v-if="t.unread" class="udot" :aria-label="tr('Unread')" />
-        </span>
-        <span class="msg">
-          <MemberAvatar :name="who(t.root.author_id).name" :src="who(t.root.author_id).avatar" :size="20" />
-          <span class="mcol">
-            <span><b>{{ who(t.root.author_id).name }}</b> <span class="tx-meta">{{ relativeTime(t.root.created_at) }}</span></span>
-            <span class="body">{{ t.root.body }}</span>
-            <span v-if="active !== t.root.id" class="tx-meta">{{ t.replies.length ? (t.replies.length === 1 ? tr('1 reply') : tr('{n} replies', { n: t.replies.length })) : quote(t.root.doc_anchor) }}</span>
-          </span>
-        </span>
+      <div class="ch">
+        <button type="button" class="tags tagbtn" :aria-expanded="active === t.root.id" @click="pick(t)">
+          <span v-if="t.root.doc_anchor?.code" class="sq pid">{{ t.root.doc_anchor.code }}</span>
+          <template v-for="sid in screensOf(t)" :key="sid"><span class="tx-meta arrow" aria-hidden="true">→</span><span class="sq sid ellipsis" :title="screenName(sid)">{{ screenName(sid) }}</span></template>
+          <span v-if="!t.root.doc_anchor?.code && !screensOf(t).length" class="tx-meta qt">{{ quote(t.root.doc_anchor) }}</span>
+        </button>
+        <span v-if="t.unread" class="udot" :aria-label="tr('Unread')" />
+        <button type="button" :class="['sq', 'pop-x', 'rs', { ok: !!t.root.resolved_at }]" :aria-pressed="!!t.root.resolved_at" :aria-label="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" :data-tip="t.root.resolved_at ? tr('Reopen') : tr('Resolve')" @click="resolve(t)"><EditorIcon name="resolve" :size="16" /></button>
+      </div>
+      <!-- 접힌 메모: 첫 글 미리보기 -->
+      <button v-if="active !== t.root.id" type="button" class="peek" @click="pick(t)">
+        <span class="mh"><MemberAvatar :name="who(t.root.author_id).name" :src="who(t.root.author_id).avatar" :size="24" /><b>{{ who(t.root.author_id).name }}</b><span class="tx-meta">{{ relativeTime(t.root.created_at) }}</span></span>
+        <span class="pt">{{ t.root.body }}</span>
+        <span v-if="t.replies.length" class="tx-meta rc">{{ t.replies.length === 1 ? tr('1 reply') : tr('{n} replies', { n: t.replies.length }) }}</span>
       </button>
-      <template v-if="active === t.root.id">
-        <div v-for="c in t.replies" :key="c.id" class="msg reply">
-          <MemberAvatar :name="who(c.author_id).name" :src="who(c.author_id).avatar" :size="20" />
-          <span class="mcol"><span><b>{{ who(c.author_id).name }}</b> <span class="tx-meta">{{ relativeTime(c.created_at) }}</span></span><span class="body">{{ c.body }}</span></span>
-        </div>
-        <CommentComposer :people="people" compact :placeholder="tr('Reply. @ to mention')" :busy="busy" @send="(b: string, m: string[]) => sendReply(t, b, m)" @cancel="active = null" />
-        <div class="acts">
-          <Button size="s" type="tertiary" contents="icon-text" :icon-name="t.root.resolved_at ? 'refresh' : 'check'" @click="resolve(t)">{{ t.root.resolved_at ? tr('Reopen') : tr('Resolve') }}</Button>
-        </div>
-      </template>
+      <!-- 연 메모: 캔버스 코멘트 창과 같은 스레드 -->
+      <CommentThreadView
+        v-else
+        :thread="t" :people="people" :my-id="myId" :can-moderate="canModerate" :busy="busy"
+        @reply="sendReply" @edit="edit" @react="react" @remove="(c) => (confirmThread = c)" @remove-msg="(c) => (confirmMsg = c)" @cancel="active = null"
+      />
     </div>
   </div>
 
   <!-- 아래 게시판: 문서 전체 댓글 -->
   <section v-else class="board" :aria-label="tr('Comments')">
     <div class="nh"><span class="tx-head">{{ tr('Comments') }}</span><span class="tx-meta">{{ board.length === 1 ? tr('1 on the whole document') : tr('{n} on the whole document', { n: board.length }) }}</span></div>
-    <CommentComposer :people="people" :placeholder="tr('Write a comment. @ to mention')" :busy="busy" @send="(b: string, m: string[]) => sendBoard(b, m)" />
+    <div class="newrow">
+      <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
+      <CommentComposer :people="people" placeholder="Add a comment" :busy="busy" class="grow" @send="(b: string, m: string[]) => sendBoard(b, m)" />
+    </div>
     <div v-for="t in board" :key="t.root.id" class="post">
-      <div class="msg">
-        <MemberAvatar :name="who(t.root.author_id).name" :src="who(t.root.author_id).avatar" :size="24" />
-        <span class="mcol">
-          <span><b>{{ who(t.root.author_id).name }}</b> <span class="tx-meta">{{ relativeTime(t.root.created_at) }}</span></span>
-          <span class="body">{{ t.root.body }}</span>
-        </span>
-      </div>
-      <div v-for="c in t.replies" :key="c.id" class="msg reply">
-        <MemberAvatar :name="who(c.author_id).name" :src="who(c.author_id).avatar" :size="20" />
-        <span class="mcol"><span><b>{{ who(c.author_id).name }}</b> <span class="tx-meta">{{ relativeTime(c.created_at) }}</span></span><span class="body">{{ c.body }}</span></span>
-      </div>
-      <div class="pacts">
-        <button type="button" class="sq tbtn" @click="replying = replying === t.root.id ? null : t.root.id"><EditorIcon name="comment" :size="12" />{{ tr('Reply') }}</button>
-      </div>
-      <CommentComposer v-if="replying === t.root.id" :people="people" compact autofocus :placeholder="tr('Reply. @ to mention')" :busy="busy" @send="(b: string, m: string[]) => sendReply(t, b, m)" @cancel="replying = null" />
+      <CommentThreadView
+        :thread="t" :people="people" :my-id="myId" :can-moderate="canModerate" :busy="busy" :reply="replying === t.root.id" autofocus
+        @reply="sendReply" @edit="edit" @react="react" @remove="(c) => (confirmThread = c)" @remove-msg="(c) => (confirmMsg = c)" @cancel="replying = null"
+      />
+      <button v-if="replying !== t.root.id" type="button" class="sq tbtn rbtn" @click="replying = t.root.id"><EditorIcon name="comment" :size="14" />{{ t.replies.length ? tr('Reply · {n}', { n: t.replies.length }) : tr('Reply') }}</button>
     </div>
   </section>
+
+  <AppConfirm
+    v-if="confirmThread"
+    :title="tr('Delete this thread?')"
+    :desc="tr('The comment and all its replies are deleted for everyone')"
+    :actions="[{ label: tr('Cancel'), onClick: () => (confirmThread = null) }, { label: tr('Delete thread'), kind: 'destructed', onClick: () => removeConfirmed(confirmThread) }]"
+    @close="confirmThread = null"
+  />
+  <AppConfirm
+    v-if="confirmMsg"
+    :title="tr('Delete this comment?')"
+    :desc="tr('It\'s deleted for everyone')"
+    :actions="[{ label: tr('Cancel'), onClick: () => (confirmMsg = null) }, { label: tr('Delete'), kind: 'destructed', onClick: () => removeConfirmed(confirmMsg) }]"
+    @close="confirmMsg = null"
+  />
 </template>
 
 <style scoped>
@@ -176,29 +201,36 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .nh { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
 .f1 { flex: 1; }
 .empty { margin: 0; }
-.tbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 22px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; color: var(--sys-color-neutral-600); }
+.tbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; color: var(--sys-color-neutral-600); }
 .tbtn:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
-/* 메모 카드: 노란 종이(접힘) → 고르면 흰 카드 + 노란 선 */
-.card { display: flex; flex-direction: column; gap: var(--ref-spacing-05); padding: var(--ref-spacing-05) var(--ref-spacing-06); border-radius: var(--ref-radius-07); --sq-fill: #FFFDF3; --sq-line: #F3E2A6; --sq-line-w: 1px; }
+.tbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+/* 메모 카드(Word 노트): 접힘 = 옅은 노란 종이, 고르면 흰 카드 + 노란 선. 안쪽 12 · 줄 사이 8 */
+.card { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06); border-radius: var(--ref-radius-06); --sq-fill: #FFFDF3; --sq-line: #F3E2A6; --sq-line-w: 1px; }
 .card.on { --sq-fill: var(--sys-color-common-white-default); --sq-line: #E8C14A; filter: drop-shadow(0 6px 12px rgb(3 9 26 / 8%)); }
 .card.done { opacity: .6; }
-.head { display: flex; flex-direction: column; gap: var(--ref-spacing-04); text-align: left; color: inherit; }
-.head:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; border-radius: var(--ref-radius-04); }
-.tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
+.ch { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
+.tags { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-02); min-width: 0; }
+.tagbtn { text-align: left; color: inherit; min-height: 24px; }
+.tagbtn:focus-visible, .peek:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; border-radius: var(--ref-radius-03); }
+.qt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arrow { margin: 0 1px; }
-.udot { width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); margin-left: auto; }
-.msg { display: flex; gap: var(--ref-spacing-04); min-width: 0; }
-.msg.reply { padding-left: var(--ref-spacing-02); }
-.mcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.mcol b { font-weight: 600; }
-.body { white-space: pre-wrap; word-break: break-word; color: var(--sys-color-neutral-700); }
-.acts { display: flex; justify-content: flex-end; }
-.ellipsis { min-width: 0; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 10px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); white-space: nowrap; }
-.sid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
+.udot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
+.rs { flex: none; width: 24px; height: 24px; color: var(--sys-color-neutral-500); }
+.rs.ok { color: var(--sys-color-theme-success-default, #24A638); }
+.peek { display: flex; flex-direction: column; gap: var(--ref-spacing-03); text-align: left; color: inherit; }
+.mh { display: flex; gap: var(--ref-spacing-06); align-items: center; min-width: 0; }
+.mh b { font-weight: 600; white-space: nowrap; }
+.pt { padding-left: 32px; color: var(--sys-color-neutral-800); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.rc { padding-left: 32px; }
+.newrow { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); }
+.fa { flex: none; margin-top: 6px; }
+.grow { flex: 1; min-width: 0; }
+.ellipsis { min-width: 0; max-width: 132px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); white-space: nowrap; }
+.sid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
 
-.board { display: flex; flex-direction: column; gap: var(--ref-spacing-08); margin-top: var(--ref-spacing-16); padding-top: var(--ref-spacing-12); box-shadow: 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.post { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
-.post .reply { margin-left: 28px; }
-.pacts { display: flex; margin-left: 24px; }
+/* 게시판: 새 글 줄(내 아바타 + 입력칸) 아래로 글마다 구분선, 글 사이 16 */
+.board { display: flex; flex-direction: column; gap: var(--ref-spacing-08); margin-top: var(--ref-spacing-14); padding-top: var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.post { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-08); box-shadow: 0 -1px 0 var(--iris-line); }
+.rbtn { align-self: flex-start; margin-left: 28px; }
 </style>

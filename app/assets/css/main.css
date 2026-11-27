@@ -50,13 +50,14 @@ input,textarea{font:inherit;color:inherit}
 .sq::before,.ib::before,.fld::before,.float::before,.seg-item::before,.rail-btn::before,.dd::before,.menu::before,.menu-item::before,.grp::before,.act::before,.field::before{background-color:var(--sq-fill);background-image:linear-gradient(var(--sq-overlay),var(--sq-overlay))}
 /* 선(::after)은 내용 위에 — 안에 든 그림 · 미리보기 · 썸네일이 가장자리까지 닿아도 테두리가 끊기지 않아요(피그마 안쪽 스트로크와 같게). 선 모양 밖은 잘려서 내용을 가리지 않아요 */
 .sq::after,.ib::after,.fld::after,.float::after,.seg-item::after,.rail-btn::after,.dd::after,.menu::after,.menu-item::after,.grp::after,.act::after,.field::after{box-shadow:inset 0 0 0 var(--sq-line-w) var(--sq-line);z-index:1}
-[data-sq]::before,[data-sq]::after{inset:-1px!important;border-radius:0!important}
-[data-sq]::before{clip-path:var(--sq-path)}
+[data-sq]:not(.bd-sq)::before,[data-sq]:not(.bd-sq)::after{inset:-1px!important;border-radius:0!important}
+[data-sq]:not(.bd-sq)::before{clip-path:var(--sq-path)}
 /* 선: 넓은 안쪽 그림자(inset, 두께 + 4px)를 정확한 squircle 고리(--sq-ring)로 잘라요 — 모서리까지 고른 두께(사용자 요청 2026-11-27).
    예전처럼 선 색 판을 고리로 오려내면 브라우저가 가끔 오려내기를 놓칠 때 판 전체가 회색 · 검은 사각형으로 깜빡였고,
    둥근 안쪽 그림자를 바깥 모양으로만 자르면 squircle 모서리에서 선이 끊기거나 굵어 보였어요. 지금은 오려내기가 빠져도 조금 굵은 선만 보여요 */
-[data-sq]::after{border-radius:calc(var(--sq-r,0px) + 1px)!important;background:none;box-shadow:inset 0 0 0 calc(var(--sq-line-w) + 4px) var(--sq-line)!important;clip-path:var(--sq-ring)}
+[data-sq]:not(.bd-sq)::after{border-radius:calc(var(--sq-r,0px) + 1px)!important;background:none;box-shadow:inset 0 0 0 calc(var(--sq-line-w) + 4px) var(--sq-line)!important;clip-path:var(--sq-ring)}
 .sq-clip[data-sq]{clip-path:var(--sq-clip)}
+/* 디자인 시스템 부품(.bd-sq)도 같은 data-sq 속성을 쓰지만 자체 규칙으로 그려요 — 위 규칙에서 빼야 DS 버튼 · 입력칸 테두리가 바깥 패널 선으로 덮여 끊기지 않아요(2026-11-27) */
 /* .sqc: 선 없이 배경 · 그림만 있는 요소(견본 · 썸네일 · 입력칸 · 작은 칩)는 요소 자체를 squircle 로 잘라요. 바깥 그림자 · 테두리가 있으면 .sq + --sq-fill · --sq-line 으로 */
 [data-sqc]{clip-path:var(--sq-clip)}
 .sq.hov:hover,.sq.hov:active{background-color:transparent}

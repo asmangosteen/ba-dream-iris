@@ -184,6 +184,7 @@ const isOn = (b: ViewBlock) => b.type !== 'table' && !!props.highlight && (reqsB
 // ---------------------------------------------------------------------------
 const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? '')
 const fileLabel = computed(() => (props.doc.file_type ?? '').toUpperCase())
+const DOC_STATUS_LABEL: Record<NonNullable<DocRow['status']>, string> = { draft: 'Draft', review: 'In review', confirmed: 'Confirmed' }
 const meta = computed(() => {
   const d = props.doc
   const src = d.source_type === 'upload' && d.file_type ? fileLabel.value : tr(DOC_SOURCE_LABEL[d.source_type])
@@ -294,6 +295,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <div v-if="$slots.actions" class="acts"><slot name="actions" /></div>
       </div>
       <div class="tx-meta meta">
+        <span v-if="doc.abbr" class="sq dchip abbr" :data-tip="tr('Document abbreviation')">{{ doc.abbr }}</span>
+        <span v-if="doc.status" :class="['sq', 'dchip', 'st', doc.status]">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
         <span>{{ meta }}</span>
         <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(wideHref)">{{ tr('Open wide') }}</TextButton>
         <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(editHref)">{{ tr('Edit') }}</TextButton>
@@ -410,6 +413,10 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .title-row > h1, .title-row > h2 { flex: 1; min-width: 0; }
 .acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); margin-top: -1px; }
 .meta { display: flex; align-items: center; gap: var(--ref-spacing-06); flex-wrap: wrap; }
+.dchip { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
+.dchip.abbr { color: var(--sys-color-neutral-800); --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.dchip.st.review { color: #8A6100; --sq-fill: #FFF6DA; }
+.dchip.st.confirmed { color: #14612C; --sq-fill: #DDF4E4; }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; color: var(--sys-color-neutral-500); border-radius: var(--ref-radius-02); transition: color .12s ease; }
 .src:hover { color: var(--sys-color-brand-primary-default); }
 .src:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }

@@ -559,45 +559,49 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
 </script>
 
 <template>
-  <form ref="root" class="editor" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save" @keydown.meta.s.prevent="save" @keydown.ctrl.s.prevent="save">
-    <!-- 위 막대: 편집 중 · 저장 상태 · 경고 · 취소 · 저장 (예전 아래 버튼 줄이 본문을 가리던 문제 — 위로 옮겼어요) -->
+  <form ref="root" class="ded" @submit.prevent="save" @keydown.meta.enter.prevent="save" @keydown.ctrl.enter.prevent="save" @keydown.meta.s.prevent="save" @keydown.ctrl.s.prevent="save">
+    <!-- 위 막대: 편집 중 · 저장 상태 · 경고 · 취소 · 저장(스크롤해도 위에 붙어 있어요 — 예전 아래 버튼 줄이 본문을 가리던 문제) -->
     <div class="topbar">
       <span class="sq chip-edit">{{ tr('Editing') }}</span>
       <span class="tx-meta status" role="status" aria-live="polite">{{ statusText }}</span>
       <span class="f1" />
-      <span v-if="blockMode && warnCount" class="sq warnchip" :title="tr('Format warnings')"><EditorIcon name="warning" :size="12" />{{ warnCount }}</span>
+      <span v-if="blockMode && warnCount" class="sq warnchip" :data-tip="tr('Format warnings')"><EditorIcon name="warning" :size="12" />{{ warnCount }}</span>
       <Button size="s" type="tertiary" :disabled="saving" @click="emit('cancel')">{{ tr('Cancel') }}</Button>
       <Button size="s" type="primary" :loading="saving" :disabled="!canSave && !saving" @click="save">{{ tr('Save') }}</Button>
     </div>
     <p v-if="error" class="tx-meta warn" role="alert"><EditorIcon name="warning" :size="12" />{{ error }}</p>
 
-    <TextInput
-      v-model:value="form.title"
-      v-bind="TI"
-      :label="tr('Document name')"
-      essential
-      :placeholder="tr('Document name')"
-      :show-supporting-text="!form.title.trim()"
-      :supporting-text="tr('Enter a document name')"
-      supporting-theme="destructed"
-      :input-props="{ id: `edTitle-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
-      :label-props="{ htmlFor: `edTitle-${doc.id}` }"
-    />
-    <div class="row">
-      <div class="choice">
-        <span :id="`edCat-${doc.id}`" class="tx-head lbl">{{ tr('Category') }}</span>
-        <div class="seg cats" role="radiogroup" :aria-labelledby="`edCat-${doc.id}`">
-          <button v-for="c in CATS" :key="c[0]" type="button" role="radio" :aria-checked="form.category === c[0]" :class="['sq', 'seg-item', { on: form.category === c[0] }]" @click="form.category = c[0]">{{ tr(c[1]) }}</button>
+    <!-- 문서 정보 -->
+    <div class="fields">
+      <TextInput
+        v-model:value="form.title"
+        v-bind="TI"
+        :label="tr('Document name')"
+        essential
+        :placeholder="tr('Document name')"
+        :show-supporting-text="!form.title.trim()"
+        :supporting-text="tr('Enter a document name')"
+        supporting-theme="destructed"
+        :input-props="{ id: `edTitle-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }"
+        :label-props="{ htmlFor: `edTitle-${doc.id}` }"
+      />
+      <div class="row">
+        <div class="choice f1">
+          <span :id="`edCat-${doc.id}`" class="tx-head lbl">{{ tr('Category') }}</span>
+          <div class="seg cats" role="radiogroup" :aria-labelledby="`edCat-${doc.id}`">
+            <button v-for="c in CATS" :key="c[0]" type="button" role="radio" :aria-checked="form.category === c[0]" :class="['sq', 'seg-item', { on: form.category === c[0] }]" @click="form.category = c[0]">{{ tr(c[1]) }}</button>
+          </div>
+        </div>
+        <div class="ver">
+          <TextInput v-model:value="form.version" v-bind="TI" :label="tr('Version')" :placeholder="tr('e.g. v1.3')" :show-supporting-text="false" :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }" :label-props="{ htmlFor: `edVer-${doc.id}` }" />
         </div>
       </div>
-      <TextInput v-model:value="form.version" v-bind="TI" class="ver" :label="tr('Version')" :placeholder="tr('e.g. v1.3')" :show-supporting-text="false" :input-props="{ id: `edVer-${doc.id}`, autocomplete: 'off', onKeydown: onEnter }" :label-props="{ htmlFor: `edVer-${doc.id}` }" />
+      <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><EditorIcon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
+      <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><EditorIcon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
     </div>
 
-    <div v-if="doc.source_type === 'upload' && fileName" class="tx-meta src"><EditorIcon name="clip" :size="12" /><span class="ellipsis" :title="fileName">{{ fileName }}</span></div>
-    <div v-else-if="doc.source_type === 'link' && doc.url" class="tx-meta src"><EditorIcon name="link" :size="12" /><span class="ellipsis" :title="doc.url">{{ doc.url }}</span></div>
-
     <!-- 본문: 블록 편집 -->
-    <template v-if="blockMode">
+    <section v-if="blockMode" class="content" :aria-label="tr('Content')">
       <div class="body-h">
         <span class="tx-head lbl">{{ tr('Content') }}</span>
         <span class="f1" />
@@ -612,69 +616,61 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
         <textarea v-model="mdText" class="area md" rows="20" spellcheck="false" :aria-label="tr('Markdown')" />
       </div>
 
-      <div v-else class="blocks">
+      <!-- 문서 상자: 왼쪽 여백에 블록 손잡이(+ · ⋮), 오른쪽 여백에 열 더하기 -->
+      <div v-else class="sq docbox">
         <div v-for="(b, bi) in blocks" :key="b.id" :class="['blk', b.type]">
-          <!-- 왼쪽 손잡이: + 블록 더하기 · ⋮ 옮기기 · 바꾸기 · 지우기 -->
           <span class="gut">
-            <button type="button" class="ib g" :aria-label="tr('Add block')" :aria-expanded="menu?.id === b.id && menu.kind === 'add'" @click="menu = menu?.id === b.id && menu.kind === 'add' ? null : { id: b.id, kind: 'add' }"><EditorIcon name="plus" :size="12" /></button>
-            <button type="button" class="ib g" :aria-label="tr('Block menu')" :aria-expanded="menu?.id === b.id && menu.kind === 'more'" @click="menu = menu?.id === b.id && menu.kind === 'more' ? null : { id: b.id, kind: 'more' }"><EditorIcon name="menu_kebab" :size="12" /></button>
+            <button type="button" class="sq gbtn" :aria-label="tr('Add block')" :data-tip="tr('Add block')" :aria-expanded="menu?.id === b.id && menu.kind === 'add'" @click="menu = menu?.id === b.id && menu.kind === 'add' ? null : { id: b.id, kind: 'add' }"><EditorIcon name="plus" :size="14" /></button>
+            <button type="button" class="sq gbtn" :aria-label="tr('Block menu')" :data-tip="tr('Block menu')" :aria-expanded="menu?.id === b.id && menu.kind === 'more'" @click="menu = menu?.id === b.id && menu.kind === 'more' ? null : { id: b.id, kind: 'more' }"><EditorIcon name="menu_kebab" :size="14" /></button>
           </span>
-          <div v-if="menu?.id === b.id" class="sq bmenu" role="menu">
+          <div v-if="menu?.id === b.id" class="sq menu bmenu" role="menu">
             <template v-if="menu.kind === 'add'">
-              <button v-for="t in TYPES" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="addAfter(b.id, t.k)"><EditorIcon :name="t.icon" :size="14" />{{ tr(t.label) }}</button>
+              <button v-for="t in TYPES" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="addAfter(b.id, t.k)"><EditorIcon :name="t.icon" :size="16" />{{ tr(t.label) }}</button>
             </template>
             <template v-else>
-              <button v-for="t in TYPES.filter((x) => x.k !== b.type)" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="turnInto(b.id, t.k)"><EditorIcon :name="t.icon" :size="14" />{{ tr('Turn into {type}', { type: tr(t.label) }) }}</button>
-              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === 0" @click="move(b.id, -1)"><EditorIcon name="chevron_down" :size="14" class="up" />{{ tr('Move up') }}</button>
-              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === blocks.length - 1" @click="move(b.id, 1)"><EditorIcon name="chevron_down" :size="14" />{{ tr('Move down') }}</button>
-              <button type="button" role="menuitem" class="sq menu-item danger" @click="removeBlock(b.id)"><EditorIcon name="trashbin" :size="14" />{{ tr('Delete') }}</button>
+              <button v-for="t in TYPES.filter((x) => x.k !== b.type)" :key="t.k" type="button" role="menuitem" class="sq menu-item" @click="turnInto(b.id, t.k)"><EditorIcon :name="t.icon" :size="16" />{{ tr('Turn into {type}', { type: tr(t.label) }) }}</button>
+              <span class="sep" role="separator" />
+              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === 0" @click="move(b.id, -1)"><EditorIcon name="chevron_down" :size="16" class="up" />{{ tr('Move up') }}</button>
+              <button type="button" role="menuitem" class="sq menu-item" :disabled="bi === blocks.length - 1" @click="move(b.id, 1)"><EditorIcon name="chevron_down" :size="16" />{{ tr('Move down') }}</button>
+              <button type="button" role="menuitem" class="sq menu-item danger" @click="removeBlock(b.id)"><EditorIcon name="trashbin" :size="16" />{{ tr('Delete') }}</button>
             </template>
           </div>
 
           <!-- 표 블록 -->
           <div v-if="b.type === 'table'" class="tbl-edit">
-            <div class="tscroll">
-              <table class="etbl">
-                <colgroup>
-                  <col v-for="(_, ci) in b.rows?.[0] ?? []" :key="ci" :style="{ width: colWidth(b, ci) }">
-                  <col style="width: 24px">
-                </colgroup>
-                <tbody>
-                  <tr v-for="(row, ri) in b.rows ?? []" :key="ri" :class="{ head: ri === 0, warned: warnAt.has(`${b.id}:${ri}`) }">
-                    <td v-for="(cell, ci) in row" :key="ci" :class="{ idcol: ci === 0 && ri > 0 && colWidth(b, 0) === '96px' }">
-                      <span v-if="ci === 0 && warnAt.has(`${b.id}:${ri}`)" class="wdot" role="img" :aria-label="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" :title="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" />
-                      <textarea
-                        :value="cell"
-                        :data-cell="`${b.id}:${ri}:${ci}`"
-                        class="auto cell"
-                        rows="1"
-                        cols="1"
-                        :aria-label="ri === 0 ? tr('Column {n} header', { n: ci + 1 }) : tr('Row {r}, column {c}', { r: ri, c: ci + 1 })"
-                        :placeholder="ri === 0 ? tr('Header') : ''"
-                        @input="onCell(b, ri, ci, $event)"
-                        @keydown="onCellKey(b, ri, ci, $event)"
-                        @paste="onCellPaste(b, ri, ci, $event)"
-                        @focus="idQuery(b, ri, ci, cell)"
-                        @blur="onCellBlur"
-                      />
-                      <div v-if="suggest && suggest.key === `${b.id}:${ri}:${ci}`" class="sq sug" role="listbox" :aria-label="tr('Policy IDs')">
-                        <button v-for="(s, si) in suggest.items" :key="s.code" type="button" role="option" :aria-selected="si === suggest.i" :class="['sq', 'menu-item', { on: si === suggest.i }]" @mousedown.prevent="pickSuggest(b, ri, ci, s.code)"><span class="sq pid num">{{ s.code }}</span><span class="ellipsis">{{ s.label }}</span></button>
-                        <span class="tx-meta sug-hint">{{ tr('↑↓ to move · Enter to pick') }}</span>
-                      </div>
-                    </td>
-                    <td class="rowact">
-                      <button v-if="ri > 0 && (b.rows?.length ?? 0) > 2" type="button" class="ib g" :aria-label="tr('Delete row {r}', { r: ri })" @click="removeRow(b, ri)"><EditorIcon name="close" :size="12" /></button>
-                      <button v-else-if="ri === 0" type="button" class="ib g" :aria-label="tr('Add column')" :title="tr('Add column')" @click="addCol(b)"><EditorIcon name="plus" :size="12" /></button>
-                    </td>
-                  </tr>
-                  <tr class="colact">
-                    <td v-for="(_, ci) in b.rows?.[0] ?? []" :key="ci"><button v-if="(b.rows?.[0]?.length ?? 0) > 1" type="button" class="ib g" :aria-label="tr('Delete column {n}', { n: ci + 1 })" :title="tr('Delete column')" @click="removeCol(b, ci)"><EditorIcon name="minus" :size="12" /></button></td>
-                    <td />
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <button type="button" class="sq addrow" @click="addRow(b)"><EditorIcon name="plus" :size="12" />{{ tr('Add row') }}</button>
+            <table class="etbl">
+              <colgroup><col v-for="(_, ci) in b.rows?.[0] ?? []" :key="ci" :style="{ width: colWidth(b, ci) }"></colgroup>
+              <tbody>
+                <tr v-for="(row, ri) in b.rows ?? []" :key="ri" :class="{ head: ri === 0, warned: warnAt.has(`${b.id}:${ri}`) }">
+                  <td v-for="(cell, ci) in row" :key="ci" :class="{ idcol: ci === 0 && ri > 0 && colWidth(b, 0) === '96px' }">
+                    <span v-if="ci === 0 && warnAt.has(`${b.id}:${ri}`)" class="wdot" role="img" :aria-label="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" :data-tip="warnAt.get(`${b.id}:${ri}`)!.map(wText).join(' · ')" />
+                    <textarea
+                      :value="cell"
+                      :data-cell="`${b.id}:${ri}:${ci}`"
+                      class="auto cell"
+                      rows="1"
+                      cols="1"
+                      :aria-label="ri === 0 ? tr('Column {n} header', { n: ci + 1 }) : tr('Row {r}, column {c}', { r: ri, c: ci + 1 })"
+                      :placeholder="ri === 0 ? tr('Header') : ''"
+                      @input="onCell(b, ri, ci, $event)"
+                      @keydown="onCellKey(b, ri, ci, $event)"
+                      @paste="onCellPaste(b, ri, ci, $event)"
+                      @focus="idQuery(b, ri, ci, cell)"
+                      @blur="onCellBlur"
+                    />
+                    <!-- 머리 칸: 열 지우기(마우스를 올리면) · 줄 칸 마지막: 행 지우기 -->
+                    <button v-if="ri === 0 && row.length > 1" type="button" class="sq cact" :aria-label="tr('Delete column {n}', { n: ci + 1 })" :data-tip="tr('Delete column')" @click="removeCol(b, ci)"><EditorIcon name="close" :size="12" /></button>
+                    <button v-else-if="ri > 0 && ci === row.length - 1 && (b.rows?.length ?? 0) > 2" type="button" class="sq cact" :aria-label="tr('Delete row {r}', { r: ri })" :data-tip="tr('Delete row')" @click="removeRow(b, ri)"><EditorIcon name="close" :size="12" /></button>
+                    <div v-if="suggest && suggest.key === `${b.id}:${ri}:${ci}`" class="sq menu sug" role="listbox" :aria-label="tr('Policy IDs')">
+                      <button v-for="(s, si) in suggest.items" :key="s.code" type="button" role="option" :aria-selected="si === suggest.i" :class="['sq', 'menu-item', { on: si === suggest.i }]" @mousedown.prevent="pickSuggest(b, ri, ci, s.code)"><span class="sq pid">{{ s.code }}</span><span class="ellipsis">{{ s.label }}</span></button>
+                      <span class="sug-hint">{{ tr('↑↓ to move · Enter to pick') }}</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button type="button" class="sq addcol" :aria-label="tr('Add column')" :data-tip="tr('Add column')" @click="addCol(b)"><EditorIcon name="plus" :size="12" /></button>
+            <button type="button" class="sq tbtn" @click="addRow(b)"><EditorIcon name="plus" :size="14" />{{ tr('Add row') }}</button>
             <div v-for="(w, wi) in blockWarns(b.id)" :key="wi" class="sq warnline" role="note"><EditorIcon name="warning" :size="12" />{{ wText(w) }}</div>
           </div>
 
@@ -692,10 +688,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
             @paste="onPaste(b, $event)"
           />
         </div>
-        <button type="button" class="sq addblock" @click="addAfter(null, 'p')"><EditorIcon name="plus" :size="14" />{{ tr('Add block') }}</button>
-        <button type="button" class="sq addblock" @click="addAfter(null, 'table')"><EditorIcon name="table" :size="14" />{{ tr('Add table') }}</button>
+        <p v-if="!blocks.length" class="tx-meta empty">{{ tr('No content yet') }}</p>
+        <div class="adds">
+          <button type="button" class="sq tbtn" @click="addAfter(null, 'p')"><EditorIcon name="plus" :size="14" />{{ tr('Add block') }}</button>
+          <button type="button" class="sq tbtn" @click="addAfter(null, 'table')"><EditorIcon name="table" :size="14" />{{ tr('Add table') }}</button>
+        </div>
       </div>
-    </template>
+    </section>
 
     <!-- PDF · 링크 글: 글 상자 하나 -->
     <div v-else class="col6 grow">
@@ -706,24 +705,29 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
 </template>
 
 <style scoped>
-.editor { display: flex; flex-direction: column; gap: var(--ref-spacing-10); min-height: 100%; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-/* 위 막대: 스크롤해도 위에 붙어 있어요(본문을 가리지 않게 흰 바탕 + 아래 선) */
-.topbar { position: sticky; top: calc(-1 * var(--ref-spacing-14)); z-index: 3; display: flex; align-items: center; gap: var(--ref-spacing-06); margin: calc(-1 * var(--ref-spacing-14)) calc(-1 * var(--ref-spacing-16)) 0; padding: var(--ref-spacing-08) var(--ref-spacing-16); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
-.chip-edit { height: 22px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
+/* 문서 패널 안쪽 여백(--doc-pad-*)에 맞춰요: 위 16 · 좌우 24 */
+/* 뿌리 이름을 .editor 로 두면 편집기 전용 전역 규칙(.editor .menu …)이 걸려서 .ded */
+.ded { display: flex; flex-direction: column; gap: var(--ref-spacing-10); min-height: 100%; font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.topbar { position: sticky; top: calc(-1 * var(--doc-pad-t, 16px)); z-index: 4; display: flex; align-items: center; gap: var(--ref-spacing-04); margin: calc(-1 * var(--doc-pad-t, 16px)) calc(-1 * var(--doc-pad-x, 24px)) 0; padding: var(--ref-spacing-06) var(--doc-pad-x, 24px); min-height: 44px; box-sizing: border-box; background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+.chip-edit { height: 22px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: var(--sys-color-brand-primary-default); --sq-fill: var(--sys-color-brand-primary-lightest); }
 .status { white-space: nowrap; }
-.warnchip { height: 22px; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: #B44A0E; --sq-fill: #FFF1E8; }
-.f1 { flex: 1; }
+.warnchip { height: 22px; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); padding: 0 var(--ref-spacing-05); margin-right: var(--ref-spacing-02); border-radius: var(--ref-radius-03); font-weight: 600; font-size: 11px; color: #B44A0E; --sq-fill: #FFF1E8; }
+.f1 { flex: 1; min-width: 0; }
 .lbl { color: var(--sys-color-neutral-700); }
-.row { display: flex; align-items: flex-start; gap: var(--ref-spacing-12); flex-wrap: wrap; }
-.choice { display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-.ver { width: 140px; flex: none; }
+.warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); margin: 0; color: var(--sys-color-theme-error-default); }
+/* 문서 정보: 항목 사이 16(팝업 본문 규격과 같게) */
+.fields { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
+.row { display: flex; align-items: flex-start; gap: var(--ref-spacing-10); }
+.choice { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.ver { width: 120px; flex: none; }
 .src { display: flex; align-items: center; gap: var(--ref-spacing-04); min-width: 0; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.body-h { display: flex; align-items: center; gap: var(--ref-spacing-06); margin-top: var(--ref-spacing-04); }
-.hint { margin: calc(-1 * var(--ref-spacing-06)) 0 0; }
-.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
+.content { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
+.body-h { display: flex; align-items: center; gap: var(--ref-spacing-06); }
+.hint { margin: 0; }
+.col6 { display: flex; flex-direction: column; gap: var(--ref-spacing-04); min-width: 0; }
 .grow { flex: 1; }
-.warn { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); margin: 0; color: var(--sys-color-theme-error-default); }
+.empty { margin: 0; }
 
 .area { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 240px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 .area.md { min-height: 420px; }
@@ -731,52 +735,60 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocPointer, 
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 
-/* 블록 */
-.blocks { display: flex; flex-direction: column; gap: var(--ref-spacing-02); padding-left: 36px; padding-bottom: var(--ref-spacing-24); }
+/* 문서 상자: 얇은 선 · 안쪽 위 12 · 왼쪽 40(손잡이 자리) · 오른쪽 24(열 더하기 자리) */
+.docbox { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-03); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-08) 40px; border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .blk { position: relative; }
-.gut { position: absolute; left: -36px; top: 2px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
-.blk:hover .gut, .blk:focus-within .gut, .gut:has([aria-expanded='true']) { opacity: 1; }
-.ib.g { width: 16px; height: 22px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); }
-.ib.g:hover { color: var(--sys-color-neutral-800); background: var(--sys-color-neutral-100); }
-.ib.g:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; opacity: 1; }
-.bmenu { position: absolute; left: -36px; top: 26px; z-index: 5; min-width: 180px; display: flex; flex-direction: column; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); }
-.bmenu .menu-item { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: var(--sys-color-common-white-default); text-align: left; font-size: 12px; }
-.bmenu .menu-item:hover:not(:disabled) { --sq-fill: rgb(253 253 253 / 12%); }
-.bmenu .menu-item:disabled { opacity: .4; }
-.bmenu .menu-item.danger { color: #FF8A8A; }
+.gut { position: absolute; left: -36px; top: 1px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.blk:hover > .gut, .blk:focus-within > .gut, .gut:has([aria-expanded='true']) { opacity: 1; }
+.gbtn { width: 16px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); }
+.gbtn:hover, .gbtn[aria-expanded='true'] { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.gbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.bmenu { position: absolute; left: -36px; top: 28px; z-index: 6; min-width: 200px; }
+.sep { display: block; height: 1px; margin: var(--ref-spacing-02) var(--ref-spacing-04); background: var(--iris-line); }
 .up { transform: rotate(180deg); }
-.btext { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-02) var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-family: var(--font-family-base); font-size: 13px; line-height: 21px; color: var(--sys-color-neutral-800); }
+.btext { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-03) var(--ref-spacing-04); margin: 0 calc(-1 * var(--ref-spacing-04)); width: calc(100% + 2 * var(--ref-spacing-04)); border-radius: var(--ref-radius-03); font-family: var(--font-family-base); font-size: 13px; line-height: 21px; color: var(--sys-color-neutral-800); transition: background-color .12s; }
 .btext:hover { background: var(--sys-color-neutral-100); }
-.btext:focus { background: var(--sys-color-neutral-100); box-shadow: inset 0 0 0 1px var(--ref-color-gray-900-10); }
+.btext:focus { background: var(--sys-color-neutral-100); }
 .btext::placeholder { color: var(--sys-color-neutral-400); }
-.btext.h1 { font-size: 18px; line-height: 26px; font-weight: 600; margin-top: var(--ref-spacing-08); }
-.btext.h2 { font-size: 15px; line-height: 22px; font-weight: 600; margin-top: var(--ref-spacing-06); }
-.blk.li { padding-left: var(--ref-spacing-10); }
-.blk.li::before { content: ''; position: absolute; left: 6px; top: 12px; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-500); }
+.btext.h1 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.btext.h2 { font-size: 15px; line-height: 22px; font-weight: 600; }
+.blk.h1:not(:first-child) { margin-top: var(--ref-spacing-08); }
+.blk.h2:not(:first-child) { margin-top: var(--ref-spacing-06); }
+.blk.li { padding-left: var(--ref-spacing-08); }
+.blk.li::before { content: ''; position: absolute; left: 3px; top: 13px; width: 4px; height: 4px; border-radius: 50%; background: var(--sys-color-neutral-500); }
 
-/* 표 블록 */
-.tbl-edit { display: flex; flex-direction: column; gap: var(--ref-spacing-04); margin: var(--ref-spacing-04) 0; }
-.tscroll { overflow: visible; }
+/* 표 블록: 칸 선 1px · 머리 칸 옅은 회색 · 경고 행 옅은 주황(칸 안만) */
+.tbl-edit { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-03) 0 var(--ref-spacing-05); }
 .etbl { border-collapse: collapse; width: 100%; table-layout: fixed; }
-.etbl td { position: relative; border: 1px solid var(--iris-line); padding: 0; vertical-align: top; }
+.etbl td { position: relative; border: 1px solid var(--iris-line-strong); padding: 0; vertical-align: top; background: var(--sys-color-common-white-default); }
 .etbl tr.head td { background: var(--sys-color-neutral-100); }
 .etbl tr.head .cell { font-weight: 600; color: var(--sys-color-neutral-700); }
 .etbl tr.warned td { background: #FFF9F2; }
-.etbl td.rowact, .etbl tr.colact td { border: 0; background: transparent; min-width: 0; width: 24px; text-align: center; }
-.etbl tr.colact td { height: 18px; }
-.etbl tr.colact .ib.g, .etbl td.rowact .ib.g { opacity: 0; height: 18px; margin: 0 auto; }
-.tbl-edit:hover .ib.g { opacity: 1; }
-.cell { display: block; width: 100%; min-width: 0; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-04) var(--ref-spacing-05); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.cell { display: block; width: 100%; min-width: 0; box-sizing: border-box; resize: none; overflow: hidden; border: 0; outline: 0; background: transparent; padding: var(--ref-spacing-05) var(--ref-spacing-06); font-family: var(--font-family-base); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); overflow-wrap: break-word; word-break: keep-all; }
 .cell:focus { box-shadow: inset 0 0 0 1.5px var(--sys-color-brand-primary-default); background: var(--sys-color-common-white-default); }
 .idcol .cell { font-weight: 600; color: var(--iris-peek-ink); }
-.wdot { position: absolute; left: -10px; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: #E2601B; }
-.addrow, .addblock { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 26px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); font-size: 12px; }
-.addrow:hover, .addblock:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
-.addblock { margin-top: var(--ref-spacing-02); }
-.warnline { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: #FFF6EC; color: #B44A0E; font-size: 12px; }
-.sug { position: absolute; left: 0; top: calc(100% + 4px); z-index: 6; width: 260px; display: flex; flex-direction: column; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; filter: drop-shadow(0 8px 16px rgb(69 76 88 / 16%)); }
-.sug .menu-item { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); text-align: left; font-size: 12px; color: var(--sys-color-neutral-800); }
-.sug .menu-item.on, .sug .menu-item:hover { --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
-.sug-hint { padding: var(--ref-spacing-02) var(--ref-spacing-04) var(--ref-spacing-03); }
+/* 칸 안 작은 지우기(×): 마우스를 올린 칸 · 행에서만 */
+.cact { position: absolute; right: 2px; top: 5px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; --sq-fill: var(--sys-color-common-white-default); }
+td:hover > .cact, tr:hover > td:last-child > .cact:not(:only-of-type), .cact:focus-visible { opacity: 1; }
+tr.head td:hover > .cact { opacity: 1; }
+tr:not(.head):hover > td:last-child > .cact { opacity: 1; }
+.cact:hover { color: var(--sys-color-theme-error-default); --sq-fill: var(--sys-color-neutral-100); }
+.addcol { position: absolute; right: -20px; top: 4px; width: 16px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; }
+.tbl-edit:hover > .addcol, .addcol:focus-visible { opacity: 1; }
+.addcol:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.wdot { position: absolute; left: -12px; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: #E2601B; }
+.tbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 28px; padding: 0 var(--ref-spacing-06); margin-left: calc(-1 * var(--ref-spacing-06)); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); font-size: 12px; }
+.tbtn:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
+.tbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.adds { display: flex; gap: var(--ref-spacing-08); margin-top: var(--ref-spacing-06); padding-top: var(--ref-spacing-06); box-shadow: 0 -1px 0 var(--iris-line); }
+.warnline { align-self: stretch; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-04) var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: #FFF6EC; color: #B44A0E; font-size: 12px; }
+/* ID 추천: Iris 공용 떠 있는 목록(.menu) */
+.sug { position: absolute; left: 0; top: calc(100% + 4px); z-index: 7; width: 280px; }
+.sug .menu-item { gap: var(--ref-spacing-04); height: 28px; }
+.sug .menu-item.on { --sq-fill: var(--sys-color-brand-primary-lightest); }
+.bmenu .menu-item { height: 28px; }
+.bmenu .menu-item:disabled { opacity: .4; }
+.bmenu .menu-item.danger { color: var(--sys-color-theme-error-default); }
+.sug-hint { display: block; padding: var(--ref-spacing-03) var(--ref-spacing-06) var(--ref-spacing-04); font-size: 11px; color: var(--sys-color-neutral-500); }
 .pid { display: inline-flex; align-items: center; height: 18px; padding: 0 var(--ref-spacing-03); border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); white-space: nowrap; flex: none; }
 </style>

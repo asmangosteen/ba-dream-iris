@@ -261,4 +261,12 @@ export default {
   '{n} screen slots': '화면 칸 {n}개',
   '{p} policies · {s} screen slots · {l} links read': '정책 {p} · 화면 칸 {s} · 연결 {l} 읽음',
   '↑↓ to move · Enter to pick': '↑↓ 로 옮기고 Enter 로 고르기',
+  'Add a note': '메모 남기기',
+  'Delete row': '행 삭제',
+  'Hide notes': '메모 닫기',
+  'Show notes beside the document': '문서 옆에 메모 보기',
+  'Linked page': '연결한 페이지',
+  'Uploaded file': '올린 파일',
+  'Reply · {n}': '답글 {n}',
+  'Couldn\'t delete. Try again': '지우지 못했어요. 다시 해 주세요',
 } satisfies Record<string, string>

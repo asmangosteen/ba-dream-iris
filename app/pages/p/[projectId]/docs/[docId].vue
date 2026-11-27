@@ -163,7 +163,8 @@ onBeforeUnmount(endLinkDrag)
 const notesOpen = ref(false)
 let notesTouched = false
 const notesRef = ref<{ count: number } | null>(null)
-const noteCount = computed(() => comments.docThreads(docId.value).filter((t) => !t.root.resolved_at).length)
+/** 문서 옆 메모만(자리가 있는 댓글) — 아래 게시판 글은 빼요 */
+const noteCount = computed(() => comments.docThreads(docId.value).filter((t) => !!t.root.doc_anchor && !t.root.resolved_at).length)
 watch(noteCount, (n) => { if (n > 0 && !notesTouched) notesOpen.value = true }, { immediate: true })
 watch(docId, () => { notesTouched = false; notesOpen.value = noteCount.value > 0 })
 function toggleNotes() { notesTouched = true; notesOpen.value = !notesOpen.value }
@@ -463,7 +464,7 @@ async function removeDoc() {
             :class="['sq', 'seg-item', 'tab', { on: d.id === docId }]"
             :title="d.title"
           >
-            <EditorIcon :name="docIcon(d)" :size="12" />
+            <span class="dicon" :data-tip="tr(DOC_SOURCE_TIP[d.source_type])"><EditorIcon :name="docIcon(d)" :size="12" /></span>
             <span class="ellipsis">{{ d.title }}</span>
           </NuxtLink>
         </nav>
@@ -518,7 +519,7 @@ async function removeDoc() {
             @edit="startEdit"
           >
             <template #actions>
-              <button type="button" :class="['sq', 'hbtn', { on: notesOpen }]" :aria-pressed="notesOpen" @click="toggleNotes"><EditorIcon name="comment" :size="14" />{{ noteCount ? tr('Comments {n}', { n: noteCount }) : tr('Comments') }}</button>
+              <button type="button" :class="['sq', 'hbtn', { on: notesOpen }]" :aria-pressed="notesOpen" :data-tip="notesOpen ? tr('Hide notes') : tr('Show notes beside the document')" @click="toggleNotes"><EditorIcon name="sidebar_expand" :size="14" />{{ tr('Notes') }}<span v-if="noteCount" class="hcount">{{ noteCount }}</span></button>
               <button type="button" class="sq hbtn" @click="histOpen = true"><EditorIcon name="clock" :size="14" />{{ tr('History') }}</button>
               <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="startEdit">{{ tr('Edit') }}</Button>
               <div ref="moreEl" class="more">
@@ -613,12 +614,13 @@ async function removeDoc() {
 .split :deep(.flash) { animation: flash 1.4s ease; }
 @keyframes flash { 0%, 40% { background: #FFF1C2; } 100% { background: transparent; } }
 .doc.wide { width: 880px; }
-.read-cols { display: flex; gap: var(--ref-spacing-12); align-items: flex-start; }
+.read-cols { display: flex; gap: var(--ref-spacing-10); align-items: flex-start; }
 .read-main { flex: 1; min-width: 0; }
-.read-notes { width: 248px; flex: none; position: sticky; top: 0; }
+.read-notes { width: 260px; flex: none; position: sticky; top: 0; padding-left: var(--ref-spacing-10); box-shadow: -1px 0 0 var(--iris-line); }
 .hbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 28px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-04); font-size: 12px; color: var(--sys-color-neutral-700); white-space: nowrap; }
 .hbtn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .hbtn.on { color: #8A6100; --sq-fill: #FFF6DA; }
+.hcount { min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #E8C14A; color: #FFFFFF; font-size: 10px; font-weight: 600; }
 .hbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f-status { display: block; height: 26px; }
 .f-title { display: block; padding: 0 9px 10px; font-size: 11px; line-height: 16px; font-weight: 600; color: #03091A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -632,7 +634,9 @@ async function removeDoc() {
 .tabs { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { max-width: 168px; }
-.doc-body { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-14) var(--ref-spacing-16) var(--ref-spacing-17); }
+.dicon { flex: none; display: inline-flex; }
+/* 안쪽 여백: 위 16 · 좌우 24 · 아래 32(예전 32 · 40 · 48 이 너무 넓다는 요청 2026-11-27). 편집 위 막대도 이 값을 따라요 */
+.doc-body { --doc-pad-t: var(--ref-spacing-10); --doc-pad-x: var(--ref-spacing-12); flex: 1; min-height: 0; overflow: auto; padding: var(--doc-pad-t) var(--doc-pad-x) var(--ref-spacing-14); }
 .loading { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .missing { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ref-spacing-06); }
 .missing p { margin: 0 0 var(--ref-spacing-04); }

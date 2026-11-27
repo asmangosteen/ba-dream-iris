@@ -88,6 +88,8 @@ export interface UsageRow { id: string; screen_id: string; component_id: string 
 // 라벨은 영어 원문(사전 열쇠)이에요. 보여 줄 때 tr(DOC_CATEGORY_LABEL[k]) 처럼 감싸 주세요(한국어는 app/i18n/ko/docs.ts)
 export const DOC_CATEGORY_LABEL: Record<DocCategory, string> = { planning: 'Planning', dev: 'Development', design: 'Design', etc: 'Other' }
 export const DOC_SOURCE_LABEL: Record<DocSource, string> = { native: 'Written', upload: 'File', link: 'Link' }
+/** 문서 아이콘이 뜻하는 것(마우스를 올리면 보여요) */
+export const DOC_SOURCE_TIP: Record<DocSource, string> = { native: 'Written in Iris', upload: 'Uploaded file', link: 'Linked page' }
 export const PRIORITY_LABEL: Record<ReqPriority, string> = { must: 'Must', should: 'Should', could: 'Could' }
 export const LINK_STATUS: Record<LinkStatus, { label: string }> = {
   unchecked: { label: 'Unchecked' },
