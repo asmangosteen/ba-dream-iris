@@ -472,7 +472,8 @@ async function removeDoc() {
         <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Close document')" :title="tr('Close document')" @click="navigateTo(`/p/${projectId}`)" />
       </div>
 
-      <div class="doc-body">
+      <!-- 떠 있는 얇은 스크롤 막대: 기본 스크롤바가 자리를 차지하지 않아 내용이 길어져도 폭이 그대로(사용자 요청 2026-11-27) -->
+      <div v-ovscroll class="doc-body">
         <div v-if="docs.status.value === 'pending' && !docs.data.value?.length" class="loading">
           <Skeleton shape="text" width="60%" />
           <Skeleton shape="text" />
