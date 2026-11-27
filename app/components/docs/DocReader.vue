@@ -407,8 +407,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .compact .head { gap: var(--ref-spacing-02); }
 .title-row { display: flex; align-items: flex-start; gap: var(--ref-spacing-08); min-width: 0; }
 .title-row > h1, .title-row > h2 { flex: 1; min-width: 0; }
-.acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-02); margin-top: -1px; }
-.meta { display: flex; align-items: center; gap: var(--ref-spacing-06); flex-wrap: wrap; }
+.acts { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); margin-top: -1px; }
+.meta { display: flex; align-items: center; gap: var(--ref-spacing-05); flex-wrap: wrap; }
 .dchip { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
 .dchip.abbr { color: var(--sys-color-neutral-800); --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .dchip.st.review { color: #8A6100; --sq-fill: #FFF6DA; }

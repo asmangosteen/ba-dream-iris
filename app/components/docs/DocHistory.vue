@@ -94,12 +94,13 @@ function restore(before = false) {
 
 <template>
   <div class="hist">
+    <!-- 위 막대: 고치기 화면 위 막대와 같은 규격(높이 44 · 좌우 24 · 아래 선, 스크롤해도 위에) -->
     <div class="hh">
       <span class="tx-head">{{ tr('History') }}</span>
-      <span class="tx-meta">{{ tr('Only the blocks that changed are stored, so history stays small.') }}</span>
       <span class="f1" />
-      <button type="button" class="sq ib s" :aria-label="tr('Close history')" @click="emit('close')"><EditorIcon name="close" :size="14" /></button>
+      <button type="button" class="sq ib s" :aria-label="tr('Close history')" :data-tip="tr('Close history')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
     </div>
+    <p class="tx-meta desc">{{ tr('Only the blocks that changed are stored, so history stays small.') }}</p>
     <p v-if="history.status.value === 'success' && !list.length" class="tx-meta empty">{{ tr('No changes recorded yet. Edits from now on will show up here.') }}</p>
     <div v-else class="cols">
       <!-- 기록 목록 -->
@@ -143,10 +144,11 @@ function restore(before = false) {
 </template>
 
 <style scoped>
-.hist { display: flex; flex-direction: column; gap: var(--ref-spacing-08); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
-.hh { display: flex; align-items: baseline; gap: var(--ref-spacing-06); flex-wrap: wrap; }
+.hist { display: flex; flex-direction: column; gap: var(--ref-spacing-10); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.hh { position: sticky; top: calc(-1 * var(--doc-pad-t, 16px)); z-index: 1; display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 44px; box-sizing: border-box; margin: calc(-1 * var(--doc-pad-t, 16px)) calc(-1 * var(--doc-pad-x, 24px)) 0; padding: var(--ref-spacing-06) calc(var(--doc-pad-x, 24px) - 4px) var(--ref-spacing-06) var(--doc-pad-x, 24px); background: var(--sys-color-common-white-emphasis); box-shadow: 0 1px 0 var(--iris-line); }
+.desc { margin: 0; }
 .f1 { flex: 1; }
-.ib.s { width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
+.ib.s { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
 .ib.s:hover { --sq-fill: var(--sys-color-neutral-100); }
 .empty { margin: 0; }
 .cols { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }

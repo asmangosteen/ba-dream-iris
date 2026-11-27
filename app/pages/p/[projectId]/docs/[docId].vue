@@ -618,7 +618,7 @@ async function removeDoc() {
 .read-cols { display: flex; gap: var(--ref-spacing-10); align-items: flex-start; }
 .read-main { flex: 1; min-width: 0; }
 .read-notes { width: 260px; flex: none; position: sticky; top: 0; padding-left: var(--ref-spacing-10); box-shadow: -1px 0 0 var(--iris-line); }
-.hbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 28px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-04); font-size: 12px; color: var(--sys-color-neutral-700); white-space: nowrap; }
+.hbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-04); height: 28px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); font-size: 12px; color: var(--sys-color-neutral-700); white-space: nowrap; }
 .hbtn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .hbtn.on { color: #8A6100; --sq-fill: #FFF6DA; }
 .hcount { min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #E8C14A; color: #FFFFFF; font-size: 10px; font-weight: 600; }
