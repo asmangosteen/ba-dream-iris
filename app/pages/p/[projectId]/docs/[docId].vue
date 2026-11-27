@@ -608,6 +608,16 @@ async function onEndUp() {
     }
   } catch { await links.refresh(); say(tr("Couldn't change it. Try again")) }
 }
+/** 캔버스 빈 곳을 누르면 고른 것(정책 · 화면 · 요소 · 칸 · 메모 · 선)을 모두 풀어요(사용자 요청 2026-11-27) */
+function onCanvasClick(e: MouseEvent) {
+  if ((e.target as Element | null)?.closest?.('.frame-col')) return
+  activeReq.value = null
+  activeScreen.value = null
+  activeLayer.value = null
+  activeCol.value = null
+  activeNote.value = null
+  pickedLine.value = null
+}
 function onPickedKey(e: KeyboardEvent) { if (e.key === 'Escape' && pickedLine.value && !endDrag.value) pickedLine.value = null }
 /** 선 · 끝 동그라미 밖을 누르면 선 고르기를 풀어요 */
 function onPickedDown(e: PointerEvent) {
@@ -756,7 +766,7 @@ async function removeDoc() {
     </div>
 
     <!-- 캔버스(B안): 화면 표의 화면 칸 순서대로 + 칸 없이 연결된 화면 -->
-    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown }]">
+    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown }]" @click="onCanvasClick">
       <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
       <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
       <div class="frames">
