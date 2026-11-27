@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button, Icon, IconButton, Skeleton } from '@ba-dream/design-system'
-import DocReader from '~/components/docs/DocReader.vue'
+import DocReader, { flashWarnAt } from '~/components/docs/DocReader.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import DocEditor from '~/components/docs/DocEditor.vue'
 import DocCheckBar from '~/components/docs/DocCheckBar.vue'
@@ -183,7 +183,7 @@ function goAnchor(a: DocAnchor) {
   if (r) { activeReq.value = null; nextTick(() => reader.value?.scrollToReq(r.id)) }
   else if (a.block) goBlock({ block: a.block, row: a.row ?? null })
 }
-/** 문서의 블록 · 표 행으로 스크롤(양식 경고 [Go]) */
+/** 문서의 블록 · 표 행으로 스크롤(메모 자리) */
 function goBlock(at: { block: string; row: number | null }) {
   const root = reader.value?.root
   const blockEl = root?.querySelector(`[data-block="${at.block}"]`)
@@ -537,7 +537,7 @@ async function removeDoc() {
         />
         <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" @close="histOpen = false" @restore="restoreDoc" />
         <div v-else class="read-main">
-          <DocCheckBar :doc="doc" @go="goBlock" @edit="startEdit" />
+          <DocCheckBar :doc="doc" @go="(at: { block: string; row: number | null }) => flashWarnAt(reader?.root, at)" />
           <div v-if="goneReqs.length" class="sq gone" role="status">
             <span class="gone-col">
               <span class="tx-body gone-t">

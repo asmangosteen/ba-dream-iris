@@ -18,6 +18,20 @@ export function scrollToDocAnchor(
   el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' })
   return true
 }
+
+/** 양식 경고 줄을 누르면: 문서의 그 블록 · 표 행으로 스크롤하고 경고 박스와 같은 옅은 주황으로 잠깐 깜빡여요(사용자 요청 2026-11-27) */
+export function flashWarnAt(root: ParentNode | null | undefined, at: { block: string; row: number | null }): boolean {
+  if (!root) return false
+  const blockEl = root.querySelector(`[data-block="${at.block}"]`)
+  const el = (at.row ? blockEl?.querySelector(`tr[data-row="${at.row}"]`) : null) ?? blockEl
+  if (!el) return false
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  el.classList.remove('warn-flash')
+  void (el as HTMLElement).offsetWidth
+  el.classList.add('warn-flash')
+  setTimeout(() => el.classList.remove('warn-flash'), 1600)
+  return true
+}
 </script>
 
 <script setup lang="ts">

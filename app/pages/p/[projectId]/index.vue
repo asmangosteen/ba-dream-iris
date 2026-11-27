@@ -27,7 +27,7 @@ import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUpload
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
 import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
-import DocReader, { scrollToDocAnchor } from '~/components/docs/DocReader.vue'
+import DocReader, { scrollToDocAnchor, flashWarnAt } from '~/components/docs/DocReader.vue'
 import DocCheckBar from '~/components/docs/DocCheckBar.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import ProjectModal from '~/components/project/ProjectModal.vue'
@@ -2185,7 +2185,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
         <div ref="docScroll" v-ovscroll class="scroll doc-scroll">
-          <DocCheckBar :doc="openDoc" compact @go="(at: { block: string; row: number | null }) => scrollToDocAnchor(docScroll, { block: at.block })" @edit="navigateTo(`/p/${projectId}/docs/${openDoc.id}?edit=1`)" />
+          <DocCheckBar :doc="openDoc" compact @go="(at: { block: string; row: number | null }) => flashWarnAt(docScroll, at)" />
           <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @pick-slot="onPickSlot" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
         </div>
       </div>
