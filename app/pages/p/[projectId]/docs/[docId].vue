@@ -193,7 +193,7 @@ function goBlock(at: { block: string; row: number | null }) {
   el.classList.add('flash')
   setTimeout(() => el.classList.remove('flash'), 1400)
 }
-/** 고른 문서 탭이 탭 줄 끝에 잘리지 않게: 고를 때마다 탭 전체가 보이도록 옆으로 넘겨요(사용자 요청 2026-11-27) */
+/** 고른 문서 탭을 탭 줄 가운데로 부드럽게 넘겨요(사용자 요청 2026-11-27) */
 const tabsEl = ref<HTMLElement | null>(null)
 /** 문서를 바꾸면 이 화면이 새로 그려져서, 탭 줄 스크롤 위치를 기억해 두고 그 자리에서 부드럽게 넘겨요(사용자 요청 2026-11-27) */
 const tabsScroll = useState(`doc-tabs-scroll-${projectId}`, () => 0)
@@ -203,10 +203,10 @@ function revealTab(smooth = true) {
     const nav = tabsEl.value
     const el = nav?.querySelector<HTMLElement>('[aria-current="page"]')
     if (!nav || !el) return
-    const pad = 8
-    const left = el.offsetLeft - nav.offsetLeft, right = left + el.offsetWidth
-    if (left - pad < nav.scrollLeft) nav.scrollTo({ left: Math.max(0, left - pad), behavior: smooth ? 'smooth' : 'auto' })
-    else if (right + pad > nav.scrollLeft + nav.clientWidth) nav.scrollTo({ left: right + pad - nav.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
+    // 고른 탭을 탭 줄 가운데로(맨 앞 · 맨 뒤 탭처럼 가운데까지 못 오는 건 끝에 붙어요 — 사용자 요청 2026-11-27)
+    const left = el.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft
+    const to = Math.min(Math.max(0, left + el.offsetWidth / 2 - nav.clientWidth / 2), nav.scrollWidth - nav.clientWidth)
+    if (Math.abs(to - nav.scrollLeft) > 1) nav.scrollTo({ left: to, behavior: smooth ? 'smooth' : 'auto' })
   })
 }
 watch(docId, () => revealTab())

@@ -38,7 +38,6 @@ function where(w: FormatWarning) {
         <button v-for="(w, i) in warns" :key="i" type="button" class="sq wrow" @click="emit('go', { block: w.block, row: w.row })">
           <span class="dot" aria-hidden="true" />
           <span class="wcol"><span>{{ text(w) }}</span><span class="tx-meta">{{ where(w) }}</span><span class="fix">{{ fix(w) }}</span></span>
-          <span class="go" aria-hidden="true">→</span>
         </button>
       </div>
     </template>
@@ -61,8 +60,6 @@ function where(w: FormatWarning) {
 .wrow:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 .wcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.go { flex: none; color: #E8A87C; font-size: 14px; transition: transform .16s ease; }
-.wrow:hover .go { transform: translateX(2px); }
 .fix { margin-top: 2px; color: var(--sys-color-neutral-700); }
 .compact .warnbar { height: 28px; }
 </style>
