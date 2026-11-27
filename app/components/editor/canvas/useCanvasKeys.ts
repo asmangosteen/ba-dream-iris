@@ -1,8 +1,8 @@
 import type { ExportSetting } from '~/canvas/schema'
-import { irisDuplicate, markIrisClip, pickedLayers, selectMatchingSay } from '~/composables/useLayerMenu'
+import { irisDuplicate, markIrisClip, pickedLayers, selectMatchingSay, setIrisImageSource, unsetIrisImageSource } from '~/composables/useLayerMenu'
 import type { AlignKind } from '~/canvas/geom'
 import { textShortcut } from '~/canvas/textKeys'
-import { download, fileNameOf, renderExport } from '~/canvas/exporter'
+import { download, fileNameOf, renderCombined, renderExport } from '~/canvas/exporter'
 import { instEdit, subSel } from '~/composables/useInstanceTree'
 import { EDITABLE, type CanvasBase } from './types'
 import type { CanvasGeom } from './useCanvasGeom'
@@ -77,12 +77,22 @@ export function useCanvasKeys(canvas: Ctx) {
     const list = multi.value.length ? multi.value : [sid]
     return list.map((id) => ({ el: world.querySelector<HTMLElement>(`.frame[data-screen="${id}"]`), s: props.screens.find((x) => x.id === id) })).filter((t) => t.el && t.s).map((t) => ({ el: t.el!, name: t.s!.name, exports: store.doc(t.s!.id).exports }))
   }
+  /** 고른 것 그림(PNG 2배): 하나면 그것, 여럿이면 놓인 배치 그대로 한 장(고른 것만, 사이는 투명) */
+  const pngOfSelection = (): Promise<Blob> | null => {
+    const ts = exportTargets()
+    if (!ts.length) return null
+    // 2배(선명하게). 크롬이 클립보드에 쓸 때 그림을 다시 만들며 해상도 표시를 지워서, 맥 앱에는 두 배 크기로 붙어요(피그마 웹도 같아요)
+    return ts.length === 1 ? renderExport(ts[0]!.el, { scale: '2x', format: 'PNG' }) : renderCombined(ts.map((t) => t.el), vp.value.zoom)
+  }
+  // ⌘C 할 때 클립보드에 그림도 함께(다른 앱에 붙이면 그림)
+  const irisImage = () => pngOfSelection()
+  setIrisImageSource(irisImage)
+  onBeforeUnmount(() => unsetIrisImageSource(irisImage))
   /** ⇧⌘C PNG 로 복사(피그마와 같아요, 2배) */
   async function copyPng() {
-    const t = exportTargets()[0]
-    if (!t) return
+    const blob = pngOfSelection()
+    if (!blob) return
     try {
-      const blob = renderExport(t.el, { scale: '2x', format: 'PNG' })
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
       emit('hint', tr('Copied as PNG'))
     } catch { emit('hint', tr('Couldn\'t copy to the clipboard')) }
@@ -271,7 +281,7 @@ export function useCanvasKeys(canvas: Ctx) {
       markIrisClip(layerMode ? store.clipData() : null, lastCopy.value !== 'layers')
       return
     }
-    if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); markIrisClip(store.clipData()); store.remove(sid!, ids) } return }
+    if (mod && key === 'x') { if (layerMode && store.copy()) { lastCopy.value = 'layers'; stop(); markIrisClip(store.clipData(), false, false); store.remove(sid!, ids) } return }
     // ⌘V 는 막지 않아요: 붙여넣기 이벤트(onPaste)가 다른 앱에서 복사한 그림 · SVG 를 먼저 보고, 없으면 Iris 클립보드를 붙여요
     if (mod && key === 'v') return
     if (mod && key === 'd') {

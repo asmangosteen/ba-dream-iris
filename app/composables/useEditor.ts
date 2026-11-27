@@ -5,6 +5,19 @@ export interface PageRow { id: string; name: string; sort_order: number; layers?
 /** 캔버스 위(화면 밖) 레이어를 담는 가상 화면 id */
 export const pageCanvasId = (pageId: string) => 'page:' + pageId
 export const isPageCanvas = (id: string | null | undefined) => !!id && id.startsWith('page:')
+/** 피그마 프레임 주소 → 파일 키 · 노드 ID(figma.com/design|file|proto/:key/…?node-id=1-2 → '1:2', 브랜치 주소는 브랜치 키) */
+export function parseFigmaFrameUrl(raw: string | null | undefined): { fileKey: string; nodeId: string } | null {
+  if (!raw) return null
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+    if (!/(^|\.)figma\.com$/i.test(u.hostname)) return null
+    const parts = u.pathname.split('/').filter(Boolean)
+    if (!['design', 'file', 'proto'].includes(parts[0] ?? '') || !parts[1]) return null
+    const fileKey = parts[2] === 'branch' && parts[3] ? parts[3] : parts[1]
+    const nodeId = (u.searchParams.get('node-id') ?? '').replace(/-/g, ':')
+    return fileKey && /^[\w:;]+$/.test(nodeId) ? { fileKey, nodeId } : null
+  } catch { return null }
+}
 /** 화면 복사본의 원본(같은 탭이면 화면 목록에서, 다른 파일 · 탭이면 클립보드에 실려 온 것) */
 export interface ScreenCopySource { id?: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; layers?: unknown; thumbnail_path?: string | null; figma_url?: string | null }
 export interface ScreenRow { id: string; name: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; status: 'draft' | 'review' | 'approved'; thumbnail_path?: string | null; figma_url?: string | null; layers?: unknown; updated_at?: string; updated_by?: string | null }
@@ -212,12 +225,19 @@ export function useEditor(projectId: string) {
       const orig = src.id && !src.id.startsWith('tmp')
         ? ((await supabase.from('screens').select('device, figma_file_key, figma_node_id, figma_url, thumbnail_path, figma_layer_summary, figma_synced_at').eq('id', src.id).maybeSingle()).data as Full | null)
         : null
+      // 피그마 화면은 파일 키 · 노드 ID · 주소가 꼭 있어야 저장돼요(DB 규칙 screens_figma_fields).
+      // 원본을 못 읽으면(다른 프로젝트 권한 · 지워짐) 피그마 주소에서 뽑아요
+      const fromUrl = parseFigmaFrameUrl(orig?.figma_url ?? src.figma_url ?? null)
+      const fileKey = orig?.figma_file_key ?? fromUrl?.fileKey ?? null
+      const nodeId = orig?.figma_node_id ?? fromUrl?.nodeId ?? null
+      const figmaUrl = orig?.figma_url ?? src.figma_url ?? null
+      if (src.source === 'figma' && !(fileKey && nodeId && figmaUrl)) throw new Error('figma_link_missing')
       const { data, error } = await supabase
         .from('screens')
         .insert({
           page_id: pageId.value, name, source: src.source, x: rect.x, y: rect.y, width: rect.width, height: rect.height, sort_order: list.length, updated_by: me(), layers,
           device: orig?.device ?? null,
-          figma_file_key: orig?.figma_file_key ?? null, figma_node_id: orig?.figma_node_id ?? null, figma_url: orig?.figma_url ?? src.figma_url ?? null,
+          figma_file_key: fileKey, figma_node_id: nodeId, figma_url: figmaUrl,
           thumbnail_path: orig?.thumbnail_path ?? src.thumbnail_path ?? null, figma_layer_summary: orig?.figma_layer_summary ?? null, figma_synced_at: orig?.figma_synced_at ?? null,
         })
         .select('id, name, source, x, y, width, height, status, thumbnail_path, figma_url, layers, updated_at, updated_by')

@@ -148,6 +148,15 @@ let screenSource: ((clip: LayerClip | null, withScreens: boolean) => ScreenCopyS
 /** 편집기 페이지가 등록 · 해제해요. 프로젝트 탭을 옮기면 새 페이지가 먼저 등록하고 옛 페이지가 나중에 해제해서 — 자기 것일 때만 지워요 */
 export function setIrisScreenSource(fn: NonNullable<typeof screenSource>) { screenSource = fn }
 export function unsetIrisScreenSource(fn: NonNullable<typeof screenSource>) { if (screenSource === fn) screenSource = null }
+/**
+ * 복사할 때 함께 넣을 그림(PNG 2배): 캔버스가 등록해요 — 고른 것(레이어 · 화면)을 그려요. 여럿이면 놓인 배치 그대로 한 장(사이는 투명).
+ * 다른 앱(슬랙 · 키노트 · 노션 · 메신저 · 피그마)에 붙이면 그림으로 들어가요. Iris 끼리는 그림이 아니라 레이어 데이터로 붙어요
+ */
+let imageSource: (() => Promise<Blob> | null) | null = null
+export function setIrisImageSource(fn: NonNullable<typeof imageSource>) { imageSource = fn }
+export function unsetIrisImageSource(fn: NonNullable<typeof imageSource>) { if (imageSource === fn) imageSource = null }
+/** 그림을 못 그렸을 때 대신 넣는 1×1 투명 PNG — 그림 하나 때문에 레이어 데이터까지 못 쓰지 않게 */
+const BLANK_PNG = () => new Blob([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='), (c) => c.charCodeAt(0))], { type: 'image/png' })
 /** 이 탭에서 마지막으로 쓴 복사 내용(우클릭 Paste 처럼 클립보드를 못 읽는 붙여넣기에서 써요) */
 let lastPayload: IrisClipPayload | null = null
 export const myLastClip = () => lastPayload
@@ -178,8 +187,11 @@ function clipTexts(clip: LayerClip | null): string[] {
   clip.rootIds.forEach(walk)
   return out
 }
-/** clip: 복사한 레이어, withScreens: 복사한 화면들도 함께(화면 복사 · 레이어와 섞어 고른 복사) */
-export function markIrisClip(clip: LayerClip | null = null, withScreens = false) {
+/**
+ * clip: 복사한 레이어, withScreens: 복사한 화면들도 함께(화면 복사 · 레이어와 섞어 고른 복사).
+ * image: 그림도 함께(잘라내기는 레이어가 바로 지워져 그리지 못해서 false). 텍스트 레이어만 복사하면 그림 없이 글자만
+ */
+export function markIrisClip(clip: LayerClip | null = null, withScreens = false, image = true) {
   myStamp = Math.random().toString(36).slice(2) + Date.now().toString(36)
   const screens = screenSource?.(clip, withScreens) ?? []
   const payload: IrisClipPayload = { v: 1, stamp: myStamp, schema: SCHEMA_VERSION, clip, ...(screens.length ? { screens } : {}) }
@@ -194,11 +206,28 @@ export function markIrisClip(clip: LayerClip | null = null, withScreens = false)
     try { document.execCommand('copy') } catch { /* 이 탭 안 클립보드만 */ }
     document.removeEventListener('copy', on, { capture: true })
   }
+  const textOnly = !!clip && !screens.length && clip.nodes.filter((n) => clip.rootIds.includes(n.id)).every((n) => n.type === 'text')
+  let png: Promise<Blob> | null = null
+  if (image && !textOnly) { try { png = imageSource?.()?.catch(BLANK_PNG) ?? null } catch { png = null } }
   try {
     if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return legacy()
-    const parts: Record<string, Blob> = { 'text/html': new Blob([html], { type: 'text/html' }) }
+    const htmlBlob = new Blob([html], { type: 'text/html' })
+    // HTML 을 먼저 읽는 앱(노션 · 메일 · 키노트 …)에도 그림이 들어가게 HTML 안에도 같은 그림(원래 크기로 보이게 절반 폭)
+    const htmlWithImage = png ? png.then(async (b) => {
+      try {
+        const url = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(r.error); r.readAsDataURL(b) })
+        const bm = await createImageBitmap(b)
+        const w = Math.max(1, Math.round(bm.width / 2))
+        bm.close()
+        return new Blob([`${html}<img src="${url}" width="${w}" alt="">`], { type: 'text/html' })
+      } catch { return htmlBlob }
+    }) : htmlBlob
+    const parts: Record<string, Blob | Promise<Blob>> = { 'text/html': htmlWithImage }
     if (plain) parts['text/plain'] = new Blob([plain], { type: 'text/plain' })
-    navigator.clipboard.write([new ClipboardItem(parts)]).catch(legacy)
+    if (png) parts['image/png'] = png
+    // 그림을 함께 못 쓰는 브라우저면 그림 없이 다시
+    const noImage = () => { delete parts['image/png']; parts['text/html'] = htmlBlob; return navigator.clipboard.write([new ClipboardItem(parts)]) }
+    navigator.clipboard.write([new ClipboardItem(parts)]).catch(() => (png ? noImage() : Promise.reject(new Error('write')))).catch(legacy)
   } catch { legacy() }
 }
 /** 붙여넣은 HTML 안 Iris 복사 내용. 없거나 읽지 못하면 null */

@@ -1080,7 +1080,10 @@ function spotRightOf(id: string): { x: number; y: number } {
 async function cloneMany(items: { id?: string; src?: ScreenCopySource; x: number; y: number }[], withLayers: boolean, after?: (record: () => void) => void): Promise<string[]> {
   if (blockEdit()) return []
   const srcs = items.map((it) => it.src ?? (() => { const v = list.value.find((o) => o.id === it.id); return v ? screenSource(v) : null })())
-  const rows = await Promise.all(srcs.map((src, i) => (src ? cloneFrom(src, { x: items[i]!.x, y: items[i]!.y }, false, false) : null)))
+  // 하나가 저장에 실패해도 나머지는 붙이고(실행취소도 붙은 것만), 실패한 수를 알려요
+  let failed = 0
+  const rows = await Promise.all(srcs.map((src, i) => (src ? cloneFrom(src, { x: items[i]!.x, y: items[i]!.y }, false, false).catch(() => { failed++; return null }) : null)))
+  if (failed) sayFail(failed === srcs.length ? tr('Couldn\'t paste the frames. Try again') : tr('Couldn\'t paste {n} of the frames', { n: failed }))
   // 실행취소 한 번에 전부(after 가 있으면 그 안에서 레이어 붙이기와 함께 한 번)
   const made = rows.flatMap((r, i) => (r ? [{ src: srcs[i]!, rect: { x: items[i]!.x, y: items[i]!.y, width: srcs[i]!.width, height: srcs[i]!.height }, name: r.name, cur: r.id }] : []))
   const record = () => {
@@ -1548,29 +1551,65 @@ function onPaste(e: ClipboardEvent) {
   if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
   const cd = e.clipboardData
   if (!cd) return
-  const html = cd.getData('text/html')
+  clearTimeout(pasteWait) // 붙여넣기 이벤트가 왔으니 예비 경로는 쓰지 않아요
+  e.preventDefault()
+  applyClipboard({ html: cd.getData('text/html'), text: cd.getData('text/plain'), files: [...cd.files] })
+}
+/** 클립보드 내용 붙이기 — 붙여넣기 이벤트와 예비 경로(클립보드 직접 읽기)가 함께 써요 */
+function applyClipboard(cd: { html: string; text: string; files: File[] }) {
+  const html = cd.html
   const iris = html ? readIrisClip(html) : null
   if (iris) {
-    e.preventDefault()
     if (!pasteIris(iris)) canvas.value?.paste()
     return
   }
-  const files = [...cd.files].filter((f) => f.type.startsWith('image/'))
-  const text = cd.getData('text/plain').trim()
+  const files = cd.files.filter((f) => f.type.startsWith('image/'))
+  const text = cd.text.trim()
   const center = { x: Math.round((window.innerWidth / 2 - vp.value.x) / vp.value.zoom), y: Math.round((window.innerHeight / 2 - vp.value.y) / vp.value.zoom) }
-  if (files.length) { e.preventDefault(); onDropFiles(files, current.value ? { x: current.value.x + current.value.width / 2, y: current.value.y + current.value.height / 2 } : center); return }
+  if (files.length) { onDropFiles(files, current.value ? { x: current.value.x + current.value.width / 2, y: current.value.y + current.value.height / 2 } : center); return }
   if (/^<svg[\s>]/i.test(text) || (/^<\?xml/i.test(text) && text.includes('<svg'))) {
-    e.preventDefault()
     // 피그마처럼 벡터 레이어들로(안쪽 도형까지 고칠 수 있게). 읽지 못하면 이미지로
     if (!importSvgVectors(text, current.value ? undefined : center)) insertImage(new File([text], 'svg.svg', { type: 'image/svg+xml' }), current.value ? undefined : center)
     return
   }
-  e.preventDefault()
   // 피그마 ⌘C 는 피그마만 읽는 형식이에요 — 엉뚱한 것을 붙이지 않고 다른 복사 방법을 알려요
   if (html && isFigmaClip(html)) return say(tr('Figma copies can’t be pasted yet. In Figma, use Copy as SVG or Copy as PNG'), 5000)
   // 옛 표시(이 탭 클립보드) 이거나, 클립보드에 쓰지 못했을 때는 이 탭 클립보드
   if (!text || text === IRIS_CLIP) return canvas.value?.paste()
-  insertPlainText(cd.getData('text/plain'), current.value ? undefined : center)
+  insertPlainText(cd.text, current.value ? undefined : center)
+}
+/**
+ * 예비 경로: ⌘V 를 눌렀는데 붙여넣기 이벤트가 오지 않으면(메뉴에 붙여넣기가 없는 창 · 자동 조작 등) 클립보드를 직접 읽어 붙여요.
+ * 붙여넣기 이벤트는 키를 누른 바로 뒤에 오니까 잠깐(150ms) 기다렸다가요. 읽기를 막아 두면 이 탭 클립보드로
+ */
+let pasteWait: ReturnType<typeof setTimeout> | undefined
+function onPasteKey(e: KeyboardEvent) {
+  // 키 자리(KeyV) · 글자(v · 한글 자판 ㅍ) 어느 쪽으로든
+  const isV = e.code === 'KeyV' || e.key === 'v' || e.key === 'V' || e.key === 'ㅍ'
+  if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || !isV || e.repeat) return
+  const t = e.target as HTMLElement | null
+  if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return
+  clearTimeout(pasteWait)
+  pasteWait = setTimeout(() => { void pasteFromClipboardApi() }, 150)
+}
+/** 클립보드를 못 읽을 때: 이 탭에서 마지막으로 복사한 것(다른 페이지 · 프로젝트 · 섹션까지) → 없으면 이 편집기 클립보드 */
+function pasteInTab() { if (!irisMenuHook()) canvas.value?.paste() }
+async function pasteFromClipboardApi() {
+  if (!navigator.clipboard?.read) return pasteInTab()
+  try {
+    const items = await navigator.clipboard.read()
+    let html = '', text = ''
+    const files: File[] = []
+    for (const it of items) {
+      for (const type of it.types) {
+        const b = await it.getType(type)
+        if (type === 'text/html') html = await b.text()
+        else if (type === 'text/plain') text = await b.text()
+        else if (type.startsWith('image/')) files.push(new File([b], `pasted.${type.split('/')[1] ?? 'png'}`, { type }))
+      }
+    }
+    applyClipboard({ html, text, files })
+  } catch { pasteInTab() }
 }
 /** 다른 앱에서 복사한 글자 → 텍스트 레이어(피그마와 같아요: 글자 폭에 맞춘 텍스트, 줄바꿈 그대로). 고른 Iris 화면(없으면 캔버스) 가운데에 */
 function insertPlainText(raw: string, at?: { x: number; y: number }) {
@@ -1608,8 +1647,8 @@ function importSvgVectors(text: string, at?: { x: number; y: number }, intoSid?:
   tab.value = 'design'
   return true
 }
-onMounted(() => window.addEventListener('paste', onPaste))
-onBeforeUnmount(() => window.removeEventListener('paste', onPaste))
+onMounted(() => { window.addEventListener('paste', onPaste); window.addEventListener('keydown', onPasteKey, true) })
+onBeforeUnmount(() => { window.removeEventListener('paste', onPaste); window.removeEventListener('keydown', onPasteKey, true); clearTimeout(pasteWait) })
 // 저장이 끝나기 전에 떠나면 알리기
 // 저장 중 · 저장 실패 · 이미지를 뒤에서 올리는 중이면 닫기 전에 물어요(다 올라가기 전에 닫으면 그 이미지가 비어요)
 function onBeforeUnload(e: BeforeUnloadEvent) { if (store.saveState.state === 'saving' || store.saveState.state === 'error' || pendingUploads.value > 0) { e.preventDefault(); e.returnValue = '' } }

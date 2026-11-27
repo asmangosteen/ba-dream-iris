@@ -77,6 +77,36 @@ export async function renderExport(el: HTMLElement, e: ExportSetting): Promise<B
   return e.format === 'JPG' ? blobOf(c, 'image/jpeg', 0.92) : blobOf(c, 'image/png')
 }
 
+/**
+ * 여러 개를 한 장의 PNG 로(⌘C · ⇧⌘C 에 여러 개를 골랐을 때 — 피그마와 같아요): 캔버스에 놓인 배치 그대로, 고른 것만, 사이 빈 곳은 투명.
+ * zoom = 지금 캔버스 배율(화면 위 자리 → 캔버스 크기). 돌린 레이어는 하나 내보낼 때처럼 돌리기 전 모양으로. 앞뒤 순서는 화면에 그려진 순서대로
+ */
+export async function renderCombined(els: HTMLElement[], zoom: number, maxScale = 2): Promise<Blob> {
+  // 자리는 지금 바로 재요(그리는 동안 고른 것이 바뀌어도 그대로)
+  const items = [...els]
+    .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+    .map((el) => {
+      const r = el.getBoundingClientRect()
+      const { w, h } = sizeOf(el)
+      const z = zoom > 0 ? zoom : 1
+      return { el, x: (r.left + r.width / 2) / z - w / 2, y: (r.top + r.height / 2) / z - h / 2, w, h }
+    })
+  if (!items.length) throw new Error('nothing to render')
+  const x0 = Math.min(...items.map((i) => i.x)), y0 = Math.min(...items.map((i) => i.y))
+  const W = Math.max(...items.map((i) => i.x + i.w)) - x0, H = Math.max(...items.map((i) => i.y + i.h)) - y0
+  // 브라우저가 그릴 수 있는 크기 안으로(한 변 8192px)
+  const k = Math.min(maxScale, 8192 / Math.max(W, H, 1))
+  const out = document.createElement('canvas')
+  out.width = Math.max(1, Math.ceil(W * k)); out.height = Math.max(1, Math.ceil(H * k))
+  const ctx = out.getContext('2d')
+  if (!ctx) throw new Error('no 2d context')
+  for (const it of items) {
+    const c = await canvasOf(it.el, k)
+    ctx.drawImage(c, (it.x - x0) * k, (it.y - y0) * k, it.w * k, it.h * k)
+  }
+  return blobOf(out, 'image/png')
+}
+
 /** 작은 미리보기(Preview 펼침) */
 export async function previewOf(el: HTMLElement, maxW = 240): Promise<string> {
   const { w } = sizeOf(el)
