@@ -110,14 +110,15 @@ function pickCol(c: Col) {
 }
 
 // 끌어서 연결(새 1): 화면 오른쪽 가장자리 점을 끌어 문서의 정책 줄에 놓으면 연결 --------------
-const drag = ref<{ screen: ProjectScreen; x0: number; y0: number; x: number; y: number; over: ReqRow | null } | null>(null)
+/** x · y = 놓을 끝(정책 줄 위면 그 줄 왼쪽 가장자리에 붙어요), cx · cy = 커서 */
+const drag = ref<{ screen: ProjectScreen; x0: number; y0: number; x: number; y: number; cx: number; cy: number; over: ReqRow | null } | null>(null)
 let dropEl: Element | null = null
 function startLinkDrag(c: Col, e: PointerEvent) {
   if (!c.screen) return
   e.preventDefault()
   e.stopPropagation()
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  drag.value = { screen: c.screen, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: e.clientX, y: e.clientY, over: null }
+  drag.value = { screen: c.screen, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, over: null }
   window.addEventListener('pointermove', onLinkMove)
   window.addEventListener('pointerup', onLinkUp, { once: true })
   window.addEventListener('keydown', onLinkKey)
@@ -130,11 +131,15 @@ function reqAt(x: number, y: number): { el: Element; req: ReqRow } | null {
 }
 function onLinkMove(e: PointerEvent) {
   if (!drag.value) return
-  drag.value.x = e.clientX
-  drag.value.y = e.clientY
+  drag.value.cx = e.clientX
+  drag.value.cy = e.clientY
   const hit = reqAt(e.clientX, e.clientY)
   if (dropEl !== hit?.el) { dropEl?.classList.remove('drop-on'); dropEl = hit?.el ?? null; dropEl?.classList.add('drop-on') }
   drag.value.over = hit?.req ?? null
+  // 정책 줄 위면 선 끝을 그 줄 왼쪽 가장자리(문서 쪽 동그라미)에 붙여요(사용자 요청 2026-11-27)
+  const rr = hit?.el.getBoundingClientRect()
+  drag.value.x = rr ? rr.left : e.clientX
+  drag.value.y = rr ? rr.top + rr.height / 2 : e.clientY
 }
 function endLinkDrag() {
   dropEl?.classList.remove('drop-on')
@@ -158,6 +163,7 @@ async function onLinkUp() {
   } catch { say(tr("Couldn't link. Try again")) }
 }
 onBeforeUnmount(endLinkDrag)
+
 
 // 문서 옆 메모 · 수정 기록 ---------------------------------------------------
 /** 문서 옆 메모 칸: 메모가 있으면 열고, 없으면 닫아 둬요(캔버스를 넓게). 직접 열고 닫으면 그대로 */
@@ -323,6 +329,59 @@ const supabase = useSupabaseClient()
 const preview = useDevPreview()
 /** 에디터 패널의 "고치기"(?edit=1)로 들어오면 바로 고치기 모드(서버 · 브라우저가 같은 값으로 시작) */
 const editing = ref(route.query.edit === '1')
+
+/**
+ * 연결 선(사용자 요청 2026-11-27): 정책을 고르면 그 정책 ↔ 연결된 화면들, 화면을 고르면 그 화면 ↔ 연결된 정책들을 선으로 이어 보여요.
+ * 양 끝에 동그라미(화면 오른쪽 점 · 정책 줄 왼쪽 가장자리). 스크롤 · 패널 움직임을 따라가도록 고른 동안 매 프레임 자리를 다시 재요.
+ * 한쪽 끝이 보이는 영역 밖(문서 · 캔버스 스크롤 밖)이면 그 선은 숨겨요
+ */
+type LinkLine = { key: string; x1: number; y1: number; x2: number; y2: number }
+const linkLines = ref<LinkLine[]>([])
+const linePairs = computed<{ col: string; req: string }[]>(() => {
+  if (drag.value || editing.value || activeNote.value) return []
+  const out: { col: string; req: string }[] = []
+  if (activeScreen.value) {
+    const c = frames.value.find((x) => x.screen?.id === activeScreen.value)
+    if (c) for (const l of docLinks.value) if (l.screen_id === activeScreen.value) out.push({ col: c.key, req: l.requirement_id })
+  } else if (activeReq.value) {
+    for (const c of frames.value) if (c.screen && activeLinks.value.has(c.screen.id)) out.push({ col: c.key, req: activeReq.value })
+  }
+  return out
+})
+let lineRaf = 0
+function measureLines() {
+  lineRaf = 0
+  const pairs = linePairs.value
+  if (!pairs.length) { if (linkLines.value.length) linkLines.value = []; return }
+  const cv = canvas.value?.getBoundingClientRect()
+  const body = document.querySelector('.split .doc-body')?.getBoundingClientRect()
+  const docLeft = document.querySelector('.split .doc')?.getBoundingClientRect().left ?? Infinity
+  const root = reader.value?.root as HTMLElement | null | undefined
+  const out: LinkLine[] = []
+  for (const p of pairs) {
+    const dot = canvas.value?.querySelector(`[data-col="${p.col}"] .link-dot`)?.getBoundingClientRect()
+    const row = root?.querySelector(`[data-reqs~="${p.req}"]`)?.getBoundingClientRect()
+    if (!dot || !row || !cv || !body) continue
+    const x1 = dot.left + dot.width / 2, y1 = dot.top + dot.height / 2, x2 = row.left, y2 = row.top + row.height / 2
+    if (x1 < cv.left || x1 > Math.min(cv.right, docLeft) || y1 < cv.top || y1 > cv.bottom) continue
+    if (y2 < body.top || y2 > body.bottom) continue
+    out.push({ key: p.col + '|' + p.req, x1, y1, x2, y2 })
+  }
+  const same = out.length === linkLines.value.length && out.every((l, i) => { const o = linkLines.value[i]!; return o.key === l.key && Math.abs(o.x1 - l.x1) < 0.5 && Math.abs(o.y1 - l.y1) < 0.5 && Math.abs(o.x2 - l.x2) < 0.5 && Math.abs(o.y2 - l.y2) < 0.5 })
+  if (!same) linkLines.value = out
+  lineRaf = requestAnimationFrame(measureLines)
+}
+watch(linePairs, (p) => {
+  if (!import.meta.client) return
+  cancelAnimationFrame(lineRaf)
+  lineRaf = 0
+  if (p.length) nextTick(() => { lineRaf = requestAnimationFrame(measureLines) })
+  else linkLines.value = []
+})
+// 처음 열 때 이미 고른 정책(?req=)이 있으면 바로 그려요 — watch immediate 는 아래쪽에 선언된 editing 을 너무 일찍 읽어서 onMounted 로
+onMounted(() => { if (linePairs.value.length) lineRaf = requestAnimationFrame(measureLines) })
+onBeforeUnmount(() => cancelAnimationFrame(lineRaf))
+const curve = (x1: number, y1: number, x2: number, y2: number) => `M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`
 const dirty = ref(false)
 /** 문서에서 사라진 요구사항 번호(지우지 않고 알려만 줍니다) */
 const gone = ref<string[]>([])
@@ -501,10 +560,20 @@ async function removeDoc() {
 
     <!-- 끌어서 연결 중: 점선 + 놓을 곳 -->
     <svg v-if="drag" class="drag-line" aria-hidden="true">
-      <path :d="`M ${drag.x0} ${drag.y0} C ${(drag.x0 + drag.x) / 2} ${drag.y0}, ${(drag.x0 + drag.x) / 2} ${drag.y}, ${drag.x} ${drag.y}`" />
-      <circle :cx="drag.x" :cy="drag.y" r="4" />
+      <path :d="curve(drag.x0, drag.y0, drag.x, drag.y)" />
+      <circle class="end" :cx="drag.x0" :cy="drag.y0" r="5.25" />
+      <circle v-if="drag.over" class="end" :cx="drag.x" :cy="drag.y" r="5.25" />
+      <circle v-else :cx="drag.x" :cy="drag.y" r="4" />
     </svg>
-    <span v-if="drag" class="sq drag-chip" :style="{ left: drag.x + 12 + 'px', top: drag.y + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
+    <!-- 고른 정책 · 화면의 연결 선 -->
+    <svg v-if="linkLines.length" class="drag-line" aria-hidden="true">
+      <g v-for="l in linkLines" :key="l.key">
+        <path :d="curve(l.x1, l.y1, l.x2, l.y2)" />
+        <circle class="end" :cx="l.x1" :cy="l.y1" r="5.25" />
+        <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" />
+      </g>
+    </svg>
+    <span v-if="drag" class="sq drag-chip" :style="{ left: drag.cx + 12 + 'px', top: drag.cy + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
 
     <!-- 오른쪽: 문서 -->
     <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesShown }]">
@@ -690,8 +759,10 @@ async function removeDoc() {
 .frame-col.note .link-dot { right: -9px; }
 .link-dot:hover { transform: scale(1.25); background: var(--iris-peek); }
 .drag-line { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 20; pointer-events: none; overflow: visible; }
-.drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 2; stroke-dasharray: 6 4; }
+.drag-line path { fill: none; stroke: var(--iris-peek); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .drag-line circle { fill: var(--iris-peek); }
+/* 선 양 끝 동그라미: 화면 쪽 끌기 점과 같은 모양(흰 바탕 + 선 색 테두리) */
+.drag-line circle.end { fill: var(--sys-color-common-white-default); stroke: var(--iris-peek); stroke-width: 1.5; }
 .drag-chip { position: fixed; z-index: 21; pointer-events: none; height: 24px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .split :deep(.drop-on) td, .split :deep(.drop-on.blk) { background: color-mix(in srgb, var(--iris-peek) 12%, transparent) !important; }
 .split :deep(.drop-on) td:first-child { box-shadow: inset 2px 0 0 var(--iris-peek); }
