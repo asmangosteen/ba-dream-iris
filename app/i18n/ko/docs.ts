@@ -269,4 +269,11 @@ export default {
   'Uploaded file': '올린 파일',
   'Reply · {n}': '답글 {n}',
   'Couldn\'t delete. Try again': '지우지 못했어요. 다시 해 주세요',
+  'Add below': '아래에 더하기',
+  'Turn into': '바꾸기',
+  'Go to the first warning': '첫 경고로 가기',
+  'Add {code} to the policy table': '{code} 정책 표에 넣기',
+  'Put {code} in the Policy column': '{code}을 \'정책\' 열에 넣기',
+  'Fill in the Policy column': '\'정책\' 열 채우기',
+  'Go to the row': '그 행으로',
 } satisfies Record<string, string>

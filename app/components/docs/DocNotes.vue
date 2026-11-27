@@ -232,5 +232,5 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 /* 게시판: 새 글 줄(내 아바타 + 입력칸) 아래로 글마다 구분선, 글 사이 16 */
 .board { display: flex; flex-direction: column; gap: var(--ref-spacing-08); margin-top: var(--ref-spacing-14); padding-top: var(--ref-spacing-10); box-shadow: 0 -1px 0 var(--iris-line); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .post { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding-top: var(--ref-spacing-08); box-shadow: 0 -1px 0 var(--iris-line); }
-.rbtn { align-self: flex-start; margin-left: 28px; }
+.rbtn { align-self: flex-start; margin-left: 28px; } /* 아이콘이 글자 시작선(32)에 오게: 버튼 안쪽 여백 4 만큼 덜 */
 </style>

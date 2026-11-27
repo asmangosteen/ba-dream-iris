@@ -93,7 +93,7 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 
 <template>
   <div ref="root" class="ctv">
-    <div v-for="c in msgs" :key="c.id" class="msg">
+    <div v-for="c in msgs" :key="c.id" :class="['msg', { reply: c.id !== thread.root.id }]">
       <span class="mh">
         <MemberAvatar :name="nameOf(c.author_id)" :src="person(c.author_id)?.avatar" :size="24" /><b>{{ nameOf(c.author_id) }}</b><span class="tx-meta">{{ relativeTime(c.created_at) }}<template v-if="c.edited_at"> · {{ tr('edited') }}</template></span>
         <span v-if="canEditMsg(c) || canDeleteMsg(c)" :class="['msg-more', { on: msgMenu?.c.id === c.id }]">
@@ -132,6 +132,8 @@ function viewImage(src: string) { const u = resolveSrc(src); if (u) window.open(
 /* CommentLayer 스레드 창과 같은 값: 글 사이 12 · 이름 줄 8 · 글은 아바타만큼(32) 들여 */
 .ctv { position: relative; display: flex; flex-direction: column; gap: var(--ref-spacing-06); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .msg { display: flex; flex-direction: column; gap: var(--ref-spacing-03); }
+/* 답글 · 답글 입력칸: 프로필이 첫 댓글 글자 시작선(아바타 24 + 간격 8 = 32)에 오게 들여요(사용자 요청 2026-11-27) */
+.msg.reply, .foot { margin-left: 32px; }
 .mh { display: flex; gap: var(--ref-spacing-06); align-items: center; min-width: 0; }
 .mh b { font-weight: 600; color: var(--sys-color-neutral-800); white-space: nowrap; }
 .mh .tx-meta { white-space: nowrap; }
