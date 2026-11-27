@@ -100,7 +100,7 @@ function pickSlot(code: string) {
   activeLayer.value = null
   activeNote.value = null
   activeCol.value = c.key
-  nextTick(() => canvas.value?.querySelector(`[data-col="${c.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }))
+  nextTick(() => revealCol(c.key))
 }
 function pickCol(c: Col) {
   activeCol.value = null
@@ -282,7 +282,7 @@ function pickReq(id: string) {
   nextTick(() => {
     const code = activeCode.value
     const first = frames.value.find((c) => (c.screen && activeLinks.value.has(c.screen.id)) || (!!code && !!c.slot?.policy_codes.includes(code)))
-    if (first) canvas.value?.querySelector(`[data-col="${first.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+    if (first) revealCol(first.key)
   })
 }
 
@@ -372,7 +372,8 @@ let lineRaf = 0
 function measureLines() {
   lineRaf = 0
   const pairs = linePairs.value
-  if (!pairs.length) { if (linkLines.value.length) linkLines.value = []; return }
+  measureSel()
+  if (!pairs.length && !activeLayer.value) { if (linkLines.value.length) linkLines.value = []; return }
   const cv = canvas.value?.getBoundingClientRect()
   const body = document.querySelector('.split .doc-body')?.getBoundingClientRect()
   const docLeft = document.querySelector('.split .doc')?.getBoundingClientRect().left ?? Infinity
@@ -397,12 +398,12 @@ function measureLines() {
   if (!same) linkLines.value = out
   lineRaf = requestAnimationFrame(measureLines)
 }
-watch(linePairs, (p) => {
+watch([linePairs, activeLayer], ([p, al]) => {
   if (!import.meta.client) return
   cancelAnimationFrame(lineRaf)
   lineRaf = 0
-  if (p.length) nextTick(() => { lineRaf = requestAnimationFrame(measureLines) })
-  else linkLines.value = []
+  if (p.length || al) nextTick(() => { lineRaf = requestAnimationFrame(measureLines) })
+  else { linkLines.value = []; selBox.value = null }
 })
 // 처음 열 때 이미 고른 정책(?req=)이 있으면 바로 그려요 — watch immediate 는 아래쪽에 선언된 editing 을 너무 일찍 읽어서 onMounted 로
 onMounted(() => { if (linePairs.value.length) lineRaf = requestAnimationFrame(measureLines) })
@@ -418,15 +419,15 @@ function nearestSide(r: DOMRect, x: number, y: number): [number, number] {
  * 요소(도형 · 프레임 · 글 무엇이든)나 화면에 마우스를 올리면 그 상하좌우 가운데에 동그라미 4개 — 끌어서 정책 줄에 놓으면 그 요소만 연결돼요.
  * 요소를 지우고 새로 그렸으면 새 요소를 다시 연결하면 돼요
  */
-type ArtScreen = { id: string; source: 'figma' | 'native'; width: number; height: number; thumbnail_path: string | null; layers: unknown }
+type ArtScreen = { id: string; source: 'figma' | 'native'; x: number; y: number; width: number; height: number; thumbnail_path: string | null; layers: unknown }
 const artIds = computed(() => frames.value.flatMap((c) => (c.screen ? [c.screen.id] : [])).sort().join(','))
 const art = useAsyncData(`split-art-${projectId}`, async () => {
   const ids = artIds.value ? artIds.value.split(',') : []
   if (!ids.length) return {} as Record<string, ArtScreen>
   if (preview) {
-    return Object.fromEntries(Object.values(PREVIEW_SCREENS).flat().filter((x) => ids.includes(x.id)).map((x) => [x.id, { id: x.id, source: x.source, width: x.width, height: x.height, thumbnail_path: x.thumbnail_path ?? null, layers: x.layers ?? null }])) as Record<string, ArtScreen>
+    return Object.fromEntries(Object.values(PREVIEW_SCREENS).flat().filter((x) => ids.includes(x.id)).map((x) => [x.id, { id: x.id, source: x.source, x: x.x, y: x.y, width: x.width, height: x.height, thumbnail_path: x.thumbnail_path ?? null, layers: x.layers ?? null }])) as Record<string, ArtScreen>
   }
-  const { data, error } = await supabase.from('screens').select('id, source, width, height, thumbnail_path, layers').in('id', ids)
+  const { data, error } = await supabase.from('screens').select('id, source, x, y, width, height, thumbnail_path, layers').in('id', ids)
   if (error) throw error
   return Object.fromEntries(((data ?? []) as ArtScreen[]).map((x) => [x.id, x])) as Record<string, ArtScreen>
 }, { server: false, watch: [artIds], default: () => ({}) as Record<string, ArtScreen> })
@@ -475,8 +476,7 @@ function onFrameHover(c: Col, e: PointerEvent) {
   const fr = frame.getBoundingClientRect()
   const inside = e.clientX >= fr.left && e.clientX <= fr.right && e.clientY >= fr.top && e.clientY <= fr.bottom
   const el = inside ? layerAt(col, e.clientX, e.clientY) : null
-  const r = (el ?? frame).getBoundingClientRect(), cr = col.getBoundingClientRect()
-  const b: Box = { col: c.key, layer: el?.getAttribute('data-layer') ?? null, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height }
+  const b = boxOf(c.key, el?.getAttribute('data-layer') ?? null, el ?? frame)
   const o = hover.value
   if (!o || o.col !== b.col || o.layer !== b.layer || Math.abs(o.x - b.x) > 0.5 || Math.abs(o.y - b.y) > 0.5 || Math.abs(o.w - b.w) > 0.5) hover.value = b
 }
@@ -490,7 +490,6 @@ function onFrameClick(c: Col) {
     activeScreen.value = null
     activeReq.value = null
     activeLayer.value = same ? null : { screen: c.screen.id, layer: h.layer }
-    selBox.value = same ? null : { ...h }
     const first = same ? null : docLinks.value.find((l) => l.screen_id === c.screen!.id && l.layer_ids?.includes(h.layer!))
     if (first) nextTick(() => reader.value?.scrollToReq(first.requirement_id))
     return
@@ -498,6 +497,160 @@ function onFrameClick(c: Col) {
   pickCol(c)
 }
 watch(activeLayer, (v) => { if (!v) selBox.value = null })
+/** 상자 자리는 캔버스(화면 좌표) 기준 — 동그라미 · 테두리는 확대와 상관없이 같은 크기로 캔버스 위 층에 그려요 */
+function boxOf(col: string, layer: string | null, el: Element): Box {
+  const r = el.getBoundingClientRect(), cr = canvas.value!.getBoundingClientRect()
+  return { col, layer, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height }
+}
+function measureSel() {
+  const al = activeLayer.value
+  const c = al ? frames.value.find((x) => x.screen?.id === al.screen) : null
+  const el = c && al ? canvas.value?.querySelector(`[data-col="${c.key}"] .sthumb [data-layer="${al.layer}"]`) : null
+  const b = c && al && el ? boxOf(c.key, al.layer, el) : null
+  const o = selBox.value
+  if (!b) { if (o) selBox.value = null; return }
+  if (!o || o.col !== b.col || o.layer !== b.layer || Math.abs(o.x - b.x) > 0.5 || Math.abs(o.y - b.y) > 0.5 || Math.abs(o.w - b.w) > 0.5 || Math.abs(o.h - b.h) > 0.5) selBox.value = b
+}
+const hoverCol = computed(() => (hover.value ? frames.value.find((x) => x.key === hover.value!.col) ?? null : null))
+/** 화면 칸을 벗어나도 그 칸의 동그라미 위로 옮겨 가는 거면 동그라미를 그대로 둬요 */
+function onColLeave(e: PointerEvent) {
+  if ((e.relatedTarget as Element | null)?.closest?.('.ldot')) return
+  hover.value = null
+}
+function onDotLeave(e: PointerEvent) {
+  const t = e.relatedTarget as Element | null
+  if (hover.value && t?.closest?.(`[data-col="${hover.value.col}"], .ldot`)) return
+  hover.value = null
+}
+
+/**
+ * 캔버스 보기(사용자 요청 2026-11-27): 편집기처럼 확대 · 이동(⌘/Ctrl + 휠 · 핀치 확대, 휠 · 빈 곳 끌기 이동, ⇧1 맞춰 보기 · ⇧0 100%).
+ * 기본은 편집기에 놓인 자리 그대로(페이지가 여럿이면 페이지마다 묶어 옆으로), [ID 순서]를 켜면 화면 칸 순서(C-01, C-02 …)로 한 줄 — 디자인이 없는 칸도 보여요
+ */
+const idOrder = ref(false)
+const view = ref({ x: 0, y: 0, z: 0.5 })
+let userMoved = false
+const FR_W = 390, FR_H = 844
+type Placed = { c: Col; x: number; y: number; w: number; h: number }
+const placed = computed<Placed[]>(() => {
+  const size = (c: Col) => { const a = c.screen ? art.data.value?.[c.screen.id] : null; return { w: a?.width || FR_W, h: a?.height || FR_H } }
+  if (idOrder.value) {
+    let x = 0
+    return frames.value.map((c) => { const { w, h } = size(c); const p = { c, x, y: 0, w, h }; x += w + 120; return p })
+  }
+  const groups = new Map<string, Col[]>()
+  for (const c of frames.value) if (c.screen) { const g = groups.get(c.screen.page_id) ?? []; g.push(c); groups.set(c.screen.page_id, g) }
+  const out: Placed[] = []
+  let ox = 0
+  for (const g of groups.values()) {
+    const items = g.map((c) => { const a = art.data.value?.[c.screen!.id]; return { c, x: a?.x ?? 0, y: a?.y ?? 0, ...size(c) } })
+    const minX = Math.min(...items.map((i) => i.x)), minY = Math.min(...items.map((i) => i.y)), maxX = Math.max(...items.map((i) => i.x + i.w))
+    for (const i of items) out.push({ ...i, x: i.x - minX + ox, y: i.y - minY })
+    ox += maxX - minX + 400
+  }
+  return out
+})
+const placedOf = (key: string) => placed.value.find((p) => p.c.key === key)
+/** 캔버스에서 문서 패널에 가리지 않는 영역(안쪽 여백 뺀 곳) */
+function visibleArea() {
+  const el = canvas.value
+  if (!el) return null
+  const cs = getComputedStyle(el)
+  const L = parseFloat(cs.paddingLeft), R = parseFloat(cs.paddingRight), T = parseFloat(cs.paddingTop), B = parseFloat(cs.paddingBottom)
+  return { L, T, w: Math.max(100, el.clientWidth - L - R), h: Math.max(100, el.clientHeight - T - B) }
+}
+let animTimer: ReturnType<typeof setTimeout> | undefined
+const animView = ref(false)
+function setView(v: { x: number; y: number; z: number }, animate = false) {
+  hover.value = null
+  if (animate) { animView.value = true; clearTimeout(animTimer); animTimer = setTimeout(() => { animView.value = false }, 260) }
+  view.value = v
+}
+onBeforeUnmount(() => clearTimeout(animTimer))
+function fit(animate = false) {
+  const a = visibleArea()
+  const ps = placed.value
+  if (!a || !ps.length) return
+  const bx = Math.min(...ps.map((p) => p.x)), by = Math.min(...ps.map((p) => p.y)) - 40
+  const bw = Math.max(...ps.map((p) => p.x + p.w)) - bx, bh = Math.max(...ps.map((p) => p.y + p.h)) + 40 - by
+  const z = Math.min(1, Math.max(0.05, Math.min(a.w / bw, a.h / bh)))
+  setView({ z, x: a.L + (a.w - bw * z) / 2 - bx * z, y: a.T + (a.h - bh * z) / 2 - by * z }, animate)
+}
+/** 화면 칸이 보이는 영역 밖이면 가운데로 옮겨요(확대는 그대로) */
+function revealCol(key: string) {
+  const p = placedOf(key), a = visibleArea()
+  if (!p || !a) return
+  const { x, y, z } = view.value
+  const l = x + p.x * z, t = y + p.y * z, r = l + p.w * z, b = t + p.h * z
+  if (l >= a.L && r <= a.L + a.w && t >= a.T && b <= a.T + a.h) return
+  setView({ z, x: a.L + a.w / 2 - (p.x + p.w / 2) * z, y: a.T + a.h / 2 - (p.y + p.h / 2) * z }, true)
+}
+function zoomAt(px: number, py: number, nz: number, animate = false) {
+  const { x, y, z } = view.value
+  const k = Math.min(4, Math.max(0.05, nz))
+  setView({ z: k, x: px - (px - x) * (k / z), y: py - (py - y) * (k / z) }, animate)
+}
+function zoomBy(f: number) {
+  const a = visibleArea()
+  if (!a) return
+  userMoved = true
+  zoomAt(a.L + a.w / 2, a.T + a.h / 2, view.value.z * f, true)
+}
+function onWheel(e: WheelEvent) {
+  e.preventDefault()
+  userMoved = true
+  const r = canvas.value!.getBoundingClientRect()
+  const unit = e.deltaMode === 1 ? 16 : 1
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - r.left, e.clientY - r.top, view.value.z * Math.exp(-e.deltaY * unit * 0.01))
+  else {
+    const dx = (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX) * unit, dy = (e.shiftKey && !e.deltaX ? 0 : e.deltaY) * unit
+    setView({ ...view.value, x: view.value.x - dx, y: view.value.y - dy })
+  }
+}
+// 빈 곳 끌기로 이동 — 움직였으면 놓을 때 '선택 풀기'를 건너뛰어요
+let pan: { sx: number; sy: number; vx: number; vy: number; moved: boolean } | null = null
+let skipClick = false
+const panning = ref(false)
+function onCanvasDown(e: PointerEvent) {
+  if (e.button !== 0 && e.button !== 1) return
+  if ((e.target as Element | null)?.closest?.('.frame-col, .ldot, .zoombar') && e.button === 0) return
+  pan = { sx: e.clientX, sy: e.clientY, vx: view.value.x, vy: view.value.y, moved: false }
+  window.addEventListener('pointermove', onPanMove)
+  window.addEventListener('pointerup', onPanUp, { once: true })
+}
+function onPanMove(e: PointerEvent) {
+  if (!pan) return
+  const dx = e.clientX - pan.sx, dy = e.clientY - pan.sy
+  if (!pan.moved && Math.hypot(dx, dy) < 4) return
+  pan.moved = true
+  panning.value = true
+  userMoved = true
+  setView({ ...view.value, x: pan.vx + dx, y: pan.vy + dy })
+}
+function onPanUp() {
+  window.removeEventListener('pointermove', onPanMove)
+  skipClick = !!pan?.moved
+  pan = null
+  panning.value = false
+}
+onBeforeUnmount(() => window.removeEventListener('pointermove', onPanMove))
+function toggleIdOrder() {
+  idOrder.value = !idOrder.value
+  userMoved = false
+  hover.value = null
+  nextTick(() => fit(true))
+}
+// 데이터가 들어오는 동안은(사용자가 아직 움직이지 않았으면) 계속 맞춰 보기
+watch(() => placed.value.map((p) => `${p.c.key}:${p.x},${p.y},${p.w},${p.h}`).join('|'), () => { if (!userMoved) nextTick(() => fit()) })
+onMounted(() => nextTick(() => fit()))
+function onViewKey(e: KeyboardEvent) {
+  const t = e.target as HTMLElement | null
+  if (t?.closest?.('input, textarea, [contenteditable="true"]')) return
+  if (e.shiftKey && (e.code === 'Digit1' || e.key === '!')) { e.preventDefault(); userMoved = true; fit(true) }
+  else if (e.shiftKey && (e.code === 'Digit0' || e.key === ')')) { e.preventDefault(); const a = visibleArea(); if (a) { userMoved = true; zoomAt(a.L + a.w / 2, a.T + a.h / 2, 1, true) } }
+}
+onMounted(() => window.addEventListener('keydown', onViewKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onViewKey))
 
 /**
  * 선 끝 잡기(피그마 프로토타입 연결선처럼 — 사용자 요청 2026-11-27):
@@ -507,8 +660,11 @@ watch(activeLayer, (v) => { if (!v) selBox.value = null })
 const pickedLine = ref<string | null>(null)
 type EndTarget = { kind: 'req'; req: ReqRow } | { kind: 'layer'; col: Col; layer: string | null }
 const endDrag = ref<{ key: string; end: 'a' | 'b'; x: number; y: number; moved: boolean; sx: number; sy: number; target: EndTarget | null } | null>(null)
+/** 마우스를 올린 선(끝 동그라미 · 선) — 검은 안내는 이때만(사용자 요청 2026-11-27) */
+const hoverLine = ref<string | null>(null)
 const shownLines = computed(() => {
-  const list = pickedLine.value ? linkLines.value.filter((l) => l.key === pickedLine.value) : linkLines.value
+  // 여러 개 연결돼 있으면 고른 선이 있어도 다 보여요 — 고른 선만 실선 · 굵게
+  const list = linkLines.value
   const d = endDrag.value
   if (!d?.moved) return list
   return list.map((l) => (l.key !== d.key ? l : d.end === 'a' ? { ...l, x1: d.x, y1: d.y } : { ...l, x2: d.x, y2: d.y }))
@@ -516,7 +672,7 @@ const shownLines = computed(() => {
 watch(linkLines, (v) => { if (pickedLine.value && !endDrag.value && !v.some((l) => l.key === pickedLine.value)) pickedLine.value = null })
 watch(linePairs, () => { if (!endDrag.value) pickedLine.value = null })
 const pickedInfo = computed(() => {
-  const l = linkLines.value.find((x) => x.key === pickedLine.value)
+  const l = linkLines.value.find((x) => x.key === hoverLine.value)
   if (!l) return null
   const sc = frames.value.find((x) => x.key === l.col)
   const r = docReqs.value.find((x) => x.id === l.req)
@@ -524,10 +680,16 @@ const pickedInfo = computed(() => {
   return { line: l, text: `${from} ↔ ${r?.code ?? ''}${r?.title ? ' ' + r.title : ''}`, x: (l.x1 + l.x2) / 2, y: (l.y1 + l.y2) / 2 }
 })
 /** 화면 쪽 동그라미(4개 중 하나)를 눌렀는데 그 자리에서 선이 나가고 있으면 새 연결 대신 그 선 끝을 잡아요 */
-function onDotDown(c: Col, e: PointerEvent, layer: string | null) {
-  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+/** 그 동그라미 자리에서 나가는 선(고른 선이 있으면 그걸 먼저) */
+function lineAtDot(c: Col, layer: string | null, el: Element) {
+  const r = el.getBoundingClientRect()
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2
-  const l = linkLines.value.find((x) => x.col === c.key && x.layer === layer && Math.abs(x.x1 - cx) < 3 && Math.abs(x.y1 - cy) < 3 && (!pickedLine.value || x.key === pickedLine.value))
+  const hits = linkLines.value.filter((x) => x.col === c.key && x.layer === layer && Math.abs(x.x1 - cx) < 3 && Math.abs(x.y1 - cy) < 3)
+  return hits.find((x) => x.key === pickedLine.value) ?? hits[0] ?? null
+}
+function onDotEnter(c: Col, e: PointerEvent, layer: string | null) { hoverLine.value = lineAtDot(c, layer, e.currentTarget as Element)?.key ?? null }
+function onDotDown(c: Col, e: PointerEvent, layer: string | null) {
+  const l = lineAtDot(c, layer, e.currentTarget as Element)
   if (l) return grabEnd(l, 'a', e)
   startLinkDrag(c, e, layer)
 }
@@ -551,9 +713,8 @@ function endTargetAt(end: 'a' | 'b', x: number, y: number): { t: EndTarget | nul
   if (!colEl || !c?.screen) { hover.value = null; return { t: null, sx: x, sy: y } }
   const frame = colEl.querySelector('.frame')!
   const el = layerAt(colEl, x, y)
-  const r = (el ?? frame).getBoundingClientRect(), cr = colEl.getBoundingClientRect()
   const layer = el?.getAttribute('data-layer') ?? null
-  hover.value = { col: c.key, layer, x: r.left - cr.left, y: r.top - cr.top, w: r.width, h: r.height }
+  hover.value = boxOf(c.key, layer, el ?? frame)
   return { t: { kind: 'layer', col: c, layer }, sx: x, sy: y }
 }
 function onEndMove(e: PointerEvent) {
@@ -610,7 +771,8 @@ async function onEndUp() {
 }
 /** 캔버스 빈 곳을 누르면 고른 것(정책 · 화면 · 요소 · 칸 · 메모 · 선)을 모두 풀어요(사용자 요청 2026-11-27) */
 function onCanvasClick(e: MouseEvent) {
-  if ((e.target as Element | null)?.closest?.('.frame-col')) return
+  if (skipClick) { skipClick = false; return }
+  if ((e.target as Element | null)?.closest?.('.frame-col, .ldot, .zoombar')) return
   activeReq.value = null
   activeScreen.value = null
   activeLayer.value = null
@@ -623,7 +785,7 @@ function onPickedKey(e: KeyboardEvent) { if (e.key === 'Escape' && pickedLine.va
 function onPickedDown(e: PointerEvent) {
   if (!pickedLine.value || endDrag.value) return
   const t = e.target as Element | null
-  if (t?.closest?.('.link-lines circle, .ldot')) return
+  if (t?.closest?.('.link-lines circle, .link-lines .hit, .ldot')) return
   pickedLine.value = null
 }
 onMounted(() => { window.addEventListener('keydown', onPickedKey); window.addEventListener('pointerdown', onPickedDown, true) })
@@ -766,58 +928,78 @@ async function removeDoc() {
     </div>
 
     <!-- 캔버스(B안): 화면 표의 화면 칸 순서대로 + 칸 없이 연결된 화면 -->
-    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown }]" @click="onCanvasClick">
-      <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
-      <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
-      <div class="frames">
+    <main ref="canvas" :aria-label="tr('Canvas')" :class="['canvas-dots', 'canvas', { wide: notesShown, panning }]" @click="onCanvasClick" @wheel="onWheel" @pointerdown="onCanvasDown">
+      <!-- 확대 · 이동되는 캔버스(편집기 좌표 그대로) -->
+      <div :class="['world', { anim: animView }]" :style="{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, '--z': view.z }">
         <div
-          v-for="c in frames"
-          :key="c.key"
-          :data-col="c.key"
-          @pointermove="onFrameHover(c, $event)"
-          @pointerleave="hover = null"
-          :class="['frame-col', { lit: isLit(c), note: isNoteLit(c), dim: isDim(c), empty: !c.screen }]"
+          v-for="p in placed"
+          :key="p.c.key"
+          :data-col="p.c.key"
+          :style="{ left: p.x + 'px', top: p.y + 'px', width: p.w + 'px', height: p.h + 'px', '--fw': p.w, '--k': p.w / 176 }"
+          :class="['frame-col', { lit: isLit(p.c), note: isNoteLit(p.c), dim: isDim(p.c), empty: !p.c.screen }]"
+          @pointermove="onFrameHover(p.c, $event)"
+          @pointerleave="onColLeave"
         >
-          <button type="button" class="frame-btn" :aria-pressed="isLit(c)" :aria-label="c.screen ? tr('{name} · Policies: {n}', { name: c.name, n: reqCount(c.screen.id) }) : tr('{code} {name} · No design yet', { code: c.code ?? '', name: c.name })" @click="onFrameClick(c)">
+          <button type="button" class="frame-btn" :aria-pressed="isLit(p.c)" :aria-label="p.c.screen ? tr('{name} · Policies: {n}', { name: p.c.name, n: reqCount(p.c.screen.id) }) : tr('{code} {name} · No design yet', { code: p.c.code ?? '', name: p.c.name })" @click="onFrameClick(p.c)">
             <span class="frame-label">
-              <span v-if="c.code" class="sq sid num">{{ c.code }}</span>
-              <span class="ellipsis">{{ c.name }}</span>
-              <StatusIcon v-if="c.screen && activeLinks.get(c.screen.id)" :status="activeLinks.get(c.screen.id)!.status" :size="10" />
-              <span v-if="c.screen && pinCount(c.screen.id)" class="sq npin num" :title="tr('Notes')">{{ pinCount(c.screen.id) }}</span>
+              <span v-if="p.c.code" class="sq sid num">{{ p.c.code }}</span>
+              <span class="ellipsis">{{ p.c.name }}</span>
+              <StatusIcon v-if="p.c.screen && activeLinks.get(p.c.screen.id)" :status="activeLinks.get(p.c.screen.id)!.status" :size="10" />
+              <span v-if="p.c.screen && pinCount(p.c.screen.id)" class="sq npin num" :title="tr('Notes')">{{ pinCount(p.c.screen.id) }}</span>
             </span>
-            <span v-if="c.screen && artOf(c.screen.id)" class="frame art" aria-hidden="true">
-              <ScreenThumb :screen="artOf(c.screen.id)!" />
+            <span v-if="p.c.screen && artOf(p.c.screen.id)" class="frame art" aria-hidden="true">
+              <ScreenThumb :screen="artOf(p.c.screen.id)!" />
             </span>
-            <span v-else-if="c.screen" class="frame" aria-hidden="true">
-              <span class="f-status" />
-              <span class="f-title">{{ c.name }}</span>
-              <span class="f-body">
-                <span class="sqc f-bar" />
-                <span class="sq f-card" />
-                <span class="sq f-card" />
-                <span class="sq f-card" />
+            <span v-else-if="p.c.screen" class="frame" aria-hidden="true">
+              <span class="ph">
+                <span class="f-status" />
+                <span class="f-title">{{ p.c.name }}</span>
+                <span class="f-body">
+                  <span class="sqc f-bar" />
+                  <span class="sq f-card" />
+                  <span class="sq f-card" />
+                  <span class="sq f-card" />
+                </span>
+                <span class="sqc f-cta" />
               </span>
-              <span class="sqc f-cta" />
             </span>
             <span v-else class="frame noframe">
-              <b>{{ tr('No design yet') }}</b>
-              <span class="tx-meta">{{ tr('Import from Figma or draw a frame, then link it to this slot') }}</span>
+              <span class="ph ph-empty">
+                <b>{{ tr('No design yet') }}</b>
+                <span class="tx-meta">{{ tr('Import from Figma or draw a frame, then link it to this slot') }}</span>
+              </span>
             </span>
-            <span class="frame-page">{{ c.page || (c.slot?.states.length ? tr('States: {list}', { list: c.slot.states.join(', ') }) : '') }}</span>
+            <span class="frame-page">{{ p.c.page || (p.c.slot?.states.length ? tr('States: {list}', { list: p.c.slot.states.join(', ') }) : '') }}</span>
           </button>
-          <!-- 고른 요소 테두리 -->
-          <span v-if="selBox && selBox.col === c.key" class="sel-box" :style="boxStyle(selBox)" aria-hidden="true" />
-          <!-- 끌어서 연결: 올린 요소(없으면 화면) 상하좌우 가운데 동그라미 4개 -->
-          <template v-if="c.screen && !editing && hover && hover.col === c.key">
-            <span v-if="hover.layer" class="hov-box" :style="boxStyle(hover)" aria-hidden="true" />
-            <button
-              v-for="sd in SIDES" :key="sd" type="button" class="ldot" :style="dotAt(hover, sd)"
-              :aria-label="tr('Drag onto a policy row to link {name}', { name: hover.layer ? layerName(c.screen.id, hover.layer) : c.name })"
-              :title="tr('Drag onto a policy row to link')"
-              @pointerdown="onDotDown(c, $event, hover.layer)"
-            />
-          </template>
         </div>
+      </div>
+      <!-- 캔버스 위 층(확대와 상관없이 같은 크기): 고른 요소 테두리 · 올린 요소 테두리 · 동그라미 4개 -->
+      <div class="ov">
+        <span v-if="selBox" class="sel-box" :style="boxStyle(selBox)" aria-hidden="true" />
+        <template v-if="hover && hoverCol?.screen && !editing">
+          <span v-if="hover.layer" class="hov-box" :style="boxStyle(hover)" aria-hidden="true" />
+          <button
+            v-for="sd in SIDES" :key="sd" type="button" class="ldot" :style="dotAt(hover, sd)"
+            :aria-label="tr('Drag onto a policy row to link {name}', { name: hover.layer ? layerName(hoverCol.screen.id, hover.layer) : hoverCol.name })"
+            :title="tr('Drag onto a policy row to link')"
+            @pointerdown="onDotDown(hoverCol, $event, hover.layer)"
+            @pointerenter="onDotEnter(hoverCol, $event, hover.layer)"
+            @pointerleave="hoverLine = null; onDotLeave($event)"
+          />
+        </template>
+      </div>
+      <!-- 왼쪽 아래: ID 순서 · 확대 + 안내 -->
+      <div class="bl">
+      <div class="sq float zoombar" @pointerdown.stop @click.stop>
+        <button type="button" :class="['sq', 'zb', 'zb-txt', { on: idOrder }]" :aria-pressed="idOrder" :data-tip="idOrder ? tr('Back to layout') : tr('Sort by screen ID')" data-tip-at="top" @click="toggleIdOrder"><EditorIcon name="list_numbered" :size="16" />{{ tr('Sort by screen ID') }}</button>
+        <span class="zsep" aria-hidden="true" />
+        <button type="button" class="sq zb" :aria-label="tr('Zoom out')" :data-tip="tr('Zoom out')" data-tip-at="top" @click="zoomBy(1 / 1.25)"><EditorIcon name="minus" :size="16" /></button>
+        <button type="button" class="sq zb zb-pct num" :aria-label="tr('Zoom to fit')" :data-tip="tr('Zoom to fit') + ' · ⇧1'" data-tip-at="top" @click="userMoved = true; fit(true)">{{ Math.round(view.z * 100) }}%</button>
+        <button type="button" class="sq zb" :aria-label="tr('Zoom in')" :data-tip="tr('Zoom in')" data-tip-at="top" @click="zoomBy(1.25)"><EditorIcon name="plus" :size="16" /></button>
+      </div>
+        <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
+        <p v-else-if="frames.length && !placed.length" class="tx-meta hint">{{ tr('No designs are attached yet · choose Sort by screen ID to see the empty slots') }}</p>
+        <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
       </div>
     </main>
 
@@ -832,9 +1014,11 @@ async function removeDoc() {
     <svg v-if="shownLines.length" class="drag-line link-lines" aria-hidden="true">
       <g v-for="l in shownLines" :key="l.key" :class="{ on: pickedLine === l.key }">
         <path :d="curve(l.x1, l.y1, l.x2, l.y2)" />
+        <!-- 선 위 올리기 · 누르기용 넓은 투명 선 -->
+        <path class="hit" :d="curve(l.x1, l.y1, l.x2, l.y2)" @pointerenter="hoverLine = l.key" @pointerleave="hoverLine = null" @pointerdown.stop="pickedLine = l.key" />
         <!-- 그 요소 · 화면에 마우스를 올려 동그라미 4개가 떠 있으면 겹쳐 진해 보이지 않게 선 쪽 동그라미는 빼요(끝을 끄는 중엔 보여요) -->
-        <circle v-if="(endDrag?.moved && endDrag.key === l.key) || !(hover && hover.col === l.col && hover.layer === l.layer)" class="end" :cx="l.x1" :cy="l.y1" r="5.25" @pointerdown="grabEnd(l, 'a', $event)" />
-        <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" @pointerdown="grabEnd(l, 'b', $event)" />
+        <circle v-if="(endDrag?.moved && endDrag.key === l.key) || !(hover && hover.col === l.col && hover.layer === l.layer)" class="end" :cx="l.x1" :cy="l.y1" r="5.25" @pointerenter="hoverLine = l.key" @pointerleave="hoverLine = null" @pointerdown="grabEnd(l, 'a', $event)" />
+        <circle class="end" :cx="l.x2" :cy="l.y2" r="5.25" @pointerenter="hoverLine = l.key" @pointerleave="hoverLine = null" @pointerdown="grabEnd(l, 'b', $event)" />
       </g>
     </svg>
     <!-- 고른 선: 무엇과 무엇이 이어졌는지 + 끝을 끌어 옮기기 · 떼기 안내 -->
@@ -999,27 +1183,47 @@ async function removeDoc() {
 .crumb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
 .pill .tx-head { white-space: nowrap; }
 
-.canvas { position: absolute; inset: 0; overflow: auto; padding: 64px 632px 48px 48px; box-sizing: border-box; }
+.canvas { position: absolute; inset: 0; overflow: hidden; padding: 64px 632px 48px 48px; box-sizing: border-box; cursor: default; touch-action: none; }
+.canvas.panning { cursor: grabbing; }
 .canvas { transition: padding-right .24s cubic-bezier(0.2, 0, 0, 1); }
 .canvas.wide { padding-right: 912px; }
-.hint { margin: 0 0 var(--ref-spacing-12); }
-.frames { display: flex; flex-wrap: wrap; gap: 32px 44px; }
-.frame-col { position: relative; width: 176px; flex: none; transition: opacity .15s; }
-.frame-btn { display: flex; flex-direction: column; gap: var(--ref-spacing-06); width: 100%; text-align: left; }
+.bl { position: absolute; left: 16px; bottom: 16px; right: 648px; z-index: 4; display: flex; align-items: center; gap: var(--ref-spacing-08); pointer-events: none; transition: right .24s cubic-bezier(0.2, 0, 0, 1); }
+.canvas.wide .bl { right: 928px; }
+.bl > * { pointer-events: auto; }
+.hint { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none !important; }
+/* 확대 · 이동되는 층: 안의 자리는 편집기 좌표(px), 글자 · 선 두께는 --z 로 나눠서 화면에서 늘 같은 크기 */
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.world.anim { transition: transform .24s cubic-bezier(0.2, 0, 0, 1); }
+.frame-col { position: absolute; transition: opacity .15s; }
+.frame-btn { display: block; width: 100%; height: 100%; text-align: left; position: relative; }
+.ov { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.ov .ldot { pointer-events: auto; }
+/* 왼쪽 아래 막대: ID 순서 · 확대 */
+.zoombar { flex: none; display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 var(--ref-spacing-04) 0 var(--ref-spacing-06); box-sizing: border-box; }
+.zb { display: inline-flex; align-items: center; justify-content: center; gap: var(--ref-spacing-04); min-width: 28px; height: 28px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; color: var(--sys-color-neutral-800); }
+.zb:hover { --sq-fill: var(--sys-color-neutral-100); }
+.zb.on { --sq-fill: var(--sys-color-neutral-200); font-weight: 500; }
+.zb:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.zb-txt { padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-05); }
+.zb-pct { min-width: 48px; }
+.zsep { width: 1px; height: 16px; margin: 0 var(--ref-spacing-03); background: var(--iris-line); }
 .frame-btn:focus-visible { outline: none; }
-.frame-btn:focus-visible .frame { outline: 1.5px solid var(--sys-color-brand-primary-default); outline-offset: 2px; }
+.frame-btn:focus-visible .frame { outline: calc(1.5px / var(--z)) solid var(--sys-color-brand-primary-default); outline-offset: calc(2px / var(--z)); }
 .frame-col.dim { opacity: .55; }
-.frame-label { display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
+.frame-label { position: absolute; left: 0; bottom: 100%; width: calc(var(--fw) * var(--z) * 1px); box-sizing: border-box; padding-bottom: 6px; transform: scale(calc(1 / var(--z))); transform-origin: 0 100%; display: flex; align-items: center; gap: var(--ref-spacing-04); font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-500); }
 .frame-col.lit .frame-label { color: var(--iris-peek); font-weight: 500; }
-.frame-page { font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); }
+.frame-page { position: absolute; left: 0; top: 100%; width: calc(var(--fw) * var(--z) * 1px); box-sizing: border-box; padding-top: 6px; transform: scale(calc(1 / var(--z))); transform-origin: 0 0; font-size: 11px; line-height: 16px; color: var(--sys-color-neutral-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 375 × 812 화면을 176 폭으로 줄인 틀 (썸네일 전까지 자리만) */
 /* 화면 틀 = 캔버스 프레임: 편집기 캔버스처럼 모서리 없이(캔버스는 squircle 예외) — 강조 테두리도 각지게 */
-.frame { position: relative; display: block; width: 176px; height: 381px; border-radius: 0; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: 1px solid var(--iris-line); }
+.frame { position: relative; display: block; width: 100%; height: 100%; border-radius: 0; overflow: hidden; background: var(--iris-paper); box-shadow: var(--shadow-01); outline: calc(1px / var(--z)) solid var(--iris-line); }
+/* 그린 게 없는 화면 · 빈 칸 그림은 176 폭 기준으로 그린 걸 칸 크기만큼 키워요 */
+.ph { position: absolute; left: 0; top: 0; width: 176px; height: 381px; transform: scale(var(--k)); transform-origin: 0 0; }
+.ph-empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10); box-sizing: border-box; text-align: center; }
 .frame-btn:hover .frame { outline-color: var(--ref-color-gray-900-20); }
 /* 고른 화면 테두리는 연결 선과 같은 청색(사용자 요청 2026-11-27) */
-.frame-col.lit .frame { outline: 1.5px solid var(--iris-peek); outline-offset: 2px; }
-.frame-col.note .frame { outline: 2px solid #E8C14A; outline-offset: 2px; box-shadow: 0 0 0 6px rgb(232 193 74 / 22%); }
-.noframe { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--ref-spacing-04); padding: var(--ref-spacing-10); text-align: center; background: transparent; box-shadow: none; outline: 1.5px dashed var(--iris-line-strong); font-size: 12px; color: var(--sys-color-neutral-700); }
+.frame-col.lit .frame { outline: calc(1.5px / var(--z)) solid var(--iris-peek); outline-offset: calc(2px / var(--z)); }
+.frame-col.note .frame { outline: calc(2px / var(--z)) solid #E8C14A; outline-offset: calc(2px / var(--z)); box-shadow: 0 0 0 calc(6px / var(--z)) rgb(232 193 74 / 22%); }
+.noframe { background: transparent; box-shadow: none; outline: calc(1.5px / var(--z)) dashed var(--iris-line-strong); font-size: 12px; color: var(--sys-color-neutral-700); }
 .noframe b { font-weight: 600; }
 .frame-label .sid { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
 .npin { flex: none; display: inline-flex; align-items: center; height: 16px; padding: 0 4px; border-radius: 8px 8px 8px 2px; font-size: 10px; font-weight: 600; color: #8A6100; --sq-fill: #FFF1C2; }
@@ -1042,7 +1246,8 @@ async function removeDoc() {
 /* 연결 선 끝 동그라미는 잡을 수 있어요(피그마 프로토타입 연결선처럼). 고른 선은 실선 · 조금 굵게 */
 .link-lines circle.end { pointer-events: auto; cursor: grab; }
 .link-lines circle.end:hover { fill: var(--iris-peek); }
-.link-lines g.on path { stroke-width: 2; stroke-dasharray: none; }
+.link-lines g.on path:not(.hit) { stroke-width: 2; stroke-dasharray: none; }
+.link-lines path.hit { stroke: transparent; stroke-width: 12; stroke-dasharray: none; pointer-events: stroke; cursor: pointer; }
 .line-chip { position: fixed; z-index: 21; transform: translate(-50%, calc(-100% - 10px)); max-width: 320px; display: flex; flex-direction: column; gap: 2px; padding: var(--ref-spacing-05) var(--ref-spacing-07); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; line-height: 18px; pointer-events: none; }
 .line-chip b { font-weight: 600; }
 .line-chip span { color: rgb(255 255 255 / 70%); }
