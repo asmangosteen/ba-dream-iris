@@ -507,7 +507,7 @@ watch(vp, (v) => { if (following.value && followVp && (v.x !== followVp.x || v.y
 watch(following, (k) => { followVp = null; if (!k) followBySpot.value = false })
 // 커서 채팅(피그마 '/'): 캔버스 위에서 / 를 누르면 내 커서 옆 말풍선에 쳐요. 치는 대로 다른 사람에게 보여요.
 // 말풍선은 글자만큼 늘고 줄어요(줄이 넘치면 높이도). 5초 동안 안 치면 스르륵 사라지고, 다시 치면 이어서 써요.
-// Enter 는 쓰지 않아요(치는 대로 보내져요). Esc · 다른 곳 누르기 = 닫기
+// Enter 는 쓰지 않아요(치는 대로 보내져요), ⇧Enter = 줄바꿈. Esc · 다른 곳 누르기 = 닫기
 const CHAT_IDLE = 5000
 let lastPt: { x: number; y: number } | null = null
 const chatOpen = ref(false)
@@ -560,7 +560,7 @@ function onChatInput(e: Event) {
 function onChatKey(e: KeyboardEvent) {
   if (e.isComposing) return
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeChat(); return }
-  if (e.key === 'Enter') e.preventDefault() // 보내기는 따로 없어요 — 치는 대로 보이고, 멈추면 5초 뒤 사라져요(줄바꿈도 막아요)
+  if (e.key === 'Enter' && !e.shiftKey) e.preventDefault() // 보내기는 따로 없어요 — 치는 대로 보이고, 멈추면 5초 뒤 사라져요. ⇧Enter 는 줄바꿈
 }
 function onSlashKey(e: KeyboardEvent) {
   if (e.code !== 'Slash' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || chatOpen.value || commentMode.value) return
