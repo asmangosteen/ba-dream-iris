@@ -7,6 +7,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 import EmojiPicker from '~/components/editor/EmojiPicker.vue'
 import ImageLightbox from '~/components/app/ImageLightbox.vue'
 import { useImageSrc } from '~/canvas/images'
+import { floatPos, useScrollLock } from '~/composables/useFloatLayer'
 
 /**
  * 스레드 글 목록 + 답글 줄(캔버스 코멘트 창 CommentLayer 와 같은 모양 · 동작) — 문서 댓글(메모 · 게시판)에서 써요.
@@ -52,14 +53,13 @@ const canEditMsg = (c: CommentRow) => c.author_id === props.myId
 const canDeleteMsg = (c: CommentRow) => c.author_id === props.myId || props.canModerate
 
 const root = ref<HTMLElement | null>(null)
-const msgMenu = ref<{ c: CommentRow; right: number; top: number; up: boolean } | null>(null)
+/** ⋯ 메뉴 · 😊 창은 body 맨 위층(fixed)에 띄워요 — 메모 칸처럼 잘리는 칸 안에서도 잘리지 않게(사용자 요청 2026-11-27) */
+const uid = useId()
+const msgMenu = ref<{ c: CommentRow; left: number; top: number } | null>(null)
 function openMsgMenu(c: CommentRow, e: MouseEvent) {
   if (msgMenu.value?.c.id === c.id) { msgMenu.value = null; return }
   const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const t = root.value?.getBoundingClientRect()
-  if (!t) return
-  const up = b.bottom + 4 + 80 > window.innerHeight
-  msgMenu.value = { c, right: t.right - b.right, top: up ? b.top - t.top - 4 : b.bottom - t.top + 4, up }
+  msgMenu.value = { c, ...floatPos(b, 140, 76, 'below', 'right') }
 }
 const editingId = ref<string | null>(null)
 function deleteMsg(c: CommentRow) {
@@ -75,10 +75,7 @@ const whoReacted = (ids: string[]) => ids.map((id) => (id === props.myId ? tr('Y
 function openReact(c: CommentRow, e: MouseEvent) {
   if (rx.value?.c.id === c.id) { rx.value = null; return }
   const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const t = root.value?.getBoundingClientRect()
-  if (!t) return
-  const below = b.bottom + 6 + 340 <= window.innerHeight
-  rx.value = { c, left: Math.max(0, b.right - t.left - 300), top: below ? b.bottom - t.top + 6 : b.top - t.top - 6 - 340 }
+  rx.value = { c, ...floatPos(b, 300, 344, 'below', 'right', 6) }
 }
 function pickReaction(emoji: string) { const r = rx.value; rx.value = null; if (r) emit('react', r.c, emoji) }
 function onDocDown(e: PointerEvent) {
@@ -87,6 +84,8 @@ function onDocDown(e: PointerEvent) {
   if (msgMenu.value && !el?.closest?.('.msg-more')) msgMenu.value = null
 }
 onMounted(() => document.addEventListener('pointerdown', onDocDown, true))
+// 열려 있는 동안 뒤 화면은 스크롤되지 않아요(창 안은 그대로)
+useScrollLock(() => !!rx.value || !!msgMenu.value, (el) => !!el.closest(`[data-ctv="${uid}"]`))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocDown, true))
 const imgCount = (c: CommentRow) => c.attachments?.length ?? 0
 /** 붙인 이미지 크게 보기(공용 ImageLightbox) — 썸네일은 작은 1:1(사용자 요청 2026-11-27) */
@@ -121,12 +120,14 @@ function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachmen
         <button type="button" :class="['sq', 'pop-x', 'rx-add', { on: rx?.c.id === c.id }]" :aria-label="tr('Add reaction')" :data-tip="tr('Add reaction')" @click="openReact(c, $event)"><EditorIcon name="emoji" :size="16" /></button>
       </div>
     </div>
-    <div v-if="msgMenu" class="sq menu mm msg-more msg-menu" role="menu" :style="{ right: msgMenu.right + 'px', top: msgMenu.top + 'px', transform: msgMenu.up ? 'translateY(-100%)' : undefined }">
+    <Teleport to="body">
+    <div v-if="msgMenu" :data-ctv="uid" class="sq menu mm msg-more msg-menu" role="menu" :style="{ left: msgMenu.left + 'px', top: msgMenu.top + 'px' }">
       <button v-if="canEditMsg(msgMenu.c)" type="button" role="menuitem" class="sq menu-item" @click="editingId = msgMenu!.c.id; msgMenu = null">{{ tr('Edit') }}</button>
       <button v-if="canDeleteMsg(msgMenu.c)" type="button" role="menuitem" class="sq menu-item danger" @click="deleteMsg(msgMenu!.c)">{{ msgMenu.c.id === thread.root.id ? tr('Delete thread') : tr('Delete') }}</button>
     </div>
     <ImageLightbox v-model:index="lb.index" :images="lb.images" />
-      <EmojiPicker v-if="rx" class="rx-pick" :style="{ left: rx.left + 'px', top: rx.top + 'px' }" @pick="pickReaction" @close="rx = null" />
+      <EmojiPicker v-if="rx" :data-ctv="uid" class="rx-pick" :style="{ left: rx.left + 'px', top: rx.top + 'px' }" @pick="pickReaction" @close="rx = null" />
+    </Teleport>
     <div v-if="reply" class="foot">
       <MemberAvatar :name="me?.name ?? '?'" :src="me?.avatar" :size="24" class="fa" />
       <CommentComposer :key="thread.root.id" compact :autofocus="autofocus" :busy="busy" :people="people" placeholder="Reply" class="grow" @send="(b, m, a) => emit('reply', thread.root, b, m, a)" @cancel="emit('cancel')" />
@@ -146,7 +147,7 @@ function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachmen
 .msg-more { position: relative; margin-left: auto; opacity: 0; }
 .msg:hover .msg-more, .msg-more.on, .msg-more:focus-within { opacity: 1; }
 .mb-x { width: 28px; height: 24px; }
-.msg-menu { position: absolute; left: auto; bottom: auto; width: 140px; z-index: 8; opacity: 1; margin: 0; }
+.msg-menu { position: fixed; right: auto; bottom: auto; width: 140px; box-sizing: border-box; z-index: 1000; opacity: 1; margin: 0; }
 .ed { margin-left: 32px; }
 .body { margin: 0; padding-left: 32px; color: var(--sys-color-neutral-800); white-space: pre-wrap; overflow-wrap: anywhere; }
 .at { font-weight: 500; color: var(--sys-color-brand-primary-default); }
@@ -161,7 +162,7 @@ function viewImage(c: CommentRow, i: number) { lb.value = { images: (c.attachmen
 .rx:hover { --sq-fill: var(--sys-color-neutral-200); }
 .rx.me { --sq-fill: var(--sys-color-brand-primary-lightest); --sq-line: var(--sys-color-brand-primary-default); color: var(--sys-color-brand-primary-default); }
 .rx-e { font-size: 16px; line-height: 1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
-.rx-pick { position: absolute; z-index: 8; }
+.rx-pick { position: fixed; z-index: 1000; }
 .rx-img { margin-top: 0; margin-left: auto; align-self: flex-start; }
 .imgs { padding-left: 32px; display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .img { display: block; width: 64px; height: 64px; flex: none; padding: 0; border-radius: var(--ref-radius-04); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; cursor: zoom-in; }

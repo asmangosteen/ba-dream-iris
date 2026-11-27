@@ -34,9 +34,11 @@ const props = withDefaults(defineProps<{
   compact?: boolean
   /** 화면이 하나라도 연결된 요구사항 id — 없는 것(프레임을 지워 연결이 끊긴 것 등)은 번호를 빨갛게. 안 주면 색 구분 안 함 */
   linked?: string[] | null
+  /** 고른 메모가 가리키는 자리(블록 · 표 행 · 고른 글) — 노란 하이라이트 밑줄 */
+  noteMark?: { block?: string | null; row?: number | null; quote?: string | null } | null
   /** 직접 만든 정책(문서 표 밖)에 지우기 버튼 보이기 */
   removable?: boolean
-}>(), { highlight: null, compact: false, linked: null, removable: false })
+}>(), { highlight: null, compact: false, linked: null, removable: false, noteMark: null })
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
@@ -111,6 +113,21 @@ const reqsByBlock = computed(() => {
   return map
 })
 
+/**
+ * 메모 자리 노란 밑줄(사용자 요청 2026-11-27): 고른 메모의 블록(표면 그 행) 안에서 고른 글을 찾아 그 부분만,
+ * 여러 칸에 걸쳐 고른 글이면 그 글에 들어 있는 칸 글 전체를 표시해요
+ */
+const squash = (t: string) => t.replace(/\s+/g, ' ').trim()
+function hl(t: string, block: string, row: number | null = null): { t: string; m: boolean }[] {
+  const nm = props.noteMark
+  const q = nm?.quote ? squash(nm.quote) : ''
+  if (!nm || !q || nm.block !== block || (row !== null && nm.row != null && nm.row !== row)) return [{ t, m: false }]
+  const i = t.indexOf(q)
+  if (i >= 0) return [{ t: t.slice(0, i), m: false }, { t: t.slice(i, i + q.length), m: true }, { t: t.slice(i + q.length), m: false }].filter((x) => x.t)
+  const st = squash(t)
+  if (st && q.includes(st)) return [{ t, m: true }]
+  return [{ t, m: false }]
+}
 function segments(t: string): Seg[] {
   const re = codeRe.value
   if (!re) return [{ t }]
@@ -371,7 +388,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
                   <button v-if="s.req" type="button" :class="['sq', 'pid', 'num', { nolink: unlinked(s.req.id) }]" :aria-pressed="highlight === s.req.id" :title="unlinked(s.req.id) ? s.req.title + ' · ' + tr('Not drawn in any frame') : s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
                   <span v-else-if="s.policy" class="sq pid num missing" :title="tr('Not in the policy table')">{{ s.t }}</span>
                   <button v-else-if="s.slot" type="button" class="sq sid num" :title="tr('Go to the screen slot')" @click="emit('pick-slot', s.slot)">{{ s.t }}</button>
-                  <template v-else>{{ s.t }}</template>
+                  <template v-else><template v-for="(x, xi) in hl(s.t, b.id, ri + 1)" :key="xi"><mark v-if="x.m" class="nmark">{{ x.t }}</mark><template v-else>{{ x.t }}</template></template></template>
                 </template>
                 <span v-if="ci === 1 && rowMarks(b, ri + 1).length" class="marks">
                   <span v-for="m in rowMarks(b, ri + 1)" :key="m" :class="['sq', 'mark', m]">{{ MARK_ICON[m] === '〔〕' ? '〔' + tr(MARK_LABEL[m]) + '〕' : MARK_ICON[m] + ' ' + tr(MARK_LABEL[m]) }}</span>
@@ -393,13 +410,13 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <span v-if="headerReqs(b).length" class="codes">
           <template v-for="r in headerReqs(b)" :key="r.id">
             <button type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? tr('Not drawn in any frame') : undefined" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
-            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete policy {code}', { code: r.code })" :data-tip="tr('Delete policy')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="12" /></button>
+            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete policy {code}', { code: r.code })" :data-tip="tr('Delete policy')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="16" /></button>
           </template>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
           <template v-for="(s, i) in segments(b.text)" :key="i">
             <button v-if="s.req" type="button" :class="['sq', 'code', 'num', { nolink: unlinked(s.req.id) }]" :aria-pressed="highlight === s.req.id" :title="unlinked(s.req.id) ? s.req.title + ' · ' + tr('Not drawn in any frame') : s.req.title" @click="emit('pick-req', s.req.id)" @mouseenter="emit('hover-req', s.req.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ s.t }}</button>
-            <template v-else>{{ s.t }}</template>
+            <template v-else><template v-for="(x, xi) in hl(s.t, b.id)" :key="xi"><mark v-if="x.m" class="nmark">{{ x.t }}</mark><template v-else>{{ x.t }}</template></template></template>
           </template>
         </component>
       </div>
@@ -453,8 +470,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .blk p, .blk h3 { margin: 0; }
 .compact .blk.marked { padding: var(--ref-spacing-06) var(--ref-spacing-07); }
 .codes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ref-spacing-04); }
-/* 직접 만든 정책 지우기: 카드에 마우스를 올렸을 때만 */
-.rm { width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; }
+/* 직접 만든 정책 지우기: 카드 오른쪽 위, 마우스를 올렸을 때만(사용자 요청 2026-11-27) */
+.rm { position: absolute; top: var(--ref-spacing-04); right: var(--ref-spacing-04); width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; }
 .blk:hover .rm, .rm:focus-visible { opacity: 1; }
 .rm:hover { color: var(--sys-color-theme-error-default); --sq-fill: var(--sys-color-neutral-100); }
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); text-align: inherit; }
@@ -510,6 +527,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .mark.dev_check { color: #1F63BD; --sq-fill: #EEF5FD; }
 
 .tool.below { transform: translate(-50%, 0); }
+/* 메모 자리: 노란 하이라이트 + 밑줄 */
+.nmark { background: #FFF1C2; color: inherit; border-radius: 2px; text-decoration: underline; text-decoration-color: #E8C14A; text-decoration-thickness: 2px; text-underline-offset: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .tool { position: absolute; z-index: 4; transform: translate(-50%, -100%); display: flex; padding: var(--ref-spacing-02); border-radius: var(--ref-radius-06); --sq-fill: var(--sys-color-neutral-800); filter: drop-shadow(0 8px 16px rgb(69 76 88 / 24%)); white-space: nowrap; }
 .tool-btn { display: flex; align-items: center; gap: var(--ref-spacing-04); height: 26px; padding: 0 var(--ref-spacing-08); font-size: 12px; line-height: 18px; font-weight: 500; color: var(--sys-color-common-white-default); border-radius: var(--ref-radius-04); }
 .tool-btn:hover { --sq-fill: rgb(253 253 253 / 12%); }

@@ -291,4 +291,5 @@ export default {
   'Write the policy IDs this screen follows in the Policy column of {code}': '{code}의 \'정책\' 열에 이 화면이 따르는 정책 번호를 적으세요',
   'Add {code} to a screen’s Policy column — or if it has no screen, write 〔화면 없음〕 after the policy name': '화면의 \'정책\' 열에 {code}을 넣거나, 화면이 없는 정책이면 정책 이름 뒤에 〔화면 없음〕을 적으세요',
   'Give one of the {code} rows a new number': '{code} 행 중 하나에 새 번호를 주세요',
+  'Whole block': '블록 전체',
 } satisfies Record<string, string>

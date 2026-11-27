@@ -195,6 +195,9 @@ function goBlock(at: { block: string; row: number | null }) {
 }
 /** 고른 문서 탭이 탭 줄 끝에 잘리지 않게: 고를 때마다 탭 전체가 보이도록 옆으로 넘겨요(사용자 요청 2026-11-27) */
 const tabsEl = ref<HTMLElement | null>(null)
+/** 문서를 바꾸면 이 화면이 새로 그려져서, 탭 줄 스크롤 위치를 기억해 두고 그 자리에서 부드럽게 넘겨요(사용자 요청 2026-11-27) */
+const tabsScroll = useState(`doc-tabs-scroll-${projectId}`, () => 0)
+function onTabsScroll() { if (tabsEl.value) tabsScroll.value = tabsEl.value.scrollLeft }
 function revealTab(smooth = true) {
   nextTick(() => {
     const nav = tabsEl.value
@@ -208,7 +211,10 @@ function revealTab(smooth = true) {
 }
 watch(docId, () => revealTab())
 watch(() => docs.data.value?.length, () => revealTab(false))
-onMounted(() => revealTab(false))
+onMounted(() => {
+  if (tabsEl.value) tabsEl.value.scrollLeft = tabsScroll.value
+  revealTab(true)
+})
 /** 직접 만든 정책(#12) 지우기 — 문서 표에서 읽은 정책은 문서에서 그 행을 지우면 '문서에서 빠짐'으로 남아요 */
 const confirmReq = ref<ReqRow | null>(null)
 const removingReq = ref(false)
@@ -489,7 +495,7 @@ async function removeDoc() {
     <!-- 오른쪽: 문서 -->
     <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesShown }]">
       <div class="doc-tabs">
-        <nav ref="tabsEl" class="seg tabs" :aria-label="tr('Choose a document')">
+        <nav ref="tabsEl" class="seg tabs" @scroll.passive="onTabsScroll" :aria-label="tr('Choose a document')">
           <NuxtLink
             v-for="d in docs.data.value ?? []"
             :key="d.id"
@@ -547,6 +553,7 @@ async function removeDoc() {
             :doc="doc"
             :reqs="docReqs"
             :highlight="activeReq ?? noteReqId"
+            :note-mark="noteThread?.root.doc_anchor ?? null"
             :linked="links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))] : null"
             @pick-req="pickReq"
             @pick-slot="pickSlot"

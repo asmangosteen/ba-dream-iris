@@ -6,6 +6,7 @@ import ImageLightbox from '~/components/app/ImageLightbox.vue'
 import { Button } from '@ba-dream/design-system'
 import { mentionIds } from '~/composables/useComments'
 import { MediaTooLargeError, prepareImage, useImageSrc } from '~/canvas/images'
+import { floatPos, useScrollLock } from '~/composables/useFloatLayer'
 
 /**
  * 코멘트 입력칸(피그마와 같아요): Enter 보내기 · ⇧Enter 줄바꿈 · Esc 닫기. @ 를 치면 이 프로젝트 멤버를 골라 넣어요(멘션 → 알림).
@@ -80,33 +81,29 @@ function startMention() {
 
 // --- 이모지 ---
 const emojiOpen = ref(false)
-/**
- * 떠 있는 목록이 잘리지 않게(사용자 요청 2026-11-27): 열 때 입력칸을 감싼 스크롤 · 잘림 영역(없으면 창)에서
- * 아래 · 위 남은 공간을 재서, 멘션 목록은 아래가 모자라면 위로, 이모지 창은 위가 모자라면 아래로 열어요
- */
-const mentionUp = ref(false)
-const emojiDown = ref(false)
-function clipBox(el: HTMLElement): { top: number; bottom: number } {
-  for (let p = el.parentElement; p; p = p.parentElement) {
-    const o = getComputedStyle(p)
-    if (/(auto|scroll|hidden|clip)/.test(o.overflowY)) { const r = p.getBoundingClientRect(); return { top: Math.max(r.top, 0), bottom: Math.min(r.bottom, window.innerHeight) } }
-  }
-  return { top: 0, bottom: window.innerHeight }
+// 멘션 목록(줄 32 × 사람 수 + 위아래 8) · 이모지 창(300 × 약 340): body 맨 위층(fixed)에 띄워 칸 밖으로 잘리지 않게(사용자 요청 2026-11-27)
+const mentionAt = ref<{ left: number; top: number } | null>(null)
+const emojiAt = ref<{ left: number; top: number } | null>(null)
+function placeMention() {
+  const n = matches.value.length
+  if (!n || !root.value) { mentionAt.value = null; return }
+  const h = Math.min(n * 32 + 12, 280)
+  mentionAt.value = floatPos(root.value.getBoundingClientRect(), 240, h, props.up ? 'above' : 'below')
 }
-function room(): { above: number; below: number } {
-  const el = root.value
-  if (!el) return { above: 9999, below: 9999 }
-  const r = el.getBoundingClientRect(), c = clipBox(el)
-  return { above: r.top - c.top, below: c.bottom - r.bottom }
+function placeEmoji() {
+  if (!emojiOpen.value || !root.value) { emojiAt.value = null; return }
+  emojiAt.value = floatPos(root.value.getBoundingClientRect(), 300, 344, 'above')
 }
-// 멘션 목록(줄 32 × 사람 수 + 위아래 8) · 이모지 창(약 340)
-watch(() => matches.value.length, (n) => { if (!n) return; const need = Math.min(n * 32 + 12, 280); const { above, below } = room(); mentionUp.value = below < need && above > below })
-watch(emojiOpen, (v) => { if (!v) return; const { above, below } = room(); emojiDown.value = above < 344 && below > above })
+watch(() => matches.value.length, () => nextTick(placeMention))
+watch(emojiOpen, () => nextTick(placeEmoji))
+watch(text, () => { if (matches.value.length) nextTick(placeMention) })
+// 열려 있는 동안 뒤 화면은 스크롤되지 않아요(창 안은 그대로)
+useScrollLock(() => emojiOpen.value || !!matches.value.length, (el) => !!el.closest(`[data-cc="${uid}"]`))
 function onEmoji(e: string) { emojiOpen.value = false; insert(e) }
 /** 바깥을 누르면 이모지 창을 닫아요 */
 function onDocDown(e: PointerEvent) {
   const t = e.target as Element | null
-  if (emojiOpen.value && !root.value?.contains(t)) emojiOpen.value = false
+  if (emojiOpen.value && !root.value?.contains(t) && !t?.closest?.(`[data-cc="${uid}"]`)) emojiOpen.value = false
   // 멘션 목록: 목록 바깥을 누르면 닫아요(입력칸을 눌러도 — 다시 @ 를 치면 또 열려요)
   if (q.value !== null && !t?.closest?.('.mm')) q.value = null
 }
@@ -223,12 +220,14 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
       </div>
       <input ref="fileEl" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple class="sr" tabindex="-1" aria-hidden="true" @change="onFile">
     </div>
-    <div v-if="matches.length" :id="`${uid}-m`" :class="['sq', 'menu', 'mm', { up: up || mentionUp }]" role="listbox" :aria-label="tr('Mention someone')">
+    <Teleport to="body">
+    <div v-if="matches.length && mentionAt" :id="`${uid}-m`" :data-cc="uid" class="sq menu mm" :style="{ left: mentionAt.left + 'px', top: mentionAt.top + 'px' }" role="listbox" :aria-label="tr('Mention someone')">
       <button v-for="(p, i) in matches" :key="p.id" type="button" role="option" :aria-selected="i === pick" :class="['sq', 'menu-item', { on: i === pick }]" @mousedown.prevent="choose(p)">
         <MemberAvatar :name="p.name" :src="p.avatar" :size="20" /><span class="f1">{{ p.name }}</span><span v-if="p.role" class="tx-meta">{{ tr(p.role) }}</span>
       </button>
     </div>
-    <EmojiPicker v-if="emojiOpen" :class="['emo', { down: emojiDown }]" @pick="onEmoji" @close="emojiOpen = false; ta?.focus()" />
+    <EmojiPicker v-if="emojiOpen && emojiAt" :data-cc="uid" class="emo" :style="{ left: emojiAt.left + 'px', top: emojiAt.top + 'px' }" @pick="onEmoji" @close="emojiOpen = false; ta?.focus()" />
+    </Teleport>
   </div>
 </template>
 
@@ -281,11 +280,9 @@ onMounted(() => { nextTick(() => { grow(); if (props.autofocus || props.editing)
 /* 고치기 버튼(Cancel · Save): 높이 28, 사이 4 */
 .tools :deep(.bd-button) { height: 28px; min-height: 28px; }
 .tools :deep(.bd-button + .bd-button) { margin-left: var(--ref-spacing-02); }
-.mm { top: calc(100% + 4px); left: 0; right: auto; width: 240px; z-index: 5; }
-.mm.up { top: auto; bottom: calc(100% + 4px); }
+.mm { position: fixed; right: auto; bottom: auto; width: 240px; box-sizing: border-box; z-index: 1000; }
 /* 멘션 줄: 아바타(20)보다 위아래 여유 있게 32 — 공용 검은 메뉴는 줄 높이 24 를 !important 로 정해요 */
 .mm .menu-item { height: 32px !important; min-height: 32px; }
-.emo { position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 6; }
-.emo.down { bottom: auto; top: calc(100% + 4px); }
+.emo { position: fixed; z-index: 1000; }
 .sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 </style>
