@@ -185,11 +185,8 @@ const isOn = (b: ViewBlock) => b.type !== 'table' && !!props.highlight && (reqsB
 const fileName = computed(() => (props.doc.file_path ?? '').split('/').pop() ?? '')
 const fileLabel = computed(() => (props.doc.file_type ?? '').toUpperCase())
 const DOC_STATUS_LABEL: Record<NonNullable<DocRow['status']>, string> = { draft: 'Draft', review: 'In review', confirmed: 'Confirmed' }
-const meta = computed(() => {
-  const d = props.doc
-  const src = d.source_type === 'upload' && d.file_type ? fileLabel.value : tr(DOC_SOURCE_LABEL[d.source_type])
-  return [tr(DOC_CATEGORY_LABEL[d.category]), src, relativeTime(d.updated_at), d.version_label].filter(Boolean).join(' · ')
-})
+/** 머리 아래 줄: 약어 · 상태 칩과 버튼만(분류 · 출처 · 시각 · 버전 글은 빼요 — 사용자 요청 2026-11-27) */
+const hasMeta = computed(() => !!props.doc.abbr || !!props.doc.status || props.compact || (props.doc.source_type === 'upload' && !showFileCard.value && !preview && !!props.doc.file_path))
 const linkFailed = computed(() => props.doc.source_type === 'link' && !text.value.trim() && props.doc.fetch_status === 'failed')
 const showFileCard = computed(() => props.doc.source_type === 'upload' && !text.value.trim())
 const linkHost = computed(() => {
@@ -294,10 +291,9 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <h1 v-else class="tx-title">{{ doc.title }}</h1>
         <div v-if="$slots.actions" class="acts"><slot name="actions" /></div>
       </div>
-      <div class="tx-meta meta">
+      <div v-if="hasMeta" class="tx-meta meta">
         <span v-if="doc.abbr" class="sq dchip abbr" :data-tip="tr('Document abbreviation')">{{ doc.abbr }}</span>
         <span v-if="doc.status" :class="['sq', 'dchip', 'st', doc.status]">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
-        <span>{{ meta }}</span>
         <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(wideHref)">{{ tr('Open wide') }}</TextButton>
         <TextButton v-if="compact" size="s" color="blue" @click="navigateTo(editHref)">{{ tr('Edit') }}</TextButton>
         <TextButton v-if="doc.source_type === 'upload' && !showFileCard && !preview && doc.file_path" size="s" color="blue" contents="text-icon" icon-name="arrow_up_right" :loading="opening" @click="openFile">{{ tr('Original') }}</TextButton>
