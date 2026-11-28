@@ -2121,10 +2121,6 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div class="sec-h"><span>{{ tr('Layers') }}</span><button class="ib s24" :aria-label="tr('Collapse all layers')" :data-tip="tr('Collapse all layers') + ' · ⌥L'" @click="layerTree?.collapseAll()"><EditorIcon name="layers_collapse_all" /></button></div>
           <div v-ovscroll class="lbody" @scroll="onPaneScroll">
             <LayerTree ref="layerTree" :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" :cover-id="project.data.value?.cover_screen_id ?? null" @thumbnail="onThumbnail" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
-            <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
-              <span class="tx-meta">{{ tr('No frames yet') }}</span>
-              <TextButton size="s" color="blue" @click="tool = 'frame'">{{ tr('Draw frame') }}</TextButton>
-          </div>
           </div>
         </section>
       </template>
