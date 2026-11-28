@@ -407,6 +407,7 @@ export default {
   'Close — import keeps going': '닫기 — 가져오기는 계속돼요',
   'Coming soon': '곧 열려요',
   'Editable layers': '편집 가능한 레이어',
+  'Turning frames into editable layers is still being built. For now they come in as thumbnails, and you can convert them once it’s ready': '레이어로 바꾸는 기능은 아직 만드는 중이에요. 지금은 그림으로 들어오고, 기능이 열리면 바꿀 수 있어요',
   'Thumbnail': '그림만',
   'Import as': '가져오는 방식',
   'Every frame inside — you pick which ones in a list': '안에 있는 프레임 전부 — 목록에서 골라요',

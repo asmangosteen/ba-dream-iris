@@ -127,16 +127,20 @@ function togglePick(r: Row, e: MouseEvent) {
   const b = el.getBoundingClientRect()
   // 팝업(.pop)에 filter 가 있어 fixed 의 기준이 팝업이에요 — 팝업 기준 좌표로
   const p = el.closest('.pop')?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight)
-  const below = window.innerHeight - b.bottom > 240
+  // 메뉴 높이(최대 224 + 안쪽 여백) — 팝업 안에서 아래 자리가 모자라면 위로, 둘 다 모자라면 넓은 쪽
+  const need = Math.min(232, Math.max(1, slotChoices.value.length) * 32 + 12)
+  const down = p.bottom - b.bottom - 8, up = b.top - p.top - 8
+  const below = down >= need || down >= up
   pickPos.value = below ? { left: b.left - p.left + 'px', top: b.bottom - p.top + 4 + 'px', bottom: 'auto' } : { left: b.left - p.left + 'px', top: 'auto', bottom: p.bottom - b.top + 4 + 'px' }
   pickOpen.value = r.id
 }
 const slotChoices = computed(() => (slotsQ.data.value ?? []).filter((s) => !s.removed_at))
+const pickRow = computed(() => rows.value.find((r) => r.id === pickOpen.value) ?? null)
 /** 바깥 누르기 = 닫기만(서비스 공통 규칙: pointerdown capture) · 표를 스크롤하면 닫기 */
-function onPickOutside(e: PointerEvent) { if (pickOpen.value && !(e.target as HTMLElement).closest?.('.fi-pick')) pickOpen.value = null }
+function onPickOutside(e: PointerEvent) { if (pickOpen.value && !(e.target as HTMLElement).closest?.('.fi-pick, .fi-menu')) pickOpen.value = null }
 onMounted(() => document.addEventListener('pointerdown', onPickOutside, true))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onPickOutside, true))
-function chooseSlot(r: Row, s: SlotRow) { r.slot = s; r.checked = true; pickOpen.value = null }
+function chooseSlot(r: Row, s: SlotRow) { r.slot = s; r.state = null; r.match = "new"; r.checked = true; pickOpen.value = null }
 const size = (r: { width: number; height: number }) => `${r.width} × ${r.height}`
 
 // ---------------------------------------------------------------------------
@@ -417,7 +421,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                   <span v-if="segLine(i)" class="segc-sep" aria-hidden="true" /><span>{{ tr(f.label) }}</span><span class="n num">{{ fCount(f.key) }}</span>
                 </button>
               </div>
-              <div class="sq fi-box">
+              <div class="sqc fi-box"><div class="sqc fi-box-in">
                 <div class="fi-tr fi-th">
                   <span class="fi-c"><button type="button" role="checkbox" :aria-checked="someOn ? 'mixed' : allOn" :aria-label="tr('Select all')" :class="['cb', { on: allOn, mix: someOn }]" @click="toggleAll"><i class="sq" /></button></span>
                   <span>{{ tr('Frame') }}</span><span>{{ tr('Screen slot') }}</span><span>{{ tr('Result') }}</span>
@@ -435,18 +439,12 @@ async function previewScan(raw: string): Promise<ScanResult> {
                       <span v-else-if="r.match === 'again'" class="tx-meta">{{ r.existing?.slotCode ?? tr('Not attached') }}</span>
                       <div v-else class="fi-pick">
                         <button type="button" class="sq fi-pick-b" :aria-expanded="pickOpen === r.id" @click="togglePick(r, $event)">{{ tr('Choose a slot') }}<EditorIcon name="chevron_down" :size="12" /></button>
-                        <div v-if="pickOpen === r.id" class="sq menu fi-menu" role="menu" :style="pickPos">
-                          <div class="menu-sc">
-                            <p v-if="!slotChoices.length" class="tx-meta fi-menu-empty">{{ tr('No screen slots yet — add a document with a screen table') }}</p>
-                            <button v-for="s in slotChoices" :key="s.id" type="button" role="menuitem" class="sq menu-item" @click="chooseSlot(r, s)"><span class="ellipsis">{{ s.code }} {{ s.name }}</span></button>
-                          </div>
-                        </div>
                       </div>
                     </span>
                     <span><span :class="['sq', 'fi-res', RESULT[r.match].cls]">{{ tr(RESULT[r.match].label) }}</span></span>
                   </div>
                 </div>
-              </div>
+              </div></div>
             </template>
           </template>
 
@@ -485,6 +483,9 @@ async function previewScan(raw: string): Promise<ScanResult> {
             </div>
           </template>
 
+          <!-- 편집 가능한 레이어: 고를 수 있지만 레이어로 바꾸는 기능은 다음 작업 — 지금은 그림으로 들어온다고 분명히 알려요 -->
+          <p v-if="importAs === 'layers' && (step === 'list' || step === 'frame')" class="sq fi-note"><EditorIcon name="info" :size="16" class="fi-note-ic" /><span>{{ tr('Turning frames into editable layers is still being built. For now they come in as thumbnails, and you can convert them once it’s ready') }}</span></p>
+
           <!-- 4 가져오는 중 -->
           <template v-if="step === 'run'">
             <div class="fi-prog">
@@ -495,7 +496,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
               <EditorIcon name="clock" :size="16" class="fi-note-ic" />
               <span class="fi-col"><b>{{ tr('Figma asked us to slow down — continuing in {s}s', { s: waitLeft }) }}</b><span>{{ tr('Nothing is lost. The rest picks up on its own.') }}</span></span>
             </div>
-            <div class="sq fi-box">
+            <div class="sqc fi-box"><div class="sqc fi-box-in">
               <div v-ovscroll class="fi-rows">
                 <div v-for="r in runRows" :key="r.id" class="fi-tr run">
                   <span class="fi-c"><span :class="['fi-st', run.status[r.id]]" aria-hidden="true"><EditorIcon v-if="run.status[r.id] === 'done'" name="check" :size="12" /><EditorIcon v-else-if="run.status[r.id] === 'failed'" name="close" :size="12" /></span></span>
@@ -503,7 +504,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                   <span :class="['tx-meta', { warnt: run.status[r.id] === 'waiting' }]">{{ run.status[r.id] === 'done' ? tr('Done') : run.status[r.id] === 'failed' ? tr('Failed') : run.status[r.id] === 'waiting' ? tr('Waiting {s}s', { s: waitLeft }) : tr('Next') }}</span>
                 </div>
               </div>
-            </div>
+            </div></div>
             <span class="tx-meta">{{ tr('You can close this window — import keeps going and you’ll be told when it’s done') }}</span>
           </template>
 
@@ -523,13 +524,13 @@ async function previewScan(raw: string): Promise<ScanResult> {
             </div>
             <div v-if="attention.length" class="fi-att">
               <b>{{ tr('Needs a look') }}</b>
-              <div class="sq fi-box">
+              <div class="sqc fi-box"><div class="sqc fi-box-in">
                 <div v-ovscroll class="fi-rows short">
                   <div v-for="(a, i) in attention" :key="i" class="fi-tr att">
                     <span class="fi-slot"><span class="sq fi-res warn">{{ tr(ATT[a.kind]) }}</span><span v-if="a.code" class="sq fi-sid">{{ a.code }}</span><span class="ellipsis">{{ a.name }}<span v-if="a.extra" class="tx-meta"> · {{ a.extra }}</span></span></span>
                   </div>
                 </div>
-              </div>
+              </div></div>
             </div>
             <div v-if="result.links" class="sq fi-links">
               <span class="sq fi-pid num">{{ result.links }}</span><span>{{ tr('requests are now linked to these screens as Unchecked') }}</span>
@@ -537,13 +538,20 @@ async function previewScan(raw: string): Promise<ScanResult> {
           </template>
         </div>
 
+        <!-- 화면 칸 고르기 메뉴: 표(스크롤 · 잘라내기 칸) 밖, 팝업 바로 아래에 둬요 — 아래 자리가 모자라면 위로 -->
+        <div v-if="pickRow" class="sq menu fi-menu" role="menu" :style="pickPos">
+          <div class="menu-sc">
+            <p v-if="!slotChoices.length" class="tx-meta fi-menu-empty">{{ tr('No screen slots yet — add a document with a screen table') }}</p>
+            <button v-for="s in slotChoices" :key="s.id" type="button" role="menuitem" class="sq menu-item" @click="chooseSlot(pickRow, s)"><span class="ellipsis">{{ s.code }} {{ s.name }}</span></button>
+          </div>
+        </div>
         <footer class="pop-foot" :class="{ 'fi-foot': step === 'list' || step === 'frame' }">
           <!-- 가져오는 방식: 그림만(기본) — 편집 가능한 레이어는 다음에 열려요 -->
           <div v-if="step === 'list' || step === 'frame'" class="fi-as">
             <span class="tx-meta">{{ tr('Import as') }}</span>
-            <div class="sq segc" role="radiogroup" :aria-label="tr('Import as')" style="grid-template-columns: repeat(2, auto); width: auto">
+            <div class="sq segc fi-as-seg" role="radiogroup" :aria-label="tr('Import as')">
               <button type="button" role="radio" :aria-checked="importAs === 'thumb'" :class="['sq', 'segc-i', { on: importAs === 'thumb' }]" @click="importAs = 'thumb'">{{ tr('Thumbnail') }}</button>
-              <button type="button" role="radio" aria-checked="false" aria-disabled="true" class="sq segc-i fi-soon" :data-tip="tr('Coming soon')">{{ tr('Editable layers') }}</button>
+              <button type="button" role="radio" :aria-checked="importAs === 'layers'" :class="['sq', 'segc-i', { on: importAs === 'layers' }]" @click="importAs = 'layers'">{{ tr('Editable layers') }}</button>
             </div>
           </div>
           <div class="fi-btns">
@@ -601,7 +609,9 @@ async function previewScan(raw: string): Promise<ScanResult> {
 .fi-pids { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 
 /* 2: 표 — 옅은 테두리 칸 안, 머리 줄 회색 */
-.fi-box { border-radius: var(--ref-radius-06); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; overflow: hidden; }
+.fi-box { border-radius: var(--ref-radius-06); padding: 1px; background: var(--iris-line-strong); }
+/* 테두리 = 바깥 칸 바탕 1px(선 그림자 대신 — 안에 스크롤 칸이 있으면 squircle 선이 두껍게 번지는 문제가 있어서) */
+.fi-box-in { border-radius: calc(var(--ref-radius-06) - 1px); background: var(--sys-color-common-white-default); overflow: hidden; }
 .fi-tr { display: grid; grid-template-columns: 36px minmax(0, 1.25fr) minmax(0, 1fr) 128px; align-items: center; min-height: 52px; box-shadow: inset 0 -1px 0 var(--iris-line); }
 .fi-tr > span { min-width: 0; padding: 0 var(--ref-spacing-06); }
 .fi-tr > .fi-c { display: grid; place-items: center; padding: 0; }
@@ -673,6 +683,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
 .fi-foot { justify-content: space-between; }
 .fi-as { display: flex; align-items: center; gap: var(--ref-spacing-06); }
 .fi-btns { display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.fi-soon { opacity: .45; cursor: not-allowed; }
+/* 가져오는 방식 세그먼트: 두 칸 같은 폭, 글자 좌우 여백 넉넉히(다른 세그먼트와 같은 높이 32) */
+.fi-as-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 248px; }
 .ellipsis { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
