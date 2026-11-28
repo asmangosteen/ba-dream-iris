@@ -11,3 +11,8 @@ await navigateTo(p ? `/project/${encodeURIComponent(p)}?view=requests` : '/docum
 <template>
   <div />
 </template>
+
+<style scoped>
+/* 예전 이 화면엔 스타일이 있었어요 — 개발 서버가 그 스타일 조각을 계속 찾을 때 오류가 나지 않게 빈 자리를 남겨 둬요 */
+div { display: none; }
+</style>

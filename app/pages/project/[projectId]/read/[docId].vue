@@ -228,10 +228,11 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
 .chip.line { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .f1 { flex: 1; }
-.dhead { flex: none; display: flex; align-items: flex-start; gap: var(--ref-spacing-08); padding: var(--ref-spacing-10) var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 1; }
-.dh-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.dhead { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-08); padding: var(--ref-spacing-10) var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 1; }
+/* 제목 · 칩 한 줄(칩은 제목 오른쪽 옆, 사이 8 · 칩끼리 4) */
+.dh-col { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ref-spacing-06); }
 .dh-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dh-chips { display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.dh-chips { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .acts { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); }
 /* 문서 칩(DocReader .dchip 과 같아요) */
 .dchip { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
