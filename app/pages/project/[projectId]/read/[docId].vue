@@ -159,7 +159,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .body { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-14); }
 .col { width: min(760px, 100%); margin: 0 auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
 
-.side { flex: 0 0 320px; box-sizing: border-box; overflow: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12); }
+.side { flex: 0 0 320px; box-sizing: border-box; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12); }
 .rhead { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .rtitle { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
 .hsep { flex: none; height: 1px; background: var(--iris-line); }

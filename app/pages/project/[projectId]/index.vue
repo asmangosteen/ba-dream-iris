@@ -101,7 +101,7 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
         <div class="ttl-row">
           <h1 class="ttl">{{ project?.name ?? '' }}<template v-if="view === 'requests'"><span class="crumb-sep" aria-hidden="true">/</span>{{ tr('Requests') }}</template></h1>
           <!-- 프로젝트 설정(홈 프로젝트 카드 ⋮ 와 같은 버튼 · 같은 창) -->
-          <button v-if="project" type="button" class="sq more" :aria-label="tr('{name} settings', { name: project.name })" :data-tip="tr('{name} settings', { name: project.name })" @click="settingsOpen = true"><EditorIcon name="menu_kebab" :size="16" /></button>
+          <button v-if="project" type="button" class="sq more" :aria-label="tr('{name} settings', { name: project.name })" :data-tip="tr('{name} settings', { name: project.name })" @click="settingsOpen = true"><EditorIcon name="menu_kebab" :size="14" /></button>
         </div>
         <span v-if="project" class="tx-meta">{{ tr('Edited {when}', { when: relativeTime(project.updated_at) }) }}<template v-if="access.members.value.length"> · {{ access.members.value.length === 1 ? tr('1 person') : tr('{n} people', { n: access.members.value.length }) }}</template></span>
       </div>
@@ -190,8 +190,8 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 .ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
 .ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 제목 옆 ⋮: 홈 프로젝트 카드 ⋮ 와 같은 모양(흰 바탕 + 1px 테두리, 28 · 모서리 6), 늘 보여요 */
-.more { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+/* 제목 옆 ⋮: 홈 프로젝트 카드 ⋮ 처럼 흰 바탕 + 1px 테두리, 제목 옆이라 작게 24 · 모서리 8(squircle 이 보이게), 늘 보여요 */
+.more { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .more:hover { --sq-line: var(--ref-color-gray-900-20); color: var(--sys-color-neutral-800); }
 .more:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
