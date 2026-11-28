@@ -64,6 +64,9 @@ function onWinKey(e: KeyboardEvent) {
   expanded.value = new Set()
   opened.value = new Set()
 }
+/** 모두 접기(레이어 머리 버튼 · ⌥L 같은 동작) */
+function collapseAll() { expanded.value = new Set(); opened.value = new Set(); subOpen.value = new Set() }
+defineExpose({ collapseAll })
 onMounted(() => window.addEventListener('keydown', onWinKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onWinKey))
 /** 줄에 마우스를 올리면 캔버스에도 테두리(피그마와 같아요) */
@@ -454,11 +457,21 @@ const groupBg = (on: boolean[]) => `linear-gradient(${on.map((v, k) => `${v ? 'v
  * 레이어 목록 고르기(피그마와 같아요): ⌘(Ctrl) 클릭 = 하나씩 더하기 · 빼기, Shift 클릭 = 마지막으로 고른 줄부터 여기까지(같은 화면 안)
  */
 let anchor: { sid: string; id: string } | null = null
-/** 오토 레이아웃 프레임 아이콘(편집기 아이콘 이름): 세로 · 가로 · 줄바꿈 */
-const AL_ICON: Record<'vertical' | 'horizontal' | 'wrap', string> = {
-  vertical: 'autolayout_vertical',
-  horizontal: 'autolayout_horizontal',
-  wrap: 'autolayout_wrap',
+/**
+ * 오토 레이아웃 프레임 아이콘(피그마와 같아요 — 2026-11-29): 방향 + 수직 방향 정렬로
+ * 세로 = 왼쪽 · 가운데 · 오른쪽, 가로 = 위 · 가운데 · 아래, 줄바꿈은 하나
+ */
+function alIcon(l: NonNullable<LayerNode['style']['layout']>): string {
+  if (l.wrap) return 'autolayout_wrap'
+  const k = l.cross ?? 'start'
+  if (l.mode === 'vertical') return k === 'center' ? 'autolayout_vertical_center' : k === 'end' ? 'autolayout_vertical_right' : 'autolayout_vertical_left'
+  return k === 'center' ? 'autolayout_horizontal_center' : k === 'end' ? 'autolayout_horizontal_bottom' : 'autolayout_horizontal_top'
+}
+/** 오토 레이아웃 안에서 자리 무시(절대 위치) — 아이콘에 꺾쇠를 겹쳐 그려요(피그마와 같아요) */
+function isAbs(sid: string, n: LayerNode): boolean {
+  if (!n.absolute) return false
+  const d = store.doc(sid)
+  return n.parentId ? !!d.nodes[n.parentId]?.style.layout : !!d.frame?.layout
 }
 /** 벡터 · 연필 레이어 아이콘: 그 도형의 경로를 16 칸 가운데 12 안에 맞춰서 */
 /** 모양 그대로 보이는 레이어 아이콘(사각형 비율 · 둥근 모서리 · 원 호 · 다각형 · 별 · 선 · 펜 · 불리언 결과) */
@@ -625,7 +638,7 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         <!-- 디자인 시스템 인스턴스: 하위 레이어 펼치기(피그마 인스턴스처럼) -->
         <button v-else-if="r.n.type === 'instance'" class="sq chev" :aria-label="subOpen.has(r.sid + ':' + r.n.id) ? tr('Collapse') : tr('Expand')" @click.stop="toggleSub(r.sid + ':' + r.n.id)"><EditorIcon name="chevron_down" :size="12" :class="{ rot: !subOpen.has(r.sid + ':' + r.n.id) }" /></button>
         <span v-else class="chev" />
-        <span class="icw">
+        <span class="icw" :class="{ abs: isAbs(r.sid, r.n) }">
         <!-- 마스크(피그마와 같아요): 마스크 레이어는 마스크 아이콘, 그 위 가려지는 레이어는 아래로 ↓ 표시 -->
         <EditorIcon v-if="r.n.isMask" name="mask_layer" :size="16" class="ic" />
         <!-- 이미지 칠이 있는 사각형: 이미지 아이콘(피그마와 같아요) — 칠을 색으로 바꾸면 다시 사각형 -->
@@ -633,11 +646,13 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
         <!-- 도형 · 펜 · 불리언: 지금 그 모양 그대로(비율 · 둥글기 · 점을 고치면 바로 따라 바뀌어요) -->
         <svg v-else-if="shapeIcons.get(r.sid + ':' + r.n.id)" width="16" height="16" :viewBox="shapeIcons.get(r.sid + ':' + r.n.id)!.vb" aria-hidden="true" class="ic"><path :d="shapeIcons.get(r.sid + ':' + r.n.id)!.d" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" fill="none" stroke-linejoin="round" stroke-linecap="round" /></svg>
         <!-- 오토 레이아웃 프레임: 방향별 아이콘(세로 · 가로 · 줄바꿈) — 피그마와 같아요 -->
-        <EditorIcon v-else-if="r.n.style.layout" :name="AL_ICON[r.n.style.layout.wrap ? 'wrap' : r.n.style.layout.mode]" :size="16" class="ic" />
+        <EditorIcon v-else-if="r.n.style.layout" :name="alIcon(r.n.style.layout)" :size="16" class="ic" />
         <!-- 그룹(채우기 · 자르기 없는 프레임): 점선 네모 — 피그마 그룹 아이콘처럼 -->
         <EditorIcon v-else-if="isGroupNode(r.n)" name="group" :size="16" class="ic" />
         <EditorIcon v-else-if="LAYER_ICON[r.n.type]" :name="LAYER_ICON[r.n.type]!" :size="16" class="ic" />
         <span v-else class="ic ic-box"><EditorIcon name="image" :size="12" /></span>
+        <!-- 절대 위치: 꺾쇠를 겹쳐 그려요(안의 아이콘은 조금 작게) — 색은 그 줄 아이콘과 같아요(컴포넌트면 보라) -->
+        <EditorIcon v-if="isAbs(r.sid, r.n)" name="absolute_position" :size="16" class="ic abs-br" />
         <svg v-if="maskSpans.get(r.sid + ':' + r.n.id)" v-for="sp in [maskSpans.get(r.sid + ':' + r.n.id)!]" :key="'mk' + sp" class="mk-arrow" :class="{ up: sp < 0 }" width="7" :height="arrowLen(sp)" :viewBox="`0 0 7 ${arrowLen(sp)}`" aria-hidden="true"><path :d="`M3.5 0V${arrowLen(sp) - 0.5}M0.5 ${arrowLen(sp) - 3.5}L3.5 ${arrowLen(sp) - 0.5}L6.5 ${arrowLen(sp) - 3.5}`" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </span>
         <input v-if="renaming === r.n.id" v-select class="sqc txt-in ren" :value="r.n.name" :aria-label="tr('Layer name')" @click.stop @dblclick.stop @keydown.stop @keydown.tab.prevent="renameNext(r, $event.shiftKey ? -1 : 1, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc="renaming = null" @blur="rename(r, $event)">
@@ -688,7 +703,10 @@ function screenMenu(s: ScreenRow, e: MouseEvent) {
 
 <style scoped>
 /* 마스크: 아이콘 칸(↓ 를 아이콘 바로 아래 줄 사이에), 오른쪽 'Mask' 표시는 호버하면 🔒 👁 에 자리를 내줘요 */
-.icw { position: relative; display: inline-flex; flex: none; }
+.icw { position: relative; display: inline-flex; align-items: center; flex: none; }
+/* 절대 위치: 안의 아이콘 62% + 꺾쇠(16 칸 그대로) */
+.icw.abs > .ic:not(.abs-br) { transform: scale(.62); }
+.abs-br { position: absolute; left: 0; top: 50%; margin: 0 !important; transform: translateY(-50%); pointer-events: none; }
 .mk-arrow { position: absolute; left: 4.5px; top: calc(100% + 2px); color: var(--sys-color-neutral-400); pointer-events: none; z-index: 1; }
 /* 마스크가 위 줄에 있을 때(위로): 아이콘 위로 뻗고 머리는 위쪽 */
 .mk-arrow.up { top: auto; bottom: calc(100% + 2px); transform: scaleY(-1); }

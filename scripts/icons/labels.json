@@ -201,5 +201,13 @@
  "status_na": "요구사항 해당 없음",
  "upload": "파일 올리기",
  "download": "내려받기",
- "logout": "로그아웃"
+ "logout": "로그아웃",
+ "autolayout_vertical_left": "오토 레이아웃(세로 · 왼쪽 정렬)",
+ "autolayout_vertical_center": "오토 레이아웃(세로 · 가운데 정렬)",
+ "autolayout_vertical_right": "오토 레이아웃(세로 · 오른쪽 정렬)",
+ "autolayout_horizontal_top": "오토 레이아웃(가로 · 위 정렬)",
+ "autolayout_horizontal_center": "오토 레이아웃(가로 · 가운데 정렬)",
+ "autolayout_horizontal_bottom": "오토 레이아웃(가로 · 아래 정렬)",
+ "absolute_position": "절대 위치 꺾쇠(레이어 아이콘 위에 겹쳐 그려요)",
+ "layers_collapse_all": "레이어 모두 접기"
 }

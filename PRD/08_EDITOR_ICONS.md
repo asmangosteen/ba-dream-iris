@@ -82,6 +82,16 @@ Iris 편집기 아이콘을 **바드림 디자인 시스템 아이콘 가이드*
 | `autolayout_wrap` | 오토 레이아웃 프레임(줄바꿈) |
 | `group` | 그룹(점선 네모) |
 | `chevron_right` | 펼치기 |
+| `autolayout_vertical_left` | 오토 레이아웃(세로 · 왼쪽 정렬) |
+| `autolayout_vertical_center` | 오토 레이아웃(세로 · 가운데 정렬) |
+| `autolayout_vertical_right` | 오토 레이아웃(세로 · 오른쪽 정렬) |
+| `autolayout_horizontal_top` | 오토 레이아웃(가로 · 위 정렬) |
+| `autolayout_horizontal_center` | 오토 레이아웃(가로 · 가운데 정렬) |
+| `autolayout_horizontal_bottom` | 오토 레이아웃(가로 · 아래 정렬) |
+| `absolute_position` | 절대 위치 꺾쇠(레이어 아이콘 위에 겹쳐 그려요) |
+| `layers_collapse_all` | 레이어 모두 접기 |
+
+> 오토 레이아웃 아이콘은 방향 + 수직 방향 정렬로 골라요(세로 = 왼쪽 · 가운데 · 오른쪽, 가로 = 위 · 가운데 · 아래). 오토 레이아웃 안에서 절대 위치인 레이어는 아이콘을 62% 로 줄이고 `absolute_position` 꺾쇠를 겹쳐 그려요(색은 그 줄 아이콘과 같아요 — 컴포넌트면 보라).
 
 ### 공통 아이콘
 

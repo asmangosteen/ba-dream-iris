@@ -21,6 +21,7 @@ export default {
   'Add new page': '새 페이지 추가',
   'Page name': '페이지 이름',
   'Layers': '레이어',
+  'Collapse all layers': '레이어 모두 접기',
   'No frames yet': '아직 프레임이 없어요',
   'Draw frame': '프레임 그리기',
   'Add doc': '문서 추가',
