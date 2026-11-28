@@ -532,9 +532,9 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .wlist li { display: flex; gap: var(--ref-spacing-04); align-items: flex-start; }
 .wlist .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 
-/* 링크 안내: 입력칸 바로 아래 캡션(간격 6), 점은 입력칸 왼쪽 끝 선에 맞춰요 */
+/* 링크 안내: 입력칸 바로 아래 캡션(간격 6), 왼쪽 8 들여쓰기(사용자 요청) */
 .url-wrap { display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
-.link-help { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
+.link-help { margin: 0; padding: 0 0 0 var(--ref-spacing-06); list-style: none; display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
 .link-help li { display: flex; gap: var(--ref-spacing-04); }
 .link-help li::before { content: ''; flex: none; width: 3px; height: 3px; margin: 8px 0 0 var(--ref-spacing-02); border-radius: 50%; background: var(--sys-color-neutral-400); }
 /* 분류 머리: 라벨 옆 '문서를 보고 골랐어요' */
