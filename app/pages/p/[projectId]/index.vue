@@ -26,7 +26,7 @@ import { createLayerStore, LAYER_STORE, type LayerClip, type TreePart } from '~/
 import { isMediaFile, isVideoFile, mediaLimit, MediaTooLargeError, pendingUploads, prepareImage } from '~/canvas/images'
 import EditorAssets from '~/components/editor/EditorAssets.vue'
 import EditorVariables from '~/components/editor/EditorVariables.vue'
-import FigmaLinkModal from '~/components/editor/FigmaLinkModal.vue'
+import FigmaImportModal from '~/components/editor/FigmaImportModal.vue'
 import DocReader, { scrollToDocAnchor, flashWarnAt } from '~/components/docs/DocReader.vue'
 import DocCheckBar from '~/components/docs/DocCheckBar.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
@@ -1310,7 +1310,10 @@ async function onScreenOrder(order: string[]) {
 }
 async function onFigmaCreated() {
   await screens.refresh()
-  say(tr('Imported from Figma'))
+}
+/** 가져오기 창을 닫은 채 끝났을 때 알려요(창이 열려 있으면 창의 '끝' 화면이 알려요) */
+function onFigmaFinished(n: number) {
+  say(n === 1 ? tr('Imported 1 frame from Figma') : tr('Imported {n} frames from Figma', { n }))
 }
 
 /** 다른 페이지의 화면이면 그 페이지로 옮긴 뒤 고르기 */
@@ -2312,7 +2315,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <ShareModal v-model:open="shareOpen" :project-id="projectId" :project-name="project.data.value?.name ?? ''" />
     <KeyboardShortcuts v-if="shortcutsOpen" @close="shortcutsOpen = false" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
-    <FigmaLinkModal v-if="pageId" v-model:open="figmaOpen" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" />
+    <FigmaImportModal v-if="pageId" v-model:open="figmaOpen" :project-id="projectId" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" @finished="onFigmaFinished" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
     <AppConfirm
       v-if="confirmFrames"

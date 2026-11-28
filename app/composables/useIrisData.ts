@@ -569,13 +569,13 @@ export function useIrisMutations() {
   }
 
   /** 여러 화면에 정책 하나를 한 번에 연결(이미 있으면 건너뛰고, 고른 레이어는 더해요) */
-  async function linkMany(rows: { screen_id: string; requirement_id: string; layer_ids?: string[] }[], existing: LinkRow[]) {
+  async function linkMany(rows: { screen_id: string; requirement_id: string; layer_ids?: string[] }[], existing: LinkRow[], origin: LinkRow['origin'] = 'manual') {
     const add: LinkRow[] = []
     for (const r of rows) {
       const ex = existing.find((x) => x.screen_id === r.screen_id && x.requirement_id === r.requirement_id)
       if (ex && !r.layer_ids?.length) continue
       const layers = [...new Set([...(ex?.layer_ids ?? []), ...(r.layer_ids ?? [])])]
-      add.push({ screen_id: r.screen_id, requirement_id: r.requirement_id, status: ex?.status ?? 'unchecked', note: ex?.note ?? null, layer_ids: layers.length ? layers : null, origin: ex?.origin ?? 'manual' })
+      add.push({ screen_id: r.screen_id, requirement_id: r.requirement_id, status: ex?.status ?? 'unchecked', note: ex?.note ?? null, layer_ids: layers.length ? layers : null, origin: ex?.origin ?? origin })
     }
     if (!add.length) return add
     if (preview) { for (const r of add) await setLink(r); return add }
