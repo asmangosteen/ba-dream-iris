@@ -96,7 +96,9 @@ async function matchRows(r: ScanResult): Promise<Row[]> {
   return r.frames.map((f): Row => {
     const m = slotFromName(f.name)
     const slot = m ? slots.find((s) => s.code === m.code) ?? null : null
-    const existing = ex.get(f.id) ?? null
+    // 같은 페이지에 이미 있으면 그 화면을 다시 불러오기, 다른 페이지에 있으면 이 페이지에 새로(사용자 결정 2026-11-29)
+    const e = ex.get(f.id)
+    const existing = e && e.pageId === props.pageId ? e : null
     const match: Match = existing ? 'again' : !m ? 'noid' : !slot ? 'warn' : m.state ? 'state' : 'new'
     return { ...f, match, slot, state: m?.state ?? null, existing, checked: match === 'new' || match === 'state' }
   })
@@ -575,7 +577,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                     <span class="fi-slot">
                       <template v-if="r.slot"><span class="sq fi-sid">{{ r.slot.code }}</span><span class="ellipsis">{{ r.slot.name }}<span v-if="r.state" class="tx-meta"> · {{ r.state }}</span></span></template>
                       <span v-else-if="r.match === 'warn'" class="tx-meta">{{ tr('Not in any document') }}</span>
-                      <span v-else-if="r.match === 'again'" class="tx-meta ellipsis">{{ r.existing?.slotCode ?? tr('Not attached') }} · {{ tr('on “{page}”', { page: r.existing?.page ?? '' }) }}</span>
+                      <span v-else-if="r.match === 'again'" class="tx-meta ellipsis">{{ r.existing?.slotCode ?? tr('Not attached') }} · {{ tr('on this page') }}</span>
                       <div v-else class="fi-pick">
                         <button type="button" class="sq fi-pick-b" :aria-expanded="pickOpen === r.id" @click="togglePick(r, $event)">{{ tr('Choose a slot') }}<EditorIcon name="chevron_down" :size="12" /></button>
                       </div>
@@ -601,7 +603,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                 <div class="fi-sec">
                   <span class="tx-meta">{{ tr('Attaches to') }}</span>
                   <span v-if="singleRow.slot" class="fi-slot"><span class="sq fi-sid">{{ singleRow.slot.code }}</span><span class="ellipsis">{{ singleRow.slot.name }}<span v-if="singleRow.state" class="tx-meta"> · {{ singleRow.state }}</span></span><span :class="['sq', 'fi-res', RESULT[singleRow.match].cls]">{{ tr(RESULT[singleRow.match].label) }}</span></span>
-                  <span v-else class="fi-slot"><span class="tx-meta">{{ singleRow.match === 'again' ? tr('Already in Iris on “{page}” — reimporting updates that screen there', { page: singleRow.existing?.page ?? '' }) : singleRow.match === 'warn' ? tr('Its ID isn’t in any document') : tr('No screen ID in its name — it comes in as an unattached screen') }}</span></span>
+                  <span v-else class="fi-slot"><span class="tx-meta">{{ singleRow.match === 'again' ? tr('Already on this page — reimporting updates that screen') : singleRow.match === 'warn' ? tr('Its ID isn’t in any document') : tr('No screen ID in its name — it comes in as an unattached screen') }}</span></span>
                 </div>
                 <div v-if="reqCodesOf(singleRow.slot).length" class="fi-sec">
                   <span class="tx-meta">{{ tr('Requests that come along · Unchecked') }}</span>

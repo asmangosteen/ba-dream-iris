@@ -465,8 +465,8 @@ export default {
   'Make again': '다시 만들기',
   'Making the thumbnails Figma was slow to draw — {done} of {total}': '피그마가 늦게 그린 썸네일을 다시 만드는 중 — {done} / {total}',
   '{n} without thumbnail': '썸네일 없음 {n}',
-  'Already in Iris on “{page}” — reimporting updates that screen there': '이미 Iris의 “{page}”에 있어요 — 다시 불러오면 그 화면이 바뀌어요',
-  'on “{page}”': '“{page}”에 있음',
+  'Already on this page — reimporting updates that screen': '이 페이지에 이미 있어요 — 다시 불러오면 그 화면이 바뀌어요',
+  'on this page': '이 페이지에 있음',
   // 피그마 연결(토큰)
   'Figma connection': '피그마 연결',
   'Iris uses one team token to read Figma files when people import screens': '화면을 가져올 때 Iris는 팀 토큰 하나로 피그마 파일을 읽어요',
