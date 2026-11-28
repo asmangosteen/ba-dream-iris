@@ -34,7 +34,11 @@ const DOC_STATUS_LABEL: Record<'draft' | 'review' | 'confirmed', string> = { dra
 const docReqs = computed(() => (reqs.data.value ?? []).filter((r) => r.document_id === docId.value))
 const reqId = computed(() => (typeof route.query.req === 'string' ? route.query.req : null))
 const req = computed(() => docReqs.value.find((r) => r.id === reqId.value) ?? null)
-function pickReq(id: string) { router.replace({ query: { ...route.query, req: id } }) }
+/** 요청사항 고르기 — 이미 고른 걸 다시 누르면 선택을 풀어요(사용자 요청 2026-11-28) */
+function pickReq(id: string) {
+  const { req: _cur, ...rest } = route.query
+  router.replace({ query: reqId.value === id ? rest : { ...rest, req: id } })
+}
 const linkedIds = computed(() => [...new Set((links.data.value ?? []).map((l) => l.requirement_id))])
 
 const reqLinks = computed<LinkRow[]>(() => (req.value ? (links.data.value ?? []).filter((l) => l.requirement_id === req.value!.id) : []))
@@ -97,7 +101,8 @@ function onComment(p: { quote: string; block: string | null; row: number | null;
 /** 메모를 누르면 문서의 그 자리로: 요청사항 줄이면 그 요청사항을 골라요 */
 function goAnchor(a: DocAnchor) {
   const r = a.code ? docReqs.value.find((x) => x.code === a.code) : null
-  if (r) pickReq(r.id)
+  // 메모에서 가는 건 늘 고르기(다시 눌러 풀기는 문서 쪽에서만)
+  if (r) { if (reqId.value !== r.id) pickReq(r.id) }
   else if (a.block) scrollToDocAnchor(reader.value?.root as HTMLElement | undefined, { block: a.block })
 }
 const notice = ref('')
@@ -170,7 +175,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
       <!-- 스크롤은 카드 안쪽 칸에서(카드 자체를 스크롤 칸으로 쓰면 squircle 테두리 층 1px 때문에 넘칠 게 없어도 스크롤바가 떠요) -->
       <div v-show="pane === 'request'" v-ovscroll class="side-sc">
       <template v-if="req">
-        <div class="rhead"><span class="sq pid num">{{ req.code }}</span><span :class="['sq', 'st', status]"><StatusIcon v-if="status !== 'none'" :status="status" :size="10" />{{ tr(REQ_STATUS_TEXT[status]) }}</span></div>
+        <div class="rhead"><span class="sq pid num">{{ req.code }}</span><span :class="['sq', 'rst', status]"><StatusIcon v-if="status !== 'none'" :status="status" :size="10" />{{ tr(REQ_STATUS_TEXT[status]) }}</span></div>
         <h2 class="rtitle">{{ req.title }}</h2>
         <span class="tx-meta">{{ place }}<template v-if="usedIn"> — {{ usedIn === 1 ? tr('used in 1 screen row') : tr('used in {n} screen rows', { n: usedIn }) }}</template></span>
         <div class="hsep" />
@@ -180,7 +185,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
           <span class="sq sq-clip mini"><ScreenThumb v-if="x.art" :screen="x.art" /></span>
           <span class="scol">
             <span class="sname"><span v-if="slotCode(x.screen)" class="sq sid num">{{ slotCode(x.screen) }}</span><span class="ellipsis">{{ x.screen?.name ?? tr('Untitled screen') }}</span></span>
-            <span :class="['sq', 'st', x.link.status]"><StatusIcon :status="x.link.status" :size="10" />{{ tr(LINK_STATUS[x.link.status].label) }}</span>
+            <span :class="['sq', 'rst', x.link.status]"><StatusIcon :status="x.link.status" :size="10" />{{ tr(LINK_STATUS[x.link.status].label) }}</span>
           </span>
         </NuxtLink>
         <template v-if="notes.length">
@@ -256,11 +261,12 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .m0 { margin: 0; }
 .pid { display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); }
 .sid { flex: none; display: inline-flex; align-items: center; height: 18px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #1F63BD; --sq-line: color-mix(in srgb, var(--sys-color-brand-primary-default) 45%, transparent); --sq-line-w: 1px; }
-.st { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
-.st.missing { color: #C4222A; --sq-fill: #FFEDEB; }
-.st.partial { color: #B44A0E; --sq-fill: #FFF1E8; }
-.st.reflected { color: #1B7A2B; --sq-fill: #E9F6EC; }
-.st.none { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+/* 상태 칩: 아이콘 · 글자 사이 4(요청사항 표 상태 .status 와 같아요) — 클래스 이름은 StatusIcon 의 .st 와 겹치지 않게 */
+.rst { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
+.rst.missing { color: #C4222A; --sq-fill: #FFEDEB; }
+.rst.partial { color: #B44A0E; --sq-fill: #FFF1E8; }
+.rst.reflected { color: #1B7A2B; --sq-fill: #E9F6EC; }
+.rst.none { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .srow { display: flex; align-items: center; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); color: inherit; text-decoration: none; }
 .srow:hover { --sq-fill: var(--sys-color-neutral-200); }
 .srow:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
