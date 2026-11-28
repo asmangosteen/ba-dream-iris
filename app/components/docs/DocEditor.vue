@@ -319,7 +319,7 @@ const statusText = computed(() => saving.value ? tr('Saving…') : dirty.value ?
     <section class="content" :aria-label="tr('Content')">
       <label :for="`edBody-${doc.id}`" class="tx-head lbl">{{ blockMode ? tr('Content') : tr('Body text') }}</label>
       <p class="tx-meta hint">{{ blockMode ? tr('Paste the whole document written by AI. Tables become table blocks.') : tr('Paste or edit the original text') }}</p>
-      <div class="sq area-box">
+      <div class="sq area-box" @mousedown.self.prevent="($event.currentTarget as HTMLElement).querySelector('textarea')?.focus()">
         <textarea :id="`edBody-${doc.id}`" v-model="form.body" class="area" spellcheck="false" :placeholder="blockMode ? 'Markdown' : tr('Paste or edit the original text')" />
       </div>
     </section>
@@ -349,9 +349,10 @@ const statusText = computed(() => saving.value ? tr('Saving…') : dirty.value ?
 .content { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .hint { margin: 0; }
 /* 글 상자: 남은 높이를 다 쓰고, 넘치면 상자 안에서 스크롤(크기 조절 손잡이 없음) — 둥글기는 댓글 입력칸과 같은 18 */
-.area-box { flex: 1; min-height: 240px; display: flex; flex-direction: column; margin-top: var(--ref-spacing-02); border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden; }
+/* 위아래 여백은 틀(.area-box)에 — textarea 안 여백이면 스크롤한 글자가 그 여백을 지나 둥근 테두리 밖으로 보였어요(댓글 입력칸과 같아요) */
+.area-box { flex: 1; min-height: 240px; display: flex; flex-direction: column; margin-top: var(--ref-spacing-02); border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; overflow: hidden;  padding: var(--ref-spacing-07) 0; cursor: text;}
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
-.area { flex: 1; display: block; width: 100%; height: 100%; box-sizing: border-box; resize: none; overflow-y: auto; scrollbar-width: thin; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area { flex: 1; display: block; width: 100%; height: 100%; box-sizing: border-box; resize: none; overflow-y: auto; scrollbar-width: thin; padding: 0 var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-family: var(--font-family-base); font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 </style>

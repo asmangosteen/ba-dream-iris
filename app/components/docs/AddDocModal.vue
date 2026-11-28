@@ -407,7 +407,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               </div>
               <div class="col6">
                 <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
-                <div class="sq area-box"><textarea id="docBody" ref="areaEl" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
+                <div class="sq area-box" @mousedown.self.prevent="($event.currentTarget as HTMLElement).querySelector('textarea')?.focus()"><textarea id="docBody" ref="areaEl" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
               </div>
             </div>
 
@@ -503,10 +503,11 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .tpl { width: 100%; }
 .tpl .segc-i { min-width: 0; }
 
-.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow-y: auto; min-height: 128px; max-height: 240px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow-y: auto; min-height: 108px; max-height: 220px; padding: 0 var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 /* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
 /* 여러 줄 입력칸 둥글기: 댓글 입력칸과 같은 18 */
-.area-box { display: block; border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
+/* 위아래 여백은 틀에(스크롤한 글자가 둥근 테두리 밖으로 안 보이게 — 댓글 입력칸과 같아요) */
+.area-box { display: block; padding: var(--ref-spacing-07) 0; cursor: text; border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .area-box:hover { --sq-line: var(--ref-color-gray-900-20); }
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
