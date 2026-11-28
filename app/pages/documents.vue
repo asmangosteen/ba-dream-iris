@@ -114,7 +114,8 @@ const warnCount = (d: DocListRow) => d.check_result?.warnings?.length ?? 0
 .search { width: 220px; }
 /* 페이지 공통: 제목 → 거르기 줄 12, 거르기 줄 → 내용 16 */
 .tools { display: flex; align-items: center; gap: var(--ref-spacing-08); margin: var(--ref-spacing-08) 0 0; flex-wrap: wrap; }
-.list { display: flex; flex-direction: column; gap: var(--ref-spacing-12); margin-top: var(--ref-spacing-10); }
+/* 거르기 줄 → 첫 프로젝트 묶음 24(묶음 사이 간격과 같게 — 16이면 묶음 머리가 거르기 줄에 붙어 보여요) */
+.list { display: flex; flex-direction: column; gap: var(--ref-spacing-12); margin-top: var(--ref-spacing-12); }
 .pgrp { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .gh { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-02); }
 .gh h2 { margin: 0; }
