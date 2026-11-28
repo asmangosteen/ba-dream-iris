@@ -93,13 +93,19 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
         <span class="vsep" aria-hidden="true" />
         <template v-if="doc">
           <b class="dtitle ellipsis">{{ doc.title }}</b>
-          <span v-if="doc.abbr" class="sq chip line">{{ doc.abbr }}</span>
-          <span v-if="doc.status" class="sq chip">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
+          <!-- 칩끼리 4 — 문서 머리 약어 · 상태 칩(DocReader .meta)과 같아요 -->
+          <span v-if="doc.abbr || doc.status" class="chips">
+            <span v-if="doc.abbr" class="sq chip line">{{ doc.abbr }}</span>
+            <span v-if="doc.status" class="sq chip">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
+          </span>
           <span class="tx-meta ellipsis">{{ [doc.version_label, tr('Edited {when}', { when: relativeTime(doc.updated_at) })].filter(Boolean).join(' · ') }}</span>
         </template>
         <span class="f1" />
-        <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
-        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
+        <!-- 버튼끼리 4 — 함께 보기 머리 Notes · Edit(.acts)와 같아요 -->
+        <span class="acts">
+          <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
+        </span>
       </div>
       <div v-ovscroll class="body">
         <div class="col">
@@ -154,6 +160,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .dtitle { font-size: 14px; line-height: 22px; font-weight: 600; flex: 0 1 auto; }
 .ellipsis { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
+.chips, .acts { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); }
 .chip.line { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .f1 { flex: 1; }
 .body { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-14); }
