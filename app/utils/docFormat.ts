@@ -120,9 +120,9 @@ export function screenCodesIn(t: string, aliases: Aliases = {}): string[] {
   }
   return [...new Set(out)]
 }
-/** 칸 하나가 정확히 화면 ID 인지 — 'C-05', '몰 C-05', 'C-05 상품 상세' 의 앞 ID */
+/** 칸 하나가 정확히 화면 ID 인지 — 'C-05', '몰 C-05', 'C-05 상품 상세', 'C-05_초기'(피그마 이름은 _ 로도 이어요) 의 앞 ID */
 function leadScreen(cell: string, aliases: Aliases): { code: string; kind: SlotKind } | null {
-  const m = cell.trim().match(new RegExp(`^(?:\\S{1,8}\\s)?(${[...SLOT_KINDS, ...Object.keys(aliases)].sort((a, b) => b.length - a.length).join('|')})-(\\d{1,4})\\b`))
+  const m = cell.trim().match(new RegExp(`^(?:\\S{1,8}\\s)?(${[...SLOT_KINDS, ...Object.keys(aliases)].sort((a, b) => b.length - a.length).join('|')})-(\\d{1,4})(?![0-9A-Za-z])`))
   if (!m) return null
   const kind = (aliases[m[1]!] ?? m[1]) as SlotKind
   return { code: `${kind}-${m[2]}`, kind }

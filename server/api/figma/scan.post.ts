@@ -1,57 +1,82 @@
 // 피그마 링크 읽기(4단계 — PRD/13 3-1): 무엇의 링크인지 판별하고 가져올 프레임 목록을 돌려줘요. 썸네일은 아직 만들지 않아요(호출 아끼기)
-// - node-id 가 페이지(CANVAS) · 섹션 → 그 안의 최상위 프레임(섹션 안 프레임 포함) = 'list'
+// - node-id 가 페이지(CANVAS) · 섹션 → 그 안의 화면(프레임) 전부 — 섹션 안의 섹션도 끝까지 = 'list'
+//   한 번에 깊게 받으면 큰 페이지는 수십 MB · 십수 초가 걸려서(DB 8초 한도), 한 단계씩(depth=1) 섹션만 따라 내려가요
 // - 최상위 프레임 → 'frame', 프레임 안의 요소 → 그 요소가 있는 최상위 프레임 = 'inner'
-// - node-id 가 없으면 파일의 첫 페이지 = 'list'
-// 피그마 호출: 1~2번(Tier 1)
+// - node-id 가 없으면 페이지 목록 = 'pages'(화면에서 고르면 pageId 로 다시 불러요)
+// 피그마 호출: 섹션 깊이만큼(보통 1~3번, Tier 1)
 
-interface ScanFrame { id: string; name: string; type: string; x: number; y: number; width: number; height: number; section: string | null }
+interface ScanFrame { id: string; name: string; type: string; x: number; y: number; width: number; height: number; section: string | null; path: string[] }
 export interface FigmaScanResult {
   fileKey: string
   fileName: string
-  kind: 'list' | 'frame' | 'inner'
+  kind: 'list' | 'frame' | 'inner' | 'pages'
   container: { type: 'PAGE' | 'SECTION'; name: string } | null
   /** 'inner' 일 때 링크가 가리킨 요소 이름 */
   innerName: string | null
   frames: ScanFrame[]
+  /** 'pages' 일 때 */
+  pages?: { id: string; name: string }[]
 }
 
-const toFrame = (n: FigmaNode, section: string | null): ScanFrame => {
+const toFrame = (n: FigmaNode, path: string[]): ScanFrame => {
   const b = n.absoluteBoundingBox
-  return { id: n.id, name: n.name, type: n.type, x: Math.round(b?.x ?? 0), y: Math.round(b?.y ?? 0), width: Math.round(b?.width ?? 375), height: Math.round(b?.height ?? 812), section }
+  return { id: n.id, name: n.name, type: n.type, x: Math.round(b?.x ?? 0), y: Math.round(b?.y ?? 0), width: Math.round(b?.width ?? 375), height: Math.round(b?.height ?? 812), section: path[path.length - 1] ?? null, path }
 }
-/** 페이지 · 섹션 안의 최상위 프레임들(섹션은 한 단계 안까지) */
-function framesIn(container: FigmaNode): ScanFrame[] {
+const MAX_LEVELS = 5
+const IDS_PER_CALL = 40
+
+/** 페이지 · 섹션 안의 화면들: 바로 아래 자식만 받고(depth=1), 섹션이면 그 섹션의 자식을 다음 차례에 — 프레임 안쪽은 받지 않아요 */
+async function framesUnder(caller: FigmaCaller, key: string, root: FigmaNode): Promise<ScanFrame[]> {
   const out: ScanFrame[] = []
-  for (const c of container.children ?? []) {
-    if (FRAME_TYPES.has(c.type)) out.push(toFrame(c, container.type === 'SECTION' ? container.name : null))
-    else if (c.type === 'SECTION') for (const f of c.children ?? []) if (FRAME_TYPES.has(f.type)) out.push(toFrame(f, c.name))
+  let level: { node: FigmaNode; path: string[] }[] = [{ node: root, path: root.type === 'SECTION' ? [root.name] : [] }]
+  for (let depth = 0; depth < MAX_LEVELS && level.length; depth++) {
+    const next: { node: FigmaNode; path: string[] }[] = []
+    for (const { node, path } of level) {
+      for (const c of node.children ?? []) {
+        if (FRAME_TYPES.has(c.type)) out.push(toFrame(c, path))
+        else if (c.type === 'SECTION') next.push({ node: c, path: [...path, c.name] })
+      }
+    }
+    if (!next.length) break
+    // 다음 단계 섹션들의 자식을 묶어서 받기
+    level = []
+    for (let i = 0; i < next.length; i += IDS_PER_CALL) {
+      const chunk = next.slice(i, i + IDS_PER_CALL)
+      const r = await figmaGet<{ nodes: Record<string, { document: FigmaNode } | null> }>(caller, `/files/${key}/nodes?ids=${encodeURIComponent(chunk.map((x) => x.node.id).join(','))}&depth=1`)
+      for (const x of chunk) {
+        const d = r.nodes?.[x.node.id]?.document
+        if (d) level.push({ node: d, path: x.path })
+      }
+    }
   }
   return out
 }
 
 export default defineEventHandler(async (event): Promise<FigmaScanResult> => {
   const caller = await figmaAuth(event)
-  const body = await readBody<{ url?: unknown }>(event).catch(() => null)
+  const body = await readBody<{ url?: unknown; pageId?: unknown }>(event).catch(() => null)
   const url = typeof body?.url === 'string' ? body.url.trim() : ''
   const parsed = url ? parseFigmaUrl(url) : null
   if (!parsed) figmaFail(400, 'invalid_url', '피그마 링크가 아니에요. figma.com/design/… 으로 시작하는 주소를 붙여주세요')
-  const { fileKey, nodeId } = parsed
+  const { fileKey } = parsed
+  const pageId = typeof body?.pageId === 'string' && /^[\w:;]+$/.test(body.pageId) ? body.pageId : null
+  const nodeId = pageId ?? parsed.nodeId
   const key = encodeURIComponent(fileKey)
 
-  // node-id 없음 → 첫 페이지
+  // node-id 없음 → 페이지 목록(골라서 다시)
   if (!nodeId || nodeId === '0:0') {
-    const file = await figmaGet<{ name: string; document: FigmaNode }>(caller, `/files/${key}?depth=3`)
-    const page = file.document.children?.find((c) => c.type === 'CANVAS')
-    if (!page) figmaFail(404, 'not_found', '피그마 파일에서 페이지를 찾지 못했어요')
-    return { fileKey, fileName: file.name, kind: 'list', container: { type: 'PAGE', name: page.name }, innerName: null, frames: framesIn(page) }
+    const file = await figmaGet<{ name: string; document: FigmaNode }>(caller, `/files/${key}?depth=1`)
+    const pages = (file.document.children ?? []).filter((c) => c.type === 'CANVAS').map((c) => ({ id: c.id, name: c.name }))
+    if (!pages.length) figmaFail(404, 'not_found', '피그마 파일에서 페이지를 찾지 못했어요')
+    return { fileKey, fileName: file.name, kind: 'pages', container: null, innerName: null, frames: [], pages }
   }
 
   const ids = encodeURIComponent(nodeId)
-  const nodes = await figmaGet<{ name: string; nodes: Record<string, { document: FigmaNode } | null> }>(caller, `/files/${key}/nodes?ids=${ids}&depth=2`)
+  const nodes = await figmaGet<{ name: string; nodes: Record<string, { document: FigmaNode } | null> }>(caller, `/files/${key}/nodes?ids=${ids}&depth=1`)
   const doc = nodes.nodes?.[nodeId]?.document
   if (!doc) figmaFail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요')
   if (doc.type === 'CANVAS' || doc.type === 'SECTION') {
-    return { fileKey, fileName: nodes.name, kind: 'list', container: { type: doc.type === 'CANVAS' ? 'PAGE' : 'SECTION', name: doc.name }, innerName: null, frames: framesIn(doc) }
+    return { fileKey, fileName: nodes.name, kind: 'list', container: { type: doc.type === 'CANVAS' ? 'PAGE' : 'SECTION', name: doc.name }, innerName: null, frames: await framesUnder(caller, key, doc) }
   }
 
   // 프레임이거나 그 안의 요소: 문서 맨 위에서 이 노드까지의 길을 받아 최상위 프레임을 찾아요
@@ -65,14 +90,14 @@ export default defineEventHandler(async (event): Promise<FigmaScanResult> => {
   walk(file.document, [])
   // 최상위 프레임 = 부모가 페이지 · 섹션인 첫 프레임
   let top: FigmaNode | null = null
-  let section: string | null = null
+  let sectionPath: string[] = []
   for (let i = 1; i < path.length; i++) {
     const parent = path[i - 1]!
     const n = path[i]!
-    if ((parent.type === 'CANVAS' || parent.type === 'SECTION') && FRAME_TYPES.has(n.type)) { top = n; section = parent.type === 'SECTION' ? parent.name : null; break }
+    if ((parent.type === 'CANVAS' || parent.type === 'SECTION') && FRAME_TYPES.has(n.type)) { top = n; sectionPath = path.slice(0, i).filter((x) => x.type === 'SECTION').map((x) => x.name); break }
   }
   // 길을 못 찾으면(피그마가 잘라서 줌) 링크 노드를 프레임으로 봐요
-  if (!top) return { fileKey, fileName: nodes.name, kind: 'frame', container: null, innerName: null, frames: [toFrame(doc, null)] }
+  if (!top) return { fileKey, fileName: nodes.name, kind: 'frame', container: null, innerName: null, frames: [toFrame(doc, [])] }
   const isTop = top.id === nodeId
-  return { fileKey, fileName: nodes.name, kind: isTop ? 'frame' : 'inner', container: null, innerName: isTop ? null : doc.name, frames: [toFrame(isTop ? doc : top, section)] }
+  return { fileKey, fileName: nodes.name, kind: isTop ? 'frame' : 'inner', container: null, innerName: isTop ? null : doc.name, frames: [toFrame(isTop ? doc : top, sectionPath)] }
 })

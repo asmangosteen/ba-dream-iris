@@ -23,8 +23,8 @@ const { linkMany, setScreenSlot } = useIrisMutations()
 const slotsQ = useScreenSlots(props.projectId)
 const { reqs: reqsQ, links: linksQ } = useRequirements(props.projectId)
 
-interface ScanFrame { id: string; name: string; type: string; x: number; y: number; width: number; height: number; section: string | null }
-interface ScanResult { fileKey: string; fileName: string; kind: 'list' | 'frame' | 'inner'; container: { type: 'PAGE' | 'SECTION'; name: string } | null; innerName: string | null; frames: ScanFrame[] }
+interface ScanFrame { id: string; name: string; type: string; x: number; y: number; width: number; height: number; section: string | null; path?: string[] }
+interface ScanResult { fileKey: string; fileName: string; kind: 'list' | 'frame' | 'inner' | 'pages'; container: { type: 'PAGE' | 'SECTION'; name: string } | null; innerName: string | null; frames: ScanFrame[]; pages?: { id: string; name: string }[] }
 interface FrameComponent { name: string; count: number; key: string | null }
 interface FrameOut { id: string; name: string; width: number; height: number; thumbnailUrl: string | null; components: FrameComponent[] }
 type Match = 'new' | 'state' | 'again' | 'warn' | 'noid'
@@ -48,7 +48,7 @@ const errOf = (e: unknown) => {
 // ---------------------------------------------------------------------------
 // 1 링크
 // ---------------------------------------------------------------------------
-type Step = 'link' | 'list' | 'frame' | 'run' | 'done'
+type Step = 'link' | 'pages' | 'list' | 'frame' | 'run' | 'done'
 const step = ref<Step>('link')
 const url = ref('')
 const scanning = ref(false)
@@ -56,15 +56,18 @@ const error = ref<{ code: string; message: string } | null>(null)
 const scan = ref<ScanResult | null>(null)
 const rows = ref<Row[]>([])
 
-async function doScan() {
+/** 파일 링크(node-id 없음)면 페이지 목록 — 구분선 이름(----)은 빼요 */
+const pageList = computed(() => (scan.value?.pages ?? []).filter((p) => !/^[\s\-–—_=·.]*$/.test(p.name)))
+async function doScan(pageId?: string) {
   const raw = url.value.trim()
   if (!raw || scanning.value) return
   if (!/figma\.com\//i.test(raw)) { error.value = { code: 'invalid_url', message: FIGMA_ERROR.invalid_url! }; return }
   error.value = null
   scanning.value = true
   try {
-    const r = preview ? await previewScan(raw) : await $fetch<ScanResult>('/api/figma/scan', { method: 'POST', body: { url: raw } })
+    const r = preview ? await previewScan(raw) : await $fetch<ScanResult>('/api/figma/scan', { method: 'POST', body: { url: raw, ...(typeof pageId === 'string' ? { pageId } : {}) } })
     scan.value = r
+    if (r.kind === 'pages') { rows.value = []; step.value = 'pages'; return }
     rows.value = await matchRows(r)
     filter.value = 'all'
     if (r.kind === 'list') step.value = 'list'
@@ -77,6 +80,7 @@ async function doScan() {
   }
 }
 function onUrlKey(e: KeyboardEvent) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doScan() } }
+const pickPage = (id: string) => doScan(id)
 
 /** 이 프로젝트에 이미 들어온 같은 파일의 화면(피그마 노드 id 기준 — 이름이 바뀌어도 같은 화면) */
 async function existingOf(fileKey: string): Promise<Map<string, { id: string; slotCode: string | null }>> {
@@ -175,7 +179,8 @@ const compTotal = computed(() => single.value?.components.reduce((n, c) => n + c
 // ---------------------------------------------------------------------------
 // 4 가져오는 중 — 10개씩, 429 면 retryAfter 초 기다렸다가 이어서
 // ---------------------------------------------------------------------------
-const CHUNK = 10
+/** 한 번에 받는 프레임 수 — 프레임 안쪽까지 받아서(컴포넌트 요약) 크면 DB 8초 한도에 걸려요 */
+const CHUNK = 4
 const run = reactive({ total: 0, done: 0, waitUntil: 0, stopped: false, status: {} as Record<string, RunStatus> })
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | undefined
@@ -407,7 +412,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
 
         <div v-ovscroll class="pop-body fi-body">
           <!-- 링크(1 · 2 · 3 공통) -->
-          <div v-if="step === 'link' || step === 'list' || step === 'frame'" class="fi-link">
+          <div v-if="step === 'link' || step === 'pages' || step === 'list' || step === 'frame'" class="fi-link">
             <TextInput
               v-model:value="url"
               size="s"
@@ -434,6 +439,16 @@ async function previewScan(raw: string): Promise<ScanResult> {
               <b>{{ scan.container?.name }}</b>
               <span class="tx-meta">{{ scan.fileName }} · {{ scan.frames.length === 1 ? tr('1 frame') : tr('{n} frames', { n: scan.frames.length }) }}</span>
             </span>
+          </div>
+
+          <!-- 파일 링크: 페이지 고르기 -->
+          <div v-if="step === 'pages'" class="fi-pages">
+            <span class="tx-meta">{{ tr('{file} — choose a page', { file: scan?.fileName ?? '' }) }}</span>
+            <div class="sqc fi-box"><div v-ovscroll class="sqc fi-box-in fi-rows">
+              <button v-for="p in pageList" :key="p.id" type="button" class="fi-page" :disabled="scanning" @click="pickPage(p.id)">
+                <EditorIcon name="document" :size="16" class="fi-dim" /><span class="ellipsis">{{ p.name }}</span><EditorIcon name="chevron_right" :size="12" class="fi-dim" />
+              </button>
+            </div></div>
           </div>
 
           <!-- 1 무엇을 가져오나 -->
@@ -601,8 +616,8 @@ async function previewScan(raw: string): Promise<ScanResult> {
             <template v-else>
               <Button v-if="step !== 'link'" size="s" type="tertiary" @click="backToLink">{{ tr('Back') }}</Button>
               <Button v-else size="s" type="tertiary" @click="close">{{ tr('Cancel') }}</Button>
-              <Button v-if="step === 'link'" size="s" type="primary" :loading="scanning" :disabled="!url.trim()" @click="doScan">{{ tr('Next') }}</Button>
-              <Button v-else size="s" type="primary" :disabled="step === 'list' ? !picked.length : !singleRow || singleLoading" @click="startImport">{{ primaryLabel }}</Button>
+              <Button v-if="step === 'link'" size="s" type="primary" :loading="scanning" :disabled="!url.trim()" @click="doScan()">{{ tr('Next') }}</Button>
+              <Button v-else-if="step !== 'pages'" size="s" type="primary" :disabled="step === 'list' ? !picked.length : !singleRow || singleLoading" @click="startImport">{{ primaryLabel }}</Button>
             </template>
           </div>
         </footer>
@@ -626,6 +641,12 @@ async function previewScan(raw: string): Promise<ScanResult> {
 /* 창이 낮으면 안쪽이 줄어들지 않고 본문이 스크롤돼요(표가 눌려 사라지지 않게) */
 .fi-body > * { flex: none; }
 .fi-link { display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
+.fi-pages { display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
+.fi-page { width: 100%; display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 40px; padding: 0 var(--ref-spacing-07); border: 0; background: none; font: inherit; color: var(--sys-color-neutral-800); text-align: left; cursor: pointer; box-shadow: inset 0 -1px 0 var(--iris-line); transition: background-color .12s ease; }
+.fi-page:last-child { box-shadow: none; }
+.fi-page:hover { background: var(--interaction-light-gray-hover); }
+.fi-page:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: -2px; }
+.fi-page > .ellipsis { flex: 1; }
 .fi-note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: 0; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-700); }
 .fi-note.warn { color: var(--sys-color-theme-error-default); }
 .fi-note-ic { flex: none; margin-top: 1px; }

@@ -457,6 +457,7 @@ export default {
   'Missing design': '디자인 없음',
   'Missing state': '상태 디자인 없음',
   'Not in doc': '기획서에 없음',
+  '{file} — choose a page': '{file} — 페이지를 골라 주세요',
   // 피그마 연결(토큰)
   'Figma connection': '피그마 연결',
   'Iris uses one team token to read Figma files when people import screens': '화면을 가져올 때 Iris는 팀 토큰 하나로 피그마 파일을 읽어요',

@@ -52,7 +52,8 @@ export default defineNuxtConfig({
     cookieOptions: { sameSite: 'lax', secure: true },
   },
   // 서버 함수를 Supabase(서울)와 같은 서울 지역(icn1)에서 돌립니다. 기본값(미국 동부)이면 로그인 확인 · DB 조회마다 태평양을 오갑니다
-  nitro: { vercel: { functions: { regions: ['icn1'] } } },
+  // 피그마 가져오기는 한 요청에 피그마를 여러 번 불러서(섹션 단계 · 이미지) 기본 10초로는 모자랄 수 있어요 — 60초까지
+  nitro: { vercel: { functions: { regions: ['icn1'], maxDuration: 60 } } },
   runtimeConfig: {
     // 서버 전용 (브라우저에 노출되지 않음)
     figmaAccessToken: '',
