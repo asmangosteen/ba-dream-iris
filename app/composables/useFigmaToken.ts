@@ -12,13 +12,16 @@ export function useFigmaToken() {
   const preview = useDevPreview()
   const pv = useState<FigmaTokenStatus>('pv-figma-token', () => ({ connected: false }))
   const status = useState<FigmaTokenStatus | null>('figma-token-status', () => null)
-  const rpc = supabase.rpc as unknown as Rpc
+  // 변수에 꺼내면 supabase 와의 연결(this)이 끊겨 부르기 전에 오류가 나요 — 묶어서 꺼내요
+  const rpc = (supabase.rpc as unknown as Rpc).bind(supabase)
 
   async function refresh(): Promise<FigmaTokenStatus> {
     if (preview) { status.value = { ...pv.value }; return status.value }
-    const { data, error } = await rpc('figma_status')
-    // 함수가 아직 없으면(DB 적용 전) 연결 안 됨으로
-    status.value = error ? { connected: false } : ((data as FigmaTokenStatus | null) ?? { connected: false })
+    // 함수가 아직 없거나 부르기에 실패하면 연결 안 됨으로
+    try {
+      const { data, error } = await rpc('figma_status')
+      status.value = error ? { connected: false } : ((data as FigmaTokenStatus | null) ?? { connected: false })
+    } catch { status.value = { connected: false } }
     return status.value
   }
   /** 저장 · 바꾸기. 빈 값이면 지우기 */
