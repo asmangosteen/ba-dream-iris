@@ -54,6 +54,8 @@ const canvas = useAsyncData(`overview-canvas-${projectId}`, async () => {
   }
   return ((pg.data ?? []) as { id: string; name: string; sort_order: number }[]).map((p) => ({ ...p, screens: byPage.get(p.id) ?? [] }))
 }, { server: false, default: () => [] as { id: string; name: string; sort_order: number; screens: ThumbScreen[] }[] })
+/** 썸네일로 보일 페이지: 구분선 페이지('---')는 빼요 */
+const canvasPages = computed(() => canvas.data.value.filter((p) => !isPageDivider(p.name)))
 /** 페이지를 누르면 그 페이지로 편집기 */
 const pageHref = (id: string) => `/p/${projectId}?page=${encodeURIComponent(id)}`
 
@@ -113,9 +115,9 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
         <div v-if="canvas.status.value === 'pending' && !canvas.data.value.length" class="pages">
           <div v-for="i in 2" :key="i" class="sq pthumb-box" />
         </div>
-        <div v-else-if="!canvas.data.value.length" class="page-empty"><p class="tx-meta">{{ tr('No pages yet') }}</p></div>
+        <div v-else-if="!canvasPages.length" class="page-empty"><p class="tx-meta">{{ tr('No pages yet') }}</p></div>
         <div v-else class="pages">
-          <NuxtLink v-for="p in canvas.data.value" :key="p.id" :to="pageHref(p.id)" class="page">
+          <NuxtLink v-for="p in canvasPages" :key="p.id" :to="pageHref(p.id)" class="page">
             <span class="sq sq-clip pthumb-box"><PageThumb :screens="p.screens" /><span v-if="!p.screens.length" class="tx-meta no-frames">{{ tr('No frames yet') }}</span></span>
             <span class="tx-body pname ellipsis">{{ p.name }}</span>
           </NuxtLink>
@@ -187,10 +189,10 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 .ctitle { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
 .lnk-i { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); }
 
-/* 캔버스: 페이지 썸네일만(시안) — 두 칸씩, 칸 높이는 카드 높이에 맞춰요 */
+/* 캔버스: 페이지 썸네일만(시안) — 너비에 따라 한 줄 최대 4칸(한 칸 최소 240 — 홈 프로젝트 카드와 같아요) */
 .canvas-card { overflow: hidden; }
 /* 썸네일은 홈 프로젝트 카드와 같은 3:2. 세로로만 스크롤 — 스크롤바는 흰 카드 오른쪽 끝에 붙게(카드 안쪽 여백만큼 밖으로 빼고 그만큼 안쪽 여백) */
-.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ref-spacing-10); overflow-x: hidden; overflow-y: auto; margin: 0 calc(-1 * var(--ref-spacing-12)) calc(-1 * var(--ref-spacing-12)) 0; padding: 0 var(--ref-spacing-12) var(--ref-spacing-12) 0; }
+.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 3 * var(--ref-spacing-10)) / 4)), 1fr)); align-content: start; gap: var(--ref-spacing-10); overflow-x: hidden; overflow-y: auto; margin: 0 calc(-1 * var(--ref-spacing-12)) calc(-1 * var(--ref-spacing-12)) 0; padding: 0 var(--ref-spacing-12) var(--ref-spacing-12) 0; }
 .page { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-width: 0; color: inherit; text-decoration: none; }
 .pthumb-box { position: relative; flex: none; aspect-ratio: 3 / 2; border-radius: var(--ref-radius-06); --sq-fill: var(--iris-canvas); --sq-line: var(--iris-line); --sq-line-w: 1px; transition: --sq-line .12s; }
 .page:hover .pthumb-box { --sq-line: var(--ref-color-gray-900-20); }

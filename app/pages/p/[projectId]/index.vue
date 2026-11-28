@@ -122,7 +122,7 @@ async function onPageDrop() {
   } catch { sayFail(tr('Something went wrong. Try again')) }
 }
 /** 페이지 구분선: 이름이 대시(-, –, —) 3개 이상뿐이면 */
-const isDivider = (name: string) => /^\s*[-–—]{3,}\s*$/.test(name)
+const isDivider = isPageDivider
 /**
  * 왼쪽 패널 Pages | Layers 나누기(피그마와 같아요): 사이 선에 올리면 ↕ 커서, 끌면 Pages 높이가 바뀌고 Layers 가 나머지를 써요. 높이는 이 브라우저에 기억해요
  */
