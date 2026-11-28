@@ -199,6 +199,22 @@ function mallHistory(): DocHistoryRow[] {
   const pln = v1[pIdx]!.rows!.find((r) => r[0] === 'P-PLN-01')
   if (pln) pln[2] = '요금제는 12 · 24개월 두 가지'
   v1.splice(pIdx + 1, 0, { id: 'mb-old-note', type: 'p', text: '결제는 매월 5일 자동으로 나간다' } as DocBlock)
+  // 더 예전 기록(목록이 스크롤될 만큼 — 버전 · 상태 · 요청사항 규칙 · 화면 상태를 조금씩 고친 것)
+  const infoIdx = v1.findIndex((b) => b.type === 'table' && (b.rows?.[0]?.[0] ?? '') === '항목')
+  // v1 부터는 요청사항 표 뒤에 문단이 하나 끼어 있어서 화면 표 자리가 한 칸 밀려요 — 머리 글로 다시 찾아요
+  const sIdx1 = v1.findIndex((b) => b.type === 'table' && (b.rows?.[0]?.[1] ?? '') === '화면')
+  const setCell = (bs: DocBlock[], idx: number, key: string, col: number, val: string) => { const c = clone(bs); const r = c[idx]?.rows?.find((x) => x[0] === key); if (r) r[col] = val; return c }
+  const v0e = infoIdx >= 0 ? setCell(v1, infoIdx, '버전', 1, 'v0.9') : clone(v1)
+  const v0d = infoIdx >= 0 ? setCell(v0e, infoIdx, '상태', 1, '작성 중') : clone(v0e)
+  const v0c = setCell(v0d, pIdx, 'P-DOC-01', 2, '운전면허증은 촬영으로 올린다')
+  const v0b = setCell(v0c, sIdx1, 'C-05', 3, '-')
+  const v0a = setCell(v0b, pIdx, 'P-PLN-02', 2, '추천 요금제에 표시를 붙인다')
+  const w5 = setCell(v0a, sIdx1, 'C-04', 3, '-')
+  const w4 = setCell(w5, pIdx, 'P-DOC-02', 2, '서류 심사 결과를 알림으로 보낸다')
+  const w3 = setCell(w4, pIdx, 'P-PLN-01', 1, '요금제')
+  const w2 = infoIdx >= 0 ? setCell(w3, infoIdx, '문서 약어', 1, '몰') : clone(w3)
+  const w1 = setCell(w2, pIdx, 'P-DOC-01', 1, '서류 제출')
+  const w0 = setCell(w1, sIdx1, 'C-06', 2, '예상 인도일')
   const at = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
   const mk = (id: string, author: string, before: DocBlock[], after: DocBlock[], h: number, note?: string): DocHistoryRow => {
     const d = diffBlocks(before, after)
@@ -210,6 +226,17 @@ function mallHistory(): DocHistoryRow[] {
     mk('h-3', 'preview-me', v3, v4, 26, 'Restored to before this change'),
     mk('h-2', 'preview-3', v2, v3, 27),
     mk('h-1', 'preview-2', v1, v2, 52),
+    mk('h-0e', 'preview-me', v0e, v1, 70),
+    mk('h-0d', 'preview-me', v0d, v0e, 75),
+    mk('h-0c', 'preview-3', v0c, v0d, 98),
+    mk('h-0b', 'preview-2', v0b, v0c, 100),
+    mk('h-0a', 'preview-2', v0a, v0b, 124),
+    mk('h-w5', 'preview-3', w5, v0a, 150),
+    mk('h-w4', 'preview-me', w4, w5, 170),
+    mk('h-w3', 'preview-2', w3, w4, 172),
+    mk('h-w2', 'preview-me', w2, w3, 196),
+    mk('h-w1', 'preview-3', w1, w2, 220),
+    mk('h-w0', 'preview-me', w0, w1, 240),
   ]
 }
 PREVIEW_DOCS.unshift({ id: 'd6', title: '착한구독 상세 기획서', category: 'planning', source_type: 'native', file_path: null, file_type: null, url: null, fetch_status: null, version_label: 'v1.0', updated_at: ago(20), plain_text: null, content_blocks: MALL_BLOCKS, abbr: MALL.abbr, status: 'draft', check_result: toCheckResult(MALL) })

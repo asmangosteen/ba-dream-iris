@@ -233,4 +233,6 @@ export default {
   'Changes to {code}': '{code} 수정 내역',
   'Show all': '전체 보기',
   'No changes to {code} yet': '{code}을 바꾼 기록이 아직 없어요',
+  'Undo this change': '이 변경 되돌리기',
+  'Back to this version': '이 버전으로',
 } satisfies Record<string, string>

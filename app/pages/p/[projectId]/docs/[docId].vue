@@ -1116,7 +1116,7 @@ async function removeDoc() {
           @cancel="cancelEdit"
           @saved="onSaved"
         />
-        <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" @close="histOpen = false" @restore="restoreDoc" />
+        <DocHistory v-else-if="histOpen" :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" :focus-code="activeCode" @close="histOpen = false" @restore="restoreDoc" @clear-focus="activeReq = null" />
         <div v-else class="read-main">
           <DocCheckBar :doc="doc" @go="(at: { block: string; row: number | null }) => flashWarnAt(reader?.root, at)" />
           <div v-if="goneReqs.length" class="sq gone" role="status">

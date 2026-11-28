@@ -41,8 +41,15 @@ function rowOf(b: DocBlock | undefined, code: string) {
 }
 /** 보여 줄 기록: 고른 요청사항이 있으면 그 줄을 바꾼 것만 */
 const shown = computed(() => (props.focusCode ? list.value.filter((h) => touches(h, props.focusCode!)) : list.value))
+/** 고른 기록(처음엔 아무것도 안 골라요 — 사용자 요청 2026-11-28). 누르면 그 기록 바로 아래에 바뀐 부분이 펼쳐지고, 다시 누르면 접혀요 */
 const sel = ref<string | null>(null)
-watch(shown, (l) => { if (!sel.value || !l.some((h) => h.id === sel.value)) sel.value = l[0]?.id ?? null }, { immediate: true })
+watch(shown, (l) => { if (sel.value && !l.some((h) => h.id === sel.value)) sel.value = null })
+const root = ref<HTMLElement | null>(null)
+function toggle(id: string) {
+  sel.value = sel.value === id ? null : id
+  // 목록이 길어 스크롤 중이어도 펼친 기록이 보이게(맨 아래에 붙지 않고 그 자리에서)
+  if (sel.value) nextTick(() => root.value?.querySelector(`[data-hist="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
 const cur = computed(() => list.value.find((h) => h.id === sel.value) ?? null)
 
 const dayKey = (iso: string) => new Date(iso).toDateString()
@@ -119,7 +126,7 @@ function restore(before = false) {
 </script>
 
 <template>
-  <div :class="['hist', { narrow: hideHead }]">
+  <div ref="root" :class="['hist', { narrow: hideHead }]">
     <!-- 위 막대: 고치기 화면 위 막대와 같은 규격(높이 44 · 좌우 24 · 아래 선, 스크롤해도 위에) -->
     <div v-if="!hideHead" class="hh">
       <span class="tx-head">{{ tr('History') }}</span>
@@ -130,43 +137,40 @@ function restore(before = false) {
     <p v-if="focusCode" class="focus"><span class="tx-meta">{{ tr('Changes to {code}', { code: focusCode }) }}</span><button type="button" class="lnk" @click="emit('clear-focus')">{{ tr('Show all') }}</button></p>
     <p v-else class="tx-meta desc">{{ tr('Only the blocks that changed are stored, so history stays small.') }}</p>
     <p v-if="history.status.value === 'success' && !shown.length" class="tx-meta empty">{{ focusCode ? tr('No changes to {code} yet', { code: focusCode }) : tr('No changes recorded yet. Edits from now on will show up here.') }}</p>
-    <div v-else class="cols">
-      <!-- 기록 목록 -->
-      <div class="items" role="listbox" :aria-label="tr('History')">
-        <template v-for="g in groups" :key="g.day">
-          <span class="tx-meta day">{{ dayLabel(g.items[0]!.created_at) }}</span>
-          <button v-for="h in g.items" :key="h.id" type="button" role="option" :aria-selected="sel === h.id" :class="['sq', 'item', { on: sel === h.id }]" @click="sel = h.id">
+    <div v-else class="items" role="list" :aria-label="tr('History')">
+      <template v-for="g in groups" :key="g.day">
+        <span class="tx-meta day">{{ dayLabel(g.items[0]!.created_at) }}</span>
+        <div v-for="h in g.items" :key="h.id" :data-hist="h.id" :class="['entry', { open: sel === h.id }]" role="listitem">
+          <button type="button" :aria-expanded="sel === h.id" :class="['sq', 'item', { on: sel === h.id }]" @click="toggle(h.id)">
             <MemberAvatar :name="who(h.author_id).name" :src="who(h.author_id).avatar" :size="20" />
             <span class="icol">
               <span class="ln"><b>{{ who(h.author_id).name }}</b><span class="tx-meta">{{ timeLabel(h.created_at) }}</span></span>
               <span class="tx-meta">{{ what(h) }}</span>
               <span v-if="chips(h).length" class="chips"><span v-for="c in chips(h).slice(0, 4)" :key="c" :class="['sq', 'chip', chipKind(c)]">{{ c }}</span><span v-if="chips(h).length > 4" class="tx-meta">+{{ chips(h).length - 4 }}</span></span>
             </span>
+            <EditorIcon name="chevron_down" :size="12" :class="['caret', { up: sel === h.id }]" />
           </button>
-        </template>
-      </div>
-      <!-- 고른 기록의 바뀐 부분 -->
-      <div v-if="cur" class="diff">
-        <div class="dh">
-          <span class="dcol"><b>{{ tr('Changes by {name}', { name: who(cur.author_id).name }) }}</b><span class="tx-meta">{{ dayLabel(cur.created_at) }} {{ timeLabel(cur.created_at) }} · {{ what(cur) }}</span></span>
-          <span class="dacts">
-            <Button v-if="canRestore" size="s" type="tertiary" @click="restore(true)">{{ tr('Restore to before this change') }}</Button>
-            <Button v-if="canRestore && cur.id !== list[0]?.id" size="s" type="tertiary" stroke @click="restore(false)">{{ tr('Restore this version') }}</Button>
-          </span>
+          <!-- 고른 기록의 바뀐 부분: 그 기록 바로 아래에 -->
+          <div v-if="sel === h.id && cur" class="diff">
+            <div v-for="v in views" :key="v.id" class="vb">
+              <span :class="['sq', 'chip', v.badge]">{{ v.badge === 'add' ? tr('New') : v.badge === 'del' ? tr('Removed') : tr('Edited') }}</span>
+              <table v-if="v.type === 'table'" class="dtbl">
+                <thead v-if="v.head"><tr><th v-for="(c, i) in v.head" :key="i">{{ c }}</th></tr></thead>
+                <tbody><tr v-for="(l, i) in v.lines" :key="i" :class="l.kind"><td v-for="(c, j) in l.cells" :key="j">{{ c }}</td></tr></tbody>
+              </table>
+              <template v-else>
+                <p v-for="(l, i) in v.lines" :key="i" :class="['sqc', 'tline', l.kind, v.type]">{{ l.text }}</p>
+              </template>
+            </div>
+            <p v-if="!views.length" class="tx-meta m0">{{ tr('Only the order of blocks changed') }}</p>
+            <!-- 되돌리기: 바뀐 내용 아래(사용자 요청 2026-11-28) -->
+            <div v-if="canRestore" class="dacts">
+              <Button size="s" type="tertiary" @click="restore(true)">{{ tr('Undo this change') }}</Button>
+              <Button v-if="cur.id !== list[0]?.id" size="s" type="tertiary" stroke @click="restore(false)">{{ tr('Back to this version') }}</Button>
+            </div>
+          </div>
         </div>
-        <span class="legend tx-meta"><i class="sqc sw add" />{{ tr('Added') }}<i class="sqc sw del" />{{ tr('Removed') }}</span>
-        <div v-for="v in views" :key="v.id" class="vb">
-          <span :class="['sq', 'chip', v.badge]">{{ v.badge === 'add' ? tr('New') : v.badge === 'del' ? tr('Removed') : tr('Edited') }}</span>
-          <table v-if="v.type === 'table'" class="dtbl">
-            <thead v-if="v.head"><tr><th v-for="(c, i) in v.head" :key="i">{{ c }}</th></tr></thead>
-            <tbody><tr v-for="(l, i) in v.lines" :key="i" :class="l.kind"><td v-for="(c, j) in l.cells" :key="j">{{ c }}</td></tr></tbody>
-          </table>
-          <template v-else>
-            <p v-for="(l, i) in v.lines" :key="i" :class="['sqc', 'tline', l.kind, v.type]">{{ l.text }}</p>
-          </template>
-        </div>
-        <p v-if="!views.length" class="tx-meta">{{ tr('Only the order of blocks changed') }}</p>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -182,10 +186,13 @@ function restore(before = false) {
 .ib.s { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); }
 .ib.s:hover { --sq-fill: var(--sys-color-neutral-100); }
 .empty { margin: 0; }
-.cols { display: flex; flex-direction: column; gap: var(--ref-spacing-10); }
-.items { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: auto; }
+.items { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.entry { display: flex; flex-direction: column; min-width: 0; }
+.caret { flex: none; align-self: center; color: var(--sys-color-neutral-500); transition: transform .16s ease; }
+.caret.up { transform: rotate(180deg); }
+.m0 { margin: 0; }
 .day { padding: var(--ref-spacing-04) var(--ref-spacing-04) var(--ref-spacing-02); }
-.item { display: flex; gap: var(--ref-spacing-05); padding: var(--ref-spacing-05) var(--ref-spacing-05); border-radius: var(--ref-radius-05); text-align: left; color: inherit; }
+.item { width: 100%; box-sizing: border-box; display: flex; gap: var(--ref-spacing-05); padding: var(--ref-spacing-05) var(--ref-spacing-05); border-radius: var(--ref-radius-05); text-align: left; color: inherit; }
 .item:hover { --sq-fill: var(--sys-color-neutral-100); }
 .item.on { --sq-fill: var(--sys-color-brand-primary-lightest, #EEF5FD); }
 .item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
@@ -197,23 +204,15 @@ function restore(before = false) {
 .chip.add { color: #14612C; --sq-fill: #DDF4E4; }
 .chip.edit { color: #454C58; --sq-fill: #F1F2F3; }
 .chip.del { color: #9B1C1C; --sq-fill: #FDE2E1; }
-.diff { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding-top: var(--ref-spacing-08); box-shadow: 0 -1px 0 var(--iris-line); }
-.dh { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); flex-wrap: wrap; }
-/* 좁은 칸(문서에서 보기 오른쪽 패널): 되돌리기 버튼은 제목 아래 줄로, 목록은 안쪽 스크롤 없이 패널 스크롤 하나로 */
-.hist.narrow .dcol { flex-basis: 100%; }
-.hist.narrow .dacts { flex-wrap: wrap; }
-.hist.narrow .items { max-height: none; overflow: visible; }
-.dacts { display: flex; gap: var(--ref-spacing-04); flex: none; }
-.dcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dcol b { font-weight: 600; }
-.legend { display: flex; align-items: center; gap: var(--ref-spacing-04); }
-.sw { width: 10px; height: 10px; border-radius: 2px; margin-left: var(--ref-spacing-04); }
-.sw.add { background: #DDF4E4; box-shadow: inset 0 0 0 1px #9ED7AF; }
-.sw.del { background: #FDE2E1; box-shadow: inset 0 0 0 1px #F2AAA6; }
+.diff { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-width: 0; padding: var(--ref-spacing-06) var(--ref-spacing-05) var(--ref-spacing-08) 31px; }
+.dacts { display: flex; flex-wrap: wrap; gap: var(--ref-spacing-04); }
 .vb { display: flex; flex-direction: column; gap: var(--ref-spacing-03); }
-.dtbl { width: 100%; border-collapse: collapse; }
+.dtbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .dtbl th { text-align: left; font-weight: 600; color: var(--sys-color-neutral-600); background: var(--sys-color-neutral-100); padding: var(--ref-spacing-03) var(--ref-spacing-05); border-bottom: 1px solid var(--iris-line); }
-.dtbl td { padding: var(--ref-spacing-03) var(--ref-spacing-05); border-bottom: 1px solid var(--iris-line); vertical-align: top; white-space: pre-line; }
+.dtbl td { padding: var(--ref-spacing-03) var(--ref-spacing-05); border-bottom: 1px solid var(--iris-line); vertical-align: top; white-space: pre-line; overflow-wrap: anywhere; }
+/* 표는 칸 너비 안에서 줄바꿈 — 가로 스크롤 없이. 첫 칸(ID)은 끊기지 않게 */
+.dtbl th, .dtbl td { overflow-wrap: anywhere; }
+.dtbl th:first-child, .dtbl td:first-child { width: 72px; white-space: nowrap; overflow-wrap: normal; }
 .dtbl tr.add td { background: #EEFAF1; }
 .dtbl tr.del td { background: #FEF1F0; color: var(--sys-color-neutral-500); text-decoration: line-through; }
 .tline { margin: 0; padding: var(--ref-spacing-02) var(--ref-spacing-05); border-radius: 4px; white-space: pre-wrap; }
