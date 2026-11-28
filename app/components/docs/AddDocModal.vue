@@ -44,16 +44,19 @@ const done = ref<{ docId: string; found: number; slots: number; warnings: number
 const title = ref('')
 const body = ref('')
 /** 여러 줄 입력칸: 크기 조절 손잡이 대신 글 길이에 맞춰 늘어나요(사용자 요청 2026-11-27) */
-const growArea = (e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
+const areaEl = ref<HTMLTextAreaElement | null>(null)
+const grow = (t: HTMLTextAreaElement | null) => { if (!t) return; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
+const growArea = (e: Event) => grow(e.target as HTMLTextAreaElement)
 
 /** 틀 = 가이드의 문서 종류별 뼈대(utils/docTemplates). 넣는 순간 지금 언어로 정해져요 */
 const TEMPLATES = DOC_TEMPLATES
+const tplLine = (i: number) => { const on = TEMPLATES.findIndex((t) => t.key === template.value); return i > 0 && i !== on && i - 1 !== on }
 const tplText = (t: DocTemplate | undefined) => (t ? (isKo() ? t.ko : t.en) : '')
 const template = ref<TemplateKey>('blank')
 function pickTemplate(t: DocTemplate) {
   const cur = TEMPLATES.find((x) => x.key === template.value)
   // 이미 쓴 내용이 있으면 덮어쓰지 않습니다
-  if (!body.value.trim() || body.value === tplText(cur)) body.value = tplText(t)
+  if (!body.value.trim() || body.value === tplText(cur)) { body.value = tplText(t); nextTick(() => grow(areaEl.value)) }
   template.value = t.key
   if (!catTouched.value) category.value = t.cat
 }
@@ -137,6 +140,7 @@ const catAuto = computed(() => !catTouched.value && !!autoCat.value && autoCat.v
 const foundCount = computed(() => detectRequirements(draftDoc.value).length + (check.value?.policies.length ?? 0))
 const showCheck = computed(() => !!check.value && ((mode.value === 'file' && fileExt.value === 'md') || (mode.value === 'write' && !!body.value.trim()) || (mode.value === 'link' && !!linkBlocks.value?.length)))
 const warnOpen = ref(false)
+const warnCount = computed(() => check.value?.warnings.filter((w) => w.kind !== 'no_screen').length ?? 0)
 const wText = (w: FormatWarning) => { const t = warningText(w); return tr(t.key, t.vars) }
 
 const canSave = computed(() => {
@@ -385,47 +389,45 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               <TextInput v-model:value="title" v-bind="TI" data-autofocus :label="tr('Document name')" essential :placeholder="tr('e.g. Sign-up flow dev notes')" :input-props="{ id: 'docName', autocomplete: 'off' }" :label-props="{ htmlFor: 'docName' }" />
               <div class="choice">
                 <span id="tplLabel" class="tx-head">{{ tr('Start from a template') }}</span>
-                <div class="tpl" role="radiogroup" aria-labelledby="tplLabel">
+                <!-- 문서 종류 틀: 세그먼트 컨트롤(서비스 공용 .segc) — 한 줄로 -->
+                <div class="sq segc tpl" role="radiogroup" aria-labelledby="tplLabel" :style="{ gridTemplateColumns: `repeat(${TEMPLATES.length}, minmax(0, 1fr))` }">
                   <button
-                    v-for="t in TEMPLATES"
+                    v-for="(t, i) in TEMPLATES"
                     :key="t.key"
                     type="button"
                     role="radio"
                     :aria-checked="template === t.key"
-                    :class="['sq', 'tpl-item', { on: template === t.key }]"
+                    :class="['sq', 'segc-i', { on: template === t.key }]"
+                    :title="tr(t.label)"
                     @click="pickTemplate(t)"
-                  >{{ tr(t.label) }}</button>
+                  ><span v-if="tplLine(i)" class="segc-sep" aria-hidden="true" /><span class="ellipsis">{{ tr(t.label) }}</span></button>
                 </div>
               </div>
               <div class="col6">
                 <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
-                <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
-                <span class="tx-meta num">{{ tr('Request tables (P-AREA-01) and screen tables (C-01) are read automatically. Lines starting with REQ-001 still work') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
+                <div class="sq area-box"><textarea id="docBody" ref="areaEl" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
               </div>
             </div>
 
-            <!-- 양식 검사 결과(시안 1) -->
+            <!-- 양식 검사: 한 줄 요약(머리 · 상태 칩) + 숫자 한 줄, 경고는 눌러서 펼치기 -->
             <div v-if="showCheck && check" class="sq fcheck">
-              <span class="fc-h"><b>{{ tr('Format check') }}</b><span class="tx-meta">{{ tr('Iris planning format') }}</span></span>
-              <template v-if="check.format !== 'none'">
-                <div class="counts">
-                  <span class="sq cnt pol"><b class="num">{{ check.policies.length }}</b><span>{{ tr('Requests') }}</span></span>
-                  <span class="sq cnt slot"><b class="num">{{ check.slots.length }}</b><span>{{ tr('Screen slots') }}</span></span>
-                  <span class="sq cnt"><b class="num">{{ check.links }}</b><span>{{ tr('Links') }}</span></span>
-                  <span class="sq cnt warnc"><b class="num">{{ check.warnings.filter((w) => w.kind !== 'no_screen').length }}</b><span>{{ tr('Warnings') }}</span></span>
-                </div>
-                <button v-if="check.warnings.some((w) => w.kind !== 'no_screen')" type="button" class="sq wbar" :aria-expanded="warnOpen" @click="warnOpen = !warnOpen">
-                  <b>{{ tr('{n} warnings — you can still add it', { n: check.warnings.filter((w) => w.kind !== 'no_screen').length }) }}</b><span class="tx-meta">{{ warnOpen ? tr('Hide') : tr('Show') }}</span>
-                </button>
-                <ul v-if="warnOpen" class="sq wlist">
-                  <li v-for="(w, i) in check.warnings.filter((x) => x.kind !== 'no_screen')" :key="i"><span class="dot" />{{ wText(w) }}</li>
-                </ul>
-                <span class="tx-meta">{{ tr('Each row of the screen table becomes a screen slot, and the requests in its Request column are linked as “Unchecked”.') }}</span>
-              </template>
-              <template v-else>
-                <b class="nf">{{ tr('This doesn’t follow the Iris planning format') }}</b>
-                <span class="tx-meta">{{ tr('No request table or screen table was found, so requests and screens won’t be linked automatically.') }}</span>
-              </template>
+              <div class="fc-h">
+                <b>{{ tr('Format check') }}</b>
+                <span v-if="check.format === 'none'" class="sq fc-st none">{{ tr('Not in the Iris planning format') }}</span>
+                <button v-else-if="warnCount" type="button" class="sq fc-st warn" :aria-expanded="warnOpen" @click="warnOpen = !warnOpen"><EditorIcon name="warning" :size="12" />{{ warnCount === 1 ? tr('1 warning') : tr('{n} warnings', { n: warnCount }) }}<EditorIcon name="chevron_down" :size="12" :class="['car', { up: warnOpen }]" /></button>
+                <span v-else class="sq fc-st ok"><EditorIcon name="check" :size="12" />{{ tr('Ready to link') }}</span>
+              </div>
+              <p v-if="check.format === 'none'" class="tx-meta fc-none">{{ tr('No request or screen table was found — download the guide above to see the format') }}</p>
+              <div v-else class="fc-nums">
+                <span><b class="num">{{ check.policies.length }}</b>{{ tr('Requests') }}</span>
+                <span class="fc-dot" aria-hidden="true" />
+                <span><b class="num">{{ check.slots.length }}</b>{{ tr('Screen slots') }}</span>
+                <span class="fc-dot" aria-hidden="true" />
+                <span><b class="num">{{ check.links }}</b>{{ tr('Links') }}</span>
+              </div>
+              <ul v-if="warnOpen && warnCount" class="wlist">
+                <li v-for="(w, i) in check.warnings.filter((x) => x.kind !== 'no_screen')" :key="i"><span class="dot" />{{ wText(w) }}</li>
+              </ul>
             </div>
 
             <!-- 분류 -->
@@ -495,14 +497,11 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .url-row :deep(.bd-button) { height: 30px; min-height: 30px; }
 .url-in { flex: 1; min-width: 0; }
 
-.tpl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ref-spacing-06); }
-.tpl-item { padding: var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; font-weight: 500; transition: color .12s ease; }
-.tpl-item:hover { --sq-overlay: var(--interaction-light-gray-hover); }
-.tpl-item:active { --sq-overlay: var(--interaction-light-gray-pressed); }
-.tpl-item:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.tpl-item.on { font-weight: 600; --sq-overlay: transparent; --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 0.5px; --sq-fill: var(--sys-color-brand-primary-lightest); color: var(--sys-color-brand-primary-default); }
+/* 틀 세그먼트: 다섯 칸이 한 줄(넘치면 말줄임, 이름은 title 로) */
+.tpl { width: 100%; }
+.tpl .segc-i { min-width: 0; }
 
-.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 128px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
+.area { display: block; width: 100%; box-sizing: border-box; resize: none; overflow-y: auto; min-height: 128px; max-height: 240px; padding: var(--ref-spacing-07) var(--ref-spacing-08); border: 0; outline: 0; background: transparent; font-size: 12px; line-height: 20px; color: var(--sys-color-neutral-800); }
 /* 입력칸 틀: textarea 는 ::before · ::after 가 없어서 감싼 .sq 가 채우기 · 선(squircle)을 그려요 */
 /* 여러 줄 입력칸 둥글기: 댓글 입력칸과 같은 18 */
 .area-box { display: block; border-radius: 18px; --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
@@ -510,28 +509,27 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .area-box:focus-within { --sq-line: var(--sys-color-brand-primary-default); }
 .area::placeholder { color: var(--sys-color-neutral-500); }
 
-.fcheck { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.fc-h { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
-.fc-h b, .nf { font-weight: 600; }
-.counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ref-spacing-04); }
-.cnt { display: flex; flex-direction: column; padding: var(--ref-spacing-05) var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-100); font-size: 11px; color: var(--sys-color-neutral-700); }
-.cnt b { font-size: 16px; line-height: 22px; font-weight: 600; color: var(--sys-color-neutral-800); }
-.cnt.pol { --sq-fill: var(--iris-peek-bg); }
-.cnt.pol b { color: var(--iris-peek-ink); }
-.cnt.slot { --sq-fill: var(--sys-color-brand-primary-lightest); }
-.cnt.slot b { color: var(--sys-color-brand-primary-default); }
-.cnt.warnc { --sq-fill: #FFF1E8; }
-.cnt.warnc b { color: #B44A0E; }
-.wbar { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); height: 30px; padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: #FFF6EC; color: #B44A0E; text-align: left; }
-.wbar b { font-weight: 600; }
-.wbar:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.wlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--ref-spacing-03); }
+/* 양식 검사: 옅은 테두리 칸, 머리 줄(제목 · 상태 칩) + 숫자 한 줄 */
+.fcheck { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-07) var(--ref-spacing-08); border-radius: var(--ref-radius-06); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.fc-h { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-06); min-height: 22px; }
+.fc-h b { font-weight: 600; }
+.fc-st { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 22px; padding: 0 var(--ref-spacing-05); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.fc-st.ok { color: #1B7A2B; --sq-fill: #E9F6EC; }
+.fc-st.warn { color: #B44A0E; --sq-fill: #FFF1E8; }
+.fc-st.warn:hover { --sq-fill: #FFE6D6; }
+.fc-st.warn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.fc-st.none { color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-100); }
+.car { transition: transform .16s ease; }
+.car.up { transform: rotate(180deg); }
+.fc-nums { display: flex; align-items: center; gap: var(--ref-spacing-05); flex-wrap: wrap; color: var(--sys-color-neutral-600); }
+.fc-nums > span:not(.fc-dot) { display: inline-flex; align-items: baseline; gap: var(--ref-spacing-03); }
+.fc-nums b { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.fc-dot { width: 2px; height: 2px; border-radius: 50%; background: var(--sys-color-neutral-400); }
+.fc-none { margin: 0; }
+.wlist { margin: var(--ref-spacing-02) 0 0; padding: var(--ref-spacing-05) 0 0; list-style: none; display: flex; flex-direction: column; gap: var(--ref-spacing-03); box-shadow: inset 0 1px 0 var(--iris-line); color: var(--sys-color-neutral-700); }
 .wlist li { display: flex; gap: var(--ref-spacing-04); align-items: flex-start; }
 .wlist .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 
-.link-help { margin: 0; padding-left: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
-.link-help li { list-style: disc; }
-.cat-h { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
 .err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0; color: var(--sys-color-theme-error-default); }
 
 .success { align-items: center; justify-content: center; text-align: center; gap: var(--ref-spacing-04); }

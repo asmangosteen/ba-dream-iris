@@ -196,6 +196,8 @@ export default {
   'Iris planning format guide': 'Iris 기획서 양식 가이드',
   'Write request and screen tables this way and they link up automatically': '요청사항 · 화면 표를 이 양식대로 쓰면 저절로 연결돼요',
   'Guide': '가이드',
+  'Ready to link': '양식에 맞아요',
+  'No request or screen table was found — download the guide above to see the format': '요청사항 표 · 화면 표를 찾지 못했어요 — 위 가이드에서 양식을 확인해 주세요',
   'Layers work the same way: select layers inside a frame, then link.': '레이어도 같아요: 프레임 안 레이어를 고른 뒤 연결하세요.',
   'Layout isn’t changed · Esc to go back': '배치는 그대로예요 · Esc 로 돌아가기',
   'Link a request to all {n} — search by ID or name': '{n}개 모두에 요청사항 연결 — ID 나 이름으로 찾기',
