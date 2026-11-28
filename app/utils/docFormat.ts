@@ -161,6 +161,8 @@ export interface FormatResult {
   /** 'iris' = 요청사항(정책) 표 · 화면 표 둘 다 — 표 머리는 '요청사항' · '정책' · 'Request' · 'Policy' 모두 읽어요(2026-11-28 이름 바꿈), 'partial' = 하나만, 'none' = 못 찾음 */
   format: 'iris' | 'partial' | 'none'
   abbr: string | null
+  /** 문서 정보 표의 '문서 종류'(서비스 기획서 · 정책서 · 디자인 요청서 · 개발 요청서 · 기타) — 가이드대로 AI 가 판단해 적어요 */
+  kind: string | null
   status: 'draft' | 'review' | 'confirmed' | null
   version: string | null
   policies: FoundPolicy[]
@@ -179,7 +181,7 @@ const STATUS_WORDS: [RegExp, FormatResult['status']][] = [[/확정|confirm/i, 'c
 
 /** 문서 블록을 읽어 정책 · 화면 칸 · 연결 · 경고를 돌려줘요 */
 export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): FormatResult {
-  const res: FormatResult = { format: 'none', abbr: null, status: null, version: null, policies: [], slots: [], links: 0, warnings: [] }
+  const res: FormatResult = { format: 'none', abbr: null, kind: null, status: null, version: null, policies: [], slots: [], links: 0, warnings: [] }
   const seenP = new Set<string>(), seenS = new Set<string>()
   let policyTable = false, screenTable = false
 
@@ -194,6 +196,7 @@ export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): Format
           const k = norm(r[0] ?? ''), v = (r[1] ?? '').trim()
           if (!v) continue
           if (/약어|약자|abbr/.test(k)) res.abbr ??= v.slice(0, 8)
+          else if (/종류|양식|doctype|documenttype|^type$|^kind$/.test(k)) res.kind ??= v.slice(0, 40)
           else if (/^상태$|^status$/.test(k)) res.status ??= STATUS_WORDS.find(([re]) => re.test(v))?.[1] ?? null
           else if (/^버전$|^version$/.test(k)) res.version ??= v
         }
@@ -267,6 +270,21 @@ export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): Format
   if (screenTable) for (const p of res.policies) if (!used.has(p.code) && !p.marks.includes('no_screen')) res.warnings.push({ kind: 'no_screen', code: p.code, block: p.block, row: p.row })
   res.format = policyTable && screenTable ? 'iris' : policyTable || screenTable || res.policies.length ? 'partial' : 'none'
   return res
+}
+
+// ---------------------------------------------------------------------------
+// 문서 분류 고르기(문서 추가 창이 먼저 골라 두고, 사람이 바꿀 수 있어요)
+// ---------------------------------------------------------------------------
+export type GuessCategory = 'planning' | 'dev' | 'design' | 'etc'
+/** 문서 종류 · 제목 · 파일 이름 글로 분류 짐작 — 디자인 → 개발 → 기획 순(‘디자인 요청서’ 가 ‘요청’ 보다 먼저) */
+export function guessCategory(text: string | null | undefined): GuessCategory | null {
+  const t = (text ?? '').toLowerCase()
+  if (!t.trim()) return null
+  if (/디자인|design|시안|ui\s*가이드|브랜드/.test(t)) return 'design'
+  if (/개발|기능\s*명세|\bapi\b|사양|spec\s*sheet|dev\b|engineering|데이터\s*정의/.test(t)) return 'dev'
+  if (/기획|정책|요구\s*사항|service\s*spec|스토리\s*보드|화면\s*설계|plan|policy|prd/.test(t)) return 'planning'
+  if (/회의|리포트|report|리서치|research|메모|note|기타|other/.test(t)) return 'etc'
+  return null
 }
 
 export function toCheckResult(r: FormatResult): CheckResult {

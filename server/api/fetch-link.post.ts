@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
       res = await fetch(url, {
         redirect: 'manual',
         signal,
-        headers: { 'user-agent': 'IrisLinkFetcher/1.0', accept: 'text/html,application/xhtml+xml,text/plain;q=0.9' },
+        headers: { 'user-agent': 'IrisLinkFetcher/1.0', accept: 'text/html,application/xhtml+xml,text/markdown,text/plain;q=0.9' },
       })
       const loc = res.headers.get('location')
       if (res.status >= 300 && res.status < 400 && loc) {
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
   if (!res.ok) throw createError({ statusCode: 502, statusMessage: `페이지가 응답하지 않아요 (${res.status})` })
 
   const type = (res.headers.get('content-type') ?? '').toLowerCase()
-  if (type && !/text\/html|application\/xhtml|text\/plain/.test(type)) {
+  if (type && !/text\/html|application\/xhtml|text\/plain|text\/markdown/.test(type)) {
     throw createError({ statusCode: 415, statusMessage: '웹 페이지가 아니에요' })
   }
 
@@ -80,12 +80,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, statusMessage: '페이지를 끝까지 읽지 못했어요' })
   }
   const html = decode(bytes, type)
-  const isHtml = !type.includes('text/plain')
+  const isHtml = !/text\/plain|text\/markdown/.test(type)
   const title = isHtml ? extractTitle(html) : ''
-  const text = (isHtml ? htmlToText(html) : normalizeLines(html)).slice(0, MAX_TEXT)
+  // 글 파일(.md 등)은 줄 · 빈 줄을 그대로 둬요 — 화면에서 Markdown 으로 읽어 표까지(plain: true)
+  const text = (isHtml ? htmlToText(html) : html.replace(/\r\n?/g, '\n').trim()).slice(0, MAX_TEXT)
   if (!text.trim()) throw createError({ statusCode: 422, statusMessage: '본문을 찾지 못했어요' })
 
-  return { title: title || url.hostname, text }
+  return { title: title || url.hostname, text, plain: !isHtml }
 })
 
 // ---------------------------------------------------------------------------

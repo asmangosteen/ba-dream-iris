@@ -2,6 +2,7 @@
 import { Button, IconButton, TextInput } from '@ba-dream/design-system'
 import type { DocBlock, DocCategory, DocRow, LinkRow, ProjectScreen, ReqRow, SlotRow } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
+import type { DocTemplate, TemplateKey } from '~/utils/docTemplates'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ projectId: string }>()
@@ -33,6 +34,8 @@ const MAX_FILE = 50 * 1024 * 1024
 
 const mode = ref<Mode>('file')
 const category = ref<DocCategory>('planning')
+/** 분류는 먼저 저절로 골라 두고(문서 종류 → 제목 · 파일 이름 · 링크 제목), 사람이 한 번 누르면 그 뒤로는 그대로 둬요 */
+const catTouched = ref(false)
 const saving = ref(false)
 const error = ref('')
 const done = ref<{ docId: string; found: number; slots: number; warnings: number } | null>(null)
@@ -43,20 +46,16 @@ const body = ref('')
 /** 여러 줄 입력칸: 크기 조절 손잡이 대신 글 길이에 맞춰 늘어나요(사용자 요청 2026-11-27) */
 const growArea = (e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
 
-const TEMPLATES: { key: string; label: string; cat: DocCategory; text: string }[] = [
-  { key: 'plan', label: 'Spec', cat: 'planning', text: '## 1. Document info\n\n| Item | Value |\n| --- | --- |\n| Document abbreviation | |\n| Version | v0.1 |\n| Status | Draft |\n\n## 2. Requests\n\n| ID | Request | Rules |\n| --- | --- | --- |\n| P-AREA-01 | | |\n\n## 3. Screens\n\n| ID | Screen | What to show | States | Request |\n| --- | --- | --- | --- | --- |\n| C-01 | | | | P-AREA-01 |\n' },
-  { key: 'dev', label: 'Dev notes', cat: 'dev', text: '# Overview\n\n## API\n- \n\n## To check\n- \n' },
-  { key: 'blank', label: 'Blank', cat: 'etc', text: '' },
-]
-/** 틀 본문도 지금 언어로(넣을 때 정해져서 그다음부터는 사용자 글) */
-const tplText = (t: (typeof TEMPLATES)[number] | undefined) => (t?.text ? tr(t.text) : '')
-const template = ref('blank')
-function pickTemplate(t: (typeof TEMPLATES)[number]) {
+/** 틀 = 가이드의 문서 종류별 뼈대(utils/docTemplates). 넣는 순간 지금 언어로 정해져요 */
+const TEMPLATES = DOC_TEMPLATES
+const tplText = (t: DocTemplate | undefined) => (t ? (isKo() ? t.ko : t.en) : '')
+const template = ref<TemplateKey>('blank')
+function pickTemplate(t: DocTemplate) {
   const cur = TEMPLATES.find((x) => x.key === template.value)
   // 이미 쓴 내용이 있으면 덮어쓰지 않습니다
   if (!body.value.trim() || body.value === tplText(cur)) body.value = tplText(t)
   template.value = t.key
-  category.value = t.cat
+  if (!catTouched.value) category.value = t.cat
 }
 /** Markdown → 블록(표 포함, utils/docFormat): '# ' → h1, '## ' → h2, '- ' → li, '| … |' → 표, 나머지 → 문단 */
 function toBlocks(src: string): DocBlock[] {
@@ -89,7 +88,7 @@ const sizeLabel = (n: number) => (n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1
 // 링크 -------------------------------------------------------------------
 const url = ref('')
 const fetching = ref(false)
-const fetched = ref<{ url: string; title: string; text: string } | null>(null)
+const fetched = ref<{ url: string; title: string; text: string; plain?: boolean } | null>(null)
 const fetchFailed = ref<string | null>(null)
 const urlValid = computed(() => /^https?:\/\/[^\s/]+\.[^\s]+$/i.test(url.value.trim()))
 async function fetchLink() {
@@ -99,7 +98,7 @@ async function fetchLink() {
   fetchFailed.value = null
   fetched.value = null
   try {
-    const r = await $fetch<{ title: string; text: string }>('/api/fetch-link', { method: 'POST', body: { url: u } })
+    const r = await $fetch<{ title: string; text: string; plain?: boolean }>('/api/fetch-link', { method: 'POST', body: { url: u } })
     fetched.value = { url: u, ...r }
   } catch (e) {
     const msg = (e as { data?: { statusMessage?: string }; statusMessage?: string })
@@ -112,19 +111,31 @@ watch(url, (v) => {
   if (fetched.value && fetched.value.url !== v.trim()) fetched.value = null
   fetchFailed.value = null
 })
+/** .md · 글 파일 주소(GitHub raw · gist 등)는 Markdown 으로 읽어 표까지 — 웹 페이지(HTML)는 글만 남아요 */
+const linkBlocks = computed(() => (fetched.value?.plain && fetched.value.text ? toBlocks(fetched.value.text) : null))
 const linkHost = computed(() => { try { return new URL(url.value.trim()).hostname } catch { return '' } })
 
 // 미리 찾은 요구사항 수 (카드에 보여 주기용) --------------------------------
 const draftDoc = computed<DocRow>(() => ({
   id: 'draft', project_id: props.projectId, title: '', category: category.value, source_type: mode.value === 'write' ? 'native' : mode.value === 'file' ? 'upload' : 'link',
-  content_blocks: mode.value === 'write' ? toBlocks(body.value) : mode.value === 'file' ? fileBlocks.value : null, file_path: null, file_type: null, url: null,
+  content_blocks: mode.value === 'write' ? toBlocks(body.value) : mode.value === 'file' ? fileBlocks.value : linkBlocks.value, file_path: null, file_type: null, url: null,
   plain_text: mode.value === 'file' ? fileText.value : mode.value === 'link' ? fetched.value?.text ?? null : null,
   fetch_status: null, version_label: null, updated_at: '',
 }))
 /** 양식 검사(시안 1): 정책 표 · 화면 표를 읽은 결과 */
 const check = computed(() => (draftDoc.value.content_blocks?.length ? analyzeDoc(draftDoc.value.content_blocks) : null))
+const autoCat = computed<DocCategory | null>(() => {
+  const k = check.value?.kind
+  const fromBlocks = k ? guessCategory(k) : null
+  if (fromBlocks) return fromBlocks
+  if (mode.value === 'write') return guessCategory(title.value) ?? (template.value !== 'blank' ? TEMPLATES.find((t) => t.key === template.value)!.cat : null)
+  if (mode.value === 'file') return guessCategory(file.value?.name ?? '') ?? guessCategory(fileText.value?.slice(0, 400))
+  return guessCategory(fetched.value?.title) ?? guessCategory(fetched.value?.text.slice(0, 400))
+})
+watch(autoCat, (c) => { if (c && !catTouched.value) category.value = c }, { immediate: true })
+const catAuto = computed(() => !catTouched.value && !!autoCat.value && autoCat.value === category.value)
 const foundCount = computed(() => detectRequirements(draftDoc.value).length + (check.value?.policies.length ?? 0))
-const showCheck = computed(() => !!check.value && ((mode.value === 'file' && fileExt.value === 'md') || (mode.value === 'write' && !!body.value.trim())))
+const showCheck = computed(() => !!check.value && ((mode.value === 'file' && fileExt.value === 'md') || (mode.value === 'write' && !!body.value.trim()) || (mode.value === 'link' && !!linkBlocks.value?.length)))
 const warnOpen = ref(false)
 const wText = (w: FormatWarning) => { const t = warningText(w); return tr(t.key, t.vars) }
 
@@ -162,7 +173,9 @@ async function save() {
       const u = url.value.trim()
       if (!fetched.value && !fetchFailed.value) await fetchLink()
       const ok = fetched.value?.url === u ? fetched.value : null
-      doc = { title: ok?.title || linkHost.value || u, category: category.value, source_type: 'link', url: u, plain_text: ok?.text ?? null, fetch_status: ok ? 'ok' : 'failed' }
+      const lb = ok?.plain ? toBlocks(ok.text) : null
+      const lTitle = lb?.[0]?.type === 'h1' ? lb[0].text : ok?.title
+      doc = { title: lTitle || linkHost.value || u, category: category.value, source_type: 'link', url: u, plain_text: ok?.text ?? null, fetch_status: ok ? 'ok' : 'failed', ...(lb?.length ? { content_blocks: lb } : {}) }
     }
 
     const docId = await addDocument(props.projectId, doc)
@@ -206,7 +219,7 @@ async function save() {
 const dialog = ref<HTMLElement | null>(null)
 let returnFocus: HTMLElement | null = null
 function reset() {
-  mode.value = 'file'; category.value = 'planning'; error.value = ''; done.value = null
+  mode.value = 'file'; category.value = 'planning'; catTouched.value = false; error.value = ''; done.value = null
   title.value = ''; body.value = ''; template.value = 'blank'
   clearFile(); url.value = ''; fetched.value = null; fetchFailed.value = null
 }
@@ -345,11 +358,17 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 />
                 <Button size="s" type="tertiary" stroke :loading="fetching" :disabled="!urlValid || fetching" @click="fetchLink">{{ tr('Fetch') }}</Button>
               </div>
+              <!-- 무엇을 어떻게 읽는지(사용자 질문 2026-11-28): 공개 웹 페이지 글 / .md 주소는 표까지 -->
+              <ul v-if="!fetched && !fetchFailed" class="link-help tx-meta">
+                <li>{{ tr('Brings in the text of a public web page. Pages that need a sign-in (private Notion, Google Docs, Confluence) can’t be read') }}</li>
+                <li>{{ tr('Tables on a web page come in as plain text, so requests and screens aren’t linked') }}</li>
+                <li>{{ tr('A link to a .md file (e.g. GitHub raw) is read with its tables — or upload the file instead') }}</li>
+              </ul>
               <div v-if="fetched" class="sq card">
                 <span class="sq chip"><EditorIcon name="document" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
-                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Requests: {n}', { n: foundCount }) }}</span>
+                  <span class="tx-meta num">{{ linkHost }} · <template v-if="fetched.plain">{{ tr('Requests: {n}', { n: foundCount }) }}</template><template v-else>{{ tr('Text only — tables aren’t read') }}</template></span>
                 </span>
               </div>
               <div v-else-if="fetchFailed" class="sq card">
@@ -411,7 +430,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 
             <!-- 분류 -->
             <div class="choice">
-              <span id="catLabel" class="tx-head">{{ tr('Category') }}</span>
+              <span class="cat-h"><span id="catLabel" class="tx-head">{{ tr('Category') }}</span><span v-if="catAuto" class="tx-meta">{{ tr('Chosen from the document — change it if it’s wrong') }}</span></span>
               <div class="seg cats" role="radiogroup" aria-labelledby="catLabel">
                 <button
                   v-for="c in CATS"
@@ -420,7 +439,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                   role="radio"
                   :aria-checked="category === c[0]"
                   :class="['sq', 'seg-item', { on: category === c[0] }]"
-                  @click="category = c[0]"
+                  @click="category = c[0]; catTouched = true"
                 >{{ tr(c[1]) }}</button>
               </div>
             </div>
@@ -510,6 +529,9 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .wlist li { display: flex; gap: var(--ref-spacing-04); align-items: flex-start; }
 .wlist .dot { flex: none; width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: #E2601B; }
 
+.link-help { margin: 0; padding-left: var(--ref-spacing-08); display: flex; flex-direction: column; gap: var(--ref-spacing-02); }
+.link-help li { list-style: disc; }
+.cat-h { display: flex; align-items: baseline; gap: var(--ref-spacing-04); }
 .err { display: flex; align-items: center; gap: var(--ref-spacing-04); margin: 0; color: var(--sys-color-theme-error-default); }
 
 .success { align-items: center; justify-content: center; text-align: center; gap: var(--ref-spacing-04); }
