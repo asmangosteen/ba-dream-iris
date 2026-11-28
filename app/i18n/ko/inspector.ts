@@ -2,6 +2,7 @@
 export default {
   // 공통 · 변수(TokenPicker) · 드롭다운
   'Mixed': '여러 값',
+  "{font} — shown in Pretendard if it isn't installed on this computer": '{font} — 이 컴퓨터에 없으면 Pretendard 로 보여요',
   'Auto': '자동',
   'None': '없음',
   'System · {name}': '시스템 · {name}',

@@ -175,6 +175,8 @@ export function backgroundCss(s: LayerStyle, color: ColorFn, img: ImgFn, box?: {
 
 /** 칠이 하나라도 있나 */
 export const hasFill = (s: LayerStyle) => !!s.fill || (s.fills ?? []).some(on)
+/** 바깥 그림자를 상자 대신 내용 모양대로 그릴 레이어: 그룹 · 칠 없는 프레임(피그마와 같아요) */
+export const shadowByShape = (n: { group?: boolean; style: LayerStyle }) => !!n.group || !hasFill(n.style)
 
 /** 선 색들(맨 위가 먼저). 이미지 · 그라디언트 선은 첫 색으로 */
 export function strokeColors(s: LayerStyle, color: ColorFn): string[] {
@@ -221,14 +223,17 @@ export function strokeShadows(s: LayerStyle, t: LayerType, color: ColorFn): { ou
   return out
 }
 
-/** 효과 → CSS. boxy: 상자 모양(box-shadow 사용), 아니면 filter drop-shadow */
-export function effectCss(effects: Effect[] | undefined, color: ColorFn, boxy: boolean): { outer: string[]; inner: string[]; filter: string[]; backdrop?: string; text: string[] } {
+/**
+ * 효과 → CSS. boxy: 상자 모양(box-shadow 사용), 아니면 filter drop-shadow.
+ * dropByShape: 상자여도 바깥 그림자는 내용 모양을 따라(drop-shadow) — 칠 없는 프레임 · 그룹(피그마는 상자가 아니라 안에 그린 모양대로 그림자를 그려요. 예: 맵 핀)
+ */
+export function effectCss(effects: Effect[] | undefined, color: ColorFn, boxy: boolean, dropByShape = false): { outer: string[]; inner: string[]; filter: string[]; backdrop?: string; text: string[] } {
   const out = { outer: [] as string[], inner: [] as string[], filter: [] as string[], backdrop: undefined as string | undefined, text: [] as string[] }
   for (const e of (effects ?? []).filter(on)) {
     if (e.type === 'drop' || e.type === 'inner') {
       const c = color(e.color) ?? e.color
       if (e.type === 'drop') {
-        if (boxy) out.outer.push(`${e.x}px ${e.y}px ${e.blur}px ${e.spread ?? 0}px ${c}`)
+        if (boxy && !dropByShape) out.outer.push(`${e.x}px ${e.y}px ${e.blur}px ${e.spread ?? 0}px ${c}`)
         else out.filter.push(`drop-shadow(${e.x}px ${e.y}px ${e.blur / 2}px ${c})`)
         out.text.push(`${e.x}px ${e.y}px ${e.blur / 2}px ${c}`)
       } else if (boxy) out.inner.push(`inset ${e.x}px ${e.y}px ${e.blur}px ${e.spread ?? 0}px ${c}`)

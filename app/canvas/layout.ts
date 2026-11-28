@@ -39,14 +39,16 @@ function layoutFrame(d: LayerDoc, p: LayerNode) {
   const pMain = isH(l) ? p.sizeH : p.sizeV
   const pCross = isH(l) ? p.sizeV : p.sizeH
 
-  // 1) Hug 부모: 채우기 아닌 자식 합으로 크기
-  const fixedMain = kids.filter((k) => sizeOf(k, main) !== 'fill')
+  // 1) Hug 부모: 자식 합으로 크기. 채우기 자식은 Hug 부모 안에선 지금 크기 그대로 쳐요(피그마와 같아요 —
+  //    탭처럼 Hug 컨테이너 안 Fill 글자가 0 너비로 줄어들던 것, 사용자 제보 2026-11-29)
   if (pMain === 'hug') {
-    const sum = fixedMain.reduce((a, k) => a + k[main], 0) + (l.wrap ? 0 : gap * Math.max(0, kids.length - 1))
+    const sum = kids.reduce((a, k) => a + k[main], 0) + (l.wrap ? 0 : gap * Math.max(0, kids.length - 1))
     if (!l.wrap) p[main] = r2(padMain0 + padMain1 + sum)
   }
   if (pCross === 'hug' && !l.wrap) {
-    const mx = Math.max(0, ...kids.filter((k) => sizeOf(k, cross) !== 'fill').map((k) => k[cross]))
+    // 채우기 아닌 자식이 있으면 그것들 기준(채우기 자식은 그 높이로 늘어나요), 모두 채우기면 지금 크기 그대로
+    const fixedCross = kids.filter((k) => sizeOf(k, cross) !== 'fill')
+    const mx = Math.max(0, ...(fixedCross.length ? fixedCross : kids).map((k) => k[cross]))
     p[cross] = r2(padCross0 + padCross1 + mx)
   }
   const innerMain = Math.max(0, p[main] - padMain0 - padMain1)
@@ -73,12 +75,14 @@ function layoutFrame(d: LayerDoc, p: LayerNode) {
     const fills = line.filter((k) => sizeOf(k, main) === 'fill')
     const fixedSum = line.filter((k) => sizeOf(k, main) !== 'fill').reduce((a, k) => a + k[main], 0)
     const gaps = gap * Math.max(0, line.length - 1)
-    if (fills.length) {
+    if (fills.length && !(pMain === 'hug' && !l.wrap)) {
       const each = Math.max(1, (innerMain - fixedSum - gaps) / fills.length)
       for (const k of fills) { k[main] = r2(each); if (k.type === 'text') k.style.autoWidth = false }
     }
     const lineCross = l.wrap ? Math.max(0, ...line.map((k) => (sizeOf(k, cross) === 'fill' ? 0 : k[cross]))) : innerCross
-    for (const k of line) if (sizeOf(k, cross) === 'fill' && pCross !== 'hug') k[cross] = r2(lineCross)
+    // Hug 부모(교차 방향)도 채우기 아닌 자식이 정한 높이가 있으면 채우기 자식은 그만큼 늘어나요
+    const crossSet = pCross !== 'hug' || l.wrap || line.some((k) => sizeOf(k, cross) !== 'fill')
+    for (const k of line) if (sizeOf(k, cross) === 'fill' && crossSet) k[cross] = r2(lineCross)
     // 크기가 바뀐 자식 프레임은 다시 계산
     for (const k of line) if (k.style.layout) layoutFrame(d, k)
     const total = line.reduce((a, k) => a + k[main], 0)

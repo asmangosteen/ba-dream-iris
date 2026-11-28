@@ -2,7 +2,7 @@
  * 화면 안 레이어 JSON (PRD/02_DATA_MODEL.md "레이어 구조").
  * id 로 찾아가는 평평한 목록 + parentId/children. 구조를 바꾸면 schemaVersion 을 올리고 migrate() 에 변환을 더합니다.
  */
-import { backgroundCss, effectCss, radiiOf, rectPath, STAR_INNER, strokeColors, strokeShadows } from './paint'
+import { backgroundCss, effectCss, hasFill, radiiOf, rectPath, STAR_INNER, strokeColors, strokeShadows } from './paint'
 import { squirclePath } from './squircle'
 import type { TextSpan } from './textRuns'
 
@@ -121,6 +121,8 @@ export interface LayerStyle {
   flipY?: boolean
   // 텍스트
   color?: string
+  /** 글꼴 이름(피그마에서 가져온 디자인 시스템 밖 글꼴 — 예 'Roboto'). 비어 있으면 디자인 시스템 글꼴(Pretendard). 이 컴퓨터에 없으면 Pretendard 로 보여요 */
+  fontFamily?: string
   fontSize?: number
   fontWeight?: number
   lineHeight?: number
@@ -458,7 +460,7 @@ export function frameCss(f: LayerStyle | undefined, color: (v?: string) => strin
   const sq = frameSmooth(f, w, h)
   if (f.radii) css.borderRadius = f.radii.map((r) => r + 'px').join(' ')
   else if (f.radius) css.borderRadius = f.radius + 'px'
-  const e = effectCss(f.effects, color, true)
+  const e = effectCss(f.effects, color, true, !hasFill(f)) // 칠 없는 화면은 그림자가 안의 모양을 따라가요
   if (sq) {
     css.background = 'transparent'
     const sl = frameSmoothLayers(f, w, h, color, img)

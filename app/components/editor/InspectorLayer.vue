@@ -314,9 +314,10 @@ const SIZES = computed(() => {
 const sizeNow = computed(() => { const v = tsame('fontSize', (n) => n.style.fontSize ?? 16); return v === 'Mixed' ? null : String(v) })
 const sizeOptionsT = computed(() => [...SIZES.value.map((z) => ({ value: String(z), label: String(z), short: '' })), { value: VAR_OPT, label: vb('fontSize') ? 'Change variable…' : 'Apply variable…', short: '', sep: true }])
 function onSize(v: string) { if (v === VAR_OPT) nextTick(() => typoVar.fontSize?.show()); else setStyle('fontSize', Number(v)) }
+/** 디자인 시스템 글자 스타일 걸기 — 가져온 다른 글꼴은 떼고 Pretendard 로 */
 function pickTextStyle(t: CatalogToken) {
   const x = t.text!
-  store.bind(...S(), 'textStyle', t.id, () => ({ style: { fontSize: x.size, lineHeight: x.lineHeight, lineHeightUnit: undefined, letterSpacing: x.letterSpacing, ...(x.weight ? { fontWeight: x.weight } : {}) } }))
+  store.bind(...S(), 'textStyle', t.id, () => ({ style: { fontFamily: undefined, fontSize: x.size, lineHeight: x.lineHeight, lineHeightUnit: undefined, letterSpacing: x.letterSpacing, ...(x.weight ? { fontWeight: x.weight } : {}) } }))
 }
 function unbind(key: BindKey | BindKey[]) {
   const keys = Array.isArray(key) ? key : [key]
@@ -355,6 +356,11 @@ const weights = computed(() => {
   return [...new Set([...base, ...cur])].sort((a, b) => a - b)
 })
 const weightNow = computed(() => tsame('fontWeight', (n) => n.style.fontWeight ?? 400))
+/** 가져온 글꼴 이름(디자인 시스템 글꼴이면 '') */
+const familyNow = computed(() => {
+  const fs = [...new Set(nodes.value.filter((n) => n.type === 'text').map((n) => n.style.fontFamily ?? ''))]
+  return fs.length > 1 ? 'Mixed' : fs[0] ?? ''
+})
 // --- v7: 불리언 · 마스크 ---
 /** 선택 머리의 순서 버튼(16 그리드): 맨 앞 · 앞 · 뒤 · 맨 뒤 */
 // 불리언 아이콘: 아이콘 세트(boolean_*) 이름
@@ -903,7 +909,9 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', onDocPointer
       <template v-else>
         <div class="ig w1">
           <!-- 글꼴: 디자인 시스템 글꼴 토큰(--font-family-base) 박스 — 피그마의 'font/pretendard' 와 같아요. 글꼴은 하나라 바꾸기 · 떼기는 없어요 -->
-          <div class="sq fld ff tokenbox" :data-tip="'font/pretendard — ' + tr('the design system font') + ' (--font-family-base)'"><EditorIcon name="text_box" :size="16" class="ffi" /><span class="ffn">font/pretendard</span></div>
+          <!-- 피그마에서 가져온 다른 글꼴이면 그 이름(토큰 아님 — 이 컴퓨터에 없으면 Pretendard 로 보여요) -->
+          <div v-if="familyNow" class="sq fld ff" :data-tip="familyNow === 'Mixed' ? tr('Mixed') : tr('{font} — shown in Pretendard if it isn\'t installed on this computer', { font: familyNow })"><EditorIcon name="text_box" :size="16" class="ffi" /><span class="ffn">{{ familyNow === 'Mixed' ? tr('Mixed') : familyNow }}</span></div>
+          <div v-else class="sq fld ff tokenbox" :data-tip="'font/pretendard — ' + tr('the design system font') + ' (--font-family-base)'"><EditorIcon name="text_box" :size="16" class="ffi" /><span class="ffn">font/pretendard</span></div>
           <span />
         </div>
         <div class="ig">

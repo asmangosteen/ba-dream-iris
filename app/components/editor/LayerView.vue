@@ -11,7 +11,7 @@ import InstanceView from '~/components/editor/InstanceView.vue'
 import { nodePathIn } from '~/canvas/vector'
 import { booleanPath } from '~/canvas/boolean'
 import { squirclePath } from '~/canvas/squircle'
-import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFancyStroke, hasFill, imagePlace, strokePad, type SvgPaintDef, radiiOf, rectPath, strokePaints, strokeShadows, vectorPath } from '~/canvas/paint'
+import { backgroundCss, rotatedImage, defaultAlign, defaultJoin, effectCss, ellipsePath, hasArc, hasFancyStroke, hasFill, imagePlace, shadowByShape, strokePad, type SvgPaintDef, radiiOf, rectPath, strokePaints, strokeShadows, vectorPath } from '~/canvas/paint'
 
 /**
  * 화면 안 레이어 하나(와 자식들)를 그립니다. 좌표는 부모 기준, 캔버스 확대는 바깥 transform 이 맡습니다.
@@ -79,7 +79,8 @@ const fancyBox = computed(() => {
   const off = align === 'inside' ? w / 2 : align === 'outside' ? -w / 2 : 0
   return { d: v.type === 'ellipse' ? ellipsePath(v.w, v.h, off) : rectPath(v.w, v.h, radiiOf(v.style), off), w }
 })
-const fx = computed(() => (n.value ? effectCss(n.value.style.effects, color, boxy.value) : null))
+// 그룹 · 칠 없는 프레임은 바깥 그림자가 상자가 아니라 안의 모양을 따라가요(피그마와 같아요 — 맵 핀 그림자가 사각형으로 나오던 것)
+const fx = computed(() => (n.value ? effectCss(n.value.style.effects, color, boxy.value, boxy.value && shadowByShape(n.value)) : null))
 
 const style = computed(() => {
   const v = n.value
@@ -115,7 +116,10 @@ const style = computed(() => {
   if (v.type === 'text') {
     Object.assign(css, {
       // color '' = 칠 없음(글자가 안 보여요)
-      color: s.color === '' ? 'transparent' : color(s.color), fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: lineHeightCss(s),
+      color: s.color === '' ? 'transparent' : color(s.color),
+      // 가져온 글꼴(디자인 시스템 밖): 이 컴퓨터에 있으면 그 글꼴, 없으면 Pretendard
+      fontFamily: s.fontFamily ? `"${s.fontFamily.replace(/["\\]/g, '')}", var(--font-family-base)` : undefined,
+      fontSize: (s.fontSize ?? 16) + 'px', fontWeight: s.fontWeight ?? 400, lineHeight: lineHeightCss(s),
       letterSpacing: s.letterSpacing ? s.letterSpacing + 'px' : undefined, textAlign: s.align ?? 'left', whiteSpace: s.autoWidth ? 'pre' : 'pre-wrap',
       textDecoration: s.decoration === 'underline' ? 'underline' : s.decoration === 'strike' ? 'line-through' : undefined,
       textTransform: s.textCase === 'upper' ? 'uppercase' : s.textCase === 'lower' ? 'lowercase' : s.textCase === 'title' ? 'capitalize' : undefined,

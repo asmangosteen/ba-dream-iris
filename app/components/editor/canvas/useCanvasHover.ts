@@ -93,10 +93,13 @@ export function useCanvasHover(canvas: Ctx) {
       const m = measureCtx.measureText('Hg')
       if (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent > 0) { asc = m.fontBoundingBoxAscent; desc = m.fontBoundingBoxDescent }
     }
+    // 글자(텍스트 노드) 칸만 재요 — 감싼 문단 · 구간 요소 칸까지 세면 높이가 달라 기준선이 두 줄로 겹쳐 그려졌어요(사용자 제보 2026-11-29)
     const rg = document.createRange()
-    rg.selectNodeContents(e)
+    const rects: DOMRect[] = []
+    const tw = document.createTreeWalker(e, NodeFilter.SHOW_TEXT)
+    for (let t = tw.nextNode(); t; t = tw.nextNode()) { rg.selectNodeContents(t); rects.push(...rg.getClientRects()) }
     const byLine = new Map<number, { l: number; r: number; base: number }>()
-    for (const r of rg.getClientRects()) {
+    for (const r of rects) {
       if (!r.width || !r.height) continue
       const base = r.bottom - desc * (r.height / (asc + desc)) // 글자 칸 높이 = ascent + descent(확대 반영)
       const key = Math.round(base)

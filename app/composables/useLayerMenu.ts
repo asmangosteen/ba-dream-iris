@@ -1,6 +1,6 @@
 import { runCss } from '~/canvas/textRuns'
 import { isContainer, SCHEMA_VERSION, type LayerDoc, type LayerNode } from '~/canvas/schema'
-import { backgroundCss, effectCss, strokeShadows } from '~/canvas/paint'
+import { backgroundCss, effectCss, shadowByShape, strokeShadows } from '~/canvas/paint'
 import { canFlatten } from '~/canvas/boolean'
 import { svgOfLayers, toDataUrl, type SvgExportOpts } from '~/canvas/svgExport'
 import { loadedImageUrl } from '~/canvas/images'
@@ -40,7 +40,7 @@ export function cssOf(n: LayerNode, color: (v?: string) => string | undefined): 
   if (n.type !== 'text') Object.assign(css, Object.fromEntries(Object.entries(backgroundCss(s, color, () => undefined)).map(([k, v]) => [k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()), v])))
   const r = s.radii ? s.radii.map((v) => v + 'px').join(' ') : s.radius ? s.radius + 'px' : n.type === 'ellipse' ? '50%' : ''
   if (r) css['border-radius'] = r
-  const st = strokeShadows(s, n.type, color), fx = effectCss(s.effects, color, true)
+  const st = strokeShadows(s, n.type, color), fx = effectCss(s.effects, color, n.type !== 'text', n.type !== 'text' && shadowByShape(n))
   const sh = [...st.outer, ...st.inner, ...fx.outer, ...fx.inner]
   if (sh.length) css['box-shadow'] = sh.join(', ')
   if (fx.filter.length) css.filter = fx.filter.join(' ')

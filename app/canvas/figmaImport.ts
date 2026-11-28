@@ -18,7 +18,7 @@ export interface FigmaPaint {
 }
 interface FigmaEffect { type: string; visible?: boolean; radius?: number; color?: FigmaColor; offset?: { x: number; y: number }; spread?: number }
 interface FigmaTypeStyle {
-  fontWeight?: number; fontSize?: number; textAlignHorizontal?: string; textAlignVertical?: string; letterSpacing?: number
+  fontFamily?: string; fontWeight?: number; fontSize?: number; textAlignHorizontal?: string; textAlignVertical?: string; letterSpacing?: number
   lineHeightPx?: number; lineHeightPercentFontSize?: number; lineHeightUnit?: string; textCase?: string; textDecoration?: string; textAutoResize?: string
   fills?: FigmaPaint[]; paragraphSpacing?: number
 }
@@ -147,6 +147,8 @@ function geom(n: FigmaFullNode) {
 /** 글자 → 레이어 글자 서식 */
 function textStyleInto(s: LayerStyle, st: FigmaTypeStyle | undefined) {
   if (!st) return
+  // 글꼴: Pretendard(디자인 시스템 글꼴)가 아니면 이름 그대로 — 인스펙터 글꼴 칸에 그 이름이 보여요
+  if (st.fontFamily && !/^pretendard/i.test(st.fontFamily.trim())) s.fontFamily = st.fontFamily.trim()
   if (st.fontSize) s.fontSize = r2(st.fontSize)
   if (st.fontWeight) s.fontWeight = st.fontWeight
   if (st.letterSpacing) s.letterSpacing = r2(st.letterSpacing)
@@ -245,7 +247,8 @@ export function figmaToLayers(root: FigmaFullNode, img: (ref: string) => string 
       const lay = layoutOf(n)
       if (lay) style.layout = lay
       node = { ...common, type: n.type === 'SECTION' ? 'section' : 'frame', style, children: [] }
-      if (n.type === 'GROUP') node.group = true
+      // 그룹은 그룹, 프레임 · 인스턴스는 늘 프레임(칠이 없고 자르기를 꺼도 — 안 그러면 옛 규칙으로 그룹이 돼서 24×24 아이콘 틀이 안의 벡터 크기로 줄었어요)
+      node.group = n.type === 'GROUP'
       const myOrigin = { x: g.cx - g.w / 2, y: g.cy - g.h / 2 }
       doc.nodes[id] = node
       for (const c of n.children ?? []) {
