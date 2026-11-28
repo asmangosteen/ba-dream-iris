@@ -229,4 +229,5 @@ export default {
   'Layer': '레이어',
   'Back': '뒤로',
   'Back to overview': '개요로',
+  'Side panel': '오른쪽 패널',
 } satisfies Record<string, string>
