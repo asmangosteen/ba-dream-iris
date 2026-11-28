@@ -324,8 +324,8 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .side { flex: 0 0 320px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
 .pane-top { flex: none; padding: var(--ref-spacing-10) var(--ref-spacing-10) var(--ref-spacing-04); }
 .side-sc { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
-/* 메모 칸: 머리 줄 없이(세그먼트가 머리) — 요청사항 칸과 같은 좌우 여백 */
-.notes-sc { padding: var(--ref-spacing-06) var(--ref-spacing-10) var(--ref-spacing-10); gap: 0; }
+/* 메모 칸: 머리 줄 없이(세그먼트가 머리) — 안쪽 여백은 요청사항 · 기록 칸(.side-sc)과 똑같이 */
+.notes-sc { gap: 0; }
 .toast-wrap { position: fixed; left: 0; right: 0; bottom: 32px; z-index: 30; display: flex; justify-content: center; pointer-events: none; font-size: 12px; line-height: 18px; }
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; margin: 0; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 .toast-enter-active, .toast-leave-active { transition: opacity .16s ease, transform .16s ease; }
