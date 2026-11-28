@@ -181,51 +181,9 @@ async function onPageSettings(patch: PageSettings) {
     store.pushAction(null, () => updatePageSettings(p.id, before), () => updatePageSettings(p.id, patch))
   } catch { sayFail(tr('Couldn\'t save page settings')) }
 }
-/**
- * 정렬 보기(새 2): 버튼을 누르면 화면 ID 순서(종류 C → A → S → N → CMP, 번호, 상태 변형)로 보기만 바꿔요.
- * 디자이너가 놓은 자리는 저장하지 않고 그대로 — 다시 누르거나 Esc 면 원래 배치로. 정렬 보기 동안은 보기 전용
- */
-const sortedView = ref(false)
 const slotRows = useScreenSlots(projectId)
 const projScreens = useProjectScreens(projectId)
-const SORT_ROWS = ['C', 'A', 'S', 'N', 'CMP', '']
-const sortedPos = computed(() => {
-  if (!sortedView.value || !list.value.length) return null
-  const slotById = new Map((slotRows.data.value ?? []).map((x) => [x.id, x]))
-  const slotOf = new Map((projScreens.data.value ?? []).map((x) => [x.id, x]))
-  const keyed = list.value.map((sc) => {
-    const ps = slotOf.get(sc.id)
-    const sl = ps?.slot_id ? slotById.get(ps.slot_id) : null
-    const byName = slotFromName(sc.name)
-    const code = sl?.code ?? byName?.code ?? null
-    const state = ps?.slot_state ?? byName?.state ?? null
-    const kind = code ? code.split('-')[0]! : ''
-    return { sc, code, state, kind }
-  })
-  const x0 = Math.min(...list.value.map((v) => v.x)), y0 = Math.min(...list.value.map((v) => v.y))
-  const pos = new Map<string, { x: number; y: number }>()
-  let top = y0
-  for (const k of SORT_ROWS) {
-    const row = keyed.filter((x) => (SORT_ROWS.includes(x.kind) ? x.kind : '') === k)
-      .sort((a, b) => (a.code && b.code ? compareCodes(a.code, b.code) : a.code ? -1 : b.code ? 1 : a.sc.name.localeCompare(b.sc.name)) || (a.state ? 1 : 0) - (b.state ? 1 : 0) || (a.state ?? '').localeCompare(b.state ?? ''))
-    if (!row.length) continue
-    let x = x0
-    let h = 0
-    for (const r of row) { pos.set(r.sc.id, { x, y: top }); x += r.sc.width + 80; h = Math.max(h, r.sc.height) }
-    top += h + 200
-  }
-  return pos
-})
-const sortedList = computed(() => (sortedPos.value ? list.value.map((v) => { const p = sortedPos.value!.get(v.id); return p ? { ...v, x: p.x, y: p.y } : v }) : list.value))
-function toggleSorted() {
-  sortedView.value = !sortedView.value
-  if (sortedView.value) { store.selectScreen(null); nextTick(() => canvas.value?.fit()) }
-}
-watch(pageId, () => { sortedView.value = false })
-function onSortedKey(e: KeyboardEvent) { if (e.key === 'Escape' && sortedView.value) { e.preventDefault(); sortedView.value = false } }
-onMounted(() => window.addEventListener('keydown', onSortedKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onSortedKey))
-const canvasList = computed(() => (canvasScreen.value ? [...sortedList.value, canvasScreen.value] : sortedList.value))
+const canvasList = computed(() => (canvasScreen.value ? [...list.value, canvasScreen.value] : list.value))
 const { tokens } = useDesignSystem()
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
@@ -257,7 +215,7 @@ provide(LAYER_STORE, store)
 // 역할 · 보기 전용(PRD/12, 16 E): 디자인 편집 권한이 없으면 캔버스 · 디자인 패널을 잠가요(진짜로 막는 건 DB 규칙)
 const access = useProjectAccess(projectId)
 const readOnly = computed(() => access.data.status.value === 'success' && !access.can.value.editDesign && !access.gate.value)
-watchEffect(() => { store.readonly.value = readOnly.value || sortedView.value })
+watchEffect(() => { store.readonly.value = readOnly.value })
 /** 권한 안내 화면이 떠 있나(그때는 코멘트 핀도 숨겨요) */
 const gateActive = computed(() => !!access.gate.value)
 // 저장 충돌(PRD/16 J-2): 같은 화면을 다른 사람이 먼저 저장했어요 — 그 사람 것 / 내 것
@@ -1949,9 +1907,8 @@ function onUiKey(k: 'toggle-ui' | 'left-file' | 'left-assets' | 'design' | 'prev
   if (next) pageId.value = next.id
 }
 // 툴바 버튼
-function onRail(k: 'assets' | 'link' | 'figma' | 'comment' | 'sort') {
-  if (k === 'sort') toggleSorted()
-  else if (k === 'assets') { left.value = 'assets'; asset.value = null }
+function onRail(k: 'assets' | 'link' | 'figma' | 'comment') {
+  if (k === 'assets') { left.value = 'assets'; asset.value = null }
   else if (k === 'figma') figmaOpen.value = true
   else if (k === 'link') {
     if (!current.value) return say(tr('Select a frame on the canvas first'))
@@ -2065,7 +2022,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     />
  <CommentLayer
       v-if="!gateActive && pinsShown"
-      :vp="vp" :threads="comments.threads.value" :screens="sortedList" :page-id="pageId" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value"
+      :vp="vp" :threads="comments.threads.value" :screens="list" :page-id="pageId" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value"
       :can-moderate="access.can.value.manage" :draft="draft" :drawing="drawing" :open-id="openThread" :layer-box="layerBox"
       @open="(id) => { openThread = id; draft = null; if (id) comments.markRead(id) }"
       :draft-nudge="draftNudge" @draft-dirty="(v) => (draftDirty = v)" @draft-area="setDraftArea" :reply-nudge="replyNudge" @reply-dirty="(v) => (replyDirty = v)"
@@ -2109,7 +2066,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <button type="button" class="sq fb-stop ok" @click="acceptSpot">{{ tr('Follow') }}</button>
       <button type="button" class="sq fb-x" :aria-label="tr('Dismiss')" @click="spotPrompt = null"><EditorIcon name="close" :size="12" /></button>
     </div>
-    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="sortedList" />
+    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
       <span class="tx-meta ce-sub">{{ tr('Draw a frame with the Frame tool (F) or import one from Figma') }}</span>
@@ -2312,16 +2269,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <CommentPanel v-else :threads="comments.threads.value" :page-id="pageId" :pages="pages.data.value ?? []" :screens="list" :people="mentionPeople" :authors="commentAuthors" :my-id="comments.myId.value" :open-id="openThread" @open="goThread" @close="commentMode = false; openThread = null; draft = null" @resolve="resolveComment" @read-all="readAllComments" />
     </aside>
 
-    <EditorToolbar v-model="tool" :readonly="readOnly || sortedView" :sorted="sortedView" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
-    <!-- 정렬 보기 띠(새 2) -->
-    <div v-if="sortedView" class="sq ro-band sort-band" role="status">
-      <EditorIcon name="list_numbered" :size="16" />
-      <span>{{ tr('Sorted by screen ID') }}</span>
-      <span class="sb-sub">{{ tr('Layout isn’t changed · Esc to go back') }}</span>
-      <button type="button" class="sq sb-btn" @click="sortedView = false">{{ tr('Back to layout') }}</button>
-    </div>
+    <EditorToolbar v-model="tool" :readonly="readOnly" :commenting="commentMode" :unread="comments.threads.value.some((t) => t.unread && !t.root.resolved_at)" @rail="onRail" />
     <!-- 보기 전용 띠(PRD/16 E): 캔버스 위 가운데 -->
-    <div v-else-if="readOnly && !commentMode && !followPeer" class="sq ro-band" role="status">
+    <div v-if="readOnly && !commentMode && !followPeer" class="sq ro-band" role="status">
       <EditorIcon name="visibility_on" :size="16" />
       <span>{{ tr('You\'re viewing · {role}', { role: tr(ROLE_NAME[access.role.value ?? 'viewer']) }) }}</span>
     </div>
@@ -2478,10 +2428,6 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .dicon { flex: none; display: inline-flex; }
 .dabbr { flex: none; height: 18px; min-width: 16px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: var(--sys-color-neutral-800); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .dwarn { flex: none; height: 18px; display: inline-flex; align-items: center; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #B44A0E; --sq-fill: #FFF1E8; }
-.sort-band { pointer-events: auto; padding-right: var(--ref-spacing-03); }
-.sb-sub { color: rgb(253 253 253 / 60%); font-weight: 400; }
-.sb-btn { height: 24px; padding: 0 var(--ref-spacing-06); margin-left: var(--ref-spacing-04); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); color: var(--sys-color-neutral-800); font-size: 12px; font-weight: 600; }
-.sb-btn:hover { --sq-fill: var(--sys-color-neutral-100); }
 .ro-band { position: absolute; top: calc(var(--iris-gap, 8px) + 8px); left: 50%; transform: translateX(-50%); z-index: 7; height: 32px; display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-06); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-800); color: var(--sys-color-common-white-default); font-size: 12px; font-weight: 500; pointer-events: none; }
 .insp.ro { opacity: .64; }
 .ro-note { display: flex; align-items: flex-start; gap: var(--ref-spacing-04); margin: var(--ref-spacing-06) var(--ref-spacing-08) 0; padding: var(--ref-spacing-06); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-600); font-size: 12px; line-height: 18px; }

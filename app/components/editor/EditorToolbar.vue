@@ -5,8 +5,8 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 export type Tool = 'move' | 'hand' | 'scale' | 'pen' | 'frame' | 'section' | 'rect' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'image' | 'pencil' | 'text'
 const tool = defineModel<Tool>({ default: 'move' })
 /** 보기 전용(디자인 편집 권한 없음): 이동 · 손만, 편집 도구 자리에 잠긴 Edit(PRD/16 E) */
-const props = defineProps<{ readonly?: boolean; commenting?: boolean; unread?: boolean; /** 정렬 보기 중(새 2) */ sorted?: boolean }>()
-const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment' | 'sort'] }>()
+const props = defineProps<{ readonly?: boolean; commenting?: boolean; unread?: boolean }>()
+const emit = defineEmits<{ rail: [k: 'assets' | 'link' | 'figma' | 'comment'] }>()
 
 interface Item { key: Tool; label: string; key2?: string; icon: string }
 const ITEMS: Record<Tool, Item> = {
@@ -123,7 +123,6 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
     <button v-if="!props.readonly" type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
     <button v-if="!props.readonly" type="button" :aria-label="tr('Link policy')" :data-tip="tr('Link policy')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
     <button v-if="!props.readonly" type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
-    <button type="button" :aria-label="tr('Sort by screen ID')" :aria-pressed="!!props.sorted" :data-tip="props.sorted ? tr('Back to layout') : tr('Sort by screen ID')" data-tip-at="top" :class="['rail-btn', { on: props.sorted }]" @click="emit('rail', 'sort')"><EditorIcon name="list_numbered" :size="20" /></button>
     <button type="button" :aria-label="tr('Comment (C)')" :aria-pressed="!!props.commenting" :data-tip="tr('Comments')" data-tip-key="C" data-tip-at="top" :class="['rail-btn', { on: props.commenting }]" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /><i v-if="props.unread" class="cdot" aria-hidden="true" /></button>
   </div>
 </template>
