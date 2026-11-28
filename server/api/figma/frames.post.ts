@@ -5,7 +5,7 @@ interface FrameOut { id: string; name: string; width: number; height: number; th
 const MAX = 20
 
 export default defineEventHandler(async (event): Promise<{ fileKey: string; frames: FrameOut[]; missing: string[] }> => {
-  const token = await figmaAuth(event)
+  const caller = await figmaAuth(event)
   const body = await readBody<{ fileKey?: unknown; ids?: unknown }>(event).catch(() => null)
   const fileKey = typeof body?.fileKey === 'string' ? body.fileKey.replace(/[^\w-]/g, '') : ''
   const ids = Array.isArray(body?.ids) ? (body!.ids as unknown[]).filter((x): x is string => typeof x === 'string' && /^[\w:;]+$/.test(x)).slice(0, MAX) : []
@@ -13,9 +13,9 @@ export default defineEventHandler(async (event): Promise<{ fileKey: string; fram
   const key = encodeURIComponent(fileKey)
   const q = encodeURIComponent(ids.join(','))
 
-  const nodes = await figmaGet<{ nodes: Record<string, FigmaNodeEntry | null> }>(token, `/files/${key}/nodes?ids=${q}`)
+  const nodes = await figmaGet<{ nodes: Record<string, FigmaNodeEntry | null> }>(caller, `/files/${key}/nodes?ids=${q}`)
   // 썸네일은 실패해도 화면은 가져와요(피그마 이미지 주소는 일정 기간 뒤 만료 — 화면에서 Iris 저장소로 옮겨요)
-  const images = await figmaGet<{ images: Record<string, string | null> }>(token, `/images/${key}?ids=${q}&format=png&scale=1`).catch((e) => {
+  const images = await figmaGet<{ images: Record<string, string | null> }>(caller, `/images/${key}?ids=${q}&format=png&scale=1`).catch((e) => {
     if ((e as { statusCode?: number })?.statusCode === 429) throw e
     return { images: {} as Record<string, string | null> }
   })

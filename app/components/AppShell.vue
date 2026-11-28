@@ -25,6 +25,9 @@ const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.start
 
 const paletteOpen = ref(false)
 const profileOpen = ref(false)
+/** 피그마 연결(관리자만 — 토큰 넣기 · 바꾸기) */
+const figmaConnOpen = ref(false)
+function openFigmaConn() { menuOpen.value = false; avatarBtn.value?.focus(); figmaConnOpen.value = true }
 
 // 계정 메뉴 -------------------------------------------------------------------
 const menuOpen = ref(false)
@@ -111,6 +114,9 @@ async function signOut(scope: 'local' | 'global' = 'local') {
           <button type="button" role="menuitem" class="sq menu-item" tabindex="-1" @click="openProfile">
             <EditorIcon name="pencil" :size="16" />{{ tr('Edit profile') }}
           </button>
+          <button v-if="me?.is_admin" type="button" role="menuitem" class="sq menu-item" tabindex="-1" @click="openFigmaConn">
+            <EditorIcon name="link" :size="16" />{{ tr('Figma connection') }}
+          </button>
           <div class="msep" role="separator" />
           <button type="button" role="menuitem" class="sq menu-item" tabindex="-1" :disabled="signingOut" @click="signOut('local')">
             <EditorIcon name="logout" :size="16" />{{ signingOut ? tr('Logging out…') : tr('Log out') }}
@@ -138,6 +144,7 @@ async function signOut(scope: 'local' | 'global' = 'local') {
   </div>
   <AppCommandPalette v-model:open="paletteOpen" />
   <AppProfileModal v-model:open="profileOpen" />
+  <EditorFigmaConnectModal v-model:open="figmaConnOpen" />
 </template>
 
 <style scoped>

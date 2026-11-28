@@ -2,6 +2,7 @@
 import { Button, TextInput } from '@ba-dream/design-system'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
+import FigmaTokenField from '~/components/editor/FigmaTokenField.vue'
 import type { SlotRow } from '~/composables/useIrisData'
 import { figmaToLayers, figmaImageRefs, type FigmaFullNode } from '~/canvas/figmaImport'
 // Nuxt 내장 useDevPreview 와 이름이 겹쳐 자동 import 가 내장 쪽으로 잡히므로 직접 가져와요
@@ -422,8 +423,10 @@ async function previewScan(raw: string): Promise<ScanResult> {
               :input-props="{ id: 'figmaUrl', inputmode: 'url', autocomplete: 'off', spellcheck: false, onKeydown: onUrlKey }"
               :label-props="{ htmlFor: 'figmaUrl' }"
             />
-            <p v-if="error" :class="['sq', 'fi-note', { warn: error.code !== 'no_token' }]" role="alert">
-              <EditorIcon :name="error.code === 'no_token' ? 'info' : 'warning'" :size="16" class="fi-note-ic" /><span>{{ tr(error.message) }}</span>
+            <!-- 토큰이 없으면: 관리자는 여기서 바로 넣고(가려진 칸), 넣으면 그 링크를 다시 읽어요 -->
+            <FigmaTokenField v-if="error?.code === 'no_token'" @saved="doScan" />
+            <p v-else-if="error" class="sq fi-note warn" role="alert">
+              <EditorIcon name="warning" :size="16" class="fi-note-ic" /><span>{{ tr(error.message) }}</span>
             </p>
             <!-- 무엇을 읽었는지 -->
             <span v-if="scan && step === 'list'" class="fi-src">

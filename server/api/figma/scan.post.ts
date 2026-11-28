@@ -30,7 +30,7 @@ function framesIn(container: FigmaNode): ScanFrame[] {
 }
 
 export default defineEventHandler(async (event): Promise<FigmaScanResult> => {
-  const token = await figmaAuth(event)
+  const caller = await figmaAuth(event)
   const body = await readBody<{ url?: unknown }>(event).catch(() => null)
   const url = typeof body?.url === 'string' ? body.url.trim() : ''
   const parsed = url ? parseFigmaUrl(url) : null
@@ -40,14 +40,14 @@ export default defineEventHandler(async (event): Promise<FigmaScanResult> => {
 
   // node-id 없음 → 첫 페이지
   if (!nodeId || nodeId === '0:0') {
-    const file = await figmaGet<{ name: string; document: FigmaNode }>(token, `/files/${key}?depth=3`)
+    const file = await figmaGet<{ name: string; document: FigmaNode }>(caller, `/files/${key}?depth=3`)
     const page = file.document.children?.find((c) => c.type === 'CANVAS')
     if (!page) figmaFail(404, 'not_found', '피그마 파일에서 페이지를 찾지 못했어요')
     return { fileKey, fileName: file.name, kind: 'list', container: { type: 'PAGE', name: page.name }, innerName: null, frames: framesIn(page) }
   }
 
   const ids = encodeURIComponent(nodeId)
-  const nodes = await figmaGet<{ name: string; nodes: Record<string, { document: FigmaNode } | null> }>(token, `/files/${key}/nodes?ids=${ids}&depth=2`)
+  const nodes = await figmaGet<{ name: string; nodes: Record<string, { document: FigmaNode } | null> }>(caller, `/files/${key}/nodes?ids=${ids}&depth=2`)
   const doc = nodes.nodes?.[nodeId]?.document
   if (!doc) figmaFail(404, 'not_found', '피그마 파일이나 프레임을 찾지 못했어요. 링크를 다시 확인해주세요')
   if (doc.type === 'CANVAS' || doc.type === 'SECTION') {
@@ -56,7 +56,7 @@ export default defineEventHandler(async (event): Promise<FigmaScanResult> => {
 
   // 프레임이거나 그 안의 요소: 문서 맨 위에서 이 노드까지의 길을 받아 최상위 프레임을 찾아요
   // ids 를 주면 맨 위 ~ 이 노드까지의 길과 이 노드 안쪽만 와요(프레임 하나 크기)
-  const file = await figmaGet<{ document: FigmaNode }>(token, `/files/${key}?ids=${ids}`)
+  const file = await figmaGet<{ document: FigmaNode }>(caller, `/files/${key}?ids=${ids}`)
   const path: FigmaNode[] = []
   const walk = (n: FigmaNode, trail: FigmaNode[]): boolean => {
     if (n.id === nodeId) { path.push(...trail, n); return true }
