@@ -211,9 +211,10 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 
 /* 캔버스: 페이지 썸네일만(시안) — 두 칸씩, 칸 높이는 카드 높이에 맞춰요 */
 .canvas-card { overflow: hidden; }
-.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ref-spacing-10); overflow-x: hidden; overflow-y: auto; }
+/* 썸네일은 홈 프로젝트 카드와 같은 3:2. 세로로만 스크롤 — 스크롤바는 흰 카드 오른쪽 끝에 붙게(카드 안쪽 여백만큼 밖으로 빼고 그만큼 안쪽 여백) */
+.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ref-spacing-10); overflow-x: hidden; overflow-y: auto; margin: 0 calc(-1 * var(--ref-spacing-12)) calc(-1 * var(--ref-spacing-12)) 0; padding: 0 var(--ref-spacing-12) var(--ref-spacing-12) 0; }
 .page { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-width: 0; color: inherit; text-decoration: none; }
-.pthumb-box { position: relative; flex: none; aspect-ratio: 3 / 4; border-radius: var(--ref-radius-06); --sq-fill: var(--iris-canvas); --sq-line: var(--iris-line); --sq-line-w: 1px; transition: --sq-line .12s; }
+.pthumb-box { position: relative; flex: none; aspect-ratio: 3 / 2; border-radius: var(--ref-radius-06); --sq-fill: var(--iris-canvas); --sq-line: var(--iris-line); --sq-line-w: 1px; transition: --sq-line .12s; }
 .page:hover .pthumb-box { --sq-line: var(--ref-color-gray-900-20); }
 .page:focus-visible { outline: 0; }
 .page:focus-visible .pthumb-box { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; }
