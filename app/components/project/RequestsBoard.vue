@@ -69,8 +69,9 @@ const rows = computed<BoardRow[]>(() =>
 // ---------------------------------------------------------------------------
 // 거르기 · 찾기
 // ---------------------------------------------------------------------------
-const filter = ref<FilterKey>('todo')
-const query = ref('')
+/** 거르기 · 찾기 · 고른 줄은 프로젝트마다 기억해요 — 함께 보기 탭에 갔다가 홈 탭으로 돌아와도 보던 그대로 */
+const filter = useState<FilterKey>(`req-board-filter-${projectId}`, () => 'todo')
+const query = useState<string>(`req-board-query-${projectId}`, () => '')
 /** 세그먼트(시안 2): 전체 · 손볼 것 · 미반영 · 연결 안 됨 · 확인 전 · 반영됨 */
 const filters: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -105,7 +106,7 @@ function clearFilters() {
 // ---------------------------------------------------------------------------
 // 선택한 요구사항 — 연결된 화면 · 상태
 // ---------------------------------------------------------------------------
-const selectedId = ref<string | null>(null)
+const selectedId = useState<string | null>(`req-board-sel-${projectId}`, () => null)
 const selected = computed(() => rows.value.find((r) => r.req.id === selectedId.value) ?? null)
 const selectedLinks = computed(() => {
   const s = selected.value
@@ -319,10 +320,11 @@ function exportCsv() {
           <Button size="s" type="tertiary" stroke @click="navigateTo(readHref(selected.req))">{{ tr('View in document') }}</Button>
         </div>
       </div>
+      <div class="hsep" />
 
-      <section class="sec">
-        <div class="sec-h">
-          <span>{{ tr('Linked screens') }} <span class="tx-meta num">{{ selected.links.length }}</span></span>
+      <section class="d-pad">
+        <div class="sub-row">
+          <h3 class="sub">{{ tr('Linked screens') }} <span class="tx-meta num">{{ selected.links.length }}</span></h3>
           <div ref="addRef" class="add">
             <button type="button" class="ib s" :aria-label="tr('Link a screen')" :aria-expanded="addOpen" :disabled="saving" @click.stop="addOpen = !addOpen"><EditorIcon name="plus" :size="14" /></button>
             <div v-if="addOpen" class="sq menu" role="menu">
@@ -335,7 +337,7 @@ function exportCsv() {
             </div>
           </div>
         </div>
-        <div class="d-pad cards">
+        <div class="cards">
           <div v-if="!selectedLinks.length" class="no-link">
             <p class="tx-meta">{{ tr('No linked screens yet') }}</p>
             <TextButton size="s" color="blue" contents="icon-text" icon-name="plus" :disabled="saving" @click.stop="addOpen = true">{{ tr('Link a screen') }}</TextButton>
@@ -371,7 +373,8 @@ function exportCsv() {
 
 /* 가운데 표 */
 .body { flex: 1; min-width: 0;   box-sizing: border-box;  overflow: hidden; display: flex; flex-direction: column; }
-.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-10) var(--ref-spacing-12) var(--ref-spacing-12); }
+/* 안쪽 여백 위 · 좌우 · 아래 모두 24(문서에서 보기 본문 · 상세 패널과 같아요) */
+.body > .scroller { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: var(--ref-spacing-12); }
 /* 제목 줄: 프로젝트 목록과 같은 제목 20/600 + 프로젝트 고르기(글자 버튼 ▾) */
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; }
 .pick { position: relative; min-width: 0; }
@@ -424,12 +427,16 @@ function exportCsv() {
 
 /* 오른쪽 상세 */
 .detail { flex: 0 0 340px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
-.detail > .scroller { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding-bottom: var(--ref-spacing-10); }
-.d-top { height: 48px; padding: 0 var(--ref-spacing-06) 0 var(--ref-spacing-10) !important; }
+/* 문서에서 보기 오른쪽 칸(.side-sc)과 같은 여백: 좌우 · 아래 24, 덩어리 사이 12, 구분선은 카드 전체 너비 */
+.detail > .scroller { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: calc(var(--ref-spacing-12) - var(--ref-spacing-04)) 0 var(--ref-spacing-12); }
+.d-top { flex: none; height: 24px; padding: 0 calc(var(--ref-spacing-12) - var(--ref-spacing-04)) 0 var(--ref-spacing-12) !important; }
+.hsep { flex: none; height: 1px; background: var(--iris-line); }
+.sub-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ref-spacing-04); margin-right: calc(-1 * var(--ref-spacing-04)); }
+.sub { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; }
 .ib.s { width: 24px; height: 24px; }
 .ib:disabled { opacity: .5; cursor: default; }
 .ib:disabled:hover { --sq-overlay: transparent; }
-.d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-10) var(--ref-spacing-10); }
+.d-pad { display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: 0 var(--ref-spacing-12); }
 .d-pad p { margin: 0; }
 .d-title { font-size: 14px; line-height: 22px; font-weight: 600; }
 .summary { display: flex; flex-direction: column; gap: var(--ref-spacing-05); padding: var(--ref-spacing-08) var(--ref-spacing-08); border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-100); }
@@ -442,7 +449,7 @@ function exportCsv() {
 .menu-item { justify-content: space-between; flex: none; }
 .menu-page { flex: none; }
 .menu-empty { margin: 0; padding: var(--ref-spacing-04) var(--ref-spacing-06); }
-.cards { gap: var(--ref-spacing-04); }
+.cards { display: flex; flex-direction: column; gap: var(--ref-spacing-06); }
 .card { display: flex; flex-direction: column; gap: var(--ref-spacing-04); padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--ref-color-gray-900-10); --sq-line-w: 1px; }
 .card-row { display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }

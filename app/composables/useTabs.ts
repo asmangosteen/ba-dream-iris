@@ -73,7 +73,7 @@ export function useTabs() {
         const ids = new Set(stored.map((t) => t.id))
         tabs.value = [...stored, ...tabs.value.filter((t) => !ids.has(t.id))]
       }
-      if (raw?.home && isHomePath(raw.home)) homePath.value = raw.home
+      if (raw?.home && isHomePath(raw.home.split(/[?#]/)[0]!)) homePath.value = raw.home
     } catch { /* 저장된 값이 깨졌으면 빈 탭으로 시작 */ }
   }
   function save() {
@@ -100,7 +100,7 @@ export function useTabs() {
         }
         tabs.value = next
       }
-    } else if (isHomePath(path)) homePath.value = path
+    } else if (isHomePath(path)) homePath.value = fullPath // 쿼리까지(요청사항 보기 ?view=requests 등) — 함께 보기 탭에서 홈으로 와도 보던 화면 그대로
     save()
   }
 
