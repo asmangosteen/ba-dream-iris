@@ -87,7 +87,7 @@ async function doRemovePage() {
 const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const allScreens = useProjectScreens(projectId)
-const { addRequirement, setLink, removeLink } = useIrisMutations()
+const { setLink, removeLink } = useIrisMutations()
 
 // ---------------------------------------------------------------------------
 // 상태
@@ -1447,22 +1447,6 @@ async function focusReq(id: string) {
   nextTick(() => canvas.value?.focusOn(sid, ids))
 }
 
-async function onCreateReq(p: { text: string; block: string | null }) {
-  if (!docId.value) return
-  // 문서에 번호 없이 고른 글로 만든 정책은 임시 번호(#12) — PRD/11 3-3
-  const nums = (reqs.data.value ?? []).map((r) => Number(r.code.match(/^#(\d+)$/)?.[1] ?? 0))
-  const code = '#' + ((nums.length ? Math.max(...nums) : 0) + 1)
-  const title = p.text.replace(/\s+/g, ' ').trim().slice(0, 80)
-  try {
-    const id = await addRequirement(projectId, { document_id: docId.value, code, title, anchor: p.block ? { block: p.block } : null })
-    if (current.value) await setLink({ screen_id: current.value.id, requirement_id: id, status: 'missing', note: null })
-    // 레이어를 고른 채 만들면 그 레이어가 이 REQ 를 그린 것으로 기억해요(REQ 를 누르면 그 레이어로 포커스)
-    if (current.value && store.screenId.value === current.value.id && store.layerIds.value.length) store.update(current.value.id, [...store.layerIds.value], (n) => ({ reqs: [...new Set([...(n.reqs ?? []), id])] }))
-    await Promise.all([reqs.refresh(), links.refresh()])
-    docReq.value = id
-    say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
-  } catch { sayFail(tr('Couldn\'t create the request. Try again')) }
-}
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
   left.value = 'docs'
@@ -2143,7 +2127,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         <!-- 문서 본문은 팝오버 목록처럼 내용 위에 뜨는 얇은 스크롤 막대(올리거나 스크롤할 때만) -->
         <div ref="docScroll" v-ovscroll class="scroll doc-scroll">
           <DocCheckBar :doc="openDoc" compact @go="(at: { block: string; row: number | null }) => flashWarnAt(docScroll, at)" />
-          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @pick-slot="onPickSlot" @hover-req="(id: string | null) => (hoverReq = id)" @create-req="onCreateReq" />
+          <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @pick-slot="onPickSlot" @hover-req="(id: string | null) => (hoverReq = id)" />
         </div>
       </div>
       <div v-else v-ovscroll class="docs">

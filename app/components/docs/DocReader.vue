@@ -60,7 +60,6 @@ const emit = defineEmits<{
   'pick-slot': [code: string]
   /** 요구사항 블록 · 번호에 마우스를 올리면 그 REQ, 벗어나면 null — 캔버스가 그 항목을 청록 선으로 미리 보여 줘요 */
   'hover-req': [reqId: string | null]
-  'create-req': [payload: { text: string; block: string | null }]
   /** 고른 글에 메모 남기기(문서 옆 댓글) — 표 행이면 그 행 · 정책 ID 도 */
   comment: [payload: { quote: string; block: string | null; row: number | null; code: string | null }]
   /** 직접 만든 정책 지우기(확인은 부모가) */
@@ -283,7 +282,8 @@ function hideTool() { tool.value = null }
 function onSelectEnd() {
   const sel = window.getSelection()
   const el = article.value
-  if (!sel || sel.isCollapsed || !sel.rangeCount || !el) return hideTool()
+  // 편집기 패널(compact)은 메모 칸이 없어서 고른 글 막대를 띄우지 않아요
+  if (props.compact || !sel || sel.isCollapsed || !sel.rangeCount || !el) return hideTool()
   const range = sel.getRangeAt(0)
   if (!el.contains(range.commonAncestorContainer)) return hideTool()
   const picked = sel.toString().replace(/\s+/g, ' ').trim()
@@ -312,12 +312,6 @@ function onSelectionChange() {
 function comment() {
   if (!tool.value) return
   emit('comment', { quote: tool.value.text.slice(0, 300), block: tool.value.block, row: tool.value.row, code: tool.value.code })
-  window.getSelection()?.removeAllRanges()
-  hideTool()
-}
-function createReq() {
-  if (!tool.value) return
-  emit('create-req', { text: tool.value.text, block: tool.value.block })
   window.getSelection()?.removeAllRanges()
   hideTool()
 }
@@ -447,8 +441,8 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </template>
 
       <div v-if="tool" :class="['sq', 'tool', { below: tool.below }]" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create request') }}</button>
-        <button v-if="!compact" type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Add a note') }}</button>
+        <!-- 글을 골라 요청사항 만들기는 뺐어요 — 요청사항은 기획서 요청사항 표에 한 줄을 더해서 만들어요(사용자 결정 2026-11-28). 고른 글엔 메모만 -->
+        <button type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Add a note') }}</button>
       </div>
     </article>
 

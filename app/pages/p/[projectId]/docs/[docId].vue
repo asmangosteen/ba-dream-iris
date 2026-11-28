@@ -24,7 +24,7 @@ const docs = useDocuments(projectId)
 const { reqs, links } = useRequirements(projectId)
 const screens = useProjectScreens(projectId)
 const slots = useScreenSlots(projectId)
-const { addRequirement, removeRequirement, linkMany, setLink, removeLink, syncDocFormat, addHistory } = useIrisMutations()
+const { removeRequirement, linkMany, setLink, removeLink, syncDocFormat, addHistory } = useIrisMutations()
 const comments = useComments(projectId)
 
 const projectName = computed(() => projects.value?.find((p) => p.id === projectId)?.name ?? '')
@@ -304,36 +304,6 @@ function say(msg: string) {
   noticeTimer = setTimeout(() => { notice.value = '' }, 3000)
 }
 onBeforeUnmount(() => clearTimeout(noticeTimer))
-
-/** 문서에 번호 없이 고른 글로 만든 정책은 임시 번호(#12) — 문서에 없는 번호임을 드러내요(PRD/11 3-3) */
-function nextCode(): string {
-  const max = (reqs.data.value ?? []).reduce((m, r) => {
-    const n = Number(r.code.match(/^#(\d+)$/)?.[1] ?? 0)
-    return n > m ? n : m
-  }, 0)
-  return '#' + (max + 1)
-}
-
-async function createReq({ text, block }: { text: string; block: string | null }) {
-  if (!doc.value) return
-  const code = nextCode()
-  try {
-    const id = await addRequirement(projectId, {
-      document_id: doc.value.id,
-      code,
-      title: text.length > 60 ? text.slice(0, 59) + '…' : text,
-      body: text,
-      anchor: block ? { block } : {},
-      origin: 'manual',
-    })
-    await reqs.refresh()
-    activeScreen.value = null
-    activeReq.value = id
-    say(tr('Created request {code}', { code }))
-  } catch {
-    say(tr("Couldn't create the request. Try again in a moment."))
-  }
-}
 
 const addOpen = ref(false)
 
@@ -1167,7 +1137,6 @@ async function removeDoc() {
             :linked="links.status.value === 'success' ? [...new Set((links.data.value ?? []).map((l) => l.requirement_id))] : null"
             @pick-req="pickReq"
             @pick-slot="pickSlot"
-            @create-req="createReq"
             @comment="onComment"
             removable
             @remove-req="(r: ReqRow) => (confirmReq = r)"
