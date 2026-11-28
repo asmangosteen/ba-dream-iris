@@ -261,7 +261,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
       <p v-else class="tx-meta m0">{{ tr('Choose a request ID in the document to see its screens') }}</p>
       </div>
       <div v-if="pane === 'history' && doc" v-ovscroll class="side-sc">
-        <DocHistory :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" hide-head @restore="restoreDoc" />
+        <DocHistory :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" :focus-code="req?.code ?? null" hide-head @restore="restoreDoc" @clear-focus="req && pickReq(req.id)" />
       </div>
       <div v-show="pane === 'notes'" v-ovscroll class="side-sc notes-sc">
         <DocNotes v-if="doc" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" hide-head :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" @close="pane = 'request'" />

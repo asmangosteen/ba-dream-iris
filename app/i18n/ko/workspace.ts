@@ -230,4 +230,7 @@ export default {
   'Back': '뒤로',
   'Back to overview': '개요로',
   'Side panel': '오른쪽 패널',
+  'Changes to {code}': '{code} 수정 내역',
+  'Show all': '전체 보기',
+  'No changes to {code} yet': '{code}을 바꾼 기록이 아직 없어요',
 } satisfies Record<string, string>
