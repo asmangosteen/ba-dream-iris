@@ -19,6 +19,8 @@ const props = defineProps<{
   reqs: ReqRow[]
   links: LinkRow[]
   screens: ProjectScreen[]
+  /** 머리 줄(Notes n · ✕) 빼기 — 위에 '메모' 세그먼트가 이미 있는 '문서에서 보기' 오른쪽 패널. 해결됨 보기 버튼만 남겨요 */
+  hideHead?: boolean
 }>()
 const emit = defineEmits<{ 'pick-req': [id: string]; go: [anchor: DocAnchor]; toast: [text: string]; close: [] }>()
 /** 고른 메모(스레드 id) — 부모가 캔버스 강조에 써요 */
@@ -149,7 +151,10 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 <template>
   <!-- 문서 옆 메모 -->
   <div v-if="part === 'notes'" class="notes" :aria-label="tr('Notes')">
-    <div class="nh">
+    <div v-if="hideHead && resolvedCount" class="nh-lite">
+      <button type="button" class="sq tbtn" :aria-pressed="showResolved" @click="showResolved = !showResolved">{{ showResolved ? tr('Hide resolved') : tr('Resolved {n}', { n: resolvedCount }) }}</button>
+    </div>
+    <div v-if="!hideHead" class="nh">
       <span class="tx-head">{{ tr('Notes') }}</span>
       <span class="tx-meta">{{ notes.length }}</span>
       <span class="f1" />
@@ -237,6 +242,7 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .xbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
 .empty { margin: 0; }
+.nh-lite { display: flex; justify-content: flex-end; }
 .tbtn { display: inline-flex; align-items: center; gap: var(--ref-spacing-03); height: 24px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; color: var(--sys-color-neutral-600); }
 .tbtn:hover { --sq-fill: var(--sys-color-neutral-100); color: var(--sys-color-neutral-800); }
 .tbtn:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }

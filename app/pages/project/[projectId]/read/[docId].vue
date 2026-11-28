@@ -29,6 +29,8 @@ const members = useMembers()
 const doc = computed(() => docs.data.value?.find((d) => d.id === docId.value) ?? null)
 useHead({ title: () => (doc.value?.title ? `${doc.value.title} · Iris` : 'Iris') })
 
+/** 문서 상태 이름(DocReader 와 같아요) */
+const DOC_STATUS_LABEL: Record<'draft' | 'review' | 'confirmed', string> = { draft: 'Draft', review: 'In review', confirmed: 'Confirmed' }
 const docReqs = computed(() => (reqs.data.value ?? []).filter((r) => r.document_id === docId.value))
 const reqId = computed(() => (typeof route.query.req === 'string' ? route.query.req : null))
 const req = computed(() => docReqs.value.find((r) => r.id === reqId.value) ?? null)
@@ -128,19 +130,31 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
     </header>
     <div class="rd-row">
     <main class="sq card main">
+      <!-- 문서 머리: 카드 전체 너비 — 제목 · 칩은 왼쪽 끝, 버튼은 오른쪽 끝(함께 보기 문서 패널과 같은 좌우 24), 아래 전체 너비 구분선 -->
+      <div v-if="doc" class="dhead">
+        <div class="dh-col">
+          <h2 class="tx-title dh-title">{{ doc.title }}</h2>
+          <span v-if="doc.abbr || doc.status" class="dh-chips">
+            <span v-if="doc.abbr" class="sq dchip abbr">{{ doc.abbr }}</span>
+            <span v-if="doc.status" :class="['sq', 'dchip', 'st', doc.status]">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
+          </span>
+        </div>
+        <span class="acts">
+          <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
+          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
+        </span>
+      </div>
       <div v-ovscroll class="body">
         <div class="col">
-          <DocReader v-if="doc" :doc="doc" :reqs="docReqs" :highlight="reqId"  ref="reader" :linked="linkedIds" :note-mark="noteThread?.root.doc_anchor ?? null" @pick-req="pickReq" @comment="onComment">
-            <!-- 문서 제목 줄 오른쪽 위: 함께 보기 · 고치기(함께 보기 머리 Notes · Edit 자리와 같아요, 버튼끼리 4) -->
-            <template #actions>
-              <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
-              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
-            </template>
-          </DocReader>
-          <!-- 문서 전체 댓글(문서 아래 게시판 — 함께 보기와 같아요) -->
-          <DocNotes v-if="doc" part="board" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @toast="say" />
+          <DocReader v-if="doc" ref="reader" :doc="doc" :reqs="docReqs" :highlight="reqId" :linked="linkedIds" :note-mark="noteThread?.root.doc_anchor ?? null" hide-head @pick-req="pickReq" @comment="onComment" />
           <template v-else-if="docs.status.value === 'pending'"><Skeleton shape="text" width="40%" /><Skeleton shape="rectangle" height="240px" /></template>
           <p v-else class="tx-meta">{{ tr('This document is gone. It may have been deleted') }}</p>
+        </div>
+        <!-- 문서 전체 댓글: 위에 카드 전체 너비 구분선 -->
+        <div v-if="doc" class="board-wrap">
+          <div class="col">
+            <DocNotes part="board" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @toast="say" />
+          </div>
         </div>
       </div>
     </main>
@@ -181,7 +195,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
       <p v-else class="tx-meta m0">{{ tr('Choose a request ID in the document to see its screens') }}</p>
       </div>
       <div v-show="pane === 'notes'" v-ovscroll class="side-sc notes-sc">
-        <DocNotes v-if="doc" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" @close="pane = 'request'" />
+        <DocNotes v-if="doc" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" hide-head :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" @close="pane = 'request'" />
       </div>
     </aside>
     </div>
@@ -209,14 +223,28 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
 .chip.line { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
 .f1 { flex: 1; }
-.body { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-14); }
+.dhead { flex: none; display: flex; align-items: flex-start; gap: var(--ref-spacing-08); padding: var(--ref-spacing-10) var(--ref-spacing-12); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 1; }
+.dh-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
+.dh-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dh-chips { display: flex; align-items: center; gap: var(--ref-spacing-04); }
+.acts { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); }
+/* 문서 칩(DocReader .dchip 과 같아요) */
+.dchip { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
+.dchip.abbr { color: var(--sys-color-neutral-800); --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.dchip.st.review { color: #8A6100; --sq-fill: #FFF6DA; }
+.dchip.st.confirmed { color: #14612C; --sq-fill: #DDF4E4; }
+/* 본문 스크롤: 함께 보기 문서 패널처럼 카드 아래 기본 여백 24(그 위로는 흘러가지 않게) */
+.body { flex: 1; min-height: 0; overflow: auto; padding: var(--ref-spacing-12) var(--ref-spacing-12) var(--ref-spacing-08); margin-bottom: var(--ref-spacing-12); }
+/* 댓글 묶음: 위 구분선은 카드 전체 너비(본문 좌우 여백만큼 밖으로) */
+.board-wrap { margin: var(--ref-spacing-14) calc(-1 * var(--ref-spacing-12)) 0; padding: 0 var(--ref-spacing-12); box-shadow: 0 -1px 0 var(--iris-line); }
+.board-wrap :deep(.board) { margin: 0; padding: var(--ref-spacing-10) 0 0; box-shadow: none; }
 .col { width: min(760px, 100%); margin: 0 auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); }
 
 .side { flex: 0 0 320px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
 .pane-top { flex: none; padding: var(--ref-spacing-10) var(--ref-spacing-10) var(--ref-spacing-04); }
 .side-sc { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-08) var(--ref-spacing-12) var(--ref-spacing-12); }
-/* 메모 칸: DocNotes 머리(44, 아래 선)가 칸 위에 붙게 안쪽 위 여백 없이 */
-.notes-sc { padding: 0 var(--ref-spacing-10) var(--ref-spacing-10); gap: 0; }
+/* 메모 칸: 머리 줄 없이(세그먼트가 머리) — 요청사항 칸과 같은 좌우 여백 */
+.notes-sc { padding: var(--ref-spacing-06) var(--ref-spacing-10) var(--ref-spacing-10); gap: 0; }
 .toast-wrap { position: fixed; left: 0; right: 0; bottom: 32px; z-index: 30; display: flex; justify-content: center; pointer-events: none; font-size: 12px; line-height: 18px; }
 .toast { display: flex; align-items: center; height: 40px; box-sizing: border-box; margin: 0; padding: 0 var(--ref-spacing-10); border-radius: var(--ref-radius-06); --sq-fill: var(--iris-black); --sq-line: var(--iris-float-line); --sq-line-w: var(--iris-float-line-w); color: var(--iris-paper); font-weight: 500; white-space: nowrap; filter: var(--iris-float-shadow); }
 .toast-enter-active, .toast-leave-active { transition: opacity .16s ease, transform .16s ease; }
