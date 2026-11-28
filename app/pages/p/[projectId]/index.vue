@@ -161,7 +161,8 @@ const addDocOpen = ref(false)
 const figmaOpen = ref(false)
 /** 레이어 목록: 모두 접기 버튼 · 스크롤하면 머리 아래 구분선 */
 const layerTree = ref<{ collapseAll: () => void } | null>(null)
-const layersScrolled = ref(false)
+/** 왼쪽 목록(페이지 · 레이어 · 문서)을 내리면 머리 아래 구분선(피그마와 같아요) — 머리는 스크롤 밖이라 늘 그 자리 */
+function onPaneScroll(e: Event) { const t = e.target as HTMLElement; t.parentElement?.classList.toggle('scrolled', t.scrollTop > 0) }
 const vp = ref<Viewport>({ x: 352, y: 94, zoom: 0.5 })
 const canvas = ref<{ fit: (ids?: string[]) => void; viewWorld: () => { x: number; y: number; w: number; h: number } | null; zoomAt: (z: number) => void; fitSelection: (maxZoom?: number) => void; reveal: (sid: string, ids: string[]) => void; focusOn: (sid: string, ids: string[]) => void; insertInstance: (name: string, at?: { x: number; y: number }) => void; sectionScreens: (ids?: string[]) => void; paste: () => void } | null>(null)
 const plan = ref<{ openPicker: () => void } | null>(null)
@@ -2101,25 +2102,29 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 
       <template v-if="left === 'file'">
         <!-- 페이지 · 레이어 · 문서 목록: 팝오버와 같은 얇은 스크롤 막대(v-ovscroll) -->
-        <section ref="pagesEl" v-ovscroll class="pages" :style="pagesH ? { height: pagesH + 'px', maxHeight: 'none' } : undefined">
+        <section ref="pagesEl" class="pages" :style="pagesH ? { height: pagesH + 'px', maxHeight: 'none' } : undefined">
           <div class="sec-h"><span>{{ tr('Pages') }}</span><button class="ib s24" :aria-label="tr('Add new page')" :title="tr('Add new page')" @click="onAddPage"><EditorIcon name="plus" /></button></div>
-          <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
-          <div v-if="pageOver" class="pdrop" :style="{ top: pageOver.y - 1 + 'px' }" aria-hidden="true" />
-          <template v-for="p in pages.data.value ?? []" :key="p.id">
-            <input v-if="renaming === p.id" v-select class="sqc txt-in rename" :value="p.name" :aria-label="tr('Page name')" @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="renaming = null">
-            <!-- 이름이 '---'(대시 3개 이상)뿐인 페이지는 구분선(피그마와 같아요) — 누를 수 없고, 두 번 누르거나 우클릭으로 이름 바꾸기 · 지우기 -->
-            <div v-else-if="isDivider(p.name)" :class="['pdiv']" role="separator" :aria-label="tr('Divider')" draggable="true" @dragstart="pageDrag = p.id" @dragover="onPageOver($event, p.id)" @dragleave="pageOver = null" @drop.prevent="onPageDrop" @dragend="pageDrag = null; pageOver = null" @dblclick="renaming = p.id" @contextmenu="pageMenu(p, $event)"><i /></div>
-            <button v-else :class="['sq', 'nav-item', 's', 'prow', { on: pageId === p.id }]" draggable="true" @dragstart="pageDrag = p.id" @dragover="onPageOver($event, p.id)" @dragleave="pageOver = null" @drop.prevent="onPageDrop" @dragend="pageDrag = null; pageOver = null" @click="pageId = p.id" @dblclick="renaming = p.id" @keydown.f2.prevent="renaming = p.id" @contextmenu="pageMenu(p, $event)"><span class="ellipsis">{{ p.name }}</span></button>
-          </template>
+          <div v-ovscroll class="lbody" @scroll="onPaneScroll">
+            <Skeleton v-if="pages.status.value === 'pending'" shape="text" />
+            <div v-if="pageOver" class="pdrop" :style="{ top: pageOver.y - 1 + 'px' }" aria-hidden="true" />
+            <template v-for="p in pages.data.value ?? []" :key="p.id">
+              <input v-if="renaming === p.id" v-select class="sqc txt-in rename" :value="p.name" :aria-label="tr('Page name')" @blur="onRename(p.id, $event)" @keydown.enter="($event.target as HTMLInputElement).blur()" @keydown.esc.stop="renaming = null">
+              <!-- 이름이 '---'(대시 3개 이상)뿐인 페이지는 구분선(피그마와 같아요) — 누를 수 없고, 두 번 누르거나 우클릭으로 이름 바꾸기 · 지우기 -->
+              <div v-else-if="isDivider(p.name)" :class="['pdiv']" role="separator" :aria-label="tr('Divider')" draggable="true" @dragstart="pageDrag = p.id" @dragover="onPageOver($event, p.id)" @dragleave="pageOver = null" @drop.prevent="onPageDrop" @dragend="pageDrag = null; pageOver = null" @dblclick="renaming = p.id" @contextmenu="pageMenu(p, $event)"><i /></div>
+              <button v-else :class="['sq', 'nav-item', 's', 'prow', { on: pageId === p.id }]" draggable="true" @dragstart="pageDrag = p.id" @dragover="onPageOver($event, p.id)" @dragleave="pageOver = null" @drop.prevent="onPageDrop" @dragend="pageDrag = null; pageOver = null" @click="pageId = p.id" @dblclick="renaming = p.id" @keydown.f2.prevent="renaming = p.id" @contextmenu="pageMenu(p, $event)"><span class="ellipsis">{{ p.name }}</span></button>
+            </template>
+          </div>
         </section>
         <div :class="['split', { on: splitting }]" role="separator" aria-orientation="horizontal" :aria-label="tr('Resize pages and layers')" :title="tr('Drag to resize · double-click to reset')" @pointerdown="startSplit" @dblclick="resetSplit" />
-        <section v-ovscroll class="layers" :class="{ scrolled: layersScrolled }" @scroll="layersScrolled = ($event.target as HTMLElement).scrollTop > 0">
-          <!-- 머리는 위에 붙어 있고, 목록을 내리면 아래 구분선(피그마와 같아요) · 오른쪽 모두 접기(⌥L) -->
+        <section class="layers">
+          <!-- 머리(제목 · 모두 접기)는 늘 그 자리에, 아래 목록만 위아래 · 옆으로 스크롤 — 내리면 머리 아래 구분선(피그마와 같아요) -->
           <div class="sec-h"><span>{{ tr('Layers') }}</span><button class="ib s24" :aria-label="tr('Collapse all layers')" :data-tip="tr('Collapse all layers') + ' · ⌥L'" @click="layerTree?.collapseAll()"><EditorIcon name="layers_collapse_all" /></button></div>
-          <LayerTree ref="layerTree" :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" :cover-id="project.data.value?.cover_screen_id ?? null" @thumbnail="onThumbnail" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
-          <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
-            <span class="tx-meta">{{ tr('No frames yet') }}</span>
-            <TextButton size="s" color="blue" @click="tool = 'frame'">{{ tr('Draw frame') }}</TextButton>
+          <div v-ovscroll class="lbody" @scroll="onPaneScroll">
+            <LayerTree ref="layerTree" :screens="canvasScreen && store.doc(canvasScreen.id).rootIds.length ? [canvasScreen, ...list] : list" :multi="multiScreens" :canvas-id="canvasScreen?.id ?? null" :cover-id="project.data.value?.cover_screen_id ?? null" @thumbnail="onThumbnail" @pick-screen="pickScreen" @toggle-screen="toggleScreen" @screen-action="onScreenAction" @screen-order="onScreenOrder" />
+            <div v-if="screens.status.value === 'success' && !list.length" class="empty-col">
+              <span class="tx-meta">{{ tr('No frames yet') }}</span>
+              <TextButton size="s" color="blue" @click="tool = 'frame'">{{ tr('Draw frame') }}</TextButton>
+          </div>
           </div>
         </section>
       </template>
@@ -2140,23 +2145,25 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <DocReader :doc="openDoc" :reqs="docReqs" :highlight="docReq" :linked="linkedReqIds" compact @pick-req="pickReq" @pick-slot="onPickSlot" @hover-req="(id: string | null) => (hoverReq = id)" />
         </div>
       </div>
-      <div v-else v-ovscroll class="docs">
+      <div v-else class="docs">
         <div class="sec-h"><span>{{ tr('Docs') }}</span><button class="ib s24" :aria-label="tr('Add doc')" :title="tr('Add doc')" @click="addDocOpen = true"><EditorIcon name="plus" /></button></div>
-        <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
-        <div v-for="g in docGroups" :key="g.k" class="dgroup">
-          <span class="nav-label">{{ g.label }}</span>
-          <button v-for="d in g.items" :key="d.id" :class="['sq', 'nav-item', 's', 'drow', { on: docId === d.id }]" :aria-current="docId === d.id ? 'true' : undefined" @click="showDoc(d.id)">
-            <span class="dicon" :data-tip="tr(DOC_SOURCE_TIP[d.source_type])" :aria-label="tr(DOC_SOURCE_TIP[d.source_type])"><EditorIcon :name="docIcon(d)" :size="16" class="flex-none muted" /></span>
-            <span class="ellipsis f1">{{ d.title }}</span>
-            <span v-if="d.abbr" class="sq dabbr" :data-tip="tr('Document abbreviation')">{{ d.abbr }}</span>
-            <span v-if="warnCount(d)" class="sq dwarn num" :title="tr('{n} warnings', { n: warnCount(d) })">⚠ {{ warnCount(d) }}</span>
-            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} requests', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
-            <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
-          </button>
+        <div v-ovscroll class="lbody" @scroll="onPaneScroll">
+          <Skeleton v-if="docs.status.value === 'pending'" shape="text" />
+          <div v-for="g in docGroups" :key="g.k" class="dgroup">
+            <span class="nav-label">{{ g.label }}</span>
+            <button v-for="d in g.items" :key="d.id" :class="['sq', 'nav-item', 's', 'drow', { on: docId === d.id }]" :aria-current="docId === d.id ? 'true' : undefined" @click="showDoc(d.id)">
+              <span class="dicon" :data-tip="tr(DOC_SOURCE_TIP[d.source_type])" :aria-label="tr(DOC_SOURCE_TIP[d.source_type])"><EditorIcon :name="docIcon(d)" :size="16" class="flex-none muted" /></span>
+              <span class="ellipsis f1">{{ d.title }}</span>
+              <span v-if="d.abbr" class="sq dabbr" :data-tip="tr('Document abbreviation')">{{ d.abbr }}</span>
+              <span v-if="warnCount(d)" class="sq dwarn num" :title="tr('{n} warnings', { n: warnCount(d) })">⚠ {{ warnCount(d) }}</span>
+              <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} requests', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
+              <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
+            </button>
+          </div>
+          <div v-if="docs.status.value === 'success' && !docGroups.length" class="empty-col">
+            <span class="tx-meta">{{ tr('No docs yet') }}</span>
+            <button class="sq act line" @click="addDocOpen = true"><EditorIcon name="plus" :size="16" />{{ tr('Add doc') }}</button>
         </div>
-        <div v-if="docs.status.value === 'success' && !docGroups.length" class="empty-col">
-          <span class="tx-meta">{{ tr('No docs yet') }}</span>
-          <button class="sq act line" @click="addDocOpen = true"><EditorIcon name="plus" :size="16" />{{ tr('Add doc') }}</button>
         </div>
       </div>
       <!-- 맨 아래: 변수(토큰) — 누르면 캔버스 대신 변수 화면(다른 페이지처럼) -->
@@ -2477,8 +2484,13 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .tabs { padding: var(--ref-spacing-06); flex: none; }
 .line-b { box-shadow: 0 1px 0 var(--iris-line); }
 /* 왼쪽 패널 열: 행 바탕은 패널 안쪽 8(탭 줄과 같아요), 글자 · 섹션 제목 · ▸ 는 x 16+8 한 줄에 맞춰요 */
-.pages { display: flex; flex-direction: column; box-sizing: border-box; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); box-shadow: inset 0 -1px 0 var(--iris-line); flex: none; max-height: 40%; overflow: auto; }
-.pages > .sec-h, .layers > .sec-h, .docs > .sec-h { flex: none; height: 32px; padding: 0 0 0 var(--ref-spacing-06); }
+.pages { display: flex; flex-direction: column; box-sizing: border-box; padding-top: var(--ref-spacing-04); box-shadow: inset 0 -1px 0 var(--iris-line); flex: none; max-height: 40%; overflow: hidden; }
+/* 목록 머리(제목 · 버튼)는 스크롤 밖에 고정, 아래 .lbody 만 위아래 · 옆으로 스크롤(사용자 요청 2026-11-29). 내리면 머리 아래 패널 폭 전체 구분선 */
+.pages > .sec-h, .layers > .sec-h, .docs > .sec-h { flex: none; position: relative; height: 32px; margin: 0 var(--ref-spacing-06); padding: 0 0 0 var(--ref-spacing-06); }
+.pages > .sec-h::after, .layers > .sec-h::after, .docs > .sec-h::after { content: ''; position: absolute; left: calc(-1 * var(--ref-spacing-06)); right: calc(-1 * var(--ref-spacing-06)); bottom: 0; height: 1px; background: var(--iris-line); opacity: 0; transition: opacity .12s ease; pointer-events: none; }
+.pages.scrolled > .sec-h::after, .layers.scrolled > .sec-h::after, .docs.scrolled > .sec-h::after { opacity: 1; }
+.lbody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding: 0 var(--ref-spacing-06) var(--ref-spacing-06); }
+.pages > .lbody { position: relative; } /* 페이지 끌기 선(.pdrop) 자리 기준 */
 .docs-read { padding-top: var(--ref-spacing-04); }
 .docs-read > .sec-h { flex: none; height: 32px; padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-06); }
 .prow, .drow { padding: 5px var(--ref-spacing-06); }
@@ -2498,12 +2510,9 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
 .split::after { content: ''; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: transparent; transition: background-color 0.12s; }
 .split:hover::after { background: var(--sys-color-neutral-300); }
 .split.on::after { background: color-mix(in srgb, var(--sys-color-brand-primary-default) 55%, transparent); } /* 레이어 목록 끌기 선과 같은 색 */
-.layers { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-06); }
-/* 레이어 머리: 위에 붙어 있고(패널 바탕), 목록을 내리면 패널 폭 전체 구분선 */
-.layers > .sec-h { position: sticky; top: calc(-1 * var(--ref-spacing-04)); z-index: 2; margin-top: calc(-1 * var(--ref-spacing-04)); padding-top: var(--ref-spacing-04); height: calc(32px + var(--ref-spacing-04)); box-sizing: border-box; background: var(--sys-color-common-white-emphasis); }
-.layers > .sec-h::after { content: ''; position: absolute; left: calc(-1 * var(--ref-spacing-06)); right: calc(-1 * var(--ref-spacing-06)); bottom: 0; height: 1px; background: var(--iris-line); opacity: 0; transition: opacity .12s ease; pointer-events: none; }
-.layers.scrolled > .sec-h::after { opacity: 1; }
-.docs { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding: var(--ref-spacing-04) var(--ref-spacing-06) var(--ref-spacing-10); }
+.layers { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding-top: var(--ref-spacing-04); }
+.docs { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding-top: var(--ref-spacing-04); }
+.docs > .lbody { gap: var(--ref-spacing-06); padding-bottom: var(--ref-spacing-10); }
 .dgroup { display: flex; flex-direction: column; }
 /* 묶음 라벨(Planning · Design …): 섹션 제목보다 한 단계 아래 — 12 · 500 · neutral-500, 글자 열 x+8 */
 .dgroup .nav-label { padding: 0 var(--ref-spacing-06) var(--ref-spacing-04); color: var(--sys-color-neutral-500); font-weight: 500; }
