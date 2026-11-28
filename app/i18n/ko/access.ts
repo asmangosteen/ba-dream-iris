@@ -103,7 +103,7 @@ export default {
   'Transfer': '넘기기',
   'Delete project': '프로젝트 지우기',
   'Delete this project?': '이 프로젝트를 지울까요?',
-  'All pages, frames, docs and policies are deleted for everyone. This can\'t be undone.': '모든 사람에게서 페이지 · 화면 · 문서 · 정책이 함께 지워져요. 되돌릴 수 없어요.',
+  'All pages, frames, docs and requests are deleted for everyone. This can\'t be undone.': '모든 사람에게서 페이지 · 화면 · 문서 · 요청사항이 함께 지워져요. 되돌릴 수 없어요.',
   'Make {name} the owner?': '{name} 님을 방장으로 바꿀까요?',
   'You become a co-owner. Only the new owner can give it back': '나는 부방장이 돼요. 되돌리려면 새 방장이 다시 넘겨야 해요',
   // 홈 카드

@@ -162,7 +162,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
           </div>
           <div class="sq box danger">
             <span class="tx-head red">{{ tr('Delete project') }}</span>
-            <span class="tx-meta">{{ tr('Deleting a project also deletes all its pages, frames, docs and policies.') }}</span>
+            <span class="tx-meta">{{ tr('Deleting a project also deletes all its pages, frames, docs and requests.') }}</span>
             <span class="row"><Button size="s" type="destructed" contents="icon-text" icon-name="trashbin" @click="confirmDelete = true">{{ tr('Delete project') }}</Button></span>
           </div>
           <p v-if="err" class="tx-meta err" role="alert">{{ err }}</p>
@@ -178,7 +178,7 @@ const STATUSES: ProjectStatus[] = ['planning', 'designing', 'developing', 'done'
     <AppConfirm
       v-if="open && confirmDelete"
       :title="tr('Delete this project?')"
-      :desc="tr('All pages, frames, docs and policies are deleted for everyone. This can\'t be undone.')"
+      :desc="tr('All pages, frames, docs and requests are deleted for everyone. This can\'t be undone.')"
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmDelete = false) }, { label: tr('Delete project'), kind: 'destructed', loading: busy, onClick: remove }]"
       @close="confirmDelete = false"
     />

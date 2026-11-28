@@ -25,6 +25,8 @@ const emit = defineEmits<{ 'pick-req': [id: string]; go: [anchor: DocAnchor]; to
 const active = defineModel<string | null>('active', { default: null })
 /** 새 메모를 쓸 자리(문서에서 글을 고르고 [Comment]) */
 const draft = defineModel<DocAnchor | null>('draft', { default: null })
+/** 새 메모 칸에 쓴 글 · 이미지가 있는지(CommentComposer 가 알려 줘요) */
+const draftDirty = ref(false)
 
 const comments = useComments(props.projectId)
 const access = useProjectAccess(props.projectId)
@@ -92,9 +94,12 @@ const replying = ref<string | null>(null)
  * 떠 있는 창(이모지 · 멘션 · ⋯ 메뉴) · 확인 창 · 크게 보기가 열려 있으면 그 창만 닫히게 두고, 답글을 쓰던 중이면 접지 않아요
  */
 function onOutside(e: PointerEvent) {
-  if (!active.value || props.part !== 'notes') return
+  if (props.part !== 'notes') return
   const t = e.target as Element | null
   if (!t?.closest) return
+  // 새 메모 칸: 아무것도 안 썼으면 바깥을 누를 때 없어져요. 쓰던 중이면 남기고, 카드에 올리면 뜨는 X 로 지워요(사용자 요청 2026-11-28)
+  if (draft.value && !draftDirty.value && !t.closest('[data-draft]') && !document.querySelector('[data-cc], [data-ctv], .pop-overlay, .lb')) draft.value = null
+  if (!active.value) return
   // 다른 메모를 누르면 여기서 접지 않고 그 메모의 pick 이 바로 바꿔 펼쳐요(먼저 접으면 카드가 줄어 누른 자리가 밀려서 안 열림)
   if (t.closest('[data-note]')) return
   if (document.querySelector('[data-cc], [data-ctv], .pop-overlay, .lb')) return
@@ -153,11 +158,14 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
     </div>
 
     <!-- 새 메모 -->
-    <div v-if="draft" class="sq card on">
-      <span class="where" :title="quote(draft) || undefined">{{ placeOf(draft) }}</span>
+    <div v-if="draft" class="sq card on draft" data-draft>
+      <div class="ch">
+        <span class="where" :title="quote(draft) || undefined">{{ placeOf(draft) }}</span>
+        <button v-if="draftDirty" type="button" class="sq pop-x rs dx" :aria-label="tr('Discard note')" :data-tip="tr('Discard note')" @click="draft = null"><EditorIcon name="close" :size="16" /></button>
+      </div>
       <div class="newrow">
         <MemberAvatar :name="me.name" :src="me.avatar" :size="24" class="fa" />
-        <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[], a: string[]) => sendNote(b, m, a)" @cancel="draft = null" />
+        <CommentComposer :people="people" placeholder="Add a note" compact autofocus :busy="busy" class="grow" @send="(b: string, m: string[], a: string[]) => sendNote(b, m, a)" @cancel="draft = null" @dirty="(h: boolean) => (draftDirty = h)" />
       </div>
     </div>
 
@@ -247,6 +255,9 @@ defineExpose({ count: computed(() => all.value.filter((t) => !t.root.resolved_at
 .udot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--sys-color-brand-primary-default); }
 .rs { flex: none; width: 24px; height: 24px; color: var(--sys-color-neutral-500); }
 .rs.ok { color: var(--sys-color-theme-success-default, #24A638); }
+/* 쓰던 새 메모 지우기: 해결 버튼 자리, 카드에 마우스를 올렸을 때만 */
+.draft .dx { opacity: 0; transition: opacity .12s; }
+.draft:hover .dx, .dx:focus-visible { opacity: 1; }
 .peek { display: flex; flex-direction: column; gap: var(--ref-spacing-03); text-align: left; color: inherit; }
 .mh { display: flex; gap: var(--ref-spacing-06); align-items: center; min-width: 0; }
 .mh b { font-weight: 600; white-space: nowrap; }

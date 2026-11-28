@@ -158,7 +158,7 @@ export type WarnKind = 'missing_policy' | 'empty_policy_col' | 'no_screen' | 'du
 /** 경고: 문구는 화면에서 tr 로 만들어요(code · other 를 끼워 넣어요) */
 export interface FormatWarning { kind: WarnKind; code: string; other?: string; block: string; row: number | null }
 export interface FormatResult {
-  /** 'iris' = 정책 표 · 화면 표 둘 다, 'partial' = 하나만, 'none' = 못 찾음 */
+  /** 'iris' = 요청사항(정책) 표 · 화면 표 둘 다 — 표 머리는 '요청사항' · '정책' · 'Request' · 'Policy' 모두 읽어요(2026-11-28 이름 바꿈), 'partial' = 하나만, 'none' = 못 찾음 */
   format: 'iris' | 'partial' | 'none'
   abbr: string | null
   status: 'draft' | 'review' | 'confirmed' | null
@@ -207,7 +207,7 @@ export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): Format
       if (pCount && pCount >= sCount) {
         policyTable = true
         const others = head.map((_, i) => i).filter((i) => i !== idCol)
-        let tCol = col(head, '정책', 'policy', '이름', 'name', '제목', 'title')
+        let tCol = col(head, '요청', '정책', 'request', 'policy', '이름', 'name', '제목', 'title')
         if (tCol === idCol || tCol < 0) tCol = others[0] ?? -1
         let dCol = col(head, '세부', '규칙', 'rule', '내용', 'detail', '설명', 'description')
         if (dCol === idCol || dCol === tCol || dCol < 0) dCol = others.find((i) => i !== tCol) ?? -1
@@ -227,7 +227,7 @@ export function analyzeDoc(blocks: FormatBlock[], aliases: Aliases = {}): Format
         if (nCol === idCol) nCol = -1
         const sCol = col(head, '보여', 'show', '구성', '내용', 'spec', '설명')
         const stCol = col(head, '상태', 'state')
-        const pCol = col(head, '정책', 'polic')
+        const pCol = col(head, '요청', '정책', 'request', 'polic')
         body.forEach((r, i) => {
           const lead = leadScreen(r[idCol] ?? '', aliases)
           if (!lead) return
@@ -276,10 +276,10 @@ export function toCheckResult(r: FormatResult): CheckResult {
 /** 경고 한 줄 문구(영어 원문 열쇠 + 끼울 값). 화면에서 tr(key, vars) */
 export function warningText(w: FormatWarning): { key: string; vars: Record<string, string> } {
   switch (w.kind) {
-    case 'missing_policy': return { key: '{code} is used in {other} but isn’t in the policy table', vars: { code: w.code, other: w.other ?? '' } }
+    case 'missing_policy': return { key: '{code} is used in {other} but isn’t in the request table', vars: { code: w.code, other: w.other ?? '' } }
     case 'empty_policy_col': return w.other
-      ? { key: '{code} has nothing in the Policy column — read {other} from its text instead', vars: { code: w.code, other: w.other } }
-      : { key: '{code} has nothing in the Policy column', vars: { code: w.code } }
+      ? { key: '{code} has nothing in the Request column — read {other} from its text instead', vars: { code: w.code, other: w.other } }
+      : { key: '{code} has nothing in the Request column', vars: { code: w.code } }
     case 'no_screen': return { key: '{code} has no screen', vars: { code: w.code } }
     case 'duplicate': return { key: '{code} appears more than once', vars: { code: w.code } }
   }
@@ -288,11 +288,11 @@ export function warningText(w: FormatWarning): { key: string; vars: Record<strin
 /** 경고를 없애는 방법(영어 원문 열쇠 + 끼울 값) — 문서를 [Edit] 로 고쳐서 없애요 */
 export function warningFix(w: FormatWarning): { key: string; vars: Record<string, string> } {
   switch (w.kind) {
-    case 'missing_policy': return { key: 'Add a {code} row to the policy table, or fix the ID in {other}', vars: { code: w.code, other: w.other ?? '' } }
+    case 'missing_policy': return { key: 'Add a {code} row to the request table, or fix the ID in {other}', vars: { code: w.code, other: w.other ?? '' } }
     case 'empty_policy_col': return w.other
-      ? { key: 'Write {other} in the Policy column of {code}', vars: { code: w.code, other: w.other } }
-      : { key: 'Write the policy IDs this screen follows in the Policy column of {code}', vars: { code: w.code } }
-    case 'no_screen': return { key: 'Add {code} to a screen’s Policy column — or if it has no screen, write 〔화면 없음〕 after the policy name', vars: { code: w.code } }
+      ? { key: 'Write {other} in the Request column of {code}', vars: { code: w.code, other: w.other } }
+      : { key: 'Write the request IDs this screen follows in the Request column of {code}', vars: { code: w.code } }
+    case 'no_screen': return { key: 'Add {code} to a screen’s Request column — or if it has no screen, write 〔화면 없음〕 after the request name', vars: { code: w.code } }
     case 'duplicate': return { key: 'Give one of the {code} rows a new number', vars: { code: w.code } }
   }
 }

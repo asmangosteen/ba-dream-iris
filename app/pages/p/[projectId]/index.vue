@@ -1461,7 +1461,7 @@ async function onCreateReq(p: { text: string; block: string | null }) {
     await Promise.all([reqs.refresh(), links.refresh()])
     docReq.value = id
     say(current.value ? tr('Created {code} and linked it to {name}', { code, name: current.value.name }) : tr('Created {code}', { code }))
-  } catch { sayFail(tr('Couldn\'t create the policy. Try again')) }
+  } catch { sayFail(tr('Couldn\'t create the request. Try again')) }
 }
 async function onDocCreated(id: string) {
   await Promise.all([docs.refresh(), reqs.refresh()])
@@ -2086,7 +2086,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
             <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
             <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
-            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Policies board') }}</NuxtLink>
+            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
             <button class="sq menu-item ks-mi" role="menuitem" @click="shortcutsOpen = true"><span>{{ tr('Keyboard shortcuts') }}</span><span class="mi-key">⌃⇧?</span></button>
             <div class="msep" role="separator" />
             <ThemeSwitch compact />
@@ -2156,7 +2156,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
             <span class="ellipsis f1">{{ d.title }}</span>
             <span v-if="d.abbr" class="sq dabbr" :data-tip="tr('Document abbreviation')">{{ d.abbr }}</span>
             <span v-if="warnCount(d)" class="sq dwarn num" :title="tr('{n} warnings', { n: warnCount(d) })">⚠ {{ warnCount(d) }}</span>
-            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} policies', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
+            <span v-if="reqCount(d.id)" class="tx-meta num" :aria-label="tr('{n} requests', { n: reqCount(d.id) })">{{ reqCount(d.id) }}</span>
             <span v-if="d.fetch_status === 'failed'" class="warn" role="img" :aria-label="tr('Couldn\'t fetch this doc')"><EditorIcon name="warning" :size="16" /></span>
           </button>
         </div>
@@ -2262,7 +2262,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
         </div>
         <div v-else class="none">
           <span class="tx-head">{{ tr('Select a frame') }}</span>
-          <span class="tx-meta">{{ tr('Select a frame on the canvas or in Layers to see its policies, design and dev info here') }}</span>
+          <span class="tx-meta">{{ tr('Select a frame on the canvas or in Layers to see its requests, design and dev info here') }}</span>
           <TextButton v-if="list.length" size="s" color="blue" class="self-start" @click="pickScreen(list[0]!.id, true)">{{ tr('Select first frame') }}</TextButton>
         </div>
       </template>
@@ -2330,7 +2330,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <AppConfirm
       v-if="confirmFrames"
       :title="confirmFrames.frames.length === 1 ? tr('Delete the frame &quot;{name}&quot;?', { name: confirmFrames.frames[0]!.name }) : tr('Delete {n} frames?', { n: confirmFrames.frames.length })"
-      :desc="tr('{n} linked policies will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
+      :desc="tr('{n} linked requests will be unlinked from this frame. You can undo with ⌘Z.', { n: confirmFrames.links })"
       :actions="[{ label: tr('Cancel'), onClick: () => (confirmFrames = null) }, { label: confirmFrames.frames.length === 1 ? tr('Delete frame') : tr('Delete frames'), kind: 'destructed', onClick: doConfirmFrames }]"
       @close="confirmFrames = null"
     />

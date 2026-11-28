@@ -121,7 +121,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); document.r
     </template>
     <span v-if="!props.readonly" class="div" aria-hidden="true" />
     <button v-if="!props.readonly" type="button" :aria-label="tr('Assets')" :data-tip="tr('Assets')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'assets')"><EditorIcon name="component" :size="20" /></button>
-    <button v-if="!props.readonly" type="button" :aria-label="tr('Link policy')" :data-tip="tr('Link policy')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
+    <button v-if="!props.readonly" type="button" :aria-label="tr('Link request')" :data-tip="tr('Link request')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'link')"><EditorIcon name="link" :size="20" /></button>
     <button v-if="!props.readonly" type="button" :aria-label="tr('Import from Figma')" :data-tip="tr('Import from Figma')" data-tip-at="top" class="rail-btn" @click="emit('rail', 'figma')"><EditorIcon name="arrow_up_right" :size="20" /></button>
     <button type="button" :aria-label="tr('Comment (C)')" :aria-pressed="!!props.commenting" :data-tip="tr('Comments')" data-tip-key="C" data-tip-at="top" :class="['rail-btn', { on: props.commenting }]" @click="emit('rail', 'comment')"><EditorIcon name="comment" :size="20" /><i v-if="props.unread" class="cdot" aria-hidden="true" /></button>
   </div>

@@ -329,9 +329,9 @@ async function createReq({ text, block }: { text: string; block: string | null }
     await reqs.refresh()
     activeScreen.value = null
     activeReq.value = id
-    say(tr('Created policy {code}', { code }))
+    say(tr('Created request {code}', { code }))
   } catch {
-    say(tr("Couldn't create the policy. Try again in a moment."))
+    say(tr("Couldn't create the request. Try again in a moment."))
   }
 }
 
@@ -895,7 +895,7 @@ function onSaved({ found, gone: codes, warnings }: { found: number; gone: string
   stopEdit()
   closeBars()
   gone.value = codes
-  const base = found === 1 ? tr('Found 1 new policy') : found > 0 ? tr('Found {n} new policies', { n: found }) : tr('Document saved')
+  const base = found === 1 ? tr('Found 1 new request') : found > 0 ? tr('Found {n} new requests', { n: found }) : tr('Document saved')
   say(warnings ? base + ' · ' + (warnings === 1 ? tr('1 warning') : tr('{n} warnings', { n: warnings })) : base)
 }
 
@@ -986,7 +986,7 @@ async function removeDoc() {
         <div v-if="homeOpen" class="sq menu pmenu" role="menu" @click="homeOpen = false">
           <NuxtLink :to="backHref" class="sq menu-item" role="menuitem">{{ tr('Back to editor') }}</NuxtLink>
           <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
-          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Policies board') }}</NuxtLink>
+          <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
           <div class="msep" role="separator" />
           <ThemeSwitch compact />
           <LangSwitch />
@@ -1012,7 +1012,7 @@ async function removeDoc() {
           @pointermove="onFrameHover(p.c, $event)"
           @pointerleave="onColLeave"
         >
-          <button type="button" class="frame-btn" :aria-pressed="isLit(p.c)" :aria-label="p.c.screen ? tr('{name} · Policies: {n}', { name: p.c.name, n: reqCount(p.c.screen.id) }) : tr('{code} {name} · No design yet', { code: p.c.code ?? '', name: p.c.name })" @click="onFrameClick(p.c)">
+          <button type="button" class="frame-btn" :aria-pressed="isLit(p.c)" :aria-label="p.c.screen ? tr('{name} · Requests: {n}', { name: p.c.name, n: reqCount(p.c.screen.id) }) : tr('{code} {name} · No design yet', { code: p.c.code ?? '', name: p.c.name })" @click="onFrameClick(p.c)">
             <span class="frame-label">
               <span v-if="p.c.code" class="sq sid num">{{ p.c.code }}</span>
               <span class="ellipsis">{{ p.c.name }}</span>
@@ -1052,8 +1052,8 @@ async function removeDoc() {
           <span v-if="hover.layer" class="hov-box" :style="boxStyle(hover)" aria-hidden="true" />
           <button
             v-for="sd in SIDES" :key="sd" type="button" class="ldot" :style="dotAt(hover, sd)"
-            :aria-label="tr('Drag onto a policy row to link {name}', { name: hover.layer ? layerName(hoverCol.screen.id, hover.layer) : hoverCol.name })"
-            :title="tr('Drag onto a policy row to link')"
+            :aria-label="tr('Drag onto a request row to link {name}', { name: hover.layer ? layerName(hoverCol.screen.id, hover.layer) : hoverCol.name })"
+            :title="tr('Drag onto a request row to link')"
             @pointerdown="onDotDown(hoverCol, $event, hover.layer)"
             @pointerenter="onDotEnter(hoverCol, $event, hover.layer)"
             @pointerleave="hoverLine = null; onDotLeave($event)"
@@ -1072,7 +1072,7 @@ async function removeDoc() {
       </div>
         <p v-if="screens.status.value === 'success' && links.status.value === 'success' && !frames.length" class="tx-meta hint">{{ tr('No screens are linked to this document yet') }}</p>
         <p v-else-if="frames.length && !placed.length" class="tx-meta hint">{{ tr('No designs are attached yet · choose Sort by screen ID to see the empty slots') }}</p>
-        <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this policy') : tr('Click a policy to highlight its linked screens · drag the dot on a frame onto a policy row to link it') }}</p>
+        <p v-else-if="frames.length" class="tx-meta hint">{{ activeNote ? tr('Highlighted screens are what this note is about') : activeReq ? tr('Highlighted screens are linked to this request') : tr('Click a request to highlight its linked screens · drag the dot on a frame onto a request row to link it') }}</p>
       </div>
     </main>
 
@@ -1100,7 +1100,7 @@ async function removeDoc() {
       <span>{{ tr('Drag an end onto another place to move the link, or onto empty space to unlink') }}</span>
     </div>
     <span v-if="endDrag?.moved" class="sq drag-chip" :style="{ left: endDrag.x + 12 + 'px', top: endDrag.y + 12 + 'px' }">{{ endDrag.target?.kind === 'req' ? tr('Link to {code}', { code: endDrag.target.req.code }) : endDrag.target?.kind === 'layer' ? tr('Move to {name}', { name: endDrag.target.layer && endDrag.target.col.screen ? layerName(endDrag.target.col.screen.id, endDrag.target.layer) : endDrag.target.col.name }) : tr('Release to unlink') }}</span>
-    <span v-if="drag" class="sq drag-chip" :style="{ left: drag.cx + 12 + 'px', top: drag.cy + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a policy row') }}</span>
+    <span v-if="drag" class="sq drag-chip" :style="{ left: drag.cx + 12 + 'px', top: drag.cy + 12 + 'px' }">{{ drag.over ? tr('Link to {code}', { code: drag.over.code }) : tr('Drop on a request row') }}</span>
 
     <!-- 오른쪽: 문서 -->
     <aside :aria-label="tr('Document')" :class="['sq', 'float', 'doc', { wide: notesShown }]">
@@ -1154,7 +1154,7 @@ async function removeDoc() {
                 {{ tr('No longer in the document:') }}
                 <button v-for="r in goneReqs" :key="r.id" type="button" class="sq code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
-              <span class="tx-meta">{{ tr('These policies and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Policies') }}</NuxtLink>{{ tr('These policies and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
+              <span class="tx-meta">{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/requirements?p=${projectId}`" class="lnk">{{ tr('Requests') }}</NuxtLink>{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
             </span>
             <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><EditorIcon name="close" :size="14" /></button>
           </div>
@@ -1209,7 +1209,7 @@ async function removeDoc() {
       <!-- 확인: 공용 확인 팝업(AppConfirm · 프로필 편집 창 양식) — 아래 줄로 띄우지 않아요(사용자 요청 2026-11-27) -->
       <AppConfirm
         v-if="confirmReq"
-        :title="tr('Delete policy {code}?', { code: confirmReq.code })"
+        :title="tr('Delete request {code}?', { code: confirmReq.code })"
         :desc="tr('Its screen links are deleted too. This can’t be undone.')"
         :actions="[{ label: tr('Cancel'), onClick: () => (confirmReq = null) }, { label: tr('Delete'), kind: 'destructed', loading: removingReq, onClick: doRemoveReq }]"
         @close="confirmReq = null"
@@ -1224,7 +1224,7 @@ async function removeDoc() {
       <AppConfirm
         v-else-if="bar === 'delete' && doc"
         :title="tr('Delete “{name}”?', { name: doc.title })"
-        :desc="tr('Its policies and screen links will be deleted too. This can’t be undone.')"
+        :desc="tr('Its requests and screen links will be deleted too. This can’t be undone.')"
         :closable="!deleting"
         :actions="[{ label: tr('Cancel'), onClick: closeBars }, { label: tr('Delete'), kind: 'destructed', loading: deleting, onClick: removeDoc }]"
         @close="closeBars"

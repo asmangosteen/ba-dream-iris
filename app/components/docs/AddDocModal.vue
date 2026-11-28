@@ -34,7 +34,7 @@ const body = ref('')
 const growArea = (e: Event) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px' }
 
 const TEMPLATES: { key: string; label: string; cat: DocCategory; text: string }[] = [
-  { key: 'plan', label: 'Spec', cat: 'planning', text: '## 1. Document info\n\n| Item | Value |\n| --- | --- |\n| Document abbreviation | |\n| Version | v0.1 |\n| Status | Draft |\n\n## 2. Policies\n\n| ID | Policy | Rules |\n| --- | --- | --- |\n| P-AREA-01 | | |\n\n## 3. Screens\n\n| ID | Screen | What to show | States | Policy |\n| --- | --- | --- | --- | --- |\n| C-01 | | | | P-AREA-01 |\n' },
+  { key: 'plan', label: 'Spec', cat: 'planning', text: '## 1. Document info\n\n| Item | Value |\n| --- | --- |\n| Document abbreviation | |\n| Version | v0.1 |\n| Status | Draft |\n\n## 2. Requests\n\n| ID | Request | Rules |\n| --- | --- | --- |\n| P-AREA-01 | | |\n\n## 3. Screens\n\n| ID | Screen | What to show | States | Request |\n| --- | --- | --- | --- | --- |\n| C-01 | | | | P-AREA-01 |\n' },
   { key: 'dev', label: 'Dev notes', cat: 'dev', text: '# Overview\n\n## API\n- \n\n## To check\n- \n' },
   { key: 'blank', label: 'Blank', cat: 'etc', text: '' },
 ]
@@ -263,7 +263,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
           <div class="pop-body content success" role="status">
             <span class="badge-ok"><EditorIcon name="check" :size="20" /></span>
             <span class="tx-head">{{ tr('Document added') }}</span>
-            <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 policy') : done.found ? tr('Found {n} policies', { n: done.found }) : tr('No policies found in this document') }}<template v-if="done.slots"> · {{ tr('{n} screen slots', { n: done.slots }) }}</template><template v-if="done.warnings"> · {{ done.warnings === 1 ? tr('1 warning') : tr('{n} warnings', { n: done.warnings }) }}</template></span>
+            <span class="tx-meta">{{ done.found === 1 ? tr('Found 1 request') : done.found ? tr('Found {n} requests', { n: done.found }) : tr('No requests found in this document') }}<template v-if="done.slots"> · {{ tr('{n} screen slots', { n: done.slots }) }}</template><template v-if="done.warnings"> · {{ done.warnings === 1 ? tr('1 warning') : tr('{n} warnings', { n: done.warnings }) }}</template></span>
           </div>
           <div class="pop-foot">
             <Button size="s" type="tertiary" @click="close">{{ tr('Close') }}</Button>
@@ -303,7 +303,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <span class="sq chip num">{{ fileExt.toUpperCase() }}</span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="file.name">{{ file.name }}</span>
-                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · {{ tr('Policies: {n}', { n: foundCount }) }}</template><template v-else> · {{ tr('Content is kept as a file only') }}</template></span>
+                  <span class="tx-meta num">{{ sizeLabel(file.size) }}<template v-if="fileExt === 'md'"> · {{ tr('Requests: {n}', { n: foundCount }) }}</template><template v-else> · {{ tr('Content is kept as a file only') }}</template></span>
                 </span>
                 <IconButton icon-name="close" size="s" type="ghost" :ariaLabel="tr('Remove file')" data-autofocus @click="clearFile" />
               </div>
@@ -330,7 +330,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <span class="sq chip"><EditorIcon name="document" :size="16" /></span>
                 <span class="card-col">
                   <span class="tx-body name ellipsis" :title="fetched.title">{{ fetched.title }}</span>
-                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Policies: {n}', { n: foundCount }) }}</span>
+                  <span class="tx-meta num">{{ linkHost }} · {{ tr('Requests: {n}', { n: foundCount }) }}</span>
                 </span>
               </div>
               <div v-else-if="fetchFailed" class="sq card">
@@ -362,7 +362,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               <div class="col6">
                 <label for="docBody" class="tx-head">{{ tr('Content') }}</label>
                 <div class="sq area-box"><textarea id="docBody" v-model="body" class="area" rows="7" @input="growArea" :placeholder="tr(`'# ' heading, '## ' subheading, '- ' list. Separate paragraphs with a blank line.`)" /></div>
-                <span class="tx-meta num">{{ tr('Policy tables (P-AREA-01) and screen tables (C-01) are read automatically. Lines starting with REQ-001 still work') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
+                <span class="tx-meta num">{{ tr('Request tables (P-AREA-01) and screen tables (C-01) are read automatically. Lines starting with REQ-001 still work') }}{{ foundCount ? ' · ' + tr('{n} found', { n: foundCount }) : '' }}</span>
               </div>
             </div>
 
@@ -371,7 +371,7 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
               <span class="fc-h"><b>{{ tr('Format check') }}</b><span class="tx-meta">{{ tr('Iris planning format') }}</span></span>
               <template v-if="check.format !== 'none'">
                 <div class="counts">
-                  <span class="sq cnt pol"><b class="num">{{ check.policies.length }}</b><span>{{ tr('Policies') }}</span></span>
+                  <span class="sq cnt pol"><b class="num">{{ check.policies.length }}</b><span>{{ tr('Requests') }}</span></span>
                   <span class="sq cnt slot"><b class="num">{{ check.slots.length }}</b><span>{{ tr('Screen slots') }}</span></span>
                   <span class="sq cnt"><b class="num">{{ check.links }}</b><span>{{ tr('Links') }}</span></span>
                   <span class="sq cnt warnc"><b class="num">{{ check.warnings.filter((w) => w.kind !== 'no_screen').length }}</b><span>{{ tr('Warnings') }}</span></span>
@@ -382,11 +382,11 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
                 <ul v-if="warnOpen" class="sq wlist">
                   <li v-for="(w, i) in check.warnings.filter((x) => x.kind !== 'no_screen')" :key="i"><span class="dot" />{{ wText(w) }}</li>
                 </ul>
-                <span class="tx-meta">{{ tr('Each row of the screen table becomes a screen slot, and the policies in its Policy column are linked as “Unchecked”.') }}</span>
+                <span class="tx-meta">{{ tr('Each row of the screen table becomes a screen slot, and the requests in its Request column are linked as “Unchecked”.') }}</span>
               </template>
               <template v-else>
                 <b class="nf">{{ tr('This doesn’t follow the Iris planning format') }}</b>
-                <span class="tx-meta">{{ tr('No policy table or screen table was found, so policies and screens won’t be linked automatically.') }}</span>
+                <span class="tx-meta">{{ tr('No request table or screen table was found, so requests and screens won’t be linked automatically.') }}</span>
               </template>
             </div>
 

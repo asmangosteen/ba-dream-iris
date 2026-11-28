@@ -385,6 +385,13 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </div>
       <template v-for="b in blocks" :key="b.id">
       <div v-if="b.type === 'table'" :data-block="b.id" class="tblwrap">
+        <!-- 표에서 글을 골라 만든 정책(본문에 번호가 없는 것): 표 위에 번호 칩 — 글 문단과 같아요 -->
+        <span v-if="headerReqs(b).length" class="codes tcodes">
+          <span v-for="r in headerReqs(b)" :key="r.id" class="tcode">
+            <button type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? r.title + ' · ' + tr('Not drawn in any frame') : r.title" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', null)">{{ r.code }}</button>
+            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete request {code}', { code: r.code })" :data-tip="tr('Delete request')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="16" /></button>
+          </span>
+        </span>
         <table class="dtbl">
           <thead v-if="b.rows?.length">
             <tr><th v-for="(c, ci) in b.rows[0]" :key="ci" scope="col">{{ c }}</th></tr>
@@ -403,7 +410,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
               <td v-for="(c, ci) in row" :key="ci" class="tx-read">
                 <template v-for="(s, si) in cellSegs(cellText(b, ri + 1, ci, c))" :key="si">
                   <button v-if="s.req" type="button" :class="['sq', 'pid', 'num', { nolink: unlinked(s.req.id) }]" :aria-pressed="highlight === s.req.id" :title="unlinked(s.req.id) ? s.req.title + ' · ' + tr('Not drawn in any frame') : s.req.title" @click="emit('pick-req', s.req.id)">{{ s.t }}</button>
-                  <span v-else-if="s.policy" class="sq pid num missing" :title="tr('Not in the policy table')">{{ s.t }}</span>
+                  <span v-else-if="s.policy" class="sq pid num missing" :title="tr('Not in the request table')">{{ s.t }}</span>
                   <button v-else-if="s.slot" type="button" class="sq sid num" :title="tr('Go to the screen slot')" @click="emit('pick-slot', s.slot)">{{ s.t }}</button>
                   <template v-else><template v-for="(x, xi) in hl(s.t, b.id, ri + 1)" :key="xi"><mark v-if="x.m" class="nmark">{{ x.t }}</mark><template v-else>{{ x.t }}</template></template></template>
                 </template>
@@ -427,7 +434,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
         <span v-if="headerReqs(b).length" class="codes">
           <template v-for="r in headerReqs(b)" :key="r.id">
             <button type="button" :class="['sq', 'code', 'num', { nolink: unlinked(r.id) }]" :title="unlinked(r.id) ? tr('Not drawn in any frame') : undefined" :aria-pressed="highlight === r.id" @click="emit('pick-req', r.id)" @mouseenter="emit('hover-req', r.id)" @mouseleave="emit('hover-req', reqsByBlock.get(b.id)?.[0]?.id ?? null)">{{ r.code }}</button>
-            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete policy {code}', { code: r.code })" :data-tip="tr('Delete policy')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="16" /></button>
+            <button v-if="removable && r.origin === 'manual'" type="button" class="sq rm" :aria-label="tr('Delete request {code}', { code: r.code })" :data-tip="tr('Delete request')" @click.stop="emit('remove-req', r)"><EditorIcon name="trashbin" :size="16" /></button>
           </template>
         </span>
         <component :is="b.type === 'h1' || b.type === 'h2' ? 'h3' : 'p'" :class="b.type === 'h1' || b.type === 'h2' ? 'tx-head' : 'tx-read'">
@@ -440,7 +447,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
       </template>
 
       <div v-if="tool" :class="['sq', 'tool', { below: tool.below }]" role="toolbar" :aria-label="tr('Selected text')" :style="{ left: tool.x + 'px', top: tool.y + 'px' }" @mousedown.prevent>
-        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create policy') }}</button>
+        <button type="button" class="sq tool-btn" @click="createReq"><EditorIcon name="plus" :size="14" />{{ tr('Create request') }}</button>
         <button v-if="!compact" type="button" class="sq tool-btn" @click="comment"><EditorIcon name="comment" :size="14" />{{ tr('Add a note') }}</button>
       </div>
     </article>
@@ -491,6 +498,12 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 .rm { position: absolute; top: var(--ref-spacing-04); right: var(--ref-spacing-04); width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-02); color: var(--sys-color-neutral-500); opacity: 0; transition: opacity .12s; }
 .blk:hover .rm, .rm:focus-visible { opacity: 1; }
 .rm:hover { color: var(--sys-color-theme-error-default); --sq-fill: var(--sys-color-neutral-100); }
+/* 표 위 번호 칩: 지우기 버튼은 칩 바로 옆, 칩에 마우스를 올렸을 때만 */
+.tcodes { margin-bottom: var(--ref-spacing-04); }
+.tcode { position: relative; display: inline-flex; align-items: center; }
+/* 지우기는 칩 오른쪽에 떠서 보여요 — 숨어 있을 땐 자리를 안 차지해 칩끼리 간격이 고르게 */
+.tcode .rm { top: 50%; right: auto; left: 100%; z-index: 1; width: 24px; height: 24px; transform: translateY(-50%); --sq-fill: var(--sys-color-common-white-default); }
+.tcode:hover .rm { opacity: 1; }
 .code { display: inline; padding: 0 2px; border-radius: 3px; font-size: 12px; font-weight: 600; color: var(--iris-peek-ink); --sq-fill: var(--iris-peek-bg); text-align: inherit; }
 .code:hover, .code[aria-pressed='true'] { --sq-fill: var(--iris-peek-bg-strong); }
 .code:focus-visible { outline: 2px solid var(--iris-peek); outline-offset: 1px; }

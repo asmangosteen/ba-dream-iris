@@ -235,7 +235,7 @@ async function save() {
       const out = await syncDocFormat(before.project_id, before.id, result, { reqs: reqData.data.value ?? [], slots: slotData.data.value ?? [], screens: screenData.data.value ?? [], links: linkData.data.value ?? [] })
       added += out.added.length
       gone = out.removed
-    } catch { error.value = tr('Saved, but couldn’t update policies from the tables. Try saving again.') }
+    } catch { error.value = tr('Saved, but couldn’t update requests from the tables. Try saving again.') }
   }
   // 옛 번호(REQ-001 …) 줄도 계속 읽어요
   const existing = new Set(props.allReqs.filter((r) => r.document_id === before.id).map((r) => r.code.toUpperCase()))

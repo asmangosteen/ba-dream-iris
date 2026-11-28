@@ -183,10 +183,10 @@ defineExpose({ openPicker: () => (picking.value = true) })
   <div v-if="multi" class="plan">
     <section class="sec2 first">
       <div class="sec-h h24"><span>{{ tr('{n} frames selected', { n: multi.length }) }}</span></div>
-      <SearchField v-model:value="q" type="contained" size="s" :placeholder="tr('Link a policy to all {n} — search by ID or name', { n: multi.length })" :input-props="{ 'aria-label': tr('Search policies') }" />
+      <SearchField v-model:value="q" type="contained" size="s" :placeholder="tr('Link a request to all {n} — search by ID or name', { n: multi.length })" :input-props="{ 'aria-label': tr('Search requests') }" />
       <div v-if="q.trim()" class="plist">
         <button v-for="r in multiCandidates.slice(0, 30)" :key="r.id" class="sq menu-item" @click="linkAll(r); q = ''"><span class="num w6">{{ r.code }}</span><span class="ell">{{ r.title }}</span></button>
-        <p v-if="!multiCandidates.length" class="tx-meta m0 p6">{{ tr('No policies found') }}</p>
+        <p v-if="!multiCandidates.length" class="tx-meta m0 p6">{{ tr('No requests found') }}</p>
       </div>
       <div class="grp-list">
         <div v-for="x in shared" :key="x.req.id" class="sq mrow">
@@ -196,7 +196,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
           <TextButton v-if="x.n < multi.length" size="s" color="blue" @click="linkAll(x.req)">{{ tr('Link to all') }}</TextButton>
           <TextButton v-else size="s" color="gray" @click="unlinkAll(x.req)">{{ tr('Unlink all') }}</TextButton>
         </div>
-        <p v-if="!shared.length" class="tx-meta m0">{{ tr('None of these frames are linked to a policy yet') }}</p>
+        <p v-if="!shared.length" class="tx-meta m0">{{ tr('None of these frames are linked to a request yet') }}</p>
       </div>
       <p class="tx-meta m0">{{ tr('Layers work the same way: select layers inside a frame, then link.') }}</p>
     </section>
@@ -230,7 +230,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
 
     <section v-if="mine.length" class="pad">
       <div class="sq sum">
-        <div class="row"><span class="tx-head">{{ tr('Policies coverage') }}</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
+        <div class="row"><span class="tx-head">{{ tr('Requests coverage') }}</span><span class="num w5"><span class="blue">{{ done }}</span>/{{ scored.length }}</span></div>
         <div role="img" :aria-label="tr('{r} reflected, {p} partial, {m} missing', { r: count('reflected'), p: count('partial'), m: count('missing') })" class="bars">
           <span :style="bar('reflected')" /><span :style="bar('partial')" /><span :style="bar('missing')" />
         </div>
@@ -243,13 +243,13 @@ defineExpose({ openPicker: () => (picking.value = true) })
     </section>
 
     <section class="sec2">
-      <div class="sec-h h24"><span>{{ mine.length ? tr('Policies {n}', { n: mine.length }) : tr('Policies') }}</span><button class="ib s24" :aria-label="tr('Link policy')" :aria-expanded="picking" @click="picking = !picking"><EditorIcon name="plus" :size="16" /></button></div>
+      <div class="sec-h h24"><span>{{ mine.length ? tr('Requests {n}', { n: mine.length }) : tr('Requests') }}</span><button class="ib s24" :aria-label="tr('Link request')" :aria-expanded="picking" @click="picking = !picking"><EditorIcon name="plus" :size="16" /></button></div>
 
       <div v-if="picking" class="sq picker">
-        <SearchField v-model:value="q" type="contained" size="s" :placeholder="tr('Search by number or text')" :input-props="{ 'aria-label': tr('Search policies'), autofocus: true }" />
+        <SearchField v-model:value="q" type="contained" size="s" :placeholder="tr('Search by number or text')" :input-props="{ 'aria-label': tr('Search requests'), autofocus: true }" />
         <div class="plist">
           <button v-for="r in candidates" :key="r.id" class="sq menu-item" @click="link(r)"><span class="num w6">{{ r.code }}</span><span class="ell">{{ r.title }}</span></button>
-          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? tr('No policies found') : (reqs.data.value ?? []).length ? tr('No policies left to link') : tr('Create policies in a doc first') }}</p>
+          <p v-if="!candidates.length" class="tx-meta m0 p6">{{ q.trim() ? tr('No requests found') : (reqs.data.value ?? []).length ? tr('No requests left to link') : tr('Create requests in a doc first') }}</p>
         </div>
         <div class="pfoot"><Button size="s" type="tertiary" @click="picking = false">{{ tr('Close') }}</Button></div>
       </div>
@@ -280,8 +280,8 @@ defineExpose({ openPicker: () => (picking.value = true) })
       </div>
 
       <div v-if="!mine.length && !picking" class="empty-col">
-        <span class="tx-meta">{{ tr('No linked policies') }}</span>
-        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">{{ tr('Link policy') }}</Button>
+        <span class="tx-meta">{{ tr('No linked requests') }}</span>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="link" @click="picking = true">{{ tr('Link request') }}</Button>
       </div>
     </section>
 
@@ -290,7 +290,7 @@ defineExpose({ openPicker: () => (picking.value = true) })
       <button v-for="d in relDocs" :key="d!.id" class="sq hov doc" @click="emit('open-doc', d!.id)">
         <EditorIcon :name="docIcon(d!)" :size="16" class="muted" /><span class="ell f1">{{ d!.title }}</span><span class="tx-meta">{{ categoryLabel(d!.category) }}</span>
       </button>
-      <p v-if="!relDocs.length" class="tx-meta m0 pb2">{{ tr('Docs appear here once you link policies') }}</p>
+      <p v-if="!relDocs.length" class="tx-meta m0 pb2">{{ tr('Docs appear here once you link requests') }}</p>
     </section>
   </div>
 </template>
