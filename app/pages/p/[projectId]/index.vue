@@ -2315,7 +2315,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
     <ShareModal v-model:open="shareOpen" :project-id="projectId" :project-name="project.data.value?.name ?? ''" />
     <KeyboardShortcuts v-if="shortcutsOpen" @close="shortcutsOpen = false" />
     <AddDocModal v-model:open="addDocOpen" :project-id="projectId" @created="onDocCreated" />
-    <FigmaImportModal v-if="pageId" v-model:open="figmaOpen" :project-id="projectId" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" @finished="onFigmaFinished" />
+    <FigmaImportModal v-if="pageId" v-model:open="figmaOpen" :project-id="projectId" :page-id="pageId" :next-x="nextX" @created="onFigmaCreated" @finished="onFigmaFinished" @focus="(id: string) => pickScreen(id, true)" />
     <EditorVariables v-if="varsOpen" @close="varsOpen = false" />
     <AppConfirm
       v-if="confirmFrames"

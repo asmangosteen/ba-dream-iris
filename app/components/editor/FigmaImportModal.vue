@@ -15,7 +15,7 @@ import { useDevPreview } from '~/composables/usePreview'
  */
 const props = defineProps<{ projectId: string; pageId: string; nextX: number }>()
 const open = defineModel<boolean>('open', { required: true })
-const emit = defineEmits<{ created: []; finished: [n: number] }>()
+const emit = defineEmits<{ created: []; finished: [n: number]; focus: [screenId: string] }>()
 
 const supabase = useSupabaseClient()
 const preview = useDevPreview()
@@ -28,7 +28,7 @@ interface ScanResult { fileKey: string; fileName: string; kind: 'list' | 'frame'
 interface FrameComponent { name: string; count: number; key: string | null }
 interface FrameOut { id: string; name: string; width: number; height: number; thumbnailUrl: string | null; components: FrameComponent[] }
 type Match = 'new' | 'state' | 'again' | 'warn' | 'noid'
-interface Row extends ScanFrame { match: Match; slot: SlotRow | null; state: string | null; existing: { id: string; slotCode: string | null } | null; checked: boolean }
+interface Row extends ScanFrame { match: Match; slot: SlotRow | null; state: string | null; existing: { id: string; slotCode: string | null; pageId: string; page: string } | null; checked: boolean }
 type RunStatus = 'queued' | 'done' | 'waiting' | 'failed'
 
 const FIGMA_ERROR: Record<string, string> = {
@@ -83,11 +83,11 @@ function onUrlKey(e: KeyboardEvent) { if (e.key === 'Enter' && !e.isComposing) {
 const pickPage = (id: string) => doScan(id)
 
 /** 이 프로젝트에 이미 들어온 같은 파일의 화면(피그마 노드 id 기준 — 이름이 바뀌어도 같은 화면) */
-async function existingOf(fileKey: string): Promise<Map<string, { id: string; slotCode: string | null }>> {
+async function existingOf(fileKey: string): Promise<Map<string, { id: string; slotCode: string | null; pageId: string; page: string }>> {
   const slotCode = (id: string | null) => (id ? slotsQ.data.value?.find((s) => s.id === id)?.code ?? null : null)
-  if (preview) return new Map([['pv:6', { id: 'pv-existing', slotCode: 'C-06' }]])
-  const { data } = await supabase.from('screens').select('id, figma_node_id, slot_id, pages!inner(project_id)').eq('pages.project_id', props.projectId).eq('figma_file_key', fileKey)
-  return new Map(((data ?? []) as unknown as { id: string; figma_node_id: string; slot_id: string | null }[]).map((s) => [s.figma_node_id, { id: s.id, slotCode: slotCode(s.slot_id) }]))
+  if (preview) return new Map([['pv:6', { id: 'pv-existing', slotCode: 'C-06', pageId: 'pg-1', page: '홈 · 내 차고' }]])
+  const { data } = await supabase.from('screens').select('id, figma_node_id, slot_id, page_id, pages!inner(project_id, name)').eq('pages.project_id', props.projectId).eq('figma_file_key', fileKey)
+  return new Map(((data ?? []) as unknown as { id: string; figma_node_id: string; slot_id: string | null; page_id: string; pages: { name: string } }[]).map((s) => [s.figma_node_id, { id: s.id, slotCode: slotCode(s.slot_id), pageId: s.page_id, page: s.pages?.name ?? '' }]))
 }
 /** 프레임마다 붙을 화면 칸 · 결과(PRD/13 3장 표). ID 가 맞는 새 화면 · 상태만 미리 체크, 이미 연결된 것은 체크 안 함(3-1) */
 async function matchRows(r: ScanResult): Promise<Row[]> {
@@ -187,6 +187,48 @@ let ticker: ReturnType<typeof setInterval> | undefined
 const waitLeft = computed(() => Math.max(0, Math.ceil((run.waitUntil - now.value) / 1000)))
 const runRows = computed(() => rows.value.filter((r) => run.status[r.id]))
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
+/** 썸네일이 빠진 화면 — 묶음으로 받을 때 피그마가 무거운 화면을 늦게 그려 빠지면, 끝에 한 장씩 다시 받아요 */
+interface ThumbJob { screenId: string; fileKey: string; nodeId: string }
+const pendingThumbs: ThumbJob[] = []
+/** 끝 화면 [캔버스에서 보기]: 가져온(또는 다시 불러온) 첫 화면으로 — 다른 페이지에 있으면 그 페이지로 */
+const firstSaved = ref<string | null>(null)
+const thumbs = reactive({ active: false, total: 0, done: 0, failed: 0 })
+async function fillThumbs(jobs: ThumbJob[]) {
+  if (!jobs.length || preview) return
+  Object.assign(thumbs, { active: true, total: jobs.length, done: 0, failed: 0 })
+  for (const j of jobs) {
+    if (run.stopped) break
+    let url: string | null = null
+    for (const scale of [1, 0.5]) {
+      try {
+        const r = await withRetry(() => $fetch<{ images: Record<string, string | null> }>('/api/figma/thumbs' as string, { method: 'POST', body: { fileKey: j.fileKey, ids: [j.nodeId], scale } }), [])
+        url = r?.images?.[j.nodeId] ?? null
+      } catch { url = null }
+      if (url) break
+    }
+    if (url) {
+      const path = await keepFigmaThumb(url, j.fileKey, j.nodeId)
+      const { error: e } = await supabase.from('screens').update({ thumbnail_path: path }).eq('id', j.screenId)
+      if (e) thumbs.failed++
+    } else thumbs.failed++
+    thumbs.done++
+  }
+  thumbs.active = false
+  await refreshNuxtData([`all-screens-${props.projectId}`])
+  emit('created')
+}
+/** 이 프로젝트에서 썸네일 없이 들어온 피그마 화면(예전 가져오기 포함) */
+const missingThumbs = ref<ThumbJob[]>([])
+async function loadMissingThumbs() {
+  if (preview) { missingThumbs.value = []; return }
+  const { data } = await supabase.from('screens').select('id, figma_file_key, figma_node_id, pages!inner(project_id)').eq('pages.project_id', props.projectId).is('thumbnail_path', null).not('figma_node_id', 'is', null)
+  missingThumbs.value = ((data ?? []) as unknown as { id: string; figma_file_key: string | null; figma_node_id: string | null }[]).filter((x) => x.figma_file_key && x.figma_node_id).map((x) => ({ screenId: x.id, fileKey: x.figma_file_key!, nodeId: x.figma_node_id! }))
+}
+async function retryMissingThumbs() {
+  run.stopped = false
+  await fillThumbs(missingThumbs.value)
+  await loadMissingThumbs()
+}
 const result = reactive({ added: 0, states: 0, again: 0, failed: 0, links: 0, skipped: 0, idChanged: [] as { screenId: string; from: string; to: SlotRow; name: string }[] })
 
 async function fetchFrames(fileKey: string, ids: string[]): Promise<{ frames: FrameOut[]; missing: string[] }> {
@@ -228,6 +270,9 @@ async function startImport() {
   step.value = 'run'
   Object.assign(run, { total: list.length, done: 0, waitUntil: 0, stopped: false, status: Object.fromEntries(list.map((r) => [r.id, 'queued' as RunStatus])) })
   Object.assign(result, { added: 0, states: 0, again: 0, failed: 0, links: 0, skipped: 0, idChanged: [] })
+  pendingThumbs.length = 0
+  firstSaved.value = null
+  Object.assign(thumbs, { active: false, total: 0, done: 0, failed: 0 })
   ticker = setInterval(() => { now.value = Date.now() }, 500)
   // 캔버스 자리: 함께 보기 'ID 순서 보기'와 같은 규칙(사용자 결정 2026-11-29) — 지금 페이지 오른쪽 끝(nextX)부터
   const at = idOrderLayout(list.filter((r) => !r.existing), props.nextX)
@@ -262,6 +307,8 @@ async function startImport() {
     }
     for (const id of got.missing) { run.status[id] = 'failed'; result.failed++; run.done++ }
   }
+  // 빠진 썸네일은 한 장씩 다시(무거우면 절반 크기로)
+  if (!run.stopped) await fillThumbs(pendingThumbs)
   clearInterval(ticker)
   if (!preview) await refreshNuxtData([`all-screens-${props.projectId}`, `links-${props.projectId}`])
   emit('created')
@@ -270,6 +317,7 @@ async function startImport() {
   nextIdChange()
 }
 function stopImport() { run.stopped = true }
+function viewOnCanvas() { const id = firstSaved.value; close(); if (id) emit('focus', id) }
 
 /**
  * ID 순서 배치(함께 보기 'ID 순서 보기'와 같은 규칙 · 같은 간격): 종류(C · A · S · N · CMP · 그 밖)마다 한 줄,
@@ -329,6 +377,8 @@ async function saveFrame(fileKey: string, r: Row, f: FrameOut, catalog: Awaited<
     const { error: e } = await supabase.from('screens').update({ name: f.name, width: f.width, height: f.height, ...layerFields, ...(thumb ? { thumbnail_path: thumb } : {}), figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString() }).eq('id', r.existing.id)
     if (e) throw e
     screenId = r.existing.id
+    firstSaved.value ??= screenId
+    if (!thumb && !lay) pendingThumbs.push({ screenId, fileKey, nodeId: f.id })
     result.again++
     // 이름의 ID 가 바뀌었으면 끝난 뒤 물어요(6)
     const m = slotFromName(f.name)
@@ -343,6 +393,8 @@ async function saveFrame(fileKey: string, r: Row, f: FrameOut, catalog: Awaited<
   }).select('id').single()
   if (e1 || !data) throw e1 ?? new Error('insert')
   screenId = (data as { id: string }).id
+  firstSaved.value ??= screenId
+  if (!thumb) pendingThumbs.push({ screenId, fileKey, nodeId: f.id })
   if (f.components.length) {
     await supabase.from('screen_component_usages').insert(f.components.map((c) => ({ screen_id: screenId, component_id: matchComponent(catalog, c), detected_name: c.name, count: c.count, source: 'figma' as const })))
   }
@@ -401,6 +453,7 @@ watch(open, async (v) => {
   if (!v || import.meta.server) return
   if (step.value === 'run') return
   reset()
+  loadMissingThumbs()
   await nextTick()
   document.getElementById('figmaUrl')?.focus()
 }, { immediate: true })
@@ -477,6 +530,16 @@ async function previewScan(raw: string): Promise<ScanResult> {
             </div></div>
           </div>
 
+          <!-- 예전에 썸네일 없이 들어온 피그마 화면: 한 장씩 다시 받기 -->
+          <div v-if="step === 'link' && (missingThumbs.length || thumbs.active)" class="sq fi-miss">
+            <EditorIcon name="image" :size="16" class="fi-dim" />
+            <span class="fi-col fi-f1">
+              <b>{{ thumbs.active ? tr('Making thumbnails — {done} of {total}', { done: thumbs.done, total: thumbs.total }) : missingThumbs.length === 1 ? tr('1 Figma screen has no thumbnail') : tr('{n} Figma screens have no thumbnail', { n: missingThumbs.length }) }}</b>
+              <span class="tx-meta">{{ tr('Heavy screens (maps, big photos) can take Figma too long to draw. They’re made again one at a time') }}</span>
+            </span>
+            <Button size="s" type="tertiary" stroke :loading="thumbs.active" @click="retryMissingThumbs">{{ tr('Make again') }}</Button>
+          </div>
+
           <!-- 1 무엇을 가져오나 -->
           <div v-if="step === 'link'" class="sq fi-guide">
             <div class="fi-kind"><span class="sq fi-chip w">{{ tr('Frame') }}</span><span>{{ tr('That one screen') }}</span></div>
@@ -512,7 +575,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                     <span class="fi-slot">
                       <template v-if="r.slot"><span class="sq fi-sid">{{ r.slot.code }}</span><span class="ellipsis">{{ r.slot.name }}<span v-if="r.state" class="tx-meta"> · {{ r.state }}</span></span></template>
                       <span v-else-if="r.match === 'warn'" class="tx-meta">{{ tr('Not in any document') }}</span>
-                      <span v-else-if="r.match === 'again'" class="tx-meta">{{ r.existing?.slotCode ?? tr('Not attached') }}</span>
+                      <span v-else-if="r.match === 'again'" class="tx-meta ellipsis">{{ r.existing?.slotCode ?? tr('Not attached') }} · {{ tr('on “{page}”', { page: r.existing?.page ?? '' }) }}</span>
                       <div v-else class="fi-pick">
                         <button type="button" class="sq fi-pick-b" :aria-expanded="pickOpen === r.id" @click="togglePick(r, $event)">{{ tr('Choose a slot') }}<EditorIcon name="chevron_down" :size="12" /></button>
                       </div>
@@ -538,7 +601,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                 <div class="fi-sec">
                   <span class="tx-meta">{{ tr('Attaches to') }}</span>
                   <span v-if="singleRow.slot" class="fi-slot"><span class="sq fi-sid">{{ singleRow.slot.code }}</span><span class="ellipsis">{{ singleRow.slot.name }}<span v-if="singleRow.state" class="tx-meta"> · {{ singleRow.state }}</span></span><span :class="['sq', 'fi-res', RESULT[singleRow.match].cls]">{{ tr(RESULT[singleRow.match].label) }}</span></span>
-                  <span v-else class="fi-slot"><span class="tx-meta">{{ singleRow.match === 'warn' ? tr('Its ID isn’t in any document') : tr('No screen ID in its name — it comes in as an unattached screen') }}</span></span>
+                  <span v-else class="fi-slot"><span class="tx-meta">{{ singleRow.match === 'again' ? tr('Already in Iris on “{page}” — reimporting updates that screen there', { page: singleRow.existing?.page ?? '' }) : singleRow.match === 'warn' ? tr('Its ID isn’t in any document') : tr('No screen ID in its name — it comes in as an unattached screen') }}</span></span>
                 </div>
                 <div v-if="reqCodesOf(singleRow.slot).length" class="fi-sec">
                   <span class="tx-meta">{{ tr('Requests that come along · Unchecked') }}</span>
@@ -581,6 +644,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                 </div>
               </div>
             </div></div>
+            <p v-if="thumbs.active" class="sq fi-note" role="status"><EditorIcon name="image" :size="16" class="fi-note-ic" /><span>{{ tr('Making the thumbnails Figma was slow to draw — {done} of {total}', { done: thumbs.done, total: thumbs.total }) }}</span></p>
             <span class="tx-meta">{{ tr('You can close this window — import keeps going and you’ll be told when it’s done') }}</span>
           </template>
 
@@ -595,6 +659,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
                   <span v-if="result.states" class="sq fi-res state">{{ result.states === 1 ? tr('1 state') : tr('{n} states', { n: result.states }) }}</span>
                   <span v-if="result.again" class="sq fi-res again">{{ result.again === 1 ? tr('1 reimported') : tr('{n} reimported', { n: result.again }) }}</span>
                   <span v-if="result.failed" class="sq fi-res warn">{{ tr('{n} failed', { n: result.failed }) }}</span>
+                  <span v-if="thumbs.failed" class="sq fi-res warn">{{ tr('{n} without thumbnail', { n: thumbs.failed }) }}</span>
                 </span>
               </span>
             </div>
@@ -637,7 +702,7 @@ async function previewScan(raw: string): Promise<ScanResult> {
             </template>
             <template v-else-if="step === 'done'">
               <Button size="s" type="tertiary" @click="close">{{ tr('Close') }}</Button>
-              <Button size="s" type="primary" @click="close">{{ tr('View on canvas') }}</Button>
+              <Button size="s" type="primary" @click="viewOnCanvas">{{ tr('View on canvas') }}</Button>
             </template>
             <template v-else>
               <Button v-if="step !== 'link'" size="s" type="tertiary" @click="backToLink">{{ tr('Back') }}</Button>
@@ -667,6 +732,9 @@ async function previewScan(raw: string): Promise<ScanResult> {
 /* 창이 낮으면 안쪽이 줄어들지 않고 본문이 스크롤돼요(표가 눌려 사라지지 않게) */
 .fi-body > * { flex: none; }
 .fi-link { display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
+.fi-miss { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 48px; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-fill: #FFF6EC; }
+.fi-miss b { font-weight: 600; }
+.fi-miss :deep(.bd-button) { flex: none; }
 .fi-pages { display: flex; flex-direction: column; gap: var(--ref-spacing-05); }
 .fi-page { width: 100%; display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 40px; padding: 0 var(--ref-spacing-07); border: 0; background: none; font: inherit; color: var(--sys-color-neutral-800); text-align: left; cursor: pointer; box-shadow: inset 0 -1px 0 var(--iris-line); transition: background-color .12s ease; }
 .fi-page:last-child { box-shadow: none; }
