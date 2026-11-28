@@ -17,6 +17,16 @@ const cachedScreens = useNuxtData<ProjectScreen[]>(`all-screens-${props.projectI
 
 type Mode = 'file' | 'link' | 'write'
 // 라벨은 영어 원문 — 그릴 때 tr() 로 감싸요
+/** 기획서 양식 가이드(public/guides) — 문서 추가 창 위에서 내려받아요(사용자 요청 2026-11-28) */
+const GUIDE_URL = '/guides/iris-planning-format.md'
+function downloadGuide() {
+  const a = document.createElement('a')
+  a.href = GUIDE_URL
+  a.download = tr('Iris planning format guide') + '.md'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
 const MODES: [Mode, string][] = [['file', 'Upload file'], ['link', 'Paste link'], ['write', 'Write']]
 const CATS = Object.entries(DOC_CATEGORY_LABEL) as [DocCategory, string][]
 const MAX_FILE = 50 * 1024 * 1024
@@ -285,6 +295,15 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
           </div>
 
           <div class="pop-body content">
+            <!-- 양식 가이드: 이대로 쓰면 요청사항 · 화면이 저절로 이어져요 -->
+            <div class="sq guide">
+              <span class="sq chip"><EditorIcon name="document" :size="16" /></span>
+              <span class="card-col">
+                <span class="tx-body name">{{ tr('Iris planning format') }}</span>
+                <span class="tx-meta">{{ tr('Write request and screen tables this way and they link up automatically') }}</span>
+              </span>
+              <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="download" @click="downloadGuide">{{ tr('Guide') }}</Button>
+            </div>
             <!-- 파일 -->
             <div v-if="mode === 'file'" class="col8 fill">
               <label
@@ -443,6 +462,9 @@ watch(mode, async () => { error.value = ''; await nextTick(); autofocusTarget()?
 .drop .tx-meta { color: var(--sys-color-neutral-500); }
 .up { margin-bottom: var(--ref-spacing-04); display: grid; place-items: center; color: var(--sys-color-neutral-500); }
 
+/* 양식 가이드 줄: 고른 파일 카드와 같은 틀(옅은 바탕 · 모서리 16 · 높이 48~) */
+.guide { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 48px; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-neutral-100); }
+.guide :deep(.bd-button) { flex: none; }
 .card { display: flex; align-items: center; gap: var(--ref-spacing-06); min-height: 48px; padding: var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-06) var(--ref-spacing-08); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-neutral-100); }
 .chip { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-common-white-default); font-size: 10px; font-weight: 600; color: var(--sys-color-neutral-700); }
 .card-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
