@@ -76,6 +76,7 @@ export function useEditor(projectId: string) {
     return (data ?? []) as PageRow[]
   }, { deep: true, getCachedData: fromCache(() => `pages-${projectId}`) })
   // 서버에서 고른 페이지가 브라우저로 그대로 넘어가도록 useState 로 둡니다
+  const route = useRoute()
   const pageId = useState<string | null>(`page-${projectId}`, () => null)
   /** 화면마다 마지막으로 안 판(updated_at)과 그때 레이어 — 저장할 때 그 판이 그대로인지 확인해요(다른 사람이 먼저 저장했으면 충돌) */
   const known = new Map<string, { at: string; layers: string }>()
@@ -86,7 +87,11 @@ export function useEditor(projectId: string) {
   const screens = useAsyncData(`screens-${projectId}`, async () => {
     if (!pageId.value) {
       await pages
-      pageId.value = pages.data.value?.[0]?.id ?? null
+      // 처음 고를 페이지: 주소의 ?page= (개요에서 페이지 썸네일을 눌렀을 때) → 없으면 첫 페이지.
+      // 기다리는 동안 다른 곳(주소 처리)에서 이미 골랐으면 그대로 둬요 — 덮어쓰면 기본 페이지로 돌아가요(2026-11-29)
+      const want = typeof route.query.page === 'string' ? route.query.page : null
+      const list = pages.data.value ?? []
+      if (!pageId.value) pageId.value = (want && list.some((p) => p.id === want) ? want : list[0]?.id) ?? null
     }
     if (!pageId.value) return [] as ScreenRow[]
     if (preview) return PREVIEW_SCREENS[pageId.value] ?? []
