@@ -77,9 +77,15 @@ const notes = computed(() => {
 })
 const who = (id: string) => { const m = (members.data.value ?? []).find((x) => x.id === id); return { name: m?.name || m?.email || tr('Former member'), avatar: m?.avatar_url ?? null } }
 
-/** ← 뒤로: 온 곳으로(요청사항 보기 · 개요 · 홈 문서 목록). 주소로 바로 열었으면 프로젝트 첫 화면 */
+/**
+ * ← 뒤로: 늘 홈 안에서만(사용자 결정 2026-11-28) — 바로 전 화면이 홈 화면(프로젝트 목록 · 문서 목록 · 프로젝트 첫 화면 · 요청사항 보기)일 때만 그리로,
+ * 캔버스 · 함께 보기 같은 프로젝트 탭 화면에서 왔거나 주소로 바로 열었으면 이 프로젝트 첫 화면으로
+ */
 function goBack() {
-  if (import.meta.client && window.history.state?.back) router.back()
+  const prev = import.meta.client ? (window.history.state?.back as string | null | undefined) : null
+  const path = prev?.split(/[?#]/)[0] ?? ''
+  const homeLike = path === '/' || path === '/documents' || path.startsWith('/project/')
+  if (prev && homeLike) router.back()
   else navigateTo(`/project/${projectId}`)
 }
 const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.value ? `?req=${encodeURIComponent(reqId.value)}` : ''))
@@ -87,29 +93,32 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 
 <template>
   <div class="rd">
-    <main class="sq card main">
-      <div class="top">
-        <button type="button" class="sq back" @click="goBack"><EditorIcon name="chevron_right" :size="16" class="flip" />{{ tr('Back') }}</button>
-        <span class="vsep" aria-hidden="true" />
-        <template v-if="doc">
-          <b class="dtitle ellipsis">{{ doc.title }}</b>
+    <!-- 머리 줄: 프로젝트 첫 화면과 같은 홈 머리(제목 왼쪽 ← · 제목 20 · 아래 메타) -->
+    <header class="rd-head">
+      <button type="button" class="sq back" :aria-label="tr('Back')" :data-tip="tr('Back')" @click="goBack"><EditorIcon name="chevron_right" :size="20" class="flip" /></button>
+      <div class="ttl-col">
+        <div class="ttl-row">
+          <h1 class="ttl">{{ doc?.title ?? '' }}</h1>
           <!-- 칩끼리 4 — 문서 머리 약어 · 상태 칩(DocReader .meta)과 같아요 -->
-          <span v-if="doc.abbr || doc.status" class="chips">
+          <span v-if="doc && (doc.abbr || doc.status)" class="chips">
             <span v-if="doc.abbr" class="sq chip line">{{ doc.abbr }}</span>
             <span v-if="doc.status" class="sq chip">{{ tr(DOC_STATUS_LABEL[doc.status]) }}</span>
           </span>
-          <span class="tx-meta ellipsis">{{ [doc.version_label, tr('Edited {when}', { when: relativeTime(doc.updated_at) })].filter(Boolean).join(' · ') }}</span>
-        </template>
-        <span class="f1" />
-        <!-- 버튼끼리 4 — 함께 보기 머리 Notes · Edit(.acts)와 같아요 -->
-        <span class="acts">
-          <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
-          <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
-        </span>
+        </div>
+        <span v-if="doc" class="tx-meta">{{ [project?.name, doc.version_label, tr('Edited {when}', { when: relativeTime(doc.updated_at) })].filter(Boolean).join(' · ') }}</span>
       </div>
+      <span class="f1" />
+      <!-- 버튼끼리 4 — 함께 보기 머리 Notes · Edit(.acts)와 같아요 -->
+      <span class="acts">
+        <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
+        <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
+      </span>
+    </header>
+    <div class="rd-row">
+    <main class="sq card main">
       <div v-ovscroll class="body">
         <div class="col">
-          <DocReader v-if="doc" :doc="doc" :reqs="docReqs" :highlight="reqId" :linked="linkedIds" no-tool @pick-req="pickReq" />
+          <DocReader v-if="doc" :doc="doc" :reqs="docReqs" :highlight="reqId" :linked="linkedIds" no-tool hide-head @pick-req="pickReq" />
           <template v-else-if="docs.status.value === 'pending'"><Skeleton shape="text" width="40%" /><Skeleton shape="rectangle" height="240px" /></template>
           <p v-else class="tx-meta">{{ tr('This document is gone. It may have been deleted') }}</p>
         </div>
@@ -142,22 +151,26 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
       </template>
       <p v-else class="tx-meta m0">{{ tr('Choose a request ID in the document to see its screens') }}</p>
     </aside>
+    </div>
     <AccessGate :project-id="projectId" :project-name="project?.name" />
   </div>
 </template>
 
 <style scoped>
 /* 문서에서 보기: 회색 바탕에 문서 카드(가운데 760) + 오른쪽 요청사항 카드 320(시안 4) */
-.rd { height: calc(100vh - var(--iris-tabs-h, 0px)); box-sizing: border-box; display: flex; gap: var(--ref-spacing-10); padding: var(--ref-spacing-10); background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
+.rd { height: calc(100vh - var(--iris-tabs-h, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12); padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-14); background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .card { border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-.top { flex: none; height: 52px; display: flex; align-items: center; gap: var(--ref-spacing-06); padding: 0 var(--ref-spacing-10) 0 var(--ref-spacing-06); box-shadow: 0 1px 0 var(--iris-line); position: relative; z-index: 1; }
-.back { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-02); height: 28px; padding: 0 var(--ref-spacing-05) 0 var(--ref-spacing-03); border-radius: var(--ref-radius-03); font-weight: 500; color: var(--sys-color-neutral-700); text-decoration: none; }
-.back:hover { --sq-fill: var(--sys-color-neutral-100); }
+.rd-head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
+.rd-row { flex: 1; min-height: 0; display: flex; gap: var(--ref-spacing-10); }
+/* 제목 왼쪽 ←: 프로젝트 첫 화면과 같아요(32 정사각, 올리면 회색) */
+.back { flex: none; width: 32px; height: 32px; display: grid; place-items: center; margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-700); }
+.back:hover { --sq-fill: var(--interaction-light-gray-hover); }
 .back:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
+.ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
+.ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flip { transform: rotate(180deg); }
-.vsep { flex: none; width: 1px; height: 16px; background: var(--iris-line-strong); }
-.dtitle { font-size: 14px; line-height: 22px; font-weight: 600; flex: 0 1 auto; }
 .ellipsis { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
 .chips, .acts { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); }

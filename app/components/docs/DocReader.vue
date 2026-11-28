@@ -54,7 +54,9 @@ const props = withDefaults(defineProps<{
   removable?: boolean
   /** 글을 골라도 막대(메모 남기기)를 띄우지 않기 — 메모 칸이 없는 '문서에서 보기' 화면 */
   noTool?: boolean
-}>(), { highlight: null, compact: false, linked: null, removable: false, noteMark: null, noTool: false })
+  /** 문서 제목 · 칩 줄을 숨기기 — 화면 머리에 이미 제목이 있는 '문서에서 보기' */
+  hideHead?: boolean
+}>(), { highlight: null, compact: false, linked: null, removable: false, noteMark: null, noTool: false, hideHead: false })
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
@@ -323,7 +325,7 @@ onBeforeUnmount(() => document.removeEventListener('selectionchange', onSelectio
 
 <template>
   <div ref="root" :class="['reader', { compact }]">
-    <header class="head">
+    <header v-if="!hideHead" class="head">
       <div class="title-row">
         <h2 v-if="compact" class="tx-head" :title="doc.title">{{ doc.title }}</h2>
         <h1 v-else class="tx-title">{{ doc.title }}</h1>
