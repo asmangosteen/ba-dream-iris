@@ -8,7 +8,8 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
  * 문서 수정 기록(새 5): 누가 언제 무엇을 바꿨는지 목록 + 고른 기록의 바뀐 부분 + 그때로 되돌리기.
  * 기록엔 바뀐 블록만 남아 있어요(용량 절약). 되돌리기는 지금 글에서 그 뒤 기록들을 거꾸로 풀어 만들어요.
  */
-const props = defineProps<{ projectId: string; doc: DocRow; canRestore: boolean }>()
+/** hideHead: 위 막대(History · ✕) 빼기 — 위에 '기록' 세그먼트가 이미 있는 '문서에서 보기' 오른쪽 패널(좁은 칸) */
+const props = defineProps<{ projectId: string; doc: DocRow; canRestore: boolean; hideHead?: boolean }>()
 const emit = defineEmits<{ close: []; restore: [blocks: DocBlock[], label: string] }>()
 
 const history = useDocHistory(props.projectId, () => props.doc.id)
@@ -93,9 +94,9 @@ function restore(before = false) {
 </script>
 
 <template>
-  <div class="hist">
+  <div :class="['hist', { narrow: hideHead }]">
     <!-- 위 막대: 고치기 화면 위 막대와 같은 규격(높이 44 · 좌우 24 · 아래 선, 스크롤해도 위에) -->
-    <div class="hh">
+    <div v-if="!hideHead" class="hh">
       <span class="tx-head">{{ tr('History') }}</span>
       <span class="f1" />
       <button type="button" class="sq ib s" :aria-label="tr('Close history')" :data-tip="tr('Close history')" @click="emit('close')"><EditorIcon name="close" :size="16" /></button>
@@ -126,7 +127,7 @@ function restore(before = false) {
             <Button v-if="canRestore && cur.id !== list[0]?.id" size="s" type="tertiary" stroke @click="restore(false)">{{ tr('Restore this version') }}</Button>
           </span>
         </div>
-        <span class="legend tx-meta"><i class="sw add" />{{ tr('Added') }}<i class="sw del" />{{ tr('Removed') }}</span>
+        <span class="legend tx-meta"><i class="sqc sw add" />{{ tr('Added') }}<i class="sqc sw del" />{{ tr('Removed') }}</span>
         <div v-for="v in views" :key="v.id" class="vb">
           <span :class="['sq', 'chip', v.badge]">{{ v.badge === 'add' ? tr('New') : v.badge === 'del' ? tr('Removed') : tr('Edited') }}</span>
           <table v-if="v.type === 'table'" class="dtbl">
@@ -167,7 +168,11 @@ function restore(before = false) {
 .chip.edit { color: #454C58; --sq-fill: #F1F2F3; }
 .chip.del { color: #9B1C1C; --sq-fill: #FDE2E1; }
 .diff { display: flex; flex-direction: column; gap: var(--ref-spacing-06); padding-top: var(--ref-spacing-08); box-shadow: 0 -1px 0 var(--iris-line); }
-.dh { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); }
+.dh { display: flex; align-items: flex-start; gap: var(--ref-spacing-06); flex-wrap: wrap; }
+/* 좁은 칸(문서에서 보기 오른쪽 패널): 되돌리기 버튼은 제목 아래 줄로, 목록은 안쪽 스크롤 없이 패널 스크롤 하나로 */
+.hist.narrow .dcol { flex-basis: 100%; }
+.hist.narrow .dacts { flex-wrap: wrap; }
+.hist.narrow .items { max-height: none; overflow: visible; }
 .dacts { display: flex; gap: var(--ref-spacing-04); flex: none; }
 .dcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dcol b { font-weight: 600; }

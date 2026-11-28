@@ -180,6 +180,38 @@ const MALL_MD = `# 착한구독 상세 기획서
 `
 const MALL_BLOCKS: DocBlock[] = parseMarkdown(MALL_MD).map((x, i) => ({ ...x, id: 'mb' + i }))
 const MALL = analyzeDoc(MALL_BLOCKS)
+/**
+ * 미리보기 기록(착한구독 상세 기획서) — 기록 화면이 어떻게 뜨는지 경우별로 보이게(2026-11-28):
+ * 문단 지우기 + 요청사항 줄 고치기 · 요청사항 줄 지우기 · 되돌리기 · 화면 줄 여러 개 더하기 · 요청사항 줄 더하기.
+ * 지금 문서에서 거꾸로 버전을 만들고 그 사이 차이(diffBlocks)로 기록을 만들어서 [되돌리기]도 실제로 맞게 동작해요
+ */
+function mallHistory(): DocHistoryRow[] {
+  const clone = (bs: DocBlock[]): DocBlock[] => JSON.parse(JSON.stringify(bs))
+  const cur = clone(MALL_BLOCKS)
+  const pIdx = cur.findIndex((b) => b.type === 'table' && /요청|정책/.test(b.rows?.[0]?.[1] ?? ''))
+  const sIdx = cur.findIndex((b) => b.type === 'table' && (b.rows?.[0]?.[1] ?? '') === '화면')
+  const dropRows = (bs: DocBlock[], idx: number, pred: (r: string[]) => boolean) => { const c = clone(bs); c[idx]!.rows = (c[idx]!.rows ?? []).filter((r, i) => i === 0 || !pred(r)); return c }
+  const v5 = dropRows(cur, pIdx, (r) => r[0] === 'P-PAY-01')
+  const v4 = dropRows(v5, sIdx, (r) => /^(C-07|A-01|S-01|N-01|CMP-01)$/.test(r[0] ?? ''))
+  const v2 = clone(v4)
+  const v3 = dropRows(v2, pIdx, (r) => r[0] === 'P-DOC-02')
+  const v1 = clone(v2)
+  const pln = v1[pIdx]!.rows!.find((r) => r[0] === 'P-PLN-01')
+  if (pln) pln[2] = '요금제는 12 · 24개월 두 가지'
+  v1.splice(pIdx + 1, 0, { id: 'mb-old-note', type: 'p', text: '결제는 매월 5일 자동으로 나간다' } as DocBlock)
+  const at = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
+  const mk = (id: string, author: string, before: DocBlock[], after: DocBlock[], h: number, note?: string): DocHistoryRow => {
+    const d = diffBlocks(before, after)
+    return { id, document_id: 'd6', project_id: 'preview-1', author_id: author, changes: d.changes, summary: note ? [note, ...d.summary] : d.summary, snapshot: null, created_at: at(h) }
+  }
+  return [
+    mk('h-5', 'preview-me', v5, cur, 0.4),
+    mk('h-4', 'preview-2', v4, v5, 3),
+    mk('h-3', 'preview-me', v3, v4, 26, 'Restored to before this change'),
+    mk('h-2', 'preview-3', v2, v3, 27),
+    mk('h-1', 'preview-2', v1, v2, 52),
+  ]
+}
 PREVIEW_DOCS.unshift({ id: 'd6', title: '착한구독 상세 기획서', category: 'planning', source_type: 'native', file_path: null, file_type: null, url: null, fetch_status: null, version_label: 'v1.0', updated_at: ago(20), plain_text: null, content_blocks: MALL_BLOCKS, abbr: MALL.abbr, status: 'draft', check_result: toCheckResult(MALL) })
 
 const r = (id: string, doc: string, code: string, title: string, block: string | null, priority: ReqPriority | null, origin: ReqRow['origin'] = 'auto_pattern'): Omit<ReqRow, 'project_id'> =>
@@ -280,7 +312,7 @@ function previewStore() {
     slots: useState<Omit<SlotRow, 'project_id'>[]>('pv-slots', () => structuredClone(PREVIEW_SLOTS)),
     /** 미리보기 화면 → 화면 칸 { 화면 id: { slot, state } } */
     screenSlots: useState<Record<string, { slot: string | null; state: string | null }>>('pv-screen-slots', () => ({ 'sc-4': { slot: 'ms-C-04', state: null }, 'sc-5': { slot: 'ms-C-05', state: null }, 'sc-9': { slot: 'ms-C-07', state: null }, 'sc-10': { slot: 'ms-A-01', state: null }, 'sc-13': { slot: 'ms-S-01', state: null }, 'sc-11': { slot: 'ms-N-01', state: null }, 'sc-12': { slot: 'ms-CMP-01', state: null } })),
-    history: useState<DocHistoryRow[]>('pv-doc-history', () => []),
+    history: useState<DocHistoryRow[]>('pv-doc-history', () => mallHistory()),
   }
 }
 

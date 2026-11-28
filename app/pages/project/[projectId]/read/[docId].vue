@@ -8,6 +8,9 @@ import ScreenThumb from '~/components/editor/ScreenThumb.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
 import StatusIcon from '~/components/StatusIcon.vue'
 import DocNotes, { type DocAnchor } from '~/components/docs/DocNotes.vue'
+import DocHistory from '~/components/docs/DocHistory.vue'
+import AppConfirm from '~/components/app/AppConfirm.vue'
+import type { DocBlock, DocRow, ReqRow } from '~/composables/useIrisData'
 import { scrollToDocAnchor } from '~/components/docs/DocReader.vue'
 
 /**
@@ -85,7 +88,7 @@ const who = (id: string) => { const m = (members.data.value ?? []).find((x) => x
 
 // 메모 · 댓글(함께 보기와 같은 부품 — 사용자 요청 2026-11-28) -----------------------------
 /** 오른쪽 패널: 요청사항 · 메모 */
-const pane = ref<'request' | 'notes'>('request')
+const pane = ref<'request' | 'notes' | 'history'>('request')
 const activeNote = ref<string | null>(null)
 const noteDraft = ref<DocAnchor | null>(null)
 const noteThread = computed(() => comments.docThreads(docId.value).find((t) => t.root.id === activeNote.value) ?? null)
@@ -109,6 +112,61 @@ const notice = ref('')
 let noticeT: ReturnType<typeof setTimeout> | undefined
 function say(t: string) { notice.value = t; clearTimeout(noticeT); noticeT = setTimeout(() => { notice.value = '' }, 3000) }
 onBeforeUnmount(() => clearTimeout(noticeT))
+
+// 기록 · 지우기(함께 보기와 같은 동작) -----------------------------------------------
+const { syncDocFormat, addHistory } = useIrisMutations()
+/** 기록에서 [되돌리기]: 그때 글로 저장하고, 되돌린 것도 기록으로 남겨요 */
+async function restoreDoc(blocks: DocBlock[], label: string) {
+  const d = doc.value
+  if (!d) return
+  const plain = blocks.map((b) => b.text).join('\n') || null
+  try {
+    if (preview) {
+      const store = useState<Omit<DocRow, 'project_id'>[]>('pv-docs')
+      const i = store.value?.findIndex((x) => x.id === d.id) ?? -1
+      if (i >= 0) store.value[i] = { ...store.value[i]!, content_blocks: blocks, plain_text: plain, updated_at: new Date().toISOString() }
+    } else {
+      const { error } = await supabase.from('documents').update({ content_blocks: blocks, plain_text: plain }).eq('id', d.id)
+      if (error) throw error
+    }
+    await syncDocFormat(projectId, d.id, analyzeDoc(blocks), { reqs: reqs.data.value ?? [], slots: slots.data.value ?? [], screens: screens.data.value ?? [], links: links.data.value ?? [] }).catch(() => null)
+    await addHistory(projectId, d.id, d.content_blocks ?? [], blocks, label).catch(() => null)
+    await refreshNuxtData([`docs-${projectId}`, `reqs-${projectId}`, `links-${projectId}`, `slots-${projectId}`, `doc-history-${projectId}`])
+    say(tr('Restored'))
+  } catch { say(tr("Couldn't restore. Try again in a moment.")) }
+}
+/** 문서 지우기: 공용 확인 창(AppConfirm) → 지우고 프로젝트 첫 화면으로 */
+const confirmDel = ref(false)
+const deleting = ref(false)
+async function removeDoc() {
+  const d = doc.value
+  if (!d || deleting.value) return
+  deleting.value = true
+  try {
+    if (preview) {
+      const docsStore = useState<Omit<DocRow, 'project_id'>[]>('pv-docs')
+      const reqStore = useState<Omit<ReqRow, 'project_id'>[]>('pv-reqs')
+      const linkStore = useState<LinkRow[]>('pv-links')
+      const ids = new Set((reqStore.value ?? []).filter((r) => r.document_id === d.id).map((r) => r.id))
+      if (docsStore.value) docsStore.value = docsStore.value.filter((x) => x.id !== d.id)
+      if (reqStore.value) reqStore.value = reqStore.value.filter((r) => r.document_id !== d.id)
+      if (linkStore.value) linkStore.value = linkStore.value.filter((l) => !ids.has(l.requirement_id))
+    } else {
+      // 요청사항 · 화면 연결은 DB 에서 같이 지워져요(cascade)
+      const { error } = await supabase.from('documents').delete().eq('id', d.id)
+      if (error) throw error
+      if (d.source_type === 'upload' && d.file_path) await supabase.storage.from('documents').remove([d.file_path]).catch(() => null)
+    }
+  } catch {
+    deleting.value = false
+    say(tr("Couldn't delete the document. Try again in a moment."))
+    return
+  }
+  confirmDel.value = false
+  await refreshNuxtData([`docs-${projectId}`, `reqs-${projectId}`, `links-${projectId}`, 'all-docs'])
+  deleting.value = false
+  await navigateTo(`/project/${projectId}`)
+}
 
 /**
  * ← 뒤로: 늘 홈 안에서만(사용자 결정 2026-11-28) — 바로 전 화면이 홈 화면(프로젝트 목록 · 문서 목록 · 프로젝트 첫 화면 · 요청사항 보기)일 때만 그리로,
@@ -147,6 +205,8 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
         <span class="acts">
           <Button size="s" type="tertiary" stroke @click="navigateTo(splitHref)">{{ tr('Open in split view') }}</Button>
           <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="pencil" @click="navigateTo(`/p/${projectId}/docs/${docId}?edit=1`)">{{ tr('Edit') }}</Button>
+          <!-- 지우기: 옅은 빨강 바탕(alpha) + 빨강 글자 -->
+          <Button size="s" type="destructed" class="del-btn" contents="icon-text" icon-name="trashbin" @click="confirmDel = true">{{ tr('Delete') }}</Button>
         </span>
       </div>
       <div v-ovscroll class="body">
@@ -167,9 +227,10 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
     <aside class="sq card side" :aria-label="pane === 'notes' ? tr('Notes') : tr('Request details')">
       <!-- 요청사항 · 메모: 세그먼트 컨트롤 -->
       <div class="pane-top">
-        <div class="sq segc" role="radiogroup" :aria-label="tr('Side panel')" style="grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%">
+        <div class="sq segc" role="radiogroup" :aria-label="tr('Side panel')" style="grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%">
           <button type="button" role="radio" :aria-checked="pane === 'request'" :class="['sq', 'segc-i', { on: pane === 'request' }]" @click="pane = 'request'">{{ tr('Request') }}</button>
-          <button type="button" role="radio" :aria-checked="pane === 'notes'" :class="['sq', 'segc-i', { on: pane === 'notes' }]" @click="pane = 'notes'"><span>{{ tr('Notes') }}</span><span v-if="noteCount" class="n num">{{ noteCount }}</span></button>
+          <button type="button" role="radio" :aria-checked="pane === 'notes'" :class="['sq', 'segc-i', { on: pane === 'notes' }]" @click="pane = 'notes'"><span v-if="pane === 'history'" class="segc-sep" aria-hidden="true" /><span>{{ tr('Notes') }}</span><span v-if="noteCount" class="n num">{{ noteCount }}</span></button>
+          <button type="button" role="radio" :aria-checked="pane === 'history'" :class="['sq', 'segc-i', { on: pane === 'history' }]" @click="pane = 'history'"><span v-if="pane === 'request'" class="segc-sep" aria-hidden="true" />{{ tr('History') }}</button>
         </div>
       </div>
       <!-- 스크롤은 카드 안쪽 칸에서(카드 자체를 스크롤 칸으로 쓰면 squircle 테두리 층 1px 때문에 넘칠 게 없어도 스크롤바가 떠요) -->
@@ -199,11 +260,23 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
       </template>
       <p v-else class="tx-meta m0">{{ tr('Choose a request ID in the document to see its screens') }}</p>
       </div>
+      <div v-if="pane === 'history' && doc" v-ovscroll class="side-sc">
+        <DocHistory :project-id="projectId" :doc="doc" :can-restore="doc.source_type === 'native' || !!doc.content_blocks?.length" hide-head @restore="restoreDoc" />
+      </div>
       <div v-show="pane === 'notes'" v-ovscroll class="side-sc notes-sc">
         <DocNotes v-if="doc" v-model:active="activeNote" v-model:draft="noteDraft" part="notes" hide-head :project-id="projectId" :doc="doc" :reqs="docReqs" :links="docLinks" :screens="screens.data.value ?? []" @go="goAnchor" @toast="say" @close="pane = 'request'" />
       </div>
     </aside>
     </div>
+    <!-- 문서 지우기 확인: 공용 AppConfirm(함께 보기 '문서 지우기'와 같은 문구) -->
+    <AppConfirm
+      v-if="confirmDel && doc"
+      :title="tr('Delete “{name}”?', { name: doc.title })"
+      :desc="tr('Its requests and screen links will be deleted too. This can’t be undone.')"
+      :closable="!deleting"
+      :actions="[{ label: tr('Cancel'), onClick: () => (confirmDel = false) }, { label: tr('Delete'), kind: 'destructed', loading: deleting, onClick: removeDoc }]"
+      @close="confirmDel = false"
+    />
     <div class="toast-wrap" role="status" aria-live="polite"><Transition name="toast"><p v-if="notice" class="sq toast">{{ notice }}</p></Transition></div>
     <AccessGate :project-id="projectId" :project-name="project?.name" />
   </div>
@@ -234,6 +307,8 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .dh-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dh-chips { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); }
 .acts { flex: none; display: inline-flex; align-items: center; gap: var(--ref-spacing-04); }
+/* 지우기 버튼: DS 빨강(destructed) 바탕을 옅은 빨강(alpha 10%)으로, 글자 · 아이콘은 빨강 */
+.del-btn { --bd-btn-bg: color-mix(in srgb, var(--sys-color-theme-destructed-default) 10%, transparent) !important; --bd-btn-fg: var(--sys-color-theme-destructed-default) !important; }
 /* 문서 칩(DocReader .dchip 과 같아요) */
 .dchip { height: 20px; display: inline-flex; align-items: center; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 600; color: var(--sys-color-neutral-700); --sq-fill: var(--sys-color-neutral-100); }
 .dchip.abbr { color: var(--sys-color-neutral-800); --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
