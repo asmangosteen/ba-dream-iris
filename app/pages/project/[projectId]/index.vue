@@ -28,7 +28,9 @@ const access = useProjectAccess(projectId)
 const view = computed<'overview' | 'requests'>(() => (route.query.view === 'requests' ? 'requests' : 'overview'))
 function setView(v: 'overview' | 'requests') { navigateTo({ query: { ...route.query, view: v === 'overview' ? undefined : v } }) }
 /** 제목 왼쪽 ←: 요청사항 보기면 개요로, 개요면 홈 프로젝트 목록으로 */
-function goBack() { if (view.value === 'requests') setView('overview'); else navigateTo('/') }
+/** ← : 요청사항 보기 → 개요, 개요 → 들어온 홈 목록(프로젝트 목록 · 문서 목록) */
+const homeBack = useHomeBack(projectId)
+function goBack() { if (view.value === 'requests') homeBack.fromRequests(); else homeBack.fromOverview() }
 
 // 캔버스: 페이지 + 화면(썸네일용 레이어까지) ------------------------------------
 const supabase = useSupabaseClient()
@@ -95,7 +97,7 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 <template>
   <div class="ov">
     <!-- 머리 줄: 공용 ProjectHead(개요 · 요청사항 · 문서에서 보기가 같은 모양) -->
-    <ProjectHead :project-id="projectId" :section="view === 'requests' ? tr('Requests') : null" :back-label="view === 'requests' ? tr('Back to overview') : tr('Back to home')" @back="goBack" />
+    <ProjectHead :project-id="projectId" :section="view === 'requests' ? tr('Requests') : null" :back-label="view === 'requests' ? tr('Back to overview') : tr('Back')" @back="goBack" />
 
     <!-- 요청사항 탭 -->
     <RequestsBoard v-if="view === 'requests'" :project-id="projectId" class="ov-board" />

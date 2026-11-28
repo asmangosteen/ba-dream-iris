@@ -172,13 +172,8 @@ async function removeDoc() {
  * ← 뒤로: 늘 홈 안에서만(사용자 결정 2026-11-28) — 바로 전 화면이 홈 화면(프로젝트 목록 · 문서 목록 · 프로젝트 첫 화면 · 요청사항 보기)일 때만 그리로,
  * 캔버스 · 함께 보기 같은 프로젝트 탭 화면에서 왔거나 주소로 바로 열었으면 이 프로젝트 첫 화면으로
  */
-function goBack() {
-  const prev = import.meta.client ? (window.history.state?.back as string | null | undefined) : null
-  const path = prev?.split(/[?#]/)[0] ?? ''
-  const homeLike = path === '/' || path === '/documents' || path.startsWith('/project/')
-  if (prev && homeLike) router.back()
-  else navigateTo(`/project/${projectId}`)
-}
+const homeBack = useHomeBack(projectId)
+function goBack() { homeBack.fromRead() }
 const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.value ? `?req=${encodeURIComponent(reqId.value)}` : ''))
 </script>
 
