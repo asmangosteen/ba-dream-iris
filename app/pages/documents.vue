@@ -6,7 +6,7 @@ import EditorIcon from '~/components/editor/EditorIcon.vue'
 
 /**
  * 홈 '문서' 메뉴(4단계 시안 3 — 2026-11-28): 올려 둔 문서를 프로젝트별로 묶어 표로. 예전 홈 '정책(요청사항)' 메뉴 자리 —
- * 요청사항 보드는 프로젝트 첫 화면의 요청사항 탭으로 옮겼어요. 문서를 누르면 그 문서의 함께 보기, [Open project] 는 프로젝트 첫 화면
+ * 요청사항 보드는 프로젝트 첫 화면의 요청사항 보기로 옮겼어요. 문서를 누르면 캔버스 없이 문서만 보는 '문서에서 보기', [Open project] 는 프로젝트 첫 화면
  */
 const { data: projects } = useProjects()
 const { data: access } = useMyProjectRoles()
@@ -41,12 +41,15 @@ const warnCount = (d: DocListRow) => d.check_result?.warnings?.length ?? 0
       <div class="head">
         <h1 class="ttl">{{ tr('Documents') }}</h1>
         <span v-if="docs.status.value === 'success'" class="tx-meta">{{ tr('{n} in {p} projects', { n: total, p: groups.length }) }}</span>
-        <span class="f1" />
-        <div class="sq segc" role="radiogroup" :aria-label="tr('Filter by type')" :style="{ gridTemplateColumns: `repeat(${CATS.length}, minmax(0, 1fr))`, width: '420px' }">
+      </div>
+      <!-- 제목 아래: 종류 세그먼트(요청사항 보기와 같은 모양) · 검색 -->
+      <div class="tools">
+        <div class="sq segc" role="radiogroup" :aria-label="tr('Filter by type')" :style="{ gridTemplateColumns: `repeat(${CATS.length}, minmax(0, 1fr))`, width: '520px' }">
           <button v-for="(k, i) in CATS" :key="k" type="button" role="radio" :aria-checked="cat === k" :class="['sq', 'segc-i', { on: cat === k }]" @click="cat = k">
-            <span v-if="segLine(i)" class="segc-sep" aria-hidden="true" />{{ tr(catLabel(k)) }}
+            <span v-if="segLine(i)" class="segc-sep" aria-hidden="true" /><span>{{ tr(catLabel(k)) }}</span>
           </button>
         </div>
+        <span class="f1" />
         <SearchField v-model:value="query" class="search" type="contained" size="s" :placeholder="tr('Search documents')" :input-props="{ 'aria-label': tr('Search documents') }" />
       </div>
 
@@ -66,7 +69,7 @@ const warnCount = (d: DocListRow) => d.check_result?.warnings?.length ?? 0
             <h2 class="tx-head">{{ g.p.name }}</h2>
             <span class="tx-meta">{{ g.docs.length === 1 ? tr('1 document') : tr('{n} documents', { n: g.docs.length }) }}</span>
             <span class="f1" />
-            <NuxtLink :to="`/p/${g.p.id}/overview`" class="lnk">{{ tr('Open project') }}</NuxtLink>
+            <NuxtLink :to="`/project/${g.p.id}`" class="lnk">{{ tr('Open project') }}</NuxtLink>
           </div>
           <div class="table-wrap"><table class="dtable">
             <thead>
@@ -80,7 +83,7 @@ const warnCount = (d: DocListRow) => d.check_result?.warnings?.length ?? 0
               </tr>
             </thead>
             <tbody>
-              <tr v-for="d in g.docs" :key="d.id" tabindex="0" @click="navigateTo(`/p/${g.p.id}/docs/${d.id}`)" @keydown.enter.prevent="navigateTo(`/p/${g.p.id}/docs/${d.id}`)">
+              <tr v-for="d in g.docs" :key="d.id" tabindex="0" @click="navigateTo(`/project/${g.p.id}/read/${d.id}`)" @keydown.enter.prevent="navigateTo(`/project/${g.p.id}/read/${d.id}`)">
                 <td>
                   <span class="dname">
                     <EditorIcon :name="docIcon(d)" :size="16" class="dic" />
@@ -109,6 +112,8 @@ const warnCount = (d: DocListRow) => d.check_result?.warnings?.length ?? 0
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
 .f1 { flex: 1; }
 .search { width: 220px; }
+/* 페이지 공통: 제목 → 거르기 줄 12, 거르기 줄 → 내용 16 */
+.tools { display: flex; align-items: center; gap: var(--ref-spacing-08); margin: var(--ref-spacing-08) 0 0; flex-wrap: wrap; }
 .list { display: flex; flex-direction: column; gap: var(--ref-spacing-12); margin-top: var(--ref-spacing-10); }
 .pgrp { display: flex; flex-direction: column; gap: var(--ref-spacing-04); }
 .gh { display: flex; align-items: center; gap: var(--ref-spacing-04); padding: 0 var(--ref-spacing-02); }

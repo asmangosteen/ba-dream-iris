@@ -956,8 +956,8 @@ async function removeDoc() {
         <div v-if="homeOpen" class="sq menu pmenu" role="menu" @click="homeOpen = false">
           <NuxtLink :to="backHref" class="sq menu-item" role="menuitem">{{ tr('Back to editor') }}</NuxtLink>
           <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
-          <NuxtLink :to="`/p/${projectId}/overview`" class="sq menu-item" role="menuitem">{{ tr('Project overview') }}</NuxtLink>
-          <NuxtLink :to="`/p/${projectId}/overview?view=requests`" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
+          <NuxtLink :to="`/project/${projectId}`" class="sq menu-item" role="menuitem">{{ tr('Project overview') }}</NuxtLink>
+          <NuxtLink :to="`/project/${projectId}?view=requests`" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
           <div class="msep" role="separator" />
           <ThemeSwitch compact />
           <LangSwitch />
@@ -1125,7 +1125,7 @@ async function removeDoc() {
                 {{ tr('No longer in the document:') }}
                 <button v-for="r in goneReqs" :key="r.id" type="button" class="sq code num" :aria-pressed="activeReq === r.id" @click="pickReq(r.id)">{{ r.code }}</button>
               </span>
-              <span class="tx-meta">{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/p/${projectId}/overview?view=requests`" class="lnk">{{ tr('Requests') }}</NuxtLink>{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
+              <span class="tx-meta">{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[0] }}<NuxtLink :to="`/project/${projectId}?view=requests`" class="lnk">{{ tr('Requests') }}</NuxtLink>{{ tr('These requests and their screen links were kept. Clean up any you don’t need in {link}.').split('{link}')[1] }}</span>
             </span>
             <button type="button" class="ib s" :aria-label="tr('Dismiss')" @click="gone = []"><EditorIcon name="close" :size="14" /></button>
           </div>

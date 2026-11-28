@@ -442,8 +442,8 @@ section:not(:hover):not(:focus-within) .styl-w:not(:has(.open)){opacity:0}
 
 /* 세그먼트 컨트롤(4단계 시안 — 프로젝트 첫 화면 · 요청사항 탭): 바탕 neutral-200 · 높이 32 · 안쪽 2, 칸은 같은 너비(grid-template-columns 는 쓰는 곳에서),
    고른 칸만 흰 바탕 + 옅은 그림자, 안 고른 칸끼리 사이엔 얇은 구분선(.line). 탭 칩(.seg)과 따로예요 */
-.segc { display: grid; align-items: center; width: min(600px, 100%); height: 32px; padding: 2px; box-sizing: border-box; border-radius: var(--ref-radius-04); --sq-fill: var(--sys-color-neutral-200); }
-.segc-i { position: relative; height: 28px; display: inline-flex; align-items: center; justify-content: center; gap: var(--ref-spacing-03); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap; min-width: 0; transition: color .12s ease; }
+.segc { display: grid; align-items: center; width: min(600px, 100%); height: 32px; padding: 2px; box-sizing: border-box; border-radius: var(--ref-radius-05); --sq-fill: var(--sys-color-neutral-200); }
+.segc-i { position: relative; height: 28px; display: inline-flex; align-items: center; justify-content: center; gap: var(--ref-spacing-03); padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-04); font-size: 12px; font-weight: 500; color: var(--sys-color-neutral-600); white-space: nowrap; min-width: 0; transition: color .12s ease; }
 .segc-i .n { font-size: 11px; color: var(--sys-color-neutral-500); }
 .segc-i:hover:not(.on) { color: var(--sys-color-neutral-800); }
 .segc-i.on { --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line); --sq-line-w: 0.5px; filter: drop-shadow(0 1px 1px rgb(3 9 26 / 8%)); color: var(--sys-color-neutral-800); font-weight: 600; }

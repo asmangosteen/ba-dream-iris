@@ -35,6 +35,8 @@ const KEY = 'iris-tabs'
 export const MAX_PINNED = 5
 export const MAX_TABS = 20
 const HOME_PATHS = ['/', '/documents']
+/** 홈 탭 화면: 프로젝트 목록 · 문서 + 프로젝트 첫 화면(/project/<id> — 캔버스를 열기 전까지는 홈이에요, 2026-11-28) */
+const isHomePath = (path: string) => HOME_PATHS.includes(path) || path.startsWith('/project/')
 /** 새 탭(New file) — 탭 id 와 주소 */
 export const NEW_TAB_ID = 'new'
 export const NEW_TAB_PATH = '/new'
@@ -46,7 +48,7 @@ export function tabIdOf(path: string): string | null {
   return m ? decodeURIComponent(m[1]!) : null
 }
 /** 탭 막대를 보여 줄 화면: 홈 화면들 + 새 탭 + 프로젝트 화면(로그인 · 환영 · 확인 화면은 빼요) */
-export const showsTabs = (path: string) => HOME_PATHS.includes(path) || !!tabIdOf(path)
+export const showsTabs = (path: string) => isHomePath(path) || !!tabIdOf(path)
 
 export function useTabs() {
   const tabs = useState<ProjectTab[]>('iris-tabs', () => [])
@@ -71,7 +73,7 @@ export function useTabs() {
         const ids = new Set(stored.map((t) => t.id))
         tabs.value = [...stored, ...tabs.value.filter((t) => !ids.has(t.id))]
       }
-      if (raw?.home && HOME_PATHS.includes(raw.home)) homePath.value = raw.home
+      if (raw?.home && isHomePath(raw.home)) homePath.value = raw.home
     } catch { /* 저장된 값이 깨졌으면 빈 탭으로 시작 */ }
   }
   function save() {
@@ -98,7 +100,7 @@ export function useTabs() {
         }
         tabs.value = next
       }
-    } else if (HOME_PATHS.includes(path)) homePath.value = path
+    } else if (isHomePath(path)) homePath.value = path
     save()
   }
 

@@ -127,7 +127,7 @@ function select(id: string) {
   unlinking.value = null
 }
 const splitHref = (r: ReqRow) => `/p/${projectId}/docs/${encodeURIComponent(r.document_id)}?req=${encodeURIComponent(r.id)}`
-const readHref = (r: ReqRow) => `/p/${projectId}/read/${encodeURIComponent(r.document_id)}?req=${encodeURIComponent(r.id)}`
+const readHref = (r: ReqRow) => `/project/${projectId}/read/${encodeURIComponent(r.document_id)}?req=${encodeURIComponent(r.id)}`
 
 const saving = ref(false)
 const saveError = ref(false)

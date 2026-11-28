@@ -227,4 +227,6 @@ export default {
   'Requests · slots': '요청사항 · 칸',
   'Updated': '수정',
   'Layer': '레이어',
+  'Back': '뒤로',
+  'Back to overview': '개요로',
 } satisfies Record<string, string>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Skeleton } from '@ba-dream/design-system'
+import { Skeleton } from '@ba-dream/design-system'
 import type { DocCategory, DocRow } from '~/composables/useIrisData'
 import { DOC_CATEGORY_LABEL, DOC_SOURCE_TIP, docIcon } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
@@ -10,13 +10,14 @@ import RequestsBoard from '~/components/project/RequestsBoard.vue'
 import PageThumb, { type ThumbScreen } from '~/components/project/PageThumb.vue'
 
 /**
- * 프로젝트 첫 화면(4단계 시안 1 · 2 — 2026-11-28): 홈에서 프로젝트를 누르면 캔버스 대신 여기로.
- * [Overview] 캔버스 페이지 썸네일 · 요청사항 반영 진행도 · 문서 목록 / [Requests] 프로젝트 요청사항 탭(예전 홈 정책 보드).
- * [Open canvas] 로 편집기, 문서를 누르면 함께 보기
+ * 프로젝트 첫 화면(4단계 시안 1 · 2 — 2026-11-28): 홈에서 프로젝트를 누르면 캔버스 대신 여기로. 아직 홈 탭 화면이에요(/project/<id>) —
+ * 캔버스 · 함께 보기를 열어야 위에 프로젝트 탭이 생겨요. 제목 왼쪽 ← 는 홈(요청사항 보기에선 개요)으로.
+ * 개요: 캔버스 페이지 썸네일 · 요청사항 반영 진행도([View details] → 요청사항 보기 ?view=requests) · 문서 목록([Add document]).
+ * 문서를 누르면 캔버스 없이 문서만 보는 '문서에서 보기'(/project/<id>/read/<doc>) — 거기서 [함께 보기로 열기]로 캔버스까지
  */
 const route = useRoute()
 const projectId = route.params.projectId as string
-definePageMeta({ key: (r) => `overview-${String(r.params.projectId)}` })
+definePageMeta({ key: (r) => `project-${String(r.params.projectId)}` })
 
 const { data: projects } = useProjects()
 const project = computed(() => projects.value?.find((p) => p.id === projectId) ?? null)
@@ -24,10 +25,11 @@ useHead({ title: () => (project.value?.name ? `${project.value.name} · Iris` : 
 const access = useProjectAccess(projectId)
 const people = computed(() => access.members.value.slice(0, 5))
 
-/** 개요 · 요청사항(주소 ?view=requests 로 기억 — 뒤로 가기 · 새로 고침에도 그대로) */
+/** 개요 · 요청사항(주소 ?view=requests — 뒤로 가기 · 새로 고침에도 그대로) */
 const view = computed<'overview' | 'requests'>(() => (route.query.view === 'requests' ? 'requests' : 'overview'))
-const VIEWS = [{ key: 'overview', label: 'Overview' }, { key: 'requests', label: 'Requests' }] as const
-function setView(v: 'overview' | 'requests') { navigateTo({ query: { ...route.query, view: v === 'overview' ? undefined : v } }, { replace: true }) }
+function setView(v: 'overview' | 'requests') { navigateTo({ query: { ...route.query, view: v === 'overview' ? undefined : v } }) }
+/** 제목 왼쪽 ←: 요청사항 보기면 개요로, 개요면 홈 프로젝트 목록으로 */
+function goBack() { if (view.value === 'requests') setView('overview'); else navigateTo('/') }
 
 // 캔버스: 페이지 + 화면(썸네일용 레이어까지) ------------------------------------
 const supabase = useSupabaseClient()
@@ -88,29 +90,22 @@ function docSub(d: DocRow) {
 const warnCount = (d: DocRow) => d.check_result?.warnings?.length ?? 0
 
 const addOpen = ref(false)
-function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/docs/${id}`) }
+function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${projectId}/read/${id}`) }
 </script>
 
 <template>
   <div class="ov">
     <header class="ov-head">
+      <button type="button" class="sq back" :aria-label="view === 'requests' ? tr('Back to overview') : tr('Back to home')" :data-tip="view === 'requests' ? tr('Back to overview') : tr('Back to home')" @click="goBack"><EditorIcon name="chevron_right" :size="20" class="flip" /></button>
       <div class="ttl-col">
         <div class="ttl-row">
-          <h1 class="ttl">{{ project?.name ?? '' }}</h1>
-          <span v-if="project" class="sq chip">{{ statusLabel(project.status) }}</span>
+          <h1 class="ttl">{{ project?.name ?? '' }}<template v-if="view === 'requests'"><span class="crumb-sep" aria-hidden="true">/</span>{{ tr('Requests') }}</template></h1>
         </div>
         <span v-if="project" class="tx-meta">{{ tr('Edited {when}', { when: relativeTime(project.updated_at) }) }}<template v-if="access.members.value.length"> · {{ access.members.value.length === 1 ? tr('1 person') : tr('{n} people', { n: access.members.value.length }) }}</template></span>
       </div>
       <div v-if="people.length" class="people" :aria-label="tr('Members')">
         <MemberAvatar v-for="m in people" :key="m.member_id" :name="m.member?.name || m.member?.email || '?'" :src="m.member?.avatar_url ?? null" :size="24" class="pav" />
       </div>
-      <span class="f1" />
-      <!-- 개요 · 요청사항: 세그먼트 컨트롤(시안) -->
-      <div class="sq segc" role="radiogroup" :aria-label="tr('Project view')" style="grid-template-columns: repeat(2, minmax(0, 1fr)); width: 200px">
-        <button v-for="v in VIEWS" :key="v.key" type="button" role="radio" :aria-checked="view === v.key" :class="['sq', 'segc-i', { on: view === v.key }]" @click="setView(v.key)">{{ tr(v.label) }}</button>
-      </div>
-      <Button size="s" type="tertiary" stroke contents="icon-text" icon-name="plus" @click="addOpen = true">{{ tr('Add document') }}</Button>
-      <Button size="s" type="primary" @click="navigateTo(`/p/${projectId}`)">{{ tr('Open canvas') }}</Button>
     </header>
 
     <!-- 요청사항 탭 -->
@@ -120,12 +115,12 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/
     <div v-else class="ov-grid">
       <section class="sq card canvas-card" :aria-label="tr('Canvas')">
         <div class="card-h">
-          <h2 class="tx-head">{{ tr('Canvas') }}</h2>
+          <h2 class="ctitle">{{ tr('Canvas') }}</h2>
           <span class="f1" />
           <NuxtLink :to="`/p/${projectId}`" class="lnk">{{ tr('Open canvas') }}</NuxtLink>
         </div>
         <div v-if="canvas.status.value === 'pending' && !canvas.data.value.length" class="pages">
-          <Skeleton v-for="i in 2" :key="i" shape="rectangle" height="100%" />
+          <div v-for="i in 2" :key="i" class="sq pthumb-box" />
         </div>
         <div v-else-if="!canvas.data.value.length" class="page-empty"><p class="tx-meta">{{ tr('No pages yet') }}</p></div>
         <div v-else class="pages">
@@ -140,7 +135,7 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/
         <!-- 요청사항: 전체 진행도만(시안) — 자세한 건 [View details] → 요청사항 탭 -->
         <section class="sq card" :aria-label="tr('Requests')">
           <div class="card-h">
-            <h2 class="tx-head">{{ tr('Requests') }}</h2>
+            <h2 class="ctitle">{{ tr('Requests') }}</h2>
             <span class="f1" />
             <button type="button" class="lnk" @click="setView('requests')">{{ tr('View details') }}</button>
           </div>
@@ -153,15 +148,17 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/
 
         <section class="sq card docs-card" :aria-label="tr('Documents')">
           <div class="card-h">
-            <h2 class="tx-head">{{ tr('Documents') }}</h2>
+            <h2 class="ctitle">{{ tr('Documents') }}</h2>
             <span class="tx-meta num">{{ docs.data.value?.length ?? 0 }}</span>
+            <span class="f1" />
+            <button type="button" class="lnk lnk-i" @click="addOpen = true"><EditorIcon name="plus" :size="14" />{{ tr('Add document') }}</button>
           </div>
           <div class="docs-sc">
             <div v-if="docs.status.value === 'pending' && !docs.data.value?.length"><Skeleton shape="text" /><Skeleton shape="text" width="70%" /></div>
             <p v-else-if="!docs.data.value?.length" class="tx-meta m0">{{ tr('No documents yet') }}</p>
             <div v-for="g in docGroups" :key="g.k" class="dgroup">
               <span class="tx-meta glabel">{{ tr(g.label) }}</span>
-              <NuxtLink v-for="d in g.items" :key="d.id" :to="`/p/${projectId}/docs/${d.id}`" class="sq drow">
+              <NuxtLink v-for="d in g.items" :key="d.id" :to="`/project/${projectId}/read/${d.id}`" class="sq drow">
                 <span class="dicon" :title="tr(DOC_SOURCE_TIP[d.source_type])"><EditorIcon :name="docIcon(d)" :size="16" /></span>
                 <span class="dcol">
                   <span class="dtitle"><b class="ellipsis">{{ d.title }}</b><span v-if="d.abbr" class="sq dabbr">{{ d.abbr }}</span></span>
@@ -183,11 +180,16 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/
 <style scoped>
 /* 프로젝트 첫 화면: 탭 막대 아래 회색 바탕 + 흰 카드(시안 1). 안쪽 위 24 · 좌우 32 */
 .ov { height: calc(100vh - var(--iris-tabs-h, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12); padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-14); background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); overflow: hidden; }
-.ov-head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-08); min-width: 0; }
+.ov-head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
+/* 제목 왼쪽 ← (홈 · 개요로): 32 정사각, 올리면 회색 */
+.back { flex: none; width: 32px; height: 32px; display: grid; place-items: center; margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-700); }
+.back:hover { --sq-fill: var(--interaction-light-gray-hover); }
+.back:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
+.flip { transform: rotate(180deg); }
+.crumb-sep { margin: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-400); font-weight: 400; }
 .ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
 .ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
 .people { display: flex; flex: none; margin-left: var(--ref-spacing-04); }
 .pav + .pav { margin-left: -6px; }
 .pav { box-shadow: 0 0 0 2px var(--iris-canvas); border-radius: 50%; }
@@ -203,12 +205,15 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/p/${projectId}/
 .card { min-height: 0; display: flex; flex-direction: column; gap: var(--ref-spacing-08); padding: var(--ref-spacing-12); border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .card-h { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-04); min-height: 22px; }
 .card-h h2 { margin: 0; }
+/* 카드 제목: 편집기 왼쪽 패널 'Pages' 와 같은 12/18 · 600 · neutral-800 */
+.ctitle { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--sys-color-neutral-800); }
+.lnk-i { display: inline-flex; align-items: center; gap: var(--ref-spacing-02); }
 
 /* 캔버스: 페이지 썸네일만(시안) — 두 칸씩, 칸 높이는 카드 높이에 맞춰요 */
 .canvas-card { overflow: hidden; }
-.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(200px, 1fr); gap: var(--ref-spacing-10); overflow: auto; }
-.page { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-height: 0; color: inherit; text-decoration: none; }
-.pthumb-box { position: relative; flex: 1; min-height: 120px; border-radius: var(--ref-radius-06); --sq-fill: var(--iris-canvas); --sq-line: var(--iris-line); --sq-line-w: 1px; transition: --sq-line .12s; }
+.pages { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ref-spacing-10); overflow-x: hidden; overflow-y: auto; }
+.page { display: flex; flex-direction: column; gap: var(--ref-spacing-06); min-width: 0; color: inherit; text-decoration: none; }
+.pthumb-box { position: relative; flex: none; aspect-ratio: 3 / 4; border-radius: var(--ref-radius-06); --sq-fill: var(--iris-canvas); --sq-line: var(--iris-line); --sq-line-w: 1px; transition: --sq-line .12s; }
 .page:hover .pthumb-box { --sq-line: var(--ref-color-gray-900-20); }
 .page:focus-visible { outline: 0; }
 .page:focus-visible .pthumb-box { --sq-line: var(--sys-color-brand-primary-default); --sq-line-w: 1.5px; }

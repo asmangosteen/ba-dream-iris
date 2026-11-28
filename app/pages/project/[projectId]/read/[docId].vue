@@ -9,7 +9,7 @@ import AccessGate from '~/components/project/AccessGate.vue'
 import StatusIcon from '~/components/StatusIcon.vue'
 
 /**
- * 문서에서 보기(4단계 시안 4 — 2026-11-28): 요청사항 탭의 [View in document] 를 누르면 캔버스 없이 문서만 넓게, 그 요청사항 줄로 스크롤 · 청록 강조.
+ * 문서에서 보기(4단계 시안 4 — 2026-11-28, 홈 탭 화면 /project/<id>/read/<doc>): 요청사항 탭의 [View in document] 를 누르면 캔버스 없이 문서만 넓게, 그 요청사항 줄로 스크롤 · 청록 강조.
  * 오른쪽엔 그 요청사항 한눈에(상태 · 문서 안 자리 · 연결된 화면 · 메모). 다른 요청사항 번호를 누르면 그걸로 바뀌어요(주소 ?req= 도 같이)
  */
 const route = useRoute()
@@ -77,7 +77,11 @@ const notes = computed(() => {
 })
 const who = (id: string) => { const m = (members.data.value ?? []).find((x) => x.id === id); return { name: m?.name || m?.email || tr('Former member'), avatar: m?.avatar_url ?? null } }
 
-const backHref = `/p/${projectId}/overview?view=requests`
+/** ← 뒤로: 온 곳으로(요청사항 보기 · 개요 · 홈 문서 목록). 주소로 바로 열었으면 프로젝트 첫 화면 */
+function goBack() {
+  if (import.meta.client && window.history.state?.back) router.back()
+  else navigateTo(`/project/${projectId}`)
+}
 const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.value ? `?req=${encodeURIComponent(reqId.value)}` : ''))
 </script>
 
@@ -85,7 +89,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
   <div class="rd">
     <main class="sq card main">
       <div class="top">
-        <NuxtLink :to="backHref" class="sq back"><EditorIcon name="chevron_right" :size="16" class="flip" />{{ tr('Requests') }}</NuxtLink>
+        <button type="button" class="sq back" @click="goBack"><EditorIcon name="chevron_right" :size="16" class="flip" />{{ tr('Back') }}</button>
         <span class="vsep" aria-hidden="true" />
         <template v-if="doc">
           <b class="dtitle ellipsis">{{ doc.title }}</b>

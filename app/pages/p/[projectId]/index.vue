@@ -2072,8 +2072,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
             <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
             <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
-            <NuxtLink :to="`/p/${projectId}/overview`" class="sq menu-item" role="menuitem">{{ tr('Project overview') }}</NuxtLink>
-            <NuxtLink :to="`/p/${projectId}/overview?view=requests`" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
+            <NuxtLink :to="`/project/${projectId}`" class="sq menu-item" role="menuitem">{{ tr('Project overview') }}</NuxtLink>
+            <NuxtLink :to="`/project/${projectId}?view=requests`" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
             <button class="sq menu-item ks-mi" role="menuitem" @click="shortcutsOpen = true"><span>{{ tr('Keyboard shortcuts') }}</span><span class="mi-key">⌃⇧?</span></button>
             <div class="msep" role="separator" />
             <ThemeSwitch compact />

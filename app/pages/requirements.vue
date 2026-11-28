@@ -5,7 +5,7 @@
  */
 const route = useRoute()
 const p = typeof route.query.p === 'string' ? route.query.p : ''
-await navigateTo(p ? `/p/${encodeURIComponent(p)}/overview?view=requests` : '/documents', { replace: true })
+await navigateTo(p ? `/project/${encodeURIComponent(p)}?view=requests` : '/documents', { replace: true })
 </script>
 
 <template>
