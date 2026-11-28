@@ -2,10 +2,10 @@
 import { Button, Skeleton } from '@ba-dream/design-system'
 import type { LinkRow } from '~/composables/useIrisData'
 import DocReader from '~/components/docs/DocReader.vue'
-import EditorIcon from '~/components/editor/EditorIcon.vue'
 import MemberAvatar from '~/components/app/MemberAvatar.vue'
 import ScreenThumb from '~/components/editor/ScreenThumb.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
+import ProjectHead from '~/components/project/ProjectHead.vue'
 import StatusIcon from '~/components/StatusIcon.vue'
 import DocNotes, { type DocAnchor } from '~/components/docs/DocNotes.vue'
 import DocHistory from '~/components/docs/DocHistory.vue'
@@ -185,12 +185,8 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 <template>
   <div class="rd">
     <!-- 머리 줄: 프로젝트 첫 화면과 같은 홈 머리(제목 왼쪽 ← · 제목 20 · 아래 메타) -->
-    <header class="rd-head">
-      <button type="button" class="sq back" :aria-label="tr('Back')" :data-tip="tr('Back')" @click="goBack"><EditorIcon name="chevron_right" :size="20" class="flip" /></button>
-      <div class="ttl-col">
-        <h1 class="ttl">{{ project?.name ?? '' }}</h1>
-      </div>
-    </header>
+    <!-- 머리 줄: 공용 ProjectHead — '프로젝트 / Documents', ⋮ 프로젝트 설정, 메타(개요 · 요청사항과 같은 높이 · 모양). 문서 이름은 카드 머리에 -->
+    <ProjectHead :project-id="projectId" :section="tr('Documents')" :back-label="tr('Back')" @back="goBack" />
     <div class="rd-row">
     <main class="sq card main">
       <!-- 문서 머리: 카드 전체 너비 — 제목 · 칩은 왼쪽 끝, 버튼은 오른쪽 끝(함께 보기 문서 패널과 같은 좌우 24), 아래 전체 너비 구분선 -->
@@ -287,16 +283,7 @@ const splitHref = computed(() => `/p/${projectId}/docs/${docId.value}` + (reqId.
 .rd { height: calc(100vh - var(--iris-tabs-h, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12); padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-14); background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); }
 .card { border-radius: var(--ref-radius-07); --sq-fill: var(--sys-color-common-white-default); --sq-line: var(--iris-line); --sq-line-w: 1px; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-.rd-head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
 .rd-row { flex: 1; min-height: 0; display: flex; gap: var(--ref-spacing-10); }
-/* 제목 왼쪽 ←: 프로젝트 첫 화면과 같아요(32 정사각, 올리면 회색) */
-.back { flex: none; width: 32px; height: 32px; display: grid; place-items: center; margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-700); }
-.back:hover { --sq-fill: var(--interaction-light-gray-hover); }
-.back:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
-.ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
-.ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flip { transform: rotate(180deg); }
 .ellipsis { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 var(--ref-spacing-04); border-radius: var(--ref-radius-03); font-size: 11px; font-weight: 500; color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-neutral-200); }
 .chip.line { --sq-fill: transparent; --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }

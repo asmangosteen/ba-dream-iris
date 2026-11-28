@@ -3,7 +3,7 @@ import { Skeleton } from '@ba-dream/design-system'
 import type { DocCategory, DocRow } from '~/composables/useIrisData'
 import { DOC_CATEGORY_LABEL, DOC_SOURCE_TIP, docIcon } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
-import ProjectModal from '~/components/project/ProjectModal.vue'
+import ProjectHead from '~/components/project/ProjectHead.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import RequestsBoard from '~/components/project/RequestsBoard.vue'
@@ -89,23 +89,13 @@ function docSub(d: DocRow) {
 const warnCount = (d: DocRow) => d.check_result?.warnings?.length ?? 0
 
 const addOpen = ref(false)
-const settingsOpen = ref(false)
 function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${projectId}/read/${id}`) }
 </script>
 
 <template>
   <div class="ov">
-    <header class="ov-head">
-      <button type="button" class="sq back" :aria-label="view === 'requests' ? tr('Back to overview') : tr('Back to home')" :data-tip="view === 'requests' ? tr('Back to overview') : tr('Back to home')" @click="goBack"><EditorIcon name="chevron_right" :size="20" class="flip" /></button>
-      <div class="ttl-col">
-        <div class="ttl-row">
-          <h1 class="ttl">{{ project?.name ?? '' }}<template v-if="view === 'requests'"><span class="crumb-sep" aria-hidden="true">/</span>{{ tr('Requests') }}</template></h1>
-          <!-- 프로젝트 설정(홈 프로젝트 카드 ⋮ 와 같은 버튼 · 같은 창) -->
-          <button v-if="project" type="button" class="sq more" :aria-label="tr('{name} settings', { name: project.name })" :data-tip="tr('{name} settings', { name: project.name })" @click="settingsOpen = true"><EditorIcon name="menu_kebab" :size="14" /></button>
-        </div>
-        <span v-if="project" class="tx-meta">{{ tr('Edited {when}', { when: relativeTime(project.updated_at) }) }}<template v-if="access.members.value.length"> · {{ access.members.value.length === 1 ? tr('1 person') : tr('{n} people', { n: access.members.value.length }) }}</template></span>
-      </div>
-    </header>
+    <!-- 머리 줄: 공용 ProjectHead(개요 · 요청사항 · 문서에서 보기가 같은 모양) -->
+    <ProjectHead :project-id="projectId" :section="view === 'requests' ? tr('Requests') : null" :back-label="view === 'requests' ? tr('Back to overview') : tr('Back to home')" @back="goBack" />
 
     <!-- 요청사항 탭 -->
     <RequestsBoard v-if="view === 'requests'" :project-id="projectId" class="ov-board" />
@@ -172,7 +162,6 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
     </div>
 
     <AddDocModal v-model:open="addOpen" :project-id="projectId" @created="onDocCreated" />
-    <ProjectModal v-if="settingsOpen" v-model:open="settingsOpen" :project-id="projectId" />
     <AccessGate :project-id="projectId" :project-name="project?.name" />
   </div>
 </template>
@@ -180,20 +169,6 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 <style scoped>
 /* 프로젝트 첫 화면: 탭 막대 아래 회색 바탕 + 흰 카드(시안 1). 안쪽 위 24 · 좌우 32 */
 .ov { height: calc(100vh - var(--iris-tabs-h, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--ref-spacing-12); padding: var(--ref-spacing-12) var(--ref-spacing-14) var(--ref-spacing-14); background: var(--iris-canvas); font-size: 12px; line-height: 18px; color: var(--sys-color-neutral-800); overflow: hidden; }
-.ov-head { flex: none; display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
-/* 제목 왼쪽 ← (홈 · 개요로): 32 정사각, 올리면 회색 */
-.back { flex: none; width: 32px; height: 32px; display: grid; place-items: center; margin-left: calc(-1 * var(--ref-spacing-04)); border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-700); }
-.back:hover { --sq-fill: var(--interaction-light-gray-hover); }
-.back:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
-.flip { transform: rotate(180deg); }
-.crumb-sep { margin: 0 var(--ref-spacing-04); color: var(--sys-color-neutral-400); font-weight: 400; }
-.ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
-.ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
-.ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 제목 옆 ⋮: 홈 프로젝트 카드 ⋮ 처럼 흰 바탕 + 1px 테두리, 제목 옆이라 작게 24 · 모서리 8(squircle 이 보이게), 늘 보여요 */
-.more { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--ref-radius-04); color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
-.more:hover { --sq-line: var(--ref-color-gray-900-20); color: var(--sys-color-neutral-800); }
-.more:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
 .lnk { font-size: 12px; font-weight: 500; color: var(--sys-color-brand-primary-default); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; border-radius: var(--ref-radius-02); }
 .lnk:hover { color: var(--sys-color-brand-primary-dark, #1F63BD); }
