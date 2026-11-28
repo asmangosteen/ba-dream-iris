@@ -3,6 +3,7 @@ import { Button, TextInput } from '@ba-dream/design-system'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
 import AppConfirm from '~/components/app/AppConfirm.vue'
 import type { SlotRow } from '~/composables/useIrisData'
+import { figmaToLayers, figmaImageRefs, type FigmaFullNode } from '~/canvas/figmaImport'
 // Nuxt 내장 useDevPreview 와 이름이 겹쳐 자동 import 가 내장 쪽으로 잡히므로 직접 가져와요
 import { useDevPreview } from '~/composables/usePreview'
 
@@ -180,11 +181,38 @@ let ticker: ReturnType<typeof setInterval> | undefined
 const waitLeft = computed(() => Math.max(0, Math.ceil((run.waitUntil - now.value) / 1000)))
 const runRows = computed(() => rows.value.filter((r) => run.status[r.id]))
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
-const result = reactive({ added: 0, states: 0, again: 0, failed: 0, links: 0, idChanged: [] as { screenId: string; from: string; to: SlotRow; name: string }[] })
+const result = reactive({ added: 0, states: 0, again: 0, failed: 0, links: 0, skipped: 0, idChanged: [] as { screenId: string; from: string; to: SlotRow; name: string }[] })
 
 async function fetchFrames(fileKey: string, ids: string[]): Promise<{ frames: FrameOut[]; missing: string[] }> {
   if (preview) { await sleep(500); return { frames: ids.map((id) => { const r = rows.value.find((x) => x.id === id)!; return { id, name: r.name, width: r.width, height: r.height, thumbnailUrl: null, components: PREVIEW_COMPONENTS } }), missing: [] } }
   return $fetch<{ frames: FrameOut[]; missing: string[] }>('/api/figma/frames' as string, { method: 'POST', body: { fileKey, ids } })
+}
+
+/** 피그마 호출: 호출 한도(429)면 Retry-After 만큼 기다렸다 다시 — 기다리는 동안 그 줄은 '기다림' */
+async function withRetry<T>(fn: () => Promise<T>, ids: string[]): Promise<T | null> {
+  while (!run.stopped) {
+    try { return await fn() } catch (e) {
+      const { code, retryAfter } = errOf(e)
+      if (code !== 'rate_limited') throw e
+      run.waitUntil = Date.now() + retryAfter * 1000
+      for (const id of ids) run.status[id] = 'waiting'
+      while (Date.now() < run.waitUntil && !run.stopped) await sleep(500)
+      for (const id of ids) if (run.status[id] === 'waiting') run.status[id] = 'queued'
+    }
+  }
+  return null
+}
+/** 편집 가능한 레이어: 프레임 노드 전체 → Iris 레이어(이미지 칠은 Iris 저장소로 옮겨서) */
+async function fetchLayers(fileKey: string, id: string): Promise<{ doc: ReturnType<typeof figmaToLayers>['doc']; skipped: number } | null> {
+  const r = await withRetry(() => $fetch<{ document: FigmaFullNode; images: Record<string, string> }>('/api/figma/layers' as string, { method: 'POST', body: { fileKey, id } }), [id])
+  if (!r) return null
+  const kept: Record<string, string> = {}
+  for (const ref of figmaImageRefs(r.document)) {
+    const url = r.images[ref]
+    if (url) kept[ref] = await keepFigmaThumb(url, fileKey, ref)
+  }
+  const out = figmaToLayers(r.document, (ref) => kept[ref])
+  return { doc: out.doc, skipped: out.skipped }
 }
 
 async function startImport() {
@@ -193,7 +221,7 @@ async function startImport() {
   if (!sc || !list.length) return
   step.value = 'run'
   Object.assign(run, { total: list.length, done: 0, waitUntil: 0, stopped: false, status: Object.fromEntries(list.map((r) => [r.id, 'queued' as RunStatus])) })
-  Object.assign(result, { added: 0, states: 0, again: 0, failed: 0, links: 0, idChanged: [] })
+  Object.assign(result, { added: 0, states: 0, again: 0, failed: 0, links: 0, skipped: 0, idChanged: [] })
   ticker = setInterval(() => { now.value = Date.now() }, 500)
   // 캔버스 자리: 피그마에 놓인 배치 그대로, 지금 페이지 오른쪽 끝(nextX)부터
   const fresh = list.filter((r) => !r.existing)
@@ -259,10 +287,14 @@ async function saveFrame(fileKey: string, r: Row, f: FrameOut, catalog: Awaited<
     return
   }
   const thumb = f.thumbnailUrl ? await keepFigmaThumb(f.thumbnailUrl, fileKey, f.id) : null
+  // 편집 가능한 레이어로: Iris 화면(native) + 레이어, 피그마 연결(파일 · 노드)은 남겨 다시 불러오기에 써요
+  const lay = importAs.value === 'layers' ? await fetchLayers(fileKey, f.id) : null
+  if (lay) result.skipped += lay.skipped
+  const layerFields = lay ? { source: 'native' as const, layers: lay.doc } : {}
   const figmaUrl = `https://www.figma.com/design/${fileKey}/?node-id=${f.id.replace(/:/g, '-')}`
   let screenId: string
   if (r.existing) {
-    const { error: e } = await supabase.from('screens').update({ name: f.name, width: f.width, height: f.height, ...(thumb ? { thumbnail_path: thumb } : {}), figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString() }).eq('id', r.existing.id)
+    const { error: e } = await supabase.from('screens').update({ name: f.name, width: f.width, height: f.height, ...layerFields, ...(thumb ? { thumbnail_path: thumb } : {}), figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString() }).eq('id', r.existing.id)
     if (e) throw e
     screenId = r.existing.id
     result.again++
@@ -273,7 +305,7 @@ async function saveFrame(fileKey: string, r: Row, f: FrameOut, catalog: Awaited<
     return
   }
   const { data, error: e1 } = await supabase.from('screens').insert({
-    page_id: props.pageId, source: 'figma', name: f.name, x: at.x, y: at.y, width: f.width, height: f.height,
+    page_id: props.pageId, source: 'figma', ...layerFields, name: f.name, x: at.x, y: at.y, width: f.width, height: f.height,
     figma_file_key: fileKey, figma_node_id: f.id, figma_url: figmaUrl, thumbnail_path: thumb,
     figma_layer_summary: { components: f.components }, figma_synced_at: new Date().toISOString(),
   }).select('id').single()
@@ -483,8 +515,8 @@ async function previewScan(raw: string): Promise<ScanResult> {
             </div>
           </template>
 
-          <!-- 편집 가능한 레이어: 고를 수 있지만 레이어로 바꾸는 기능은 다음 작업 — 지금은 그림으로 들어온다고 분명히 알려요 -->
-          <p v-if="importAs === 'layers' && (step === 'list' || step === 'frame')" class="sq fi-note"><EditorIcon name="info" :size="16" class="fi-note-ic" /><span>{{ tr('Turning frames into editable layers is still being built. For now they come in as thumbnails, and you can convert them once it’s ready') }}</span></p>
+          <!-- 편집 가능한 레이어: 무엇이 어떻게 바뀌는지 미리 알려요 -->
+          <p v-if="importAs === 'layers' && (step === 'list' || step === 'frame')" class="sq fi-note"><EditorIcon name="info" :size="16" class="fi-note-ic" /><span>{{ tr('Frames come in as Iris layers you can edit — text uses the Iris font and instances are detached. Takes longer and uses more Figma requests') }}</span></p>
 
           <!-- 4 가져오는 중 -->
           <template v-if="step === 'run'">
