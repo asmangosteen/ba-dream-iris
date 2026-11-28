@@ -2059,7 +2059,7 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
       <button type="button" class="sq fb-stop ok" @click="acceptSpot">{{ tr('Follow') }}</button>
       <button type="button" class="sq fb-x" :aria-label="tr('Dismiss')" @click="spotPrompt = null"><EditorIcon name="close" :size="12" /></button>
     </div>
-    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" />
+    <CanvasPresence :vp="vp" :cursors="room.liveCursors.value" :peers="room.peers.value" :page-id="pageId" :screens="list" :self-id="room.myId.value" :selected="store.screenId.value ? [store.screenId.value, ...multiScreens] : multiScreens" />
     <div v-if="screens.status.value === 'success' && !list.length" class="sq float s canvas-empty">
       <span class="tx-head">{{ tr('This page is empty') }}</span>
       <span class="tx-meta ce-sub">{{ tr('Draw a frame with the Frame tool (F) or import one from Figma') }}</span>

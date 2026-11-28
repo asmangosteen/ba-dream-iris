@@ -17,6 +17,7 @@ export interface Peer {
   screenId: string | null
   /** editing = 화면을 고친 지 30초 안 · viewing · away = 다른 탭으로 감 */
   doing: 'editing' | 'viewing' | 'away'
+  /** 마지막으로 소식을 보낸 시각 — 20초마다 다시 보내요(오래 조용하면 연결이 끊긴 것으로 봐요) */
   since: number
   /** Spotlight me(피그마와 같아요): 켠 시각 — 0 이면 꺼짐. 다른 사람에게 '따라갈까요?' 안내가 떠요 */
   spot?: number
@@ -66,15 +67,35 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     if (!ch) return
     const st = ch.presenceState<Omit<Peer, 'key' | 'color'>>()
     const list: Peer[] = []
+    const t = Date.now()
     for (const [key, metas] of Object.entries(st)) {
       const m = metas[metas.length - 1]
       if (!m || key === myKey()) continue
+      // 받은 시각(내 시계)으로 재요 — 보낸 사람 컴퓨터 시계가 달라도 엉뚱하게 흐려지지 않게
+      const o = heard.get(key)
+      if (!o || o.since !== m.since) heard.set(key, { since: m.since, at: t })
       list.push({ ...m, key, color: peerColor(m.id) } as Peer)
     }
+    for (const k of heard.keys()) if (!list.some((p) => p.key === k)) heard.delete(k)
     peers.value = list
+    markStale()
     for (const k of Object.keys(cursors)) if (!list.some((p) => p.key === k)) delete cursors[k]
   }
   const track = () => { if (ch && ready) ch.track(meta()) }
+  /**
+   * 연결이 끊긴 사람(앱 · 브라우저를 그냥 끄거나 노트북을 덮은 경우 등 — 나간다는 소식을 못 보낸 채): 50초 넘게 소식이 없으면 흐리게(자리 비움),
+   * 2분 반이 넘으면 목록에서 빼요(사용자 제보 2026-11-29). 탭을 닫거나 다른 화면으로 나가면 그 자리에서 바로 빠져요(pagehide · 화면 닫힘)
+   */
+  const STALE = 50_000, GONE = 150_000
+  /** 사람(탭)마다 마지막으로 소식을 받은 시각(내 시계) */
+  const heard = new Map<string, { since: number; at: number }>()
+  function markStale() {
+    if (preview) return
+    const t = Date.now()
+    const quiet = (p: Peer) => t - (heard.get(p.key)?.at ?? t)
+    if (peers.value.some((p) => quiet(p) > GONE)) peers.value = peers.value.filter((p) => quiet(p) <= GONE)
+    for (const p of peers.value) if (p.doing !== 'away' && quiet(p) > STALE) p.doing = 'away'
+  }
 
   // 커서 · 보는 자리 보내기: 50ms 에 한 번(마지막 값)
   let pending: PeerCursor | null = null
@@ -136,8 +157,8 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     }, 60)
   }
 
-  onMounted(() => {
-    if (preview) { startDemo(); return }
+  function connect() {
+    if (ch) return
     ch = supabase.channel(`iris-project-${projectId}`, { config: { presence: { key: myKey() }, broadcast: { self: false } } })
     ch.on('presence', { event: 'sync' }, readPresence)
     ch.on('broadcast', { event: 'cur' }, ({ payload }) => {
@@ -151,7 +172,22 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
       else if (chats[p.key]) chats[p.key]!.at = Math.min(chats[p.key]!.at, Date.now() - CHAT_LINGER) // 닫으면 바로 스르륵
     })
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') { ready = true; track() } })
+  }
+  onMounted(() => {
+    if (preview) { startDemo(); return }
+    connect()
+    // 살아 있다는 소식: 20초마다 다시 보내고, 받은 쪽은 5초마다 조용한 사람을 살펴요
+    beat = setInterval(() => { track(); markStale() }, 20_000)
+    staleT = setInterval(markStale, 5_000)
+    window.addEventListener('pagehide', onLeave)
+    window.addEventListener('pageshow', onBack)
   })
+  let beat: ReturnType<typeof setInterval> | undefined
+  let staleT: ReturnType<typeof setInterval> | undefined
+  /** 탭 · 창을 닫거나 다른 사이트로 갈 때: 나간다는 소식을 바로 보내요(연결이 끊길 때까지 기다리지 않게) */
+  function onLeave() { if (!ch) return; ch.untrack(); supabase.removeChannel(ch); ch = null; ready = false }
+  /** 뒤로 가기로 이 화면에 돌아오면(브라우저가 화면을 그대로 보관했던 경우) 다시 들어가요 */
+  function onBack(e: PageTransitionEvent) { if (e.persisted) connect() }
   watch([opts.pageId, opts.screenId, () => me.value?.id, spot, () => opts.following?.value], track)
   // 고치는 중 → 30초 뒤 보는 중으로
   let editT: ReturnType<typeof setTimeout> | null = null
@@ -164,7 +200,10 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
     if (timer) clearTimeout(timer)
     if (chatTimer) clearTimeout(chatTimer)
     if (editT) clearTimeout(editT)
-    if (ch) { supabase.removeChannel(ch); ch = null }
+    window.removeEventListener('pagehide', onLeave)
+    window.removeEventListener('pageshow', onBack)
+    clearInterval(beat); clearInterval(staleT)
+    if (ch) { ch.untrack(); supabase.removeChannel(ch); ch = null }
   })
 
   /** 같은 페이지 · 10초 안에 움직인 커서만 */
@@ -189,5 +228,7 @@ export function useRoom(projectId: string, opts: { pageId: Ref<string | null>; s
   const myColor = computed(() => peerColor(me.value?.id ?? 'preview-me'))
   /** 나를 따라오는 사람(Spotlight 중에 보여 줘요) */
   const followers = computed(() => people.value.filter((p) => p.follows === myKey()))
-  return { peers, people, cursors, liveCursors, sendCursor, sendChat, spot, myColor, followers, myKey }
+  /** 내 사람 id — 같은 사람의 다른 탭도 '나'로 보고 빼요(캔버스 '보는 중' 표시) */
+  const myId = computed(() => me.value?.id ?? '')
+  return { peers, people, cursors, liveCursors, sendCursor, sendChat, spot, myColor, followers, myKey, myId }
 }

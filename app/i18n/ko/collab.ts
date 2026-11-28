@@ -3,6 +3,8 @@ export default {
   // 함께 보는 중(CanvasPresence · PresenceStack)
   '{name} is editing': '{name} 님이 고치는 중',
   '{name} is viewing': '{name} 님이 보는 중',
+  '{a}, {b} are viewing': '{a}, {b} 님이 보는 중',
+  '{a}, {b} and {n} others are viewing': '{a}, {b} 님 외 {n}명이 보는 중',
   'Away': '자리 비움',
   'Editing {name}': '{name} 고치는 중',
   'Viewing {name}': '{name} 보는 중',
