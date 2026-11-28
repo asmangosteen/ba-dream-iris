@@ -3,7 +3,7 @@ import { Skeleton } from '@ba-dream/design-system'
 import type { DocCategory, DocRow } from '~/composables/useIrisData'
 import { DOC_CATEGORY_LABEL, DOC_SOURCE_TIP, docIcon } from '~/composables/useIrisData'
 import EditorIcon from '~/components/editor/EditorIcon.vue'
-import MemberAvatar from '~/components/app/MemberAvatar.vue'
+import ProjectModal from '~/components/project/ProjectModal.vue'
 import AccessGate from '~/components/project/AccessGate.vue'
 import AddDocModal from '~/components/docs/AddDocModal.vue'
 import RequestsBoard from '~/components/project/RequestsBoard.vue'
@@ -23,7 +23,6 @@ const { data: projects } = useProjects()
 const project = computed(() => projects.value?.find((p) => p.id === projectId) ?? null)
 useHead({ title: () => (project.value?.name ? `${project.value.name} · Iris` : 'Iris') })
 const access = useProjectAccess(projectId)
-const people = computed(() => access.members.value.slice(0, 5))
 
 /** 개요 · 요청사항(주소 ?view=requests — 뒤로 가기 · 새로 고침에도 그대로) */
 const view = computed<'overview' | 'requests'>(() => (route.query.view === 'requests' ? 'requests' : 'overview'))
@@ -90,6 +89,7 @@ function docSub(d: DocRow) {
 const warnCount = (d: DocRow) => d.check_result?.warnings?.length ?? 0
 
 const addOpen = ref(false)
+const settingsOpen = ref(false)
 function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${projectId}/read/${id}`) }
 </script>
 
@@ -100,11 +100,10 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
       <div class="ttl-col">
         <div class="ttl-row">
           <h1 class="ttl">{{ project?.name ?? '' }}<template v-if="view === 'requests'"><span class="crumb-sep" aria-hidden="true">/</span>{{ tr('Requests') }}</template></h1>
+          <!-- 프로젝트 설정(홈 프로젝트 카드 ⋮ 와 같은 버튼 · 같은 창) -->
+          <button v-if="project" type="button" class="sq more" :aria-label="tr('{name} settings', { name: project.name })" :data-tip="tr('{name} settings', { name: project.name })" @click="settingsOpen = true"><EditorIcon name="menu_kebab" :size="16" /></button>
         </div>
         <span v-if="project" class="tx-meta">{{ tr('Edited {when}', { when: relativeTime(project.updated_at) }) }}<template v-if="access.members.value.length"> · {{ access.members.value.length === 1 ? tr('1 person') : tr('{n} people', { n: access.members.value.length }) }}</template></span>
-      </div>
-      <div v-if="people.length" class="people" :aria-label="tr('Members')">
-        <MemberAvatar v-for="m in people" :key="m.member_id" :name="m.member?.name || m.member?.email || '?'" :src="m.member?.avatar_url ?? null" :size="24" class="pav" />
       </div>
     </header>
 
@@ -173,6 +172,7 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
     </div>
 
     <AddDocModal v-model:open="addOpen" :project-id="projectId" @created="onDocCreated" />
+    <ProjectModal v-if="settingsOpen" v-model:open="settingsOpen" :project-id="projectId" />
     <AccessGate :project-id="projectId" :project-name="project?.name" />
   </div>
 </template>
@@ -190,9 +190,10 @@ function onDocCreated(id: string) { docs.refresh(); navigateTo(`/project/${proje
 .ttl-col { display: flex; flex-direction: column; gap: var(--ref-spacing-02); min-width: 0; }
 .ttl-row { display: flex; align-items: center; gap: var(--ref-spacing-06); min-width: 0; }
 .ttl { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.people { display: flex; flex: none; margin-left: var(--ref-spacing-04); }
-.pav + .pav { margin-left: -6px; }
-.pav { box-shadow: 0 0 0 2px var(--iris-canvas); border-radius: 50%; }
+/* 제목 옆 ⋮: 홈 프로젝트 카드 ⋮ 와 같은 모양(흰 바탕 + 1px 테두리, 28 · 모서리 6), 늘 보여요 */
+.more { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--ref-radius-03); color: var(--sys-color-neutral-600); --sq-fill: var(--sys-color-common-white-emphasis); --sq-line: var(--iris-line-strong); --sq-line-w: 1px; }
+.more:hover { --sq-line: var(--ref-color-gray-900-20); color: var(--sys-color-neutral-800); }
+.more:focus-visible { outline: 2px solid var(--sys-color-brand-primary-default); outline-offset: 1px; }
 .f1 { flex: 1; }
 .lnk { font-size: 12px; font-weight: 500; color: var(--sys-color-brand-primary-default); text-decoration: none; background: none; border: 0; padding: 0; cursor: pointer; border-radius: var(--ref-radius-02); }
 .lnk:hover { color: var(--sys-color-brand-primary-dark, #1F63BD); }
