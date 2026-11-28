@@ -52,7 +52,9 @@ const props = withDefaults(defineProps<{
   noteMark?: { block?: string | null; row?: number | null; quote?: string | null } | null
   /** 직접 만든 정책(문서 표 밖)에 지우기 버튼 보이기 */
   removable?: boolean
-}>(), { highlight: null, compact: false, linked: null, removable: false, noteMark: null })
+  /** 글을 골라도 막대(메모 남기기)를 띄우지 않기 — 메모 칸이 없는 '문서에서 보기' 화면 */
+  noTool?: boolean
+}>(), { highlight: null, compact: false, linked: null, removable: false, noteMark: null, noTool: false })
 
 const emit = defineEmits<{
   'pick-req': [reqId: string]
@@ -283,7 +285,7 @@ function onSelectEnd() {
   const sel = window.getSelection()
   const el = article.value
   // 편집기 패널(compact)은 메모 칸이 없어서 고른 글 막대를 띄우지 않아요
-  if (props.compact || !sel || sel.isCollapsed || !sel.rangeCount || !el) return hideTool()
+  if (props.compact || props.noTool || !sel || sel.isCollapsed || !sel.rangeCount || !el) return hideTool()
   const range = sel.getRangeAt(0)
   if (!el.contains(range.commonAncestorContainer)) return hideTool()
   const picked = sel.toString().replace(/\s+/g, ' ').trim()

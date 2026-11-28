@@ -303,6 +303,19 @@ export function useDocuments(projectId: string) {
   }, { deep: true })
 }
 
+/** 내가 볼 수 있는 모든 프로젝트의 문서(홈 '문서' 메뉴 — 프로젝트별 목록, 2026-11-28). 본문은 빼고 목록에 필요한 칸만 */
+export type DocListRow = Pick<DocRow, 'id' | 'project_id' | 'title' | 'category' | 'source_type' | 'version_label' | 'updated_at' | 'abbr' | 'status' | 'check_result'>
+export function useAllDocuments() {
+  const supabase = useSupabaseClient()
+  const preview = useDevPreview()
+  return useAsyncData('all-docs', async () => {
+    if (preview) return previewStore().docs.value.map((d) => ({ id: d.id, project_id: 'preview-1', title: d.title, category: d.category, source_type: d.source_type, version_label: d.version_label, updated_at: d.updated_at, abbr: d.abbr, status: d.status, check_result: d.check_result })) as DocListRow[]
+    const { data, error } = await supabase.from('documents').select('id, project_id, title, category, source_type, version_label, updated_at, abbr, status, check_result').order('updated_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as unknown as DocListRow[]
+  }, { deep: true })
+}
+
 /** 프로젝트의 요구사항 + 화면 연결 전체 (작은 팀 규모라 한 번에 읽습니다) */
 export function useRequirements(projectId: string) {
   const supabase = useSupabaseClient()

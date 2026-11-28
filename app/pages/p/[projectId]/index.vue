@@ -1453,14 +1453,16 @@ async function onDocCreated(id: string) {
   showDoc(id)
 }
 
-// 주소로 들어온 경우: ?doc=&req= (요구사항 보드의 '원문'), ?screen= (화면 바로 열기), ?asset= (에셋 상세)
+// 주소로 들어온 경우: ?page= (첫 화면 페이지 썸네일), ?doc=&req=, ?screen= (화면 바로 열기), ?asset= (에셋 상세)
 onMounted(async () => {
   const q = route.query
+  // ?page=<페이지 id>: 프로젝트 첫 화면에서 페이지 썸네일을 누르면 그 페이지로(2026-11-28)
+  if (typeof q.page === 'string' && q.page !== pageId.value) pageId.value = q.page
   if (typeof q.doc === 'string') { left.value = 'docs'; showDoc(q.doc, typeof q.req === 'string' ? q.req : null) }
   if (typeof q.screen === 'string') { await until(() => !!allScreens.data.value); pickScreen(q.screen, true) }
   // ?asset=<컴포넌트 id>: ⌘K 에서 컴포넌트를 고르면 에셋 탭의 그 컴포넌트 상세로(디자인 시스템 화면 대신)
   if (typeof q.asset === 'string') { left.value = 'assets'; asset.value = q.asset; expandPanels() }
-  if (q.doc || q.screen || q.asset) router.replace({ query: {} })
+  if (q.doc || q.screen || q.asset || q.page) router.replace({ query: {} })
 })
 
 // ---------------------------------------------------------------------------
@@ -2070,7 +2072,8 @@ const STATUS_BADGE: Record<ScreenRow['status'], string> = { draft: 'In progress'
           <div v-if="projMenu" class="sq menu pmenu" role="menu" @click="projMenu = false">
             <NuxtLink to="/" class="sq menu-item" role="menuitem">{{ tr('Back to files') }}</NuxtLink>
             <button class="sq menu-item" role="menuitem" @click="settingsOpen = true">{{ tr('Project settings') }}</button>
-            <NuxtLink to="/requirements" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
+            <NuxtLink :to="`/p/${projectId}/overview`" class="sq menu-item" role="menuitem">{{ tr('Project overview') }}</NuxtLink>
+            <NuxtLink :to="`/p/${projectId}/overview?view=requests`" class="sq menu-item" role="menuitem">{{ tr('Requests board') }}</NuxtLink>
             <button class="sq menu-item ks-mi" role="menuitem" @click="shortcutsOpen = true"><span>{{ tr('Keyboard shortcuts') }}</span><span class="mi-key">⌃⇧?</span></button>
             <div class="msep" role="separator" />
             <ThemeSwitch compact />

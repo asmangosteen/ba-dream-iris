@@ -2,7 +2,7 @@ import { forgetEditorCache } from '~/composables/useEditor'
 /**
  * 위 탭 막대(피그마 데스크탑처럼): 맨 앞은 늘 홈 탭(프로젝트 목록 · 요구사항 · 디자인 시스템), 뒤로 연 프로젝트가 탭으로 쌓여요.
  * - 프로젝트를 열면(/p/<id>…) 그 프로젝트 탭이 생기고(이미 있으면 그 탭으로), 탭마다 마지막으로 보던 주소(문서 화면 등)를 기억해요
- * - 홈 탭도 마지막으로 보던 홈 화면('/' · '/requirements')을 기억해요
+ * - 홈 탭도 마지막으로 보던 홈 화면('/' · '/documents')을 기억해요
  * - 열린 탭 목록은 이 기기(localStorage 'iris-tabs')에 남아 새로 고쳐도 그대로예요
  * - 새 탭(New file, /new): + 로 여는 탭 하나(id 'new'). 이미 열려 있으면 그 탭으로 가요.
  *   거기서 프로젝트를 열거나 만들면 adopt() 로 그 자리(같은 순서)의 탭이 그 프로젝트 탭으로 바뀌어요
@@ -34,7 +34,7 @@ const KEY = 'iris-tabs'
 /** 고정은 5개까지, 탭은 20개까지(넘으면 고정하지 않은 가장 왼쪽 탭부터 닫아요) */
 export const MAX_PINNED = 5
 export const MAX_TABS = 20
-const HOME_PATHS = ['/', '/requirements']
+const HOME_PATHS = ['/', '/documents']
 /** 새 탭(New file) — 탭 id 와 주소 */
 export const NEW_TAB_ID = 'new'
 export const NEW_TAB_PATH = '/new'

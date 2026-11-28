@@ -18,7 +18,8 @@ const displayName = computed(() => me.value?.name || email.value)
 // 사이드바 메뉴(라벨은 영어 원문 — 그릴 때 tr 로 바꿔요)
 const nav = [
   { to: '/', label: 'Projects', icon: 'folder' },
-  { to: '/requirements', label: 'Requests', icon: 'document' },
+  // 예전 '요청사항(정책) 보드' 자리 → 올린 문서를 프로젝트별로(2026-11-28). 요청사항 보드는 프로젝트 첫 화면의 요청사항 탭으로
+  { to: '/documents', label: 'Documents', icon: 'document' },
 ]
 const isOn = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 
