@@ -229,9 +229,8 @@ async function startImport() {
   Object.assign(run, { total: list.length, done: 0, waitUntil: 0, stopped: false, status: Object.fromEntries(list.map((r) => [r.id, 'queued' as RunStatus])) })
   Object.assign(result, { added: 0, states: 0, again: 0, failed: 0, links: 0, skipped: 0, idChanged: [] })
   ticker = setInterval(() => { now.value = Date.now() }, 500)
-  // 캔버스 자리: 피그마에 놓인 배치 그대로, 지금 페이지 오른쪽 끝(nextX)부터
-  const fresh = list.filter((r) => !r.existing)
-  const minX = Math.min(...fresh.map((r) => r.x), 0), minY = Math.min(...fresh.map((r) => r.y), 0)
+  // 캔버스 자리: 함께 보기 'ID 순서 보기'와 같은 규칙(사용자 결정 2026-11-29) — 지금 페이지 오른쪽 끝(nextX)부터
+  const at = idOrderLayout(list.filter((r) => !r.existing), props.nextX)
   const catalog = await loadCatalog()
   for (let i = 0; i < list.length && !run.stopped; i += CHUNK) {
     const chunk = list.slice(i, i + CHUNK)
@@ -253,7 +252,7 @@ async function startImport() {
     for (const f of got.frames) {
       const r = chunk.find((x) => x.id === f.id)!
       try {
-        await saveFrame(sc.fileKey, r, f, catalog, { x: Math.round(props.nextX + r.x - minX), y: Math.round(r.y - minY) })
+        await saveFrame(sc.fileKey, r, f, catalog, at.get(r.id) ?? { x: Math.round(props.nextX), y: 0 })
         run.status[r.id] = 'done'
       } catch {
         run.status[r.id] = 'failed'
@@ -271,6 +270,33 @@ async function startImport() {
   nextIdChange()
 }
 function stopImport() { run.stopped = true }
+
+/**
+ * ID 순서 배치(함께 보기 'ID 순서 보기'와 같은 규칙 · 같은 간격): 종류(C · A · S · N · CMP · 그 밖)마다 한 줄,
+ * 줄 안은 화면 번호 순 → 같은 번호면 기본 화면 먼저 · 상태 변형 뒤 → 피그마 순서(위 → 아래, 왼 → 오른쪽). 화면 사이 120, 줄 사이 600
+ */
+const KIND_ORDER = ['C', 'A', 'S', 'N', 'CMP', 'etc'] as const
+function idOrderLayout(list: Row[], x0: number): Map<string, { x: number; y: number }> {
+  const keyOf = (r: Row) => {
+    const code = r.slot?.code ?? slotFromName(r.name)?.code ?? null
+    const m = code?.match(/^([A-Z]+)-(\d+)/)
+    const kind = (m && (KIND_ORDER as readonly string[]).includes(m[1]!) ? m[1]! : 'etc') as (typeof KIND_ORDER)[number]
+    return { kind, num: m ? Number(m[2]) : Number.MAX_SAFE_INTEGER, variant: r.state ? 1 : 0 }
+  }
+  const rows = new Map<string, { r: Row; k: ReturnType<typeof keyOf> }[]>()
+  for (const r of list) { const k = keyOf(r); const g = rows.get(k.kind) ?? []; g.push({ r, k }); rows.set(k.kind, g) }
+  const out = new Map<string, { x: number; y: number }>()
+  let y = 0
+  for (const kind of KIND_ORDER) {
+    const g = rows.get(kind)
+    if (!g?.length) continue
+    g.sort((a, b) => a.k.num - b.k.num || a.k.variant - b.k.variant || a.r.y - b.r.y || a.r.x - b.r.x)
+    let x = x0, rowH = 0
+    for (const { r } of g) { out.set(r.id, { x: Math.round(x), y: Math.round(y) }); x += r.width + 120; rowH = Math.max(rowH, r.height) }
+    y += rowH + 600
+  }
+  return out
+}
 
 async function loadCatalog() {
   if (preview) return [] as { id: string; name: string; code_name: string | null; match_aliases: string[] | null; figma_component_key: string | null }[]
